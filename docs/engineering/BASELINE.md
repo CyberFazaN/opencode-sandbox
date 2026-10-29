@@ -59,10 +59,11 @@ image `ubuntu:24.04` for the custom-image rows. Variables: `CONTRIBUTING.md`.
 
 ## Verification
 
-Pre-release verification of 6.0.0 (2026-10-28), on the tree of the initial public commit (apart
-from this file and `CAMPAIGN.md`, which record the results, a release-checklist paragraph in
-`RELEASING.md` and one pattern of the documentation check in `tests/test_user_docs.py`, changed
-afterwards; the unit suite and the scans were repeated on the final tree). Platform: Arch Linux, kernel 7.2.11,
+Release verification of 6.0.0 (2026-10-29) on the tree of the initial public commit; the release
+commit changes only this file, `CAMPAIGN.md` and the CHANGELOG date. The privileged rows ran on
+2026-10-28 on an earlier tree, which differed in the hosted-CI test fixes, the host-scope
+documents (D-046), a comment in `install.sh`, one help text in `setup-rootless.sh` and the text of
+two host hints. Platform: Arch Linux, kernel 7.2.11,
 Python 3.14.8, Git 2.56.0, Docker 29.9.2 rootless (slirp4netns), Typer 0.27.3, Textual 8.2.8,
 pyte 0.8.2, pipx 1.18.7, OpenCode 2.2.0 in both base images (2.1.4 for the update rows).
 
@@ -70,7 +71,8 @@ pyte 0.8.2, pipx 1.18.7, OpenCode 2.2.0 in both base images (2.1.4 for the updat
 |---|---|
 | Static | `ruff check src tests .github/scripts` 0 findings; shellcheck on `install.sh`, `setup-rootless.sh`, `pacman-retry`, `install-opencode.sh`, `.github/scripts/pipx_smoke.sh` 0; `actionlint` (with shellcheck on the `run:` scripts) 0; `zizmor --offline` 0, also `--pedantic` (two documented ignores) |
 | Unit, host, Textual pilot | 791 passed, 49 skipped with `pyte` installed, 37 without it (the terminal modules then skip as a whole); every skipped test is a real-campaign test |
-| Real campaign: every module, both distributions, the privileged rows (`OCS_TEST_PRIVILEGED=1`) and the pipx rows with the image build from the installed package (`OCS_TEST_PIPX_BUILD=1`) | 49 tests passed, 495 checks passed, 0 failed (8 min 39 s); nothing left with the run's data-directory label; tagged images, the firewall ruleset and the network interfaces unchanged; the build cache pruned back to its size before the run |
+| Real campaign: every module, both distributions, and the pipx rows with the image build from the installed package (`OCS_TEST_PIPX_BUILD=1`) | 44 tests passed, 451 checks passed, 0 failed (9 min 26 s); the 5 privileged tests skipped (not requested for this run); nothing left with the run's data-directory label; tagged images and the network interfaces unchanged; the build cache pruned back to its size before the run |
+| Privileged rows (`OCS_TEST_PRIVILEGED=1`), on the earlier tree described above | the full campaign including them: 49 tests, 495 checks passed, 0 failed (8 min 39 s); the firewall ruleset unchanged |
 | Real campaign through a pipx installation of a local test tag (`OCS_TEST_MANAGER`) | `test_10_lifecycle`, `test_35_prerequisites`, `test_40_opencode` (first prompt and Agent Context, both distributions), `test_50_tui`: 7 tests, 193 checks passed, 0 failed |
 | Hosted CI on GitHub (`ci.yml`, first runs before publication) | Ubuntu 26.04 runner, Python 3.14.9: unit suite with the current and with the lowest direct dependencies 790 passed, 38 skipped each; the Arch Linux job (`archlinux:base-devel` container, unprivileged user, umask 022) 789 passed, 39 skipped; skip reasons listed (`-rs`): real-campaign modules, the root-refusal test where the runner blocks unprivileged user namespaces, and `/run/user` missing in the container; package build and content check; pipx installation from the checkout with `pipx_smoke.sh`: `doctor` exit 8 for a missing context and exit 4 (`mismatch`) for the runner's rootful daemon; actionlint and zizmor 0. The first run found two environment dependencies in tests (Typer's forced colour terminal under `GITHUB_ACTIONS`, the runner's 2 CPUs), fixed in the tests |
 | CI rehearsal (before the first hosted run) | the same jobs run locally in fresh venvs and an `archlinux:base-devel` container; `release_check.py` refuses the undated section and passes a dated one; `build_image.py debian` built and verified the image against the rootless daemon |

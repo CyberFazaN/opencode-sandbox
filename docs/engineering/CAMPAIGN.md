@@ -145,7 +145,7 @@ to); files under `tests/` are the unit, host and Textual pilot suite.
 | I01 | P0 | Fault injection | `test_30_faults.py`, `test_70_privileged.py`; see D05, D06, D09, E02, G03 | PASS (real) |
 | I02 | P1 | No leaks | The campaign's session end (`conftest.py`, `campaign.py`): the run's environments deleted, the product's `disk cleanup --yes` behind a guard, nothing left with the run's data-directory label, tagged images unchanged, no session processes; `test_70_privileged.py` (firewall ruleset and interfaces unchanged) | PASS (real) |
 | I03 | P1 | Performance baseline | Median durations per command from the campaign log (every command is logged with its duration); small test workspaces; no targets defined | PASS (real; durations recorded in the run log, no targets) |
-| I04 | P0 | Full regression at the release revision | The whole real campaign: `OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 OCS_TEST_PIPX_BUILD=1 pytest tests/integration`, both distributions, on the tree of the initial public commit (49 tests, 495 checks); plus `test_10`, `test_35`, `test_40`, `test_50` through a pipx installation of a test tag (193 checks); 0 failed (`BASELINE.md`, "Verification") | PASS (real) |
+| I04 | P0 | Full regression at the release revision | The whole real campaign: `OCS_TEST_DOCKER=1 OCS_TEST_PIPX_BUILD=1 pytest tests/integration`, both distributions, on the tree of the initial public commit (44 tests, 451 checks); the privileged rows (`OCS_TEST_PRIVILEGED=1`) on the earlier tree described in `BASELINE.md` (49 tests, 495 checks); plus `test_10`, `test_35`, `test_40`, `test_50` through a pipx installation of a test tag (193 checks); 0 failed (`BASELINE.md`, "Verification") | PASS (real) |
 | I05 | P0 | Documentation matches the code: every command and option named in the product, `README.md` and `docs/` exists; relative links and anchors resolve; code blocks fit 80 columns; the install commands name the release tag; active documents are English; new instructions in the guides were measured | `tests/test_cli_structure.py`, `tests/test_user_docs.py`, `tests/test_language.py`, `tests/test_disclosure.py`; review of `README.md`, `CHANGELOG.md` and the guides against the code and `--help` | PASS (review, unit) |
 | I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | PASS (review): every P0 and P1 row PASS; 6.0.0 is recommended for release as Beta on Arch Linux |
 
@@ -182,8 +182,9 @@ to); files under `tests/` are the unit, host and Textual pilot suite.
 | All | 90 | 89 | 1 | 0 | 0 | 0 |
 
 - PASS in part: D09 (the host reboot is BLOCKED with accepted risk and a next step).
-- I04 and I06 were re-established on the tree of the initial public commit; a later release
-  repeats them on its own revision (`RELEASING.md`).
+- I04 and I06 were re-established for 6.0.0 on the tree of the initial public commit (the
+  privileged rows on the earlier tree named in `BASELINE.md`); a later release repeats them on
+  its own revision (`RELEASING.md`).
 - PASS rows that rest on review, unit, host or pilot evidence by design: A02, A05, I05, I06
   (review), A03 (unit), D10 (lookup logic), E03 (crafted archives against the real extractor),
   H07 (pilot).
