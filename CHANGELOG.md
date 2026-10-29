@@ -4,7 +4,7 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## 6.0.0 — Unreleased
+## 6.0.0 — 2026-10-29
 
 Initial public release (Beta). For Linux hosts with rootless Docker; tested with real Docker on
 Arch Linux only. See README for the tested versions and the known limitations.
