@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/CyberFazaN/opencode-sandbox/security/advisories/new
+    about: Please report vulnerabilities privately.
+  - name: Documentation
+    url: https://github.com/CyberFazaN/opencode-sandbox/blob/main/docs/README.md
+    about: Installation, guides and troubleshooting.

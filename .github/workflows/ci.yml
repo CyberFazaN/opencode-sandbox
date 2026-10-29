@@ -1,0 +1,142 @@
+# Hosted CI (D-040, D-042): static checks, the fake-Docker unit suite, the package build and a
+# pipx installation from the Git checkout. The real rootless Docker campaign is not run here: it
+# runs on a disposable machine before every release (docs/engineering/RELEASING.md).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  tests:
+    name: Unit tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: current dependencies
+            dependencies: ""
+          - name: lowest direct dependencies
+            dependencies: "typer==0.16.0 textual==4.0.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install
+        env:
+          DEPENDENCIES: ${{ matrix.dependencies }}
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[test]' ruff shellcheck-py
+          # shellcheck disable=SC2086  # a space-separated list of requirements
+          if [ -n "$DEPENDENCIES" ]; then python -m pip install $DEPENDENCIES; fi
+          python -m pip list | grep -iE '^(typer|textual|click|rich) '
+      - name: Unit, host and Textual pilot tests (ruff and shellcheck included)
+        run: python -m pytest -q -rs -p no:cacheprovider
+
+  arch:
+    name: Unit tests (Arch Linux userland)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    # Not pinned to a digest on purpose: the job tests the current Arch userland (rolling).
+    container: archlinux:base-devel # zizmor: ignore[unpinned-images]
+    steps:
+      - name: Packages
+        run: pacman -Syu --noconfirm --needed python git shellcheck
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Unit tests as an unprivileged user
+        # The installer refuses root, and several tests check permissions: run as a normal user,
+        # with the usual umask (a container step may inherit 0000; the direct-workspace checks
+        # then rightly refuse the world-writable test directories).
+        run: |
+          useradd --create-home ci
+          chown -R ci: "$GITHUB_WORKSPACE"
+          # shellcheck disable=SC2016  # the inner shell started by su expands $0
+          su ci -c 'umask 022 && cd "$0" && python -m venv /home/ci/venv && /home/ci/venv/bin/pip install -q -e ".[test]" ruff \
+            && /home/ci/venv/bin/python -m pytest -q -rs -p no:cacheprovider' "$GITHUB_WORKSPACE"
+
+  package:
+    name: Package build and content
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Build and check
+        run: |
+          python -m pip install build twine
+          python -m build --outdir dist .
+          python -m twine check --strict dist/*
+          python .github/scripts/check_dist.py dist
+
+  pipx:
+    name: pipx installation from the checkout
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install with pipx (the documented mechanism, from a git+file URL)
+        run: |
+          python -m pip install pipx==1.18.7
+          echo "PIPX_HOME=$RUNNER_TEMP/pipx" >> "$GITHUB_ENV"
+          echo "PIPX_BIN_DIR=$RUNNER_TEMP/bin" >> "$GITHUB_ENV"
+          PIPX_HOME="$RUNNER_TEMP/pipx" PIPX_BIN_DIR="$RUNNER_TEMP/bin" python -m pipx install "git+file://$GITHUB_WORKSPACE"
+      - name: Start without a source tree; doctor refuses the runner's daemon
+        working-directory: ${{ runner.temp }}
+        env:
+          # The runner's Docker is rootful: through its default context doctor must exit 4 (mismatch).
+          OCS_CI_ROOTFUL_CONTEXT: default
+        run: '"$GITHUB_WORKSPACE/.github/scripts/pipx_smoke.sh" "$PIPX_BIN_DIR/opencode-sandbox" "$PIPX_HOME"'
+
+  workflows:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: actionlint and zizmor
+        run: |
+          python -m pip install actionlint-py==1.7.12.25 zizmor==1.31.1
+          actionlint
+          zizmor --offline .github/workflows

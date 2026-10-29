@@ -1,0 +1,62 @@
+name: Bug report
+description: Something does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems: please report them privately (Security tab, "Report a vulnerability"), not here.
+        Remove keys, tokens and private paths from everything you paste.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `opencode-sandbox --version`.
+      placeholder: opencode-sandbox 6.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host
+      description: Arch Linux is the tested host; reports from other Linux distributions are welcome and answered on a best-effort basis.
+      options:
+        - Arch Linux
+        - Another Linux distribution (please name it and its version below)
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `opencode-sandbox doctor`
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, its full output, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. opencode-sandbox create demo
+        2. ...
+  - type: input
+    id: versions
+    attributes:
+      label: Other versions
+      description: Docker (`docker version`), OpenCode in the environment (`opencode-sandbox opencode versions`), the environment's image (debian, arch or custom), and your host's Linux distribution and version.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues and read docs/troubleshooting.md.
+          required: true
+        - label: I removed keys, tokens and private paths from this report.
+          required: true

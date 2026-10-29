@@ -1,0 +1,13 @@
+# Updates of the pinned GitHub Actions only; Python dependencies are ranges in pyproject.toml.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # New releases wait a week (stability; time for a compromised release to be withdrawn).
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

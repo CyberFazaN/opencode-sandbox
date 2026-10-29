@@ -1,0 +1,4 @@
+# The sdist is the buildable package only; the tests need the whole repository (documents,
+# fixtures, integration campaign) and come from a checkout or a tagged source archive.
+prune tests
+global-exclude __pycache__ *.py[cod]

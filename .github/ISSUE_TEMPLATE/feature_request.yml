@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a change or a new feature.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        OpenCode Sandbox manages OpenCode environments on the user's own rootless Docker daemon. It is not a
+        general container manager and does not manage an environment's OpenCode configuration after its first start.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what stops you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How could OpenCode Sandbox help? Alternatives you considered.
+    validations:
+      required: true

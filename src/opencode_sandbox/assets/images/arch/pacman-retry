@@ -1,0 +1,8 @@
+#!/bin/sh
+# Image build helper: run pacman up to three times (transient mirror stalls).
+for attempt in 1 2 3; do
+  pacman "$@" && exit 0
+  echo "pacman-retry: attempt $attempt failed" >&2
+  sleep 5
+done
+exit 1
