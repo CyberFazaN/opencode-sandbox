@@ -15,8 +15,9 @@ verification, known issues and what is not verified. Update it whenever one of t
 
 ## Supported environments
 
-- Host: Linux with the prerequisites of D-046; real evidence on Arch Linux only (hosted CI adds
-  the fake-Docker unit suite and a pipx installation on Ubuntu 26.04). Python >= 3.11 (tested
+- Host: Linux with the prerequisites of D-046; real evidence on Arch Linux only (kernel 7.2.11
+  at the 6.1.0 release; hosted CI adds the fake-Docker unit suite and a pipx installation on
+  Ubuntu 26.04). Python >= 3.11 (tested
   3.11.18 and 3.14.8; 3.12/3.13 accepted, not tested separately; the 6.0.0 hosted CI used 3.14.9);
   Git (tested 2.56.0); the user's own rootless Docker daemon (tested 29.9.2,
   rootlesskit, slirp4netns, overlayfs, containerd image store; cgroup v2 with `cpu memory pids`
@@ -86,6 +87,8 @@ candidate below. Everything in this table ran on the release tree itself.
 | Harness setup found by the first I04 attempt | The runner venv lacked pipx (`test_65`) and the volatile `$XDG_RUNTIME_DIR/systemd/user` did not exist after a reboot (C10's fixture refuses to start without it); both provided, then the complete rerun above. No product failure |
 | Base images without the layer cache | The product's `build_image`/`verify_image` with `--no-cache` (not `--pull`, which could move the user's base tag) from the installed package: Debian 13 (52 s) and Arch (213 s) built every `RUN` step against current upstream packages and passed verification |
 | Real model provider | Installed 6.1.0 manager, isolated data: `providers set` at a hidden pty prompt (not echoed; 0600 profile; `providers list` names only), a Debian 13 `ocs-test-610` environment with network bridge, the user model `openrouter/z-ai/glm-5.3-flash`; the managed `run` opened the real OpenCode 2.2.0 TUI and the model answered `BASEOS=Debian 13` from the injected guidance without tools; terminal restored. The key was in no host process argument list, not in the container definition, home volume, workspace, `/tmp`, data directory, configuration (other than the profile) or the backup: 13 checks passed |
+| Pre-tag scans (RELEASING) | `gitleaks git` and `gitleaks dir` clean; `detect-secrets scan --all-files` (1.5.0) reports only the tests' deliberate dummy values; no home path, user or host name, private network address or e-mail address other than `example.invalid`/`example.org` |
+| Release decision (I06) | READY WITH ACCEPTED RISKS: every P0 and P1 row of `CAMPAIGN.md` PASS; the accepted risks are D09's host reboot and the items under "Unverified behaviour" |
 | Not run on this tree | Hosted CI (first run with the release pull request), a host reboot (D09) |
 
 ### 6.1.0 candidate — 2026-10-29–30

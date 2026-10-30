@@ -18,7 +18,7 @@ release. Findings and their state:
 | Finding | State |
 |---|---|
 | Planned 6.0.1 contradicted the declared Semantic Versioning (new functionality, a changed default, a removed installer) | Resolved: 6.1.0 (D-055) |
-| Version, CHANGELOG and documents were still pre-release | Resolved on this branch; CHANGELOG dated 2026-10-30 (re-date if published later) |
+| Version, CHANGELOG and documents were still pre-release | Resolved on this branch; the owner confirmed the CHANGELOG date 2026-10-30 |
 | Stabilization working records in the release tree | Resolved: condensed into the top-level records (D-055) |
 | Four of the six required CI check names of the `main` ruleset no longer exist after the matrix change | Open, owner: update the ruleset before the release pull request (RELEASING step 3.1) |
 | Host-process signal tests count every watchdog on the host and assume a default SIGINT disposition | Open, TODO "Optional Polish"; run suites serially in the foreground (RELEASING) |
@@ -50,13 +50,43 @@ file and log and deleted after the check. The owner may revoke it.
 The user documents no longer say that no real provider was tested. README, `docs/opencode.md`
 and `docs/providers.md` name the one tested provider.
 
+## I06 release decision (2026-10-30)
+
+**Verdict: READY WITH ACCEPTED RISKS.**
+
+Basis:
+- CAMPAIGN has 84 rows: P0 46/46 PASS, P1 33/33 PASS, P2 4 PASS and D09 PASS in part.
+- Every real row's module ran and passed in the I04 release-tree campaign; rows that cited only
+  the candidate now cite that rerun.
+- The unit, package, pipx, static and pre-tag scan layers (gitleaks git/dir, detect-secrets,
+  personal-data search) ran on the release tree; ARCHITECTURE names every module.
+
+Accepted risks, which the owner accepts by publishing:
+1. D09: the host reboot is BLOCKED (P2, accepted earlier). Next step: reboot, then `start` and
+   `check` on a test environment.
+2. Real-Docker evidence exists only on an Arch Linux host (D-046 documents this).
+3. One real model provider (OpenRouter `z-ai/glm-5.3-flash` on Debian 13). The automated
+   first-prompt rows use a fake provider.
+4. The other items under BASELINE "Unverified behaviour": Python 3.12/3.13 separately, other
+   pipx versions, the scheduled image build, another user's real rootless dockerd, the Click 9
+   lower-bound warning.
+5. Retained Debian 12 environments stay on Debian 12 (LTS-only until 2028-06-30). The README
+   names the date; the CHANGELOG says that existing containers and system backups keep their
+   OS.
+
+Preconditions for publication, which are not risks to accept:
+- The owner updates the `main` ruleset's required checks (RELEASING step 3.1).
+- The new hosted CI matrix passes on the release pull request (its first run). A failure means
+  fix, rerun the affected layers, and decide again.
+- This directory is removed before the release commit is tagged.
+
+Non-blocking: TODO "Optional Polish" (signal-test isolation, `status` distribution line, the
+deadline message).
+
 ## Next
 
-1. **I06**: the release decision report from CAMPAIGN (READY / READY WITH ACCEPTED RISKS /
-   NOT READY). Expected risks: D09 host reboot BLOCKED (P2), the hosted CI matrix not yet run,
-   Arch-only real host, one real model provider.
-2. Finalization: move the evidence into the top-level records, remove this directory, re-date
-   the CHANGELOG if it is published after 2026-10-30, rerun the quick checks.
-3. Publication steps, each with the owner's explicit permission: ruleset update (owner), push
+1. Finalization: move the durable evidence into the top-level records, remove this directory,
+   rerun the quick checks.
+2. Publication steps, each with the owner's explicit permission: ruleset update (owner), push
    and pull request (first hosted CI), merge commit, annotated tag, draft release, owner
    publishes, GitHub pipx smoke, post-release "Unreleased" section.
