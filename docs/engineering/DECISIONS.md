@@ -919,7 +919,8 @@ execution and recovery without replacing working lifecycle mechanisms. **Impleme
 staged.** UP-00 persisted the plan only; UP-01 implements the generic explicitly titled report
 and Agent Context heading/fallback correction; UP-02 preserves independent inventory/discovery
 results; UP-03 implements shared base guards, lock order and guarded revalidation (fixed private
-`/tmp` namespace, no override-dependent fallback). All other tasks remain pending. Current behavior remains
+`/tmp` namespace, no override-dependent fallback); UP-04 implements alias-consolidated explicit
+rollback selection and immutable consent. All other tasks remain pending. Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from
 TODO under D-045; it is a running-effort record, not a second permanent planning system.

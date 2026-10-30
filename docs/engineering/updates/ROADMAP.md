@@ -2,10 +2,11 @@
 
 ## Status and authority
 
-- **UP-00..UP-03 complete. Next: UP-04 only.** UP-00 persisted the plan; UP-01 fixes report
+- **UP-00..UP-04 complete. Next: UP-05 only.** UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
-  results; UP-03 implements shared base guards and locked revalidation. Fresh-definition Docker
-  races are DNS-blocked; retained-image real races pass, as qualified below. Not a release proposal.
+  results; UP-03 implements shared base guards; UP-04 implements identity-bound explicit rollback
+  selection. The initially DNS-blocked packaged-definition gate now passes, alongside retained
+  fixtures, as qualified below. Not a release proposal.
 - Entry point: [TODO](../../../TODO.md#active-updates-architecture-and-ux). Durable approval:
   [D-056](../DECISIONS.md#d-056-updates-architecture-and-execution-order--accepted-for-implementation).
   Current implemented behavior/evidence: [ARCHITECTURE](../ARCHITECTURE.md) and
@@ -24,7 +25,8 @@
 
 Source paths below describe the UP-00 starting point, not a substitute for reading the code
 again per task. UP-01 fixes report/Agent Context presentation; UP-02 fixes inventory loss on
-remote failure; UP-03 fixes base guard scope and cleanup/creation races. Other findings remain present.
+remote failure; UP-03 fixes base guard scope and cleanup/creation races; UP-04 removes rollback
+creation-time guessing. Other findings remain present.
 Source inspection is not regression or real-operation evidence.
 
 | Finding | Current implementation | Required correction |
@@ -33,7 +35,7 @@ Source inspection is not regression or real-operation evidence.
 | Remote failure hides inventory (fixed in UP-02) | At UP-00, CLI and TUI queried npm before enumerating environments | Shared `versions_report` retains independent source results and per-row errors; CLI stderr/exit 2 and TUI error notice keep partial failures visible |
 | Base coordination is too narrow (fixed in UP-03) | At UP-00, base locks used the selected data directory | Shared UID/canonical verified endpoint/distribution guards in a fixed private `/tmp` namespace, with no override-dependent fallback |
 | Cleanup does not guard all base copies (fixed in UP-03) | At UP-00, rollback-copy cleanup had no base guard | Candidates, copies and identifiable untagged replaced bases take build then publication, rechecking identity/ownership/local references; busy/unsafe resources remain |
-| Rollback guesses wrong order | `rollback_base` maximizes Docker image creation time | Explicit choice among distinct copies, immutable identity and current-definition verification |
+| Rollback guesses wrong order (fixed in UP-04) | At UP-00, `rollback_base` maximized Docker image creation time | Alias-consolidated immutable inventory, one-copy default, explicit multi-copy selection even with `--yes`, consent/current-base revalidation and current-definition verification |
 | Diagnostic calls can hang | `core.call` has no execution deadline; version probes use it; worker cancellation does not stop arbitrary child work | Bounded short diagnostics, owned/reaped clients and bounded or cleaned container-side probes |
 | Obsolete image advisories linger | `_show_image_checks` posts warnings, but successful image checks do not clear prior image notices/status | Replace/clear the category on new evidence without overwriting active operation progress |
 | Versions is only a report | It queries npm on opening, lists running-environment versions, and offers only Close | Compact Updates inventory/actions with independent component lifecycles |
@@ -281,7 +283,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-03. Stage order is mandatory; within correctness,
+All tasks below are pending except UP-00..UP-04. Stage order is mandatory; within correctness,
 complete one focused task per cycle. Dependencies are technical prerequisites, not permission to run extra
 tasks in a cycle. Split an oversized task into documented subcycles without changing scope.
 Every task must reproduce the defect where applicable, add regressions, rerun affected tests,
@@ -289,17 +291,17 @@ review the diff and update user/engineering documents with actual behavior and e
 
 Priority stages: UP-01..UP-06 correctness first; UP-07..UP-09 shared observations/discovery;
 UP-10..UP-12 Updates UI and existing actions; UP-13 base refresh; UP-14..UP-17 manager updates.
-UP-18 consolidates evidence without preparing a release. UP-00..UP-03 are DONE; all other
-tasks are PENDING. The next unblocked task is UP-04 only; UP-03's fresh-definition real-build
-variant remains an explicit DNS-blocked verification gate, not a passed scenario.
+UP-18 consolidates evidence without preparing a release. UP-00..UP-04 are DONE; all other
+tasks are PENDING. The next unblocked task is UP-05 only. UP-03's initially DNS-blocked
+packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
 |---|---|---|---|
 | UP-00 | DONE: persist approved plan | Owner approval | Documentation-only commit `3552f67`; decision/status links, complete scope/dependencies/test gates and resume record |
 | UP-01 | DONE: generic report and Agent Context heading | UP-00 | Explicit titles for all report callers; consistent Agent Context labels/fallback wording; pilot regressions for Agent Context, Versions, readiness and cleanup, including 80x24; evidence below |
 | UP-02 | DONE: preserve inventory on remote failure | UP-00 | CLI/TUI local rows survive npm failure; per-item errors isolated, explicit check failure still reported; offline/partial-result regressions without starting containers; evidence below |
-| UP-03 | DONE: shared base coordination | UP-00 | Secure shared namespace and lock ordering; guarded build/swap/rollback/cleanup/creation; host multiprocess and real-Docker races across data/context aliases pass with retained fixtures; fresh-definition variant DNS-blocked, evidence below |
-| UP-04 | Explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; cached-build/downgrade/tie/changed-or-missing-copy regressions and real swap preservation |
+| UP-03 | DONE: shared base coordination | UP-00 | Secure shared namespace and lock ordering; guarded build/swap/rollback/cleanup/creation; host multiprocess and real-Docker races across data/context aliases pass with retained fixtures; packaged-definition gate resolved during UP-04 |
+| UP-04 | DONE: explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; 49 mocked/host regressions and 4 packaged/retained real cases with CLI swap/layer preservation |
 | UP-05 | Bounded diagnostic execution | UP-00 | Network/short subprocess deadlines and owned cleanup/cancellation; container-side probe bounds; long builds/updates not assigned short diagnostic limits; real local-process/pilot and scoped Docker leak checks |
 | UP-06 | Clear obsolete advisories | UP-00 | Warning-to-success/unknown/new-warning transitions replace the right category and preserve busy state; readiness/image pilot regressions |
 | UP-07 | Shared local observations | UP-01..UP-06 | Structured source/time/identity, disposable cache, stopped history/Unknown, lifecycle invalidation and partial Docker results; unit/host and lifecycle regressions |
@@ -380,14 +382,14 @@ land; do not announce planned functionality as delivered in this documentation-o
 
 ## Risks and remaining implementation questions
 
-No unresolved product decision blocks UP-04. The following are implementation proofs to resolve
+No unresolved product decision blocks UP-05. The following are implementation proofs to resolve
 in the named task, not permission to reopen settled UX or add infrastructure. If evidence needs
 a materially different architecture, record the blocker and ask the owner before proceeding.
 
 | Risk / question | Resolve in | Required proof or safe fallback |
 |---|---|---|
 | Secure shared lock root on hosts with/without a usable runtime directory | Resolved in UP-03 | Fixed `/tmp/opencode-sandbox-locks-<UID>/`; no runtime/HOME/TMPDIR fallback; ownership/no-follow/inode checks, process/alias convergence, legacy-manager boundary documented |
-| Scope/order of base cleanup guards and publication identity checks | UP-03 implemented; UP-04 extends consent | All base participants guarded; host and retained-fixture real races pass; failed/changed inspect refuses mutation. Explicit copy consent remains UP-04 |
+| Scope/order of base cleanup guards and publication identity checks | Resolved in UP-03/UP-04 | Base participants guarded; immutable copy/current-base consent rechecked before verification/publication; host and packaged/retained real races pass; failed/changed inspect refuses mutation |
 | Container-side probe deadline tools and cleanup on missing/custom tooling | UP-05 | Never start stopped environments; own/reap only diagnostic resources, fail as unavailable/Unknown instead of weakening checks |
 | Cache location, invalidation and compatible npm metadata size | UP-07/UP-08 | Disposable bounded data; independent sources; policy/version semantics; no readiness-string parsing or metadata migration |
 | Daily throttle across failure, restart, time changes and overlapping callers | UP-09 | Attempt-based persistence, rate-limit handling, no network flood; explicit checks remain usable |
@@ -743,25 +745,148 @@ a materially different architecture, record the blocker and ask the owner before
   actual hash from Git. **UP-03 implemented and focused races verified; STOP after the local
   commit. Next UP-04 only**, with the fresh-definition race variant retained as a blocked gate.
 
+### UP-04 — 2026-10-30 — explicit identity-bound base rollback selection
+
+- Recovered instructions, TODO, D-056, architecture/baseline and the full working record. Git
+  was clean on `work/updates` at UP-03 `40211ab`. The verified own rootless daemon again had no
+  containers/volumes and exactly the same four original full tagged-image IDs. Local permission
+  remains scoped to disposable resources, not privileged/network changes or retained-image deletion.
+- Reproduced the defect before patching: three mocked-daemon cases with several distinct copies
+  (earlier/later/equal creation times) all **failed** because rollback silently selected/mutated
+  instead of refusing ambiguity. Root cause: `.Created` is image-build time, not tag replacement
+  history; caching, downgrades and equal dates cannot establish the last replaced base.
+- The owner reported restored connectivity. Retried the existing blocked gate on unchanged UP-03
+  product code before implementing UP-04: `up04-packaged-retry`, **2 passed, 24 checks, 2 retained
+  cases deselected**, 481.35 s. Debian 13/revision 2 and Arch/revision 1 built the packaged
+  definitions with actual package downloads/build steps and OpenCode 2.2.0. Both passed real
+  OS/tool/binary verification and the coordination races. DNS required no host changes. The old
+  UP-03 DNS failures remain historical failures, not retroactively passed; the gate is now resolved.
+
+  ```sh
+  OCS_TEST_DOCKER=1 OCS_TEST_RUN=up04-packaged-retry PYTHONPATH="$PWD/src" \
+    .work/venv311/bin/python -m pytest -q tests/integration/test_42_base_coordination.py \
+    -k packaged --basetemp=/tmp/opencode/up04-packaged-retry
+  ```
+
+- Added frozen, in-memory `BaseRollbackCopy`, `BaseRollbackInventory` and `BaseRollbackPlan`
+  records in the existing versions module, not a history store/schema or universal executor.
+  `base_rollback_inventory` uses publication for a consistent read-only image inventory; it
+  neither starts helpers nor queries npm. Full managed distribution inspection proves ownership;
+  tags only identify candidates. It consolidates exact managed copy aliases by full immutable ID,
+  retaining old-definition provenance/missing creation history. Version labels are labelled build
+  evidence, not fresh binary verification. Invalid/failed/foreign inventory fails closed.
+- Pure `select_base_rollback` defaults only for one distinct image. With several, an exact listed
+  tag or full `sha256:` ID is required; no date/version/list-order inference or short-ID guess.
+  CLI adds `opencode rollback-base --list` and `--copy TAG_OR_FULL_IMAGE_ID`. `--yes` bypasses
+  confirmation only; it never picks among several. The ambiguity error lists choices and the
+  read-only command. `--list` is noninteractive and does not need confirmation; list+copy refuses.
+- CLI previews current and selected immutable IDs, copy aliases, build provenance/version and
+  required definition, then confirms that exact replacement with the existing Cancel-default
+  confirmation. It explains future base-based creation/file-only restore effects, existing
+  container/layer preservation, pin enforcement and replaced-base retention. Without a terminal
+  it still requires `--yes`. Existing command capabilities remain, with ambiguity now intentionally
+  refused rather than guessed; the Versions TUI remains unchanged until its scheduled tasks.
+- Execution takes build then publication. A plan binds daemon, distribution, expected current
+  base (including known absence), selected full ID and alias identities. Recheck before probing
+  and again before publication; changed/missing aliases, changed/new/missing current base, failed
+  inspection/foreign ownership or another daemon/distribution refuse stale consent. A newly
+  arriving unrelated copy does not substitute the selected target. All probes/verification and
+  publication use the immutable ID, retaining current OS/tool/OpenCode/major checks. Long
+  verification holds build, not publication; UP-03 order/namespace protections are unchanged.
+- Publication keeps the replaced current immutable image under a collision-checked new rollback
+  tag, publishes the selected image, then consumes only the selected aliases. Other images/aliases
+  remain. Selecting an already-current image verifies and reports unchanged without tag changes.
+  No replacement history, migration, schema/version/image definition change, automatic update or
+  background discovery was added. Cleanup's old "uses the newest" hint now points to selectable copies.
+- Added **49** mocked-Docker/host cases in `test_base_rollback.py`: creation-time order/ties,
+  cached older builds and explicit downgrade, aliases, exact selectors, before/after-verification
+  identity/ownership/missing/inspect failures, daemon/distribution binding, new unrelated copies,
+  missing/current no-op cases, old provenance/no version label and immutable probes, guards,
+  failed definition/major/collision protection, list/confirmation/cancel/noninteractive/yes.
+  Updated the old automatic-newest regression to verify the one-copy path, full immutable probe
+  target and unchanged other-distribution exclusion; existing old-OS refusal still passes.
+- Corrections, not waived failures: first affected run **175 passed/2 failed** (new import order,
+  and the old empty-inventory fake returned human text for raw current-image JSON). Fixed test
+  responses/import grouping; rerun **177 passed**, 11.51 s. First full run **1123 passed/1 failed/
+  60 opt-in skips**, 95.57 s: the static distribution-branch detector mistook generic
+  `plan.distro != d.id` identity comparison for distro-specific branching. Reversed the same
+  comparison operands, with no check suppression/product behavior change; focused base rollback,
+  distribution and quality checks **73 passed**, 1.55 s, then all full runs below passed.
+
+  | Full suite / venv | Result / basetemp |
+  |---|---|
+  | Python 3.11.18, current Typer 0.27.3/Textual 8.2.8, `venv311` | **1124 passed, 60 opt-in skips**, 95.51 s; `/tmp/opencode/up04-final311` |
+  | Python 3.11.18, lowest Typer 0.16.0/Textual 4.0.0, `venv311low` | **1124 passed, 60 opt-in skips**, 93.75 s; `/tmp/opencode/up04-final311low` |
+  | Python 3.14.8, current, `venv314` | **1124 passed, 60 opt-in skips**, 93.78 s; `/tmp/opencode/up04-final314` |
+  | Python 3.14.8, lowest, `venv314low` | **1124 passed, 60 opt-in skips**, 93.16 s; `/tmp/opencode/up04-final314low` |
+
+  All serial foreground: `PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q
+  --basetemp=<above>`. pytest 9.2.0; only the two known lowest-Typer/Click deprecations.
+  Includes Ruff/shellcheck, document/CLI checks, unit/mocked Docker, real host files/processes,
+  existing Textual pilots/host terminal fixtures. The 60 opt-in skips are explicitly real,
+  privileged or socket-activation cases, not suppressed failures.
+- Extended the same scoped real race harness, not a new campaign framework. After real rollback,
+  create manifested aliases across two immutable images; actual CLI `--list` consolidates them,
+  `--yes` refuses ambiguity, a retag after consent refuses without moving current, and explicit
+  full-ID `--copy --yes` verifies/publishes that exact image while preserving replaced current.
+  Existing process/data-directory/context-alias exclusions, current-definition verification,
+  pinned creation, running-container image identities and writable-layer markers still pass.
+- All four packaged/retained variants passed twice: `up04-real` **4 passed/76 checks**, 61.80 s;
+  final `up04-proof` after final CLI preview wording **4 passed/76 checks, no skips/deselections**,
+  61.93 s. Packaged cases use Debian 13/revision 2 and Arch/revision 1; retained network-free
+  fixtures remain Debian 12/revision 1 and Arch/revision 1, both with actual OpenCode 2.2.0.
+  Later packaged builds reuse eligible cache; none of these is the future pull/no-cache full
+  refresh or a model-provider test. Evidence/manifests: `.work/logs/up04-proof*`.
+
+  ```sh
+  OCS_TEST_DOCKER=1 OCS_TEST_RUN=up04-proof PYTHONPATH="$PWD/src" \
+    .work/venv311/bin/python -m pytest -q tests/integration/test_42_base_coordination.py \
+    --basetemp=/tmp/opencode/up04-proof
+  ```
+
+- All three real runs used test-only namespaces/labels, manifests, run-label/immutable-ID checks,
+  guarded product cleanup and leak checks. Final own-rootless inventory: zero containers/volumes,
+  no final-run-labelled images, exactly the starting four tagged-image IDs; socket aliases removed.
+  No retained base/upstream/custom tag or rollback copy touched; shared lock files and build cache
+  intentionally retained. No host networking/service/default-context changes or privileged rows.
+- Packaging on Python 3.11: `python -m build --no-isolation --outdir .work/up04-package`, strict
+  twine and `check_dist.py` passed; `cli.py`, `cleanup.py` and `opencode_versions.py` byte-identical
+  in the wheel. No uploads/global installation/fresh pipx. Not re-established: full real campaign,
+  installed-manager/pipx execution, privileged restart/socket activation, new real-terminal/manual
+  observation or model-provider use. Existing pty/pilot tests do not prove new manual observation.
+- Updated OpenCode guide/Unreleased, TODO, architecture, baseline, campaign and D-056 status.
+  No version/assets/schema/core/base-lock/runtime-identity/dependency/workflow changes.
+  Reviewed all three changed product modules, new/updated tests, real manifest/cleanup outcomes
+  and user/current-state guides; no stale newest-copy execution hint remains. Final regression/
+  language/link/CLI/static subset after the evidence updates: **89 passed, no skips**, 7.41 s,
+  `tests/test_base_rollback.py tests/test_language.py tests/test_user_docs.py
+  tests/test_cli_structure.py tests/test_quality.py` with venv311 and
+  `/tmp/opencode/up04-docs-review`. Whitespace checks are clean.
+  Planned local commit: `fix: require explicit base rollback selection`; resolve its actual hash
+  from Git. **UP-04 complete; STOP after local commit. Next UP-05 only.**
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056 and this entire record. Use
    ARCHITECTURE for implemented behavior, not proposed functionality. Check Git status, branch,
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
-2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, then
-   the UP-03 commit. New module `base_locks.py` and shared base participants now coordinate across
-   product overrides. Image assets, manager version and schemas still match the seed. Resolve
-   actual Git state; later checkpoint evidence takes precedence. Shared private lock files are
-   persistent protocol state, not stale files to delete. Retained bases are unchanged.
-3. Select **UP-04 only**: replace `rollback_base`'s creation-time guess with alias-consolidated
-   distinct managed copy inventory, one-copy default and explicit multi-copy selection (including
-   noninteractive `--yes`). Bind selection/confirmation to immutable identity and revalidate under
-   UP-03's build/publication guards; preserve current-definition verification and replaced current
-   image. Inspect CLI confirmation and shared handler design rather than inventing a history/schema
-   service. Add cached-build/downgrade/tie/changed-or-missing-copy regressions and scoped real swap
-   preservation. Keep UP-03's lock order and collision/ownership safeguards; do not combine UP-05
-   deadlines, observations/caching, refresh or the full Updates interface. Fresh-definition races
-   remain DNS-blocked, with the exact retry above; no host networking changes are authorized.
+2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
+   `40211ab`, then the UP-04 commit. Shared base guards and identity-bound explicit rollback
+   selection are implemented. Image assets, manager version and schemas still match the seed.
+   Resolve actual Git state; later evidence takes precedence. Shared private lock files are
+   persistent protocol state, not stale files to delete. Retained bases are unchanged. The
+   packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
+3. Select **UP-05 only**: reproduce unbounded short version/diagnostic execution and cancellation
+   ownership. Inventory `core.call`/`docker`, version queries/image helpers, CLI/TUI workers and
+   existing readiness deadline mechanisms. Add bounded short subprocess/network diagnostics,
+   owned/reaped clients and cancellation waits, plus container-side probe bounds or cleanup of
+   only their owned exec/helper resources. Killing a Docker client or canceling a Textual thread
+   does not prove container-side work stopped. Never start a stopped environment merely to check,
+   and do not put blanket short timeouts on builds, installs, commit or other legitimate long
+   mutations. Use host-process/pilot regressions and scoped real Docker leak checks. Preserve
+   UP-03 guard order, UP-04 immutable consent/current-definition verification and existing
+   journals/recovery. Do not combine advisory clearing (UP-06), observations/cache, refresh or
+   Updates UI work. No host network/service changes are authorized.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.

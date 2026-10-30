@@ -287,10 +287,9 @@ def test_cli_versions_check_and_status(monkeypatch):
     assert "Last OpenCode update: updated 2.1.4 -> 2.2.0" in result.output and "rollback point ocs-checkpoint:" in result.output
 
 
-def test_rollback_base_swaps_with_the_newest_verified_copy(monkeypatch):
+def test_rollback_base_swaps_with_its_only_distinct_verified_copy(monkeypatch):
     calls, verified = [], []
-    tags = {"opencode-sandbox:debian-previous-aaaaaaaaaaaa": "2026-10-01T00:00:00Z",
-            "opencode-sandbox:debian-previous-bbbbbbbbbbbb": "2026-10-20T00:00:00Z",
+    tags = {"opencode-sandbox:debian-previous-bbbbbbbbbbbb": "2026-10-20T00:00:00Z",
             "opencode-sandbox:arch-previous-cccccccccccc": "2026-10-25T00:00:00Z"}
 
     def docker(*a, capture=False, check=True):
@@ -304,21 +303,25 @@ def test_rollback_base_swaps_with_the_newest_verified_copy(monkeypatch):
         if a[:2] == ("image", "inspect"):
             if "previous" in a[-1] and a[-1] not in tags:
                 return SimpleNamespace(returncode=1, stdout="[]", stderr="No such image: " + a[-1])
-            iid = "sha256:" + ("b" if "previous" in a[-1] else "a") * 64
+            iid = "sha256:" + ("b" if "previous" in a[-1] or a[-1] == "sha256:" + "b" * 64 else "a") * 64
             return SimpleNamespace(returncode=0, stdout=json.dumps([{"Id": iid, "Config": {"Labels": {
-                **c.distros.get("debian").image_labels(), "org.opencode-sandbox.managed": "true"}}}]), stderr="")
+                **c.distros.get("debian").image_labels(), "org.opencode-sandbox.managed": "true", v.VERSION_LABEL: "2.1.4"}}}]), stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "ensure_runtime", lambda distro=None: None)
     monkeypatch.setattr(c, "docker", docker)
     monkeypatch.setattr(c, "verify_image", lambda d, tag, version: verified.append((d.id, tag, version)))
     result = v.rollback_base("debian")
-    newest = "opencode-sandbox:debian-previous-bbbbbbbbbbbb"
-    assert verified == [("debian", newest, "2.1.4")] and result["version"] == "2.1.4"
+    previous = "opencode-sandbox:debian-previous-bbbbbbbbbbbb"
+    assert verified == [("debian", "sha256:" + "b" * 64, "2.1.4")] and result["version"] == "2.1.4"
     tag_calls = [a for a in calls if a[0] == "tag"]
     assert tag_calls == [("tag", "sha256:" + "a" * 64, result["previous_image"]),
                          ("tag", "sha256:" + "b" * 64, "opencode-sandbox:debian")]
-    assert calls[-1] == ("image", "rm", newest)
-    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=0, stdout="opencode-sandbox:debian\n", stderr=""))
+    assert calls[-1] == ("image", "rm", previous)
+    def without_copies(*a, **k):
+        if a[:2] == ("image", "ls"):
+            return SimpleNamespace(returncode=0, stdout="opencode-sandbox:debian\n", stderr="")
+        return docker(*a, **k)
+    monkeypatch.setattr(c, "docker", without_copies)
     with pytest.raises(c.SandboxError, match="No rollback copy"):
         v.rollback_base("debian")
 

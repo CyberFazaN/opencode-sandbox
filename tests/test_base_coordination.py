@@ -198,6 +198,6 @@ def test_rollback_rechecks_copy_and_base_after_verification(monkeypatch):
     monkeypatch.setattr(c, "docker", docker)
     monkeypatch.setattr(c, "ensure_runtime", lambda: None)
     monkeypatch.setattr(c, "verify_image", lambda *args: state.update(verified=True))
-    with pytest.raises(c.SandboxError, match="changed during verification"):
+    with pytest.raises(c.SandboxError, match="changed since selection or during verification"):
         v.rollback_base()
     assert not any(a[0] == "tag" or a[:2] == ("image", "rm") for a in calls)

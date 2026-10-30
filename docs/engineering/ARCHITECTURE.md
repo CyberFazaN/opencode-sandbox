@@ -9,8 +9,8 @@ state and verification: `BASELINE.md`. User-facing behaviour is in `README.md` a
 Approved staged architecture: D-056 and the [Updates working roadmap](updates/ROADMAP.md).
 UP-01 implements generic reports and the Agent Context presentation correction; UP-02 preserves
 independent local/registry version results. UP-03 adds daemon-wide base coordination and locked
-image revalidation. The Updates interface, disposable version observations/discovery cache and
-other staged corrections remain pending.
+image revalidation; UP-04 adds explicit identity-bound rollback-copy selection. The Updates
+interface, disposable version observations/discovery cache and other staged corrections remain pending.
 
 ## Boundaries
 
@@ -188,7 +188,15 @@ base image. Build/swap/rollback, cleanup and pin-check/container creation use th
 guards described above (D-056 supersedes D-033's data-directory-local base locks). Only a known
 missing-image response permits a first build; full image identity/managed distribution ownership
 is checked before replacement and rechecked at publication, and colliding candidate/copy tags
-are refused. Rollback-copy choice still uses Docker creation time until UP-04. The managed `run` starts
+are refused. Rollback inventory groups managed copy aliases by full immutable image ID, retaining
+old-definition provenance without inferring replacement history. A single distinct copy defaults;
+several require an exact listed tag/full ID, including `--yes`. Read-only `--list` does no runtime
+probe. Frozen inventory/selection records bind consent to daemon, distribution, current base and
+selected image/aliases. Execution takes build then publication to revalidate before verification
+and again before publishing; probes use the immutable ID and current OS/tool/OpenCode checks.
+Changed/missing aliases or current base refuse the stale plan. Publication preserves the replaced
+current image and consumes only the selected aliases; an already-current selection is a verified
+no-op. No new schema, history service or shared update engine. The managed `run` starts
 `opencode --standalone` through `core.LAUNCHER` with the provider profile's variables; a watchdog
 hangs the session up when the manager dies. Interactive client creation defers callable exit
 signals until the client reference and watchdog PID are owned, then restores/delivers the

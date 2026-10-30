@@ -22,10 +22,11 @@ UP-00 persisted the plan; UP-01 implements explicitly titled generic reports and
 Context heading/capitalization and inspection-fallback correction. UP-02 preserves independent
 local/registry version results, isolates failed rows and reports partial failure in both CLI and
 TUI. UP-03 implements daemon-wide base build/publication guards, cleanup/creation coordination
-and locked image revalidation. The existing Versions interface, lookup provider and policies
-remain unchanged; UP-04 is next. No image-definition, schema or manager-version change was made.
+and locked image revalidation. UP-04 adds alias-consolidated rollback inventory, explicit copy
+selection and immutable consent/revalidation. The existing Versions interface, lookup provider
+and policies remain unchanged; UP-05 is next. No image-definition, schema or manager-version change was made.
 
-UP-01..UP-03 verification is below; commands, initial failures and handoff are in the roadmap.
+UP-01..UP-04 verification is below; commands, initial failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 
@@ -86,6 +87,18 @@ in `RELEASING.md` ("Verify").
 
 ## Verification
 
+### Unpublished UP-04 — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Full unit/host/Textual-pilot/local-process suite, Python 3.11.18 and 3.14.8, current/lowest dependencies | **1124 passed, 60 opt-in skips in each of four serial foreground runs**; Typer 0.27.3/Textual 8.2.8 and 0.16.0/4.0.0. Only the two known lowest-Typer/Click deprecations. Includes Ruff/shellcheck, docs/CLI structure and existing host terminal fixtures |
+| New mocked-Docker/host regressions | 49 cases for cached-build/creation-time order and ties, explicit downgrade, alias consolidation/consumption, exact tags/full IDs, changed/missing copies/current base before and after verification, ownership/inspection failures, daemon/distribution binding, late-arriving copies, legacy provenance/no version label, immutable probes, no-op, collision/verification refusal, lock scope, CLI list/choice/confirmation/cancel/no-terminal/yes |
+| UP-03 packaged-definition gate | **RESOLVED** after DNS recovered. Before the UP-04 patch: **2 passed, 24 logged checks, 2 retained-fixture cases deselected**, `up04-packaged-retry`, 481.35 s. Debian 13/revision 2 and Arch/revision 1 built with OpenCode 2.2.0 under disposable tags, real OS/tool/binary verification and races; package download/build steps executed. No host network change or cache prune |
+| Scoped real Docker/OpenCode and CLI | All four packaged/retained variants of `test_42_base_coordination.py`: **4 passed, 76 logged checks, no skips/deselections**, final `up04-proof` (61.93 s). Adds real CLI alias-consolidated listing, ambiguous `--yes` refusal, retag-after-consent refusal, explicit immutable-ID selection, exact verified publication and replaced-image preservation. Existing cross-directory/context races and running-container/writable-layer marker checks still pass. Packaged builds may reuse cache; retained fixtures remain explicitly Debian 12/revision 1 and Arch/revision 1, not package-refresh evidence |
+| Package/static | Local Python 3.11 sdist/wheel, strict twine and `check_dist.py` passed; three changed product modules byte-identical in wheel. Manager remains 6.1.0. No upload/global installation/fresh pipx run |
+| Resources | All three real runs manifested/cleaned their test resources; final verified daemon inventory has zero containers/volumes and exactly the four original tagged-image IDs. No final-run labelled images or socket aliases remain. Shared lock files and build cache intentionally retained |
+| Not re-established | Full real campaign, privileged restart/socket activation, new real-terminal/manual UI observation, model-provider use or installed-manager/pipx execution. No full-refresh/no-cache/pull claim; that product operation remains UP-13. Diagnostic deadlines/probe cleanup remain UP-05; no release-readiness inference |
+
 ### Unpublished UP-03 — 2026-10-30
 
 | Layer | Result |
@@ -94,7 +107,7 @@ in `RELEASING.md` ("Verify").
 | New host/mocked-Docker regressions | 60 cases: cross-data/config/HOME/TMPDIR/runtime/context process convergence, daemon/distribution separation, lock order, crash release, exec descriptor closure, unsafe ownership/modes/symlink/hardlink/FIFO/path replacement, participant guards, changed/failed image inspection, local references, colliding image tags and first-build safety |
 | Final test-only strengthening | Descriptor noninheritance now directly inspects the exec child's open file identities, not just reacquisition after unlock. Base-lock/static subset **35 passed** in each of the four combinations after that assertion change; no product change after the full suites |
 | Scoped real Docker/OpenCode version verification | `test_42_base_coordination.py -k local-fixture`: **2 passed, 24 logged checks, 2 packaged-definition cases deselected**, final run `up03-proof` (22.30 s). Separate data directories, real context aliases including a socket symlink, build/rollback/cleanup/creation races, pin check through creation, immutable swaps and writable-layer markers. Explicit network-free fixtures derived from retained Debian 12/revision 1 and Arch/revision 1 with OpenCode 2.2.0; tool/OS/binary verification still runs, not new-package installation or current-definition freshness evidence |
-| Fresh packaged-definition variant | **BLOCKED, not passed**: initial attempt had 2 failures (104.30 s), Debian at Docker Hub DNS resolution for `node:24-trixie`, Arch at mirror DNS resolution during pacman. Both failed before publication and cleaned up. No networking/security changes or silent skips. Rerun the `packaged` variant when DNS works; command in the roadmap |
+| Fresh packaged-definition variant | **Initially BLOCKED, not passed in UP-03**: initial attempt had 2 failures (104.30 s), Debian at Docker Hub DNS resolution for `node:24-trixie`, Arch at mirror DNS resolution during pacman. Both failed before publication and cleaned up. No networking/security changes or silent skips. Resolved by the UP-04 retry above, not relabelled as a UP-03 pass |
 | Package | Python 3.11 sdist/wheel built locally with unchanged version 6.1.0; strict twine and `check_dist.py` passed, new `base_locks.py` byte-identical in the wheel. Not uploaded/installed globally; no fresh pipx or installed-manager race run |
 | Resources | Each real run has a manifest and guarded product cleanup; final run has zero objects with its data/test labels, unchanged original tagged images, socket aliases removed. Shared private lock files remain intentionally (never unlinked); build cache was not pruned |
 | Not re-established | Full real campaign, fresh Debian 13/Arch package builds, privileged daemon restart/socket-activation rows, real model provider, or new real-terminal/manual UI observation. Earlier release evidence remains historical; no release-readiness inference |

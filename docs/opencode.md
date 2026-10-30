@@ -100,7 +100,8 @@ that environment's OS and system layer.
 | `opencode rollback NAME --yes` | Undo its last update |
 | `opencode update-recover NAME` | Finish an interrupted update (rolls back) |
 | `opencode update-base [--version X] [--distro ID]` | Rebuild a base image, keep a rollback copy |
-| `opencode rollback-base [--distro ID] --yes` | Swap a base image with its newest rollback copy |
+| `opencode rollback-base [--distro ID] --list` | List distinct managed rollback images, full IDs and tag aliases (read-only) |
+| `opencode rollback-base [--distro ID] [--copy TAG_OR_FULL_IMAGE_ID] [--yes]` | Verify and swap the selected copy; default only when there is one distinct image |
 
 **Partial results.** `opencode versions --check` keeps available local version/policy rows when
 npm discovery fails; a failed discovery is not an up-to-date result. Registry results also
@@ -133,8 +134,23 @@ point (`disk cleanup --superseded` keeps it).
 
 **Base images.** `opencode update-base` builds and verifies a candidate and keeps the replaced
 image as `opencode-sandbox:<distro>-previous-<hex>` (not for identical rebuilds);
-`opencode rollback-base` verifies the newest rollback copy and swaps it in (the replaced image
-becomes a rollback copy, so you can swap back). `build` rebuilds without a rollback copy. Base
-images only affect containers created later. Rebuilds reuse Docker's cached operating-system
+`opencode rollback-base` verifies a selected rollback image and swaps it in (the replaced image
+becomes a rollback copy, so you can swap back). Use `opencode rollback-base --list` first; aliases
+of the same immutable image count as one copy. With several distinct images, supply an exact
+listed tag or full `sha256:...` image ID using `--copy`, even with `--yes`. Short image-ID prefixes
+are not accepted. `--yes` bypasses confirmation, not selection. Creation dates, version precedence
+and list order do not describe replacement history and are never used to guess a target.
+
+The preview identifies the selected copy, its build provenance and the current base. A changed
+or missing selected alias/current base refuses execution; review and select again. Existing
+copies with older provenance remain visible, but the selected image must still pass the current
+definition's OS, tool and OpenCode verification. The verified immutable image is published, its
+selected rollback aliases are removed, and the replaced base is retained under a new rollback
+tag. If the selected image is already current, verification reports unchanged without moving
+or removing tags. A failed/unverifiable inventory is an error, not permission to replace images.
+
+`build` rebuilds without a rollback copy. Base images affect future base-based container creation
+and file-only restores, not existing containers or writable layers; pins remain enforced.
+Rebuilds reuse Docker's cached operating-system
 layers and refresh only OpenCode; update operating-system packages inside an environment with
 its package manager.

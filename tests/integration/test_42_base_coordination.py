@@ -1,4 +1,4 @@
-"""UP-03: staged real Docker races, separate processes/data directories/context aliases.
+"""UP-03/UP-04: staged real Docker races and identity-bound rollback selection.
 
 Builds packaged definitions OR explicitly selected network-free retained-image fixtures under
 run-owned tags, never replaces the user's bases. The latter is race evidence, not a package/OS
@@ -110,6 +110,49 @@ elif action == 'held-rollback':
         input()
     c.verify_image = verify
     print('RESULT ' + json.dumps(v.rollback_base(distro)),flush=True)
+elif action == 'selection-checks':
+    from typer.testing import CliRunner
+    from opencode_sandbox.cli import app
+    def ck(test, detail):
+        assert test, detail
+        print('CHECK ' + detail, flush=True)
+    before = v.base_rollback_inventory(distro)
+    assert len(before.copies) == 1
+    target = before.copies[0].image_id
+    alias = distros.previous_tag(d, '1' * 12)
+    other = distros.previous_tag(d, '2' * 12)
+    with c.base_lock(distro, 'build'), c.base_lock(distro, 'publication'):
+        c.docker('tag',target,alias)
+        c.docker('tag',before.current_id,other)
+    inventory = v.base_rollback_inventory(distro)
+    selected = next(item for item in inventory.copies if item.image_id == target)
+    ck(len(inventory.copies) == 2 and len(selected.aliases) == 2, 'aliases consolidated into two distinct immutable images')
+    runner = CliRunner()
+    listed = runner.invoke(app,['opencode','rollback-base','--distro',distro,'--list'])
+    ck(listed.exit_code == 0 and listed.output.count(target) == 1 and alias in listed.output,
+       'real CLI lists one row per image with full identity and aliases')
+    refused = runner.invoke(app,['opencode','rollback-base','--distro',distro,'--yes'])
+    ck(refused.exit_code != 0 and 'Several distinct rollback copies' in str(refused.exception),
+       'real noninteractive yes refuses ambiguous copy choice')
+    plan = v.select_base_rollback(inventory,target)
+    with c.base_lock(distro, 'build'), c.base_lock(distro, 'publication'):
+        c.docker('tag',before.current_id,alias)
+    try:
+        v.rollback_base(plan=plan)
+    except c.SandboxError as exc:
+        ck('changed' in str(exc), 'real retag after consent is refused without publication')
+    else:
+        raise AssertionError('changed copy accepted')
+    ck(c.inspect_base_image(d,d.image)['Id'] == before.current_id, 'refused plan leaves current base untouched')
+    with c.base_lock(distro, 'build'), c.base_lock(distro, 'publication'):
+        c.docker('tag',target,alias)
+    swapped = runner.invoke(app,['opencode','rollback-base','--distro',distro,'--copy',target,'--yes'])
+    print(swapped.output,flush=True)
+    assert swapped.exit_code == 0, str(swapped.exception)
+    ck(c.inspect_base_image(d,d.image)['Id'] == target, 'real explicit immutable CLI choice verifies and publishes exactly that copy')
+    after = v.base_rollback_inventory(distro)
+    ck(len(after.copies) == 1 and after.copies[0].image_id == before.current_id,
+       'selected aliases consumed and replaced current image retained as one distinct rollback image')
 elif action in ('cleanup', 'final'):
     listed = Path(manifest).read_text().splitlines()
     refs = {line[6:] for line in listed if line.startswith('image ')}
@@ -224,6 +267,9 @@ def test_cross_directory_base_build_rollback_cleanup_and_creation(campaign, chec
         release(rollback)
         restored = camp.docker("image", "inspect", "--format", "{{.Id}}", repo + ":" + distro).stdout.strip()
         ck(restored == initial, "real rollback restores original immutable base identity")
+        selection = run("selection-checks")
+        for line in selection.splitlines():
+            if line.startswith("CHECK "): ck(True, line[6:])
         for name in names:
             info = camp.inspect(camp.ids[name])
             marker = camp.sh(camp.ids[name], "cat /var/tmp/ocs-test-layer").stdout

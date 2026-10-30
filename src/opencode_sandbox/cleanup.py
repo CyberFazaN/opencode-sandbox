@@ -350,7 +350,7 @@ def _classify_image(item, tag, labels, ids, envs, data_id, referenced, base, pre
         if tag in referenced:
             item.status, item.detail = IN_USE, note + "an environment uses it"
         else:
-            item.status, item.detail, item.scope = SUPERSEDED, note + f"rollback-base --distro {p.group('distro')} uses the newest", EXTRA
+            item.status, item.detail, item.scope = SUPERSEDED, note + f"rollback-base --distro {p.group('distro')} --list shows selectable copies", EXTRA
         return
     if tag is not None and (p := candidate.fullmatch(tag)):
         if not _base_owner(item, labels, p.group("distro")):

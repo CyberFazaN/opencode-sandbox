@@ -8,6 +8,7 @@ import json
 import re
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 
 from . import core as c
 from . import distros
@@ -415,35 +416,125 @@ def rollback_environment(m):
         return {"version": record["from"], "rolled_back_from": record["to"], "snapshot": snapshot, "image": m["image"]}
 
 
-def rollback_base(distro=None):
-    """Swap a base image with its newest rollback copy (`update-base`), after verifying the copy;
-    the replaced image becomes a rollback copy itself, so the swap can be repeated."""
+@dataclass(frozen=True)
+class BaseRollbackCopy:
+    image_id: str
+    aliases: tuple[str, ...]
+    definition: distros.ImageDefinition
+    version: str | None  # build label only; execution still verifies the actual image
+
+
+@dataclass(frozen=True)
+class BaseRollbackInventory:
+    distro: str
+    endpoint: str
+    current_id: str | None
+    copies: tuple[BaseRollbackCopy, ...]
+
+
+@dataclass(frozen=True)
+class BaseRollbackPlan:
+    distro: str
+    endpoint: str
+    current_id: str | None
+    selected: BaseRollbackCopy
+
+
+def _base_rollback_inventory(d):
+    """Caller holds publication. Names find copies; full inspection proves their ownership."""
+    pattern = re.compile(re.escape(distros.previous_tag(d, "")) + r"[0-9a-f]{12}")
+    tags = sorted({t for t in c.docker("image", "ls", "--format", "{{.Repository}}:{{.Tag}}",
+                                     distros.REPOSITORY, capture=True).stdout.split() if pattern.fullmatch(t)})
+    images, aliases = {}, {}
+    for tag in tags:
+        info = c.inspect_base_image(d, tag)
+        images[info["Id"]] = info
+        aliases.setdefault(info["Id"], []).append(tag)
+    copies = []
+    for image_id, info in sorted(images.items()):
+        labels = info["Config"]["Labels"]
+        label = labels.get(VERSION_LABEL)
+        version = normalize(label) if label and label != "<no value>" else None
+        copies.append(BaseRollbackCopy(image_id, tuple(aliases[image_id]),
+                                       distros.image_definition(d.id, labels), version))
+    current = c.inspect_base_image(d, d.image, missing=True)
+    return BaseRollbackInventory(d.id, c.docker_endpoint(), (current or {}).get("Id"), tuple(copies))
+
+
+def base_rollback_inventory(distro=None):
+    """Read-only, alias-consolidated copies. No helper containers, network lookup or date ranking."""
     c.ensure_runtime()
     d = distros.get(distros.DEFAULT if distro is None else distro)
+    with c.base_lock(d.id, "publication"):
+        return _base_rollback_inventory(d)
+
+
+def format_base_rollback_copies(inventory):
+    lines = []
+    for item in inventory.copies:
+        lines.append(f"{item.image_id} | OpenCode {item.version or 'unknown'} (build label) | "
+                     f"{item.definition.distro} {item.definition.version}, definition revision {item.definition.revision}")
+        lines.extend(f"  {tag}" for tag in item.aliases)
+    return lines or [f"No rollback copy of {distros.get(inventory.distro).image}"]
+
+
+def select_base_rollback(inventory, copy=None):
+    """Resolve an exact tag/full immutable ID before consent; confirmation bypass never chooses."""
+    if not inventory.copies:
+        raise c.SandboxError(f"No rollback copy of {distros.get(inventory.distro).image}")
+    if copy is None:
+        if len(inventory.copies) != 1:
+            raise c.SandboxError("Several distinct rollback copies; select one with --copy TAG_OR_FULL_IMAGE_ID "
+                                 "(also required with --yes). List them with opencode-sandbox opencode rollback-base "
+                                 f"--distro {inventory.distro} --list\n" + "\n".join(format_base_rollback_copies(inventory)))
+        selected = inventory.copies[0]
+    else:
+        selected = next((item for item in inventory.copies if copy == item.image_id or copy in item.aliases), None)
+        if selected is None:
+            raise c.SandboxError("Rollback copy not found; use an exact listed tag or full sha256 image ID (--list)")
+    return BaseRollbackPlan(inventory.distro, inventory.endpoint, inventory.current_id, selected)
+
+
+def _recheck_base_rollback(d, plan):
+    """Under publication, bind both tag removal and replacement to the consented identities."""
+    if d.id != plan.distro or plan.endpoint != c.docker_endpoint():
+        raise c.SandboxError("Rollback selection belongs to another distribution or daemon; review again")
+    for tag in plan.selected.aliases:
+        if c.inspect_base_image(d, tag)["Id"] != plan.selected.image_id:
+            raise c.SandboxError("Base image or rollback copy changed since selection or during verification; review again")
+    selected = c.inspect_base_image(d, plan.selected.image_id)
+    if selected["Id"] != plan.selected.image_id:
+        raise c.SandboxError("Rollback copy identity changed; review again")
+    current = c.inspect_base_image(d, d.image, missing=True)
+    if (current or {}).get("Id") != plan.current_id:
+        raise c.SandboxError("Base image changed since selection or during verification; review again")
+    return selected
+
+
+def rollback_base(distro=None, *, copy=None, plan=None):
+    """Verify and swap an explicitly selected copy; preserve the replaced base, never guess order."""
+    c.ensure_runtime()
+    d = distros.get((plan.distro if plan else distros.DEFAULT) if distro is None else distro)
+    if plan is not None and copy is not None:
+        raise c.SandboxError("Supply a rollback plan or copy, not both")
     with c.base_lock(d.id, "build"):
-        pattern = re.compile(re.escape(distros.previous_tag(d, "")) + r"[0-9a-f]{12}")
-        tags = [t for t in c.docker("image", "ls", "--format", "{{.Repository}}:{{.Tag}}", distros.REPOSITORY,
-                                    capture=True).stdout.split() if pattern.fullmatch(t)]
-        if not tags:
-            raise c.SandboxError(f"No rollback copy of {d.image} ({distros.previous_tag(d, '<hex>')})")
-        created = {t: c.docker("image", "inspect", "--format", "{{.Created}}", t, capture=True).stdout.strip() for t in tags}
-        previous = max(tags, key=lambda t: created[t])
         with c.base_lock(d.id, "publication"):
-            selected = c.inspect_base_image(d, previous)
-            original = c.inspect_base_image(d, d.image, missing=True)
-        label = c.docker("image", "inspect", "--format", _VERSION_FORMAT, previous,
-                         capture=True).stdout.strip()
-        version = supported(label) if label and label != "<no value>" else image_version(previous)
-        c.verify_image(d, previous, version)
+            if plan is None:
+                plan = select_base_rollback(_base_rollback_inventory(d), copy)
+            selected = _recheck_base_rollback(d, plan)
+        image_id = plan.selected.image_id
+        label = selected["Config"]["Labels"].get(VERSION_LABEL)
+        version = supported(label) if label and label != "<no value>" else supported(image_version(image_id))
+        c.verify_image(d, image_id, version)
         with c.base_lock(d.id, "publication"):
-            copy = c.inspect_base_image(d, previous)
-            old = c.inspect_base_image(d, d.image, missing=True)
-            if copy["Id"] != selected["Id"] or (old or {}).get("Id") != (original or {}).get("Id"):
-                raise c.SandboxError("Base image or rollback copy changed during verification; refusing replacement")
+            _recheck_base_rollback(d, plan)
+            if plan.current_id == image_id:
+                return {"image": d.image, "version": version, "previous_image": None, "unchanged": True}
             kept = None
-            if old:
+            if plan.current_id:
                 kept = _unused_base_tag(d, distros.previous_tag(d, __import__("secrets").token_hex(6)))
-                c.docker("tag", old["Id"], kept)
-            c.docker("tag", copy["Id"], d.image)
-            c.docker("image", "rm", previous, capture=True)  # only the tag: d.image names the same image
+                c.docker("tag", plan.current_id, kept)
+            c.docker("tag", image_id, d.image)
+            for tag in plan.selected.aliases:
+                c.docker("image", "rm", tag, capture=True)  # only aliases: d.image now names this image
         return {"image": d.image, "version": version, "previous_image": kept}

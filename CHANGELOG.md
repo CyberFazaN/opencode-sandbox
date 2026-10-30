@@ -20,6 +20,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   context aliases for the same verified daemon. Pinned container creation holds publication
   through its version check and creation. Image identity/ownership is rechecked before changes;
   cleanup leaves busy candidates and rollback copies alone.
+- Base rollback no longer guesses replacement order from Docker creation dates. It consolidates
+  aliases, defaults only for one distinct copy, and requires `--copy` for several, even with
+  `--yes`; `--list` shows full identities and aliases. Confirmation and execution bind to the
+  same immutable copy/current base, preserving verification and the replaced image.
 
 ## 6.1.0 — 2026-10-30
 

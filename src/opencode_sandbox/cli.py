@@ -133,14 +133,33 @@ def opencode_rollback(name: str, yes: bool=typer.Option(False,"--yes",help="Do n
 
 @opencode_app.command("rollback-base")
 def opencode_rollback_base(yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
-                           distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP)):
-    """Swap a base image with its newest rollback copy (verified first); existing containers are not changed."""
+                            distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
+                            copy: str | None=typer.Option(None,"--copy",help="Exact rollback tag or full sha256 image ID; required for several distinct copies, even with --yes"),
+                            list_copies: bool=typer.Option(False,"--list",help="List distinct managed rollback images and their aliases; do not change anything")):
+    """Swap a base with a selected, verified rollback copy; one distinct copy is the default, never the newest by date."""
     from . import opencode_versions as v
-    image=distros.get(distro).image
-    if not yes and not _confirm(f"Replace base image {image} with its newest rollback copy?", docker=True):
+    if list_copies and copy is not None:
+        raise c.SandboxError("--list cannot be combined with --copy")
+    inventory=v.base_rollback_inventory(distro)
+    if list_copies:
+        for line in v.format_base_rollback_copies(inventory): typer.echo(line)
+        return
+    plan=v.select_base_rollback(inventory,copy)
+    d=distros.get(distro)
+    image=d.image
+    typer.echo(f"Base image {image}: {plan.current_id or 'missing'}\nSelected copy: {plan.selected.image_id}")
+    for tag in plan.selected.aliases: typer.echo(f"  {tag}")
+    definition=plan.selected.definition
+    typer.echo(f"Copy build: {definition.distro} {definition.version}, revision {definition.revision}; "
+               f"OpenCode {plan.selected.version or 'unknown'} (build label). "
+               f"Required definition: {d.name} {d.version}, revision {d.revision}.")
+    typer.echo("The copy must pass the current definition's OS/tool/OpenCode checks. The replaced base is kept as a rollback copy. "
+               "Existing containers and writable layers are unchanged; future base-based creation and file-only restores use this base, with pins still enforced.")
+    if not yes and not _confirm(f"Replace {image} ({plan.current_id or 'missing'}) with {plan.selected.image_id}?", docker=True):
         raise typer.Abort()
-    result=v.rollback_base(distro)
+    result=v.rollback_base(distro,plan=plan)
     typer.echo(f"{result['image']}: OpenCode {result['version']}"
+               + (" (unchanged; selected image already current)" if result.get("unchanged") else "")
                + (f"; replaced image kept as {result['previous_image']}" if result["previous_image"] else ""))
 
 def pick(key:str | None):

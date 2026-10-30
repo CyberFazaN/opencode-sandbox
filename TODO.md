@@ -17,10 +17,10 @@ and existing operations -> explicit base refresh -> verified pipx manager self-u
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 stages. Each task includes its own tests and documentation, then a local commit and STOP.
 
-Current checkpoint: UP-00..UP-03 complete. Explicitly titled reports, honest partial inventory,
-and daemon-wide coordination of base builds, publication, cleanup and creation are in place. Real races
-pass with retained-image fixtures; fresh packaged-definition builds are DNS-blocked, not passed.
-Next: UP-04, explicit base rollback selection.
+Current checkpoint: UP-00..UP-04 complete. Explicit reports, honest partial inventory, shared
+base guards and identity-bound rollback selection are in place. Packaged-definition Debian 13
+and Arch builds/races now pass after DNS recovered, alongside retained-image fixtures.
+Next: UP-05, bounded diagnostic execution and owned probe cleanup.
 The manager version remains 6.1.0.
 Completion does not authorize a version bump, release preparation, tag, push or publication.
 

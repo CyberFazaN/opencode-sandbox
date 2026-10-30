@@ -32,10 +32,13 @@ real-terminal and live-source checks remain to be re-established in UP-18.
 UP-03 adds host-process locking/revalidation regressions and scoped real build/swap/rollback/
 cleanup/creation races (`test_42_base_coordination.py`) across data directories and canonical
 context aliases. Retained-image fixtures pass on Debian 12 and Arch with real OpenCode version
-and tool verification, not model-provider or current-definition freshness evidence. Fresh
-packaged-definition races on Debian 13/Arch are BLOCKED by DNS failures to Docker Hub/Arch
-mirrors; both attempts failed before publication and cleaned up. Full campaign/pty evidence is
-not renewed by these scoped tests; commands and remaining gates are in the Updates roadmap.
+and tool verification, not model-provider or current-definition freshness evidence. The initial
+packaged-definition attempts were DNS-blocked; after DNS recovered in UP-04, Debian 13 and Arch
+packaged builds/races passed. UP-04 extends the same test with real CLI list/explicit selection,
+multi-copy `--yes` refusal, alias retag after consent refusal, exact immutable publication and
+replaced-base preservation. All four packaged/retained cases passed with running containers and
+writable-layer markers intact (76 checks). Full campaign/pty evidence is not renewed by these
+scoped tests; commands and remaining gates are in the Updates roadmap.
 
 ## Legend
 
