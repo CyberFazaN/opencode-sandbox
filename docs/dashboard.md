@@ -54,7 +54,7 @@ Metadata-only refresh does not recheck or clear these advisories.
 | `i` | Check (`check NAME`; the details pane shows the last result) | `a` | Agent Context preview |
 | `d` | Changes (`changes show`, `bundle`, `stage`, `branch-diff`) | `e` / `b` | Export changes (`changes export`) / Backup (`backup create`, stopped environment) |
 | `R` | Repair | `k` | Promote a quick session to a scratch environment (`promote`) |
-| `B` | Backups (`backup list`, `backup restore`) | `v` | OpenCode versions (`opencode versions --check`, on demand only) |
+| `B` | Backups (`backup list`, `backup restore`) | `v` | Updates (local/cached inventory; explicit version Check) |
 | `p` / `g` | Provider profiles / dashboard preferences | `F8` | Recovery Center (interrupted operations and the command that finishes each) |
 | `D` | Disk (`disk usage` / `disk cleanup`; removal only after a confirmation listing every object) | `?` | All keys |
 | `Esc` | Close a dialog or screen | `q` | Quit |
@@ -67,14 +67,45 @@ The read-only Agent Context preview is titled **Agent Context — NAME**. If con
 fails, it shows the reason and previews the configured settings with unknown base OS provenance.
 In that fallback, saved guidance is **not verified**, not assumed outdated. Opening the preview
 does not rewrite the saved file or start the environment; guidance is regenerated before every
-OpenCode launch. Agent Context, Versions, readiness and cleanup-result reports are scrollable;
+OpenCode launch. Agent Context, Updates Details, readiness and cleanup-result reports are scrollable;
 use Tab to reach Close, or Esc to return to the dashboard.
 
-The Versions report (`v`) keeps available local rows if its npm check fails and shows the
-registry error alongside them. A local inventory failure likewise does not hide a successful
-registry check. Per-environment errors remain visible without discarding other rows, and a
-failure notice accompanies partial results. Discovery never starts stopped containers or
-installs updates; an unavailable registry is not an "up to date" result.
+## Updates
+
+`v` opens **Updates**, with three compact views: **Sandbox Manager**, **Base Images** and
+**Environment OpenCode**. Press `1`, `2` or `3` to change views; use Up/Down to select an item,
+`c` for **Check**, `d` or Enter for **Details**, and Esc to close. Tab reaches the primary
+buttons; **Cancel check** cancels this screen's read-only checks, not an installation or another
+dashboard operation. Close cancels owned checks and rejects late results. Selection survives
+view changes, and returning from Details restores focus to the inventory.
+
+Opening Updates does **not** contact npm/GitHub, execute OpenCode, start an environment or run
+an image helper. Installed manager/local metadata and cached evidence appear first; bounded
+Docker inspections arrive independently. Saved environment status is not treated as actual
+container state. Before identity can be inspected, history is explicitly unverified; stopped
+environments show dated last verification or Unknown, never their base's build label as proof.
+
+In either OpenCode view, Check queries npm for the latest supported stable release and checks
+only the selected object. A running environment gets a bounded runtime probe; a stopped one
+is **not** started. An owned base image gets an explicit bounded helper probe; its build label
+alone is not a runtime verification. The two views share discovery, including dated cached
+success after a failed request. Source/row errors and progress remain independent. A missing
+registry result means availability unknown, not "up to date"; Manual/Pinned still allow requested
+comparisons without changing policy or authorizing execution.
+
+Details discloses complete identities, observation source/time, provenance, definition revision,
+errors and pending recovery, plus existing CLI guidance. Base OS/package freshness is not
+assessed, and changing a base never migrates existing environments. Dashboard notices remain
+owned by the dashboard but are shown as a compact notice count and full text in Updates Details,
+instead of toasts covering the small-terminal controls.
+
+This checkpoint delivers manual inventory/checks. **Manager release discovery/installation
+classification, mutation buttons and optional daily discovery are not implemented here yet.**
+The disabled Update button explains that limit; Details points to existing CLI operations.
+Environment Start/Settings/Recovery remain available through the existing dashboard paths as
+applicable. No Update All, automatic installation, temporary start/probe/stop or background
+service is added. For a fresh stopped-environment version, explicitly Start from the dashboard,
+then return to Updates and Check; the environment remains running.
 
 ## State
 

@@ -30,11 +30,13 @@ with explicit status ownership preserving active operations and cleanup-safe com
 UP-07 + UP-08 add structured identity-bound runtime/image observations and disposable source
 caches, compatible stable npm discovery, explicit comparisons for Manual/Pinned, and exact target
 confirmation/revalidation. Stopped environments retain dated evidence or Unknown; failed checks
-never become readiness success. The interface is still the Versions report; next is UP-10 + UP-09
-(manual/cached Updates UI first, optional scheduling second). No image-definition, metadata/backup
-schema or manager-version change was made.
+never become readiness success. UP-10 replaces the Versions report with manual/cached-first
+Updates views, independent explicit checks and full Details; opening runs no network discovery,
+OpenCode binary or image helper. The approved package is split at this verified UI checkpoint;
+UP-09 scheduling is next. Mutation bindings and manager discovery/classification/execution stay
+pending. No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-08 verification is below; commands, initial failures and handoff are in the roadmap.
+UP-01..UP-08 and UP-10 verification is below; commands, failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -206,6 +208,25 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-10 — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1365 passed, 68 opt-in skips in each of four serial foreground runs**: Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0; pip checks clean, only the two known lowest-Typer deprecations. Times 153.47/148.59/152.04/147.78 s; all **1433 ordered IDs/outcomes identical** |
+| New/retained regressions | **39 additional default-suite cases**, plus updated prior CLI/TUI assertions for explicit selected Check, partial source/row failures and policy comparisons. New cases cover Docker-free history, inspect-without-probe/cache-writes, absent-container journal visibility, base provenance/freshness, current/lowest Textual keyboard/focus/resize/80x24/larger, independent/coalesced source progress, stale errors, canceled/late-generation results, long Details/empty inventory and notification ownership with production toast rack enabled |
+| Real terminal/Docker/OpenCode | **8 tests/136 checks passed**, no skips/deselections, `up10-verified`, 193.19 s: scoped diagnostics/version lifecycle/Updates cases on both retained distributions. Real terminal at 80x24/120x40 includes actual bounded loopback HTTP success/failure/cancellation, explicit immutable base probes, stopped no-start/metadata checks, full visible controls and restored terminal. Lifecycle retains actual 2.2.0 -> 2.1.4 -> checkpoint rollback, interrupted recovery, restore/recreation invalidation and user data/configuration preservation |
+| Failure trail | Initial two no-network-on-opening tests reproduced the old behavior. First full run: 1 failed/1360 passed/68 skips due to a new registry-loop variable matching the existing no-distro-branches gate; renamed without changing the gate. Initial terminal run: 4 test bodies completed but **4 teardown errors / 30 failed checks** (34 passed checks), exposing advisory overlays plus a test Escape/next-key sequence error. Corrected/rerun; proof 4 passed/64 checks at both sizes/distributions. Production toast rack is now explicitly enabled in the pilot regression; no advisory objects are cleared to make the test pass |
+| Scope/boundaries | Manual UP-10 checkpoint only, not UP-09. No new scheduler/preference, automatic install/start, universal executor, schema, core lifecycle, worker adapter, identity proof, image asset, dependency or CI/release-gate change. Legacy broad `test_50_tui.py` Updates expectations adjusted but that entire test is not rerun; new dedicated real terminal rows cover this changed workflow. No fresh base build, installed-manager/pipx, full campaign, paid/provider, privileged/socket/service or manual-observation evidence; not a release-readiness claim |
+
+Final code is unchanged after the full compatibility matrix. A subsequent test-only harness
+follow-up added named/labeled transient-helper manifest capture, then reran all eight real cases
+as `up10-verified`. Final source/wheel checks cover all four changed/new product modules;
+local sdist/wheel and strict metadata/content checks pass, without install/upload. The final
+document/CLI/quality subset passed **41 tests** (3.03 s), not an additional full suite.
+All four real attempts used isolated product roots/manifests and guarded product cleanup;
+ending own-rootless inventory: zero containers/volumes/run helpers and unchanged four original
+full tagged-image IDs. Retained file-only backups, caches and logs are ignored local artifacts.
 
 ### Unpublished UP-07 + UP-08 — 2026-10-30
 

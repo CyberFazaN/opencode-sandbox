@@ -239,15 +239,16 @@ def test_no_registry_call_until_requested(monkeypatch, fake_runtime, failed):
         assert looked_up == [] and not any(a[0] in ("exec", "run", "build") for a in fake_runtime)
         await pilot.press("v")
         await settle(pilot, 0.5)
-        assert looked_up == [1] and isinstance(app.screen, tui.ReportScreen)
-        assert str(app.screen.query_one("#report-title").render()) == "OpenCode versions (no automatic updates)"
-        assert app.screen.query_one("#report-text", TextArea).read_only
+        assert looked_up == []  # opening Updates is local/cached-only, including failures
+        assert type(app.screen).__name__ == "UpdatesScreen"
+        await pilot.press("3", "c")
+        await settle(pilot, 0.5)
+        assert looked_up == [1]
         if failed:
-            assert "npm registry check failed: Registry unavailable [test]" in app.screen.report
-            assert "ocs-qa-g09:" in app.screen.report
-            assert any(n.message == "Version check failed" for n in app._notifications)
+            assert "Registry unavailable [test]" in app.screen.discovery_text()
         else:
-            assert "npm registry: 2.1.4" in app.screen.report and "ocs-qa-g09:" in app.screen.report
+            assert "2.1.4" in app.screen.discovery_text()
+        assert any(item["name"] == "ocs-qa-g09" for item in app.screen.items["environments"].values())
         assert not any(a[0] in ("build", "commit") for a in fake_runtime)
     run(t, (80, 24))
 
@@ -575,7 +576,7 @@ def test_bars_separate_global_and_environment_actions_with_cli_terms():
     async def t(app, pilot):
         top = [str(b.label) for b in app.query_one("#toolbar").query(Button)]
         bottom = [str(b.label) for b in app.query_one("#actions").query(Button)]
-        assert top == ["New", "This folder", "Backups", "Providers", "Preferences", "Versions", "Recovery", "Disk"]
+        assert top == ["New", "This folder", "Backups", "Providers", "Preferences", "Updates", "Recovery", "Disk"]
         assert bottom == ["OpenCode", "Shell", "Start", "Stop", "Check", "Settings", "Usage", "Agent Context",
                           "Changes", "Export", "Backup", "Repair", "Promote", "Delete"]
         descriptions = {b.key: b.description for b in app.BINDINGS}

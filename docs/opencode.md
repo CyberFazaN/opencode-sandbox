@@ -111,6 +111,10 @@ remain available if local inventory fails. Per-environment inspection, policy or
 errors are reported without hiding other environments. Available rows go to stdout, errors to
 stderr; any report error gives exit status 2. Without `--check`, the command never queries npm.
 Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
+The dashboard's [Updates views](dashboard.md#updates), opened with `v`, are separate from this
+CLI report: opening them reads local/cached information only. **Check** explicitly queries npm
+and checks the selected object; it does not start stopped containers. Base labels, installed
+runtime evidence, registry discovery and recovery state remain distinct.
 
 **Evidence and cache.** Successful runtime checks record the version, source, time, environment,
 daemon, immutable container and creation-image IDs in disposable files under the data directory's

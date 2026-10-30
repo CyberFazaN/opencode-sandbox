@@ -6,6 +6,14 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- Compact Updates views (`v`) replace the dashboard's Versions report: Manager, Base Images and
+  Environment OpenCode, local/cached-first without network requests or version probes on opening.
+  Explicit Check has independent registry/object results and cancellable owned read-only work;
+  Details discloses full evidence, errors, recovery and existing CLI guidance. Manager checks,
+  mutation actions and optional daily discovery remain unavailable at this checkpoint.
+
 ### Fixed
 
 - The dashboard's Agent Context preview has its own environment-specific heading instead of
@@ -39,6 +47,9 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   to another major. Explicit Manual/Pinned comparisons no longer hide newer versions; pin and
   lifecycle restrictions remain. Updates resolve exact targets before confirmation and revalidate
   them instead of silently selecting a later release.
+- Updates controls stay visible at 80x24 even when dashboard advisory notices exist; their
+  ownership is preserved and full messages remain available in Details. Recovery journals remain
+  visible even when their container is absent.
 
 ## 6.1.0 — 2026-10-30
 

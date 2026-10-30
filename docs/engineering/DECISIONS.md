@@ -928,7 +928,9 @@ container probes, owned helper/client cleanup and cancellation-safe read-only pu
 UP-06 implements category-owned advisory replacement/clearing and progress-safe status ownership.
 UP-07/UP-08 implement identity-bound disposable evidence/attempt caches, compatible stable
 resolution, explicit Manual/Pinned comparisons and exact target confirmation/revalidation.
-All later tasks remain pending. Current behavior remains
+UP-10 implements the independently useful manual/cached Updates screen with explicit checks
+and Details; UP-09 scheduling and all later component action/manager tasks remain pending.
+The grouped package is split at its approved verified UI checkpoint (D-057). Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from
 TODO under D-045; it is a running-effort record, not a second permanent planning system.

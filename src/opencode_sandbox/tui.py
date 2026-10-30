@@ -163,7 +163,7 @@ class Dashboard(App):
                 Binding("r", "refresh_readiness", "Refresh", show=False), Binding("c", "current_folder", "This folder", show=False),
                 Binding("p", "providers", "Provider profiles", show=False), Binding("g", "settings", "Preferences", show=False),
                 Binding("t", "runtime", "Settings", show=False), Binding("u", "usage", "Usage", show=False),
-                Binding("v", "opencode_versions", "OpenCode versions", show=False), Binding("a", "agent_context", "Agent Context", show=False),
+                Binding("v", "updates", "Updates", show=False), Binding("a", "agent_context", "Agent Context", show=False),
                 Binding("f8", "recovery", "Recovery", show=False), Binding("R", "repair_selected", "Repair", show=False),
                 Binding("e", "export_selected", "Export changes", show=False), Binding("b", "backup_selected", "Backup", show=False),
                 Binding("B", "backups", "Backups", show=False), Binding("d", "git_review", "Changes", show=False),
@@ -189,7 +189,7 @@ class Dashboard(App):
         # Top bar: not about the selected environment. Bottom bar: the selected environment.
         with ItemGrid(id="toolbar", classes="bar", min_column_width=16):
             for label, bid in (("New", "new"), ("This folder", "current"), ("Backups", "backups"),
-                               ("Providers", "providers"), ("Preferences", "settings"), ("Versions", "ocversions"),
+                               ("Providers", "providers"), ("Preferences", "settings"), ("Updates", "ocversions"),
                                ("Recovery", "recovery"), ("Disk", "disk")):
                 yield Button(label, id=bid, compact=True)
         yield DataTable(id="envs", cursor_type="row")
@@ -603,24 +603,10 @@ class Dashboard(App):
         if failed:
             self.notify("Some objects were not removed", severity="warning")
 
-    def action_opencode_versions(self) -> None:
-        """Check registry and running environments without starting stopped ones."""
-        self.notify("Checking OpenCode versions…")
-        self._opencode_versions_worker()
-
-    @work(thread=True, exclusive=True, group="opencode-version-check")
-    def _opencode_versions_worker(self):
-        from . import opencode_versions as v
-        try:
-            lines, errors = v.versions_report(check=True)
-            publish(self, self._show_opencode_versions, "\n".join([*lines, *errors]), bool(errors))
-        except Exception as exc:
-            publish(self, self._show_opencode_versions, c.error_text(exc), True)
-
-    def _show_opencode_versions(self, message: str, error: bool) -> None:
-        self.push_screen(ReportScreen(message, title="OpenCode versions (no automatic updates)"))
-        if error:
-            self.notify("Version check failed", severity="error")
+    def action_updates(self) -> None:
+        from .updates_tui import UpdatesScreen
+        m = self.selected()
+        self.push_screen(UpdatesScreen(environment_id=m["id"] if m else None))
 
     def action_agent_context(self) -> None:
         m = self.selected()
@@ -860,7 +846,7 @@ class Dashboard(App):
         elif action == "settings": self.action_settings()
         elif action == "runtime": self.action_runtime()
         elif action == "usage": self.action_usage()
-        elif action == "ocversions": self.action_opencode_versions()
+        elif action == "ocversions": self.action_updates()
         elif action == "agentcontext": self.action_agent_context()
         elif action == "recovery": self.action_recovery()
         elif action == "open": self.action_open_selected()

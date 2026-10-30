@@ -66,6 +66,20 @@ installed-manager/pipx or report-specific real-terminal/manual evidence is renew
 The initial real-test fixture-marker failure was corrected and rerun, not skipped. Release gates
 and historical PASS qualifications below are unchanged.
 
+UP-10's independently useful manual/cached UI is now verified; optional UP-09 scheduling is
+still pending (approved split checkpoint). Four full compatibility suites: **1365 passed,
+68 opt-in skips each**; 39 new default-suite cases plus retained/migrated report assertions.
+Scoped real `test_43_diagnostics.py test_44_version_evidence.py test_51_updates.py`:
+**8 tests/136 checks passed**, `up10-verified`, 193.19 s. New terminal rows exercise both retained
+distributions at 80x24/120x40, actual loopback HTTP and base probes, source failure/cancel,
+visible controls despite advisories, no stopped startup/metadata change and terminal restoration.
+Initial terminal evidence failed (4 teardown errors/30 failed checks); advisory overlays and
+test key-sequence errors were fixed and rerun, not waived. Transient final helpers are named,
+labeled and manifested. Existing image IDs remain; guarded cleanup leaves no containers/volumes.
+No full `test_50_tui.py` rerun, full campaign, fresh definitions/build, installed-manager/pipx,
+provider, privileged/socket/service or manual-observation evidence is implied. Release gates
+and historical PASS qualifications remain unchanged.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

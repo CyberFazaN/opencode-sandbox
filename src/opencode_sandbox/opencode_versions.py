@@ -232,32 +232,47 @@ def image_observation(image, *, check=False):
     return {**result, "observation": observation, "attempt": attempt, "verification": "verified"}
 
 
-def environment_version(m):
+def environment_history(m):
+    """Docker-free dated history, never proof of the current container or its running state."""
+    data = cache.read(_environment_key(m))
+    old = cache.observation(data, "container-exec")
+    if old and (old["identity"].get("lifecycle") != _lifecycle(m)
+                or old["identity"].get("environment") != m["id"] or old["identity"].get("data") != c.data_id()):
+        old = None
+    if old:
+        try:
+            if normalize(old["value"]) != old["value"]: old = None
+        except c.SandboxError: old = None
+    if m.get("operation"): old = None
+    result = {"state": "unknown", "version": old["value"] if old else None, "observation": old,
+              "verification": "history-unverified" if old else "unknown", "attempt": cache.attempt(data)}
+    if m.get("operation"): result["recovery"] = str(c.pending_operation(m))
+    return result
+
+
+def environment_version(m, *, check=True):
     """Actual or last-verified evidence; inaccessible Docker only permits qualified history."""
     m = c.resolve(m["id"])
     try:
-        return _environment_version(m)
+        return _environment_version(m, check=check)
     except c.SandboxError as exc:
-        data = cache.read(_environment_key(m))
-        old = cache.observation(data, "container-exec")
+        result = environment_history(m)
+        old = result["observation"]
         attempt = {"at": time.time(), "ok": False, "error": c.error_text(exc)[:1000]}
-        cache.write(_environment_key(m), {"success": old, "attempt": attempt})
-        if not old or old["identity"].get("lifecycle") != _lifecycle(m) \
-                or old["identity"].get("environment") != m["id"] or old["identity"].get("data") != c.data_id() or m.get("operation"):
+        if check: cache.write(_environment_key(m), {"success": old, "attempt": attempt})
+        if not old:
             raise
-        try:
-            if normalize(old["value"]) != old["value"]: raise c.SandboxError("Invalid cached version")
-        except c.SandboxError: raise exc from None
-        return {"state": "unknown", "version": old["value"], "observation": old, "verification": "history-unverified",
-                "error": c.error_text(exc), "attempt": attempt}
+        return {**result, "error": c.error_text(exc), "attempt": attempt if check else result["attempt"]}
 
 
-def _environment_version(m):
+def _environment_version(m, *, check=True):
     # Re-read metadata: historical completed-update fields do not verify the current binary.
     m = c.resolve(m["id"])
     state = c.inspect_container(m)
     if state is None:
-        return {"state": "not-created", "version": None, "observation": None}
+        result = {"state": "not-created", "version": None, "observation": None}
+        if m.get("operation"): result["recovery"] = str(c.pending_operation(m))
+        return result
     identity = _environment_identity(m)
     data = cache.read(_environment_key(m))
     old = cache.observation(data, "container-exec", identity)
@@ -272,7 +287,7 @@ def _environment_version(m):
     if m.get("operation"):
         return {**result, "version": None, "observation": None, "verification": "unknown",
                 "recovery": str(c.pending_operation(m))}
-    if not state.get("Running"):
+    if not check or not state.get("Running"):
         return result
     attempt = {"at": time.time(), "ok": False, "identity": identity}
     cache.write(_environment_key(m), {"success": old, "attempt": {**attempt, "error": "probe did not complete"}})

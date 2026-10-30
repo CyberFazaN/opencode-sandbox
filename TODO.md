@@ -16,15 +16,15 @@ Priority: correctness/reliability fixes -> shared observations/discovery -> comp
 and existing operations -> explicit base refresh -> verified pipx manager self-update.
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
-UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen (seven now remain
-after UP-07 + UP-08). Base refresh does not depend on environment recovery; manager discovery does not
+UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen. UP-10 is now a
+verified split checkpoint; UP-09 and six later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
 depend on base refresh. Tightly
 related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
 package or safety boundary, not mechanically after each ID. Environment recovery, manager
 handoff, replacement and failure recovery retain independent verification gates. The working
 roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
 
-Current checkpoint: UP-00..UP-08 complete. Explicit reports, honest partial inventory, shared
+Current checkpoint: UP-00..UP-08 and UP-10 complete. Explicit reports, honest partial inventory, shared
 base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.
 Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
 their existing timing. Dashboard advisories now replace/clear by category without erasing active
@@ -32,7 +32,12 @@ progress. Identity-bound disposable version evidence now retains stopped history
 bounded compatible stable discovery, Manual/Pinned explicit comparisons and exact confirmed
 targets preserve policy/lifecycle restrictions. Four complete compatibility suites and scoped
 real Debian/Arch update/rollback/recovery/restore/probe checks pass (BASELINE).
-Next: UP-10 + UP-09, manual/cached Updates UI first and optional scheduling afterward.
+UP-10 now replaces Versions with three compact local/cached-first Updates views, explicit
+independent Check/Details and owned cancellation at 80x24/larger. Opening does not contact the
+network or execute version probes; stopped checks never start containers. Manager discovery
+and mutation bindings remain visibly unavailable, with existing CLI guidance. The approved
+UP-10/UP-09 package is split after the verified UI because of its scope and real-terminal fixes.
+Next: UP-09 optional default-off discovery scheduling; the manual UI does not depend on it.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by
 about 8%; findings and recommended verification cadence are in

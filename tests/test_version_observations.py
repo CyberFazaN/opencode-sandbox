@@ -209,8 +209,10 @@ def test_explicit_pilot_report_compares_policies_and_keeps_stopped_time(runtime,
     monkeypatch.setattr(readiness, "image_checks", list)
     monkeypatch.setattr(v, "latest", lambda: "2.2.0")
     async def test(app, pilot):
-        await pilot.press("v")
+        await pilot.press("v", "3", "c")
         await settle(pilot)
+        await pilot.press("d")
+        await pilot.pause()
         assert isinstance(app.screen, tui.ReportScreen)
         assert f"{mode}; update available: 2.1.4 -> 2.2.0" in app.screen.report
         assert "last verified" in app.screen.report and "not a fresh check" in app.screen.report

@@ -12,8 +12,9 @@ independent local/registry version results. UP-03 adds daemon-wide base coordina
 image revalidation; UP-04 adds explicit identity-bound rollback-copy selection; UP-05 bounds
 diagnostic execution and owns client/probe cleanup. UP-06 replaces/clears category-owned dashboard
 advisories while preserving operation status. UP-07/UP-08 add disposable identity-bound version
-evidence, compatible stable discovery and explicit policy comparisons. The Updates interface,
-optional scheduling, refresh modes and manager updater remain pending.
+evidence, compatible stable discovery and explicit policy comparisons. UP-10 adds the manual/
+cached compact Updates interface; optional scheduling, mutation bindings, refresh modes and
+manager discovery/classification/updater remain pending.
 
 ## Boundaries
 
@@ -38,6 +39,7 @@ optional scheduling, refresh modes and manager updater remain pending.
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
 | `update_cache.py` | Bounded private disposable evidence/attempt files, atomic per-key replacement; no metadata/journal authority, scheduling or mutation locks | D-056 |
+| `updates.py`, `updates_tui.py` | Read-only base inventory and compact local/cached-first Updates views; explicit independent object/npm checks, selected Details and owned cancellation; no scheduler or mutation engine | D-056, D-057 |
 | `agent_context.py` | Renders, verifies and refreshes the injected guidance | D-008, D-018 |
 | `integrations.py` | Initial MCP integrations (Context7 by default), provisioned once | D-009 |
 | `config_plan.py` | One planner/executor for CPU, memory, PIDs, network, ports, provider profile | D-010 |
@@ -51,7 +53,7 @@ optional scheduling, refresh modes and manager updater remain pending.
 | `tui_runtime.py` | Thread-worker adapter for scoped readiness/diagnostic cancellation and guarded read-only result publication; no UI retry loop | D-052, D-056 |
 
 `tui.ReportScreen` is the shared plain-text, scrollable read-only report for Agent Context,
-Versions, readiness and cleanup results. Its title is a required explicit keyword argument,
+Updates Details, readiness and cleanup results. Its title is a required explicit keyword argument,
 rendered without markup; there is no versions-specific default. Agent Context uses
 `Agent Context — NAME`. A failed container inspection is displayed with the configured-settings
 fallback, and the saved guidance is not verified against that unobserved preview. Successful
@@ -131,7 +133,33 @@ Read-only dashboard workers publish through `tui_runtime.publish`, checking canc
 liveness both before queuing and on the UI thread. No late result from a canceled/replaced check.
 This neither implements mutation Cancel nor replaces journals/recovery; base candidate cleanup
 gets its own uncancelled inspection after an interrupted probe. Full reports can take multiple
-per-call budgets, and the existing Versions interface still waits for its attempts before display.
+per-call budgets; Updates publishes local/selected evidence and independent discovery without
+waiting for every source to finish.
+
+UP-10's `UpdatesScreen` is a separate read-only screen retaining `v`, with one compact table
+shared by Manager/Bases/Environment subviews, stable selection, plain selected summaries and
+generic scrollable Details. Manager installed version is local; installation/release eligibility
+is not guessed. Pending mutation/release capabilities are visibly unavailable, with existing CLI
+guidance, not fake working buttons. No confirmation/executor/journal was added in this package.
+
+Opening renders metadata and Docker-free `environment_history` first (explicitly identity-
+unverified), then independent bounded local base/environment inspection workers. The new
+`environment_version(check=False)` option never executes OpenCode or writes attempts; default
+CLI/readiness behavior stays active. Base inventory validates immutable IDs, distinguishes
+missing/foreign/unknown/older/newer/different definition provenance and reads actual image
+evidence without helpers. Build labels do not become binary evidence. Check explicitly starts
+separate selected-object and shared-per-screen npm work; partial failure, rate limits and prior
+dated successes remain visible. Stopped/never-created environments are not started. Pending
+recovery remains qualified even without a container.
+
+Each screen owns its worker references and per-item generation tokens. A newer Check invalidates
+older local inventory publication; Cancel/Close cancels only owned read-only work and refuses
+queued/late results without treating cancellation as mutation rollback. Per-screen in-flight npm
+checks coalesce across both OpenCode views, but this is not UP-09's persistent/cross-caller
+coordinator. No timer queries a source; a UI-only notice-count timer never calls Docker/network.
+Dashboard notifications/advisories remain intact, but Updates collapses its toast rack to zero
+height and discloses a count/full messages in Details so notices cannot cover 80x24 controls.
+Leaving the screen preserves dashboard notification/status ownership.
 
 Dashboard startup/explicit Refresh publishes complete base-image check results, including success.
 Daemon, resource-support and image advisories own their notification objects and share an explicit

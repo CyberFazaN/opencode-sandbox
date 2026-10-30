@@ -55,6 +55,9 @@ Consider something else if:
   latest supported stable discovery, update policies, updates with
   automatic rollback on failure; OpenCode's self-update is off. Local version inventory remains
   available when registry discovery fails.
+- **Updates inventory** in the dashboard (`v`): compact component views, local/cached-first,
+  explicit version checks and full evidence in Details. Opening it makes no network request.
+  [Current capabilities and limits](docs/dashboard.md#updates).
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
   operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.
   One-time initial integrations (Context7 by default).

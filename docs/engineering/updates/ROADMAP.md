@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-08 and PERF complete. Next: UP-10 + UP-09 (manual/cached UI first).**
+- **UP-00..UP-08, UP-10 and PERF complete. Next: UP-09 (optional discovery scheduling).**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -10,6 +10,8 @@
   selection; UP-05 bounds short diagnostics and owns client/probe cleanup; UP-06 replaces/clears
   category-owned advisories without erasing active progress; UP-07/UP-08 add identity-bound
   evidence, disposable caches, compatible stable resolution and exact targets/comparisons.
+  UP-10 delivers the manual/cached compact Updates UI; the approved package is split after
+  this verified checkpoint because of its UI/real-terminal scope. UP-09 remains pending.
   D-057 consolidates the remaining
   packages and removes artificial dependencies, without weakening verification gates. The initially
   DNS-blocked packaged-definition gate now passes, alongside retained
@@ -50,7 +52,7 @@ Source inspection is not regression or real-operation evidence.
 | Rollback guesses wrong order (fixed in UP-04) | At UP-00, `rollback_base` maximized Docker image creation time | Alias-consolidated immutable inventory, one-copy default, explicit multi-copy selection even with `--yes`, consent/current-base revalidation and current-definition verification |
 | Diagnostic calls can hang (fixed for short checks in UP-05) | At UP-00, general `core.call`/version probes had no execution deadline | Finite read-only allowlist/explicit probe scopes, total HTTP child budget, bounded output/client reaping, container-side limits, label-checked helper cleanup and cancellation-safe read-only UI publication; long mutations keep their existing timing |
 | Obsolete image advisories linger (fixed in UP-06) | At UP-00, `_show_image_checks` posted warnings, but successful checks were not published | Complete results replace/clear owned daemon/resource/image notices; explicit status ownership preserves active progress and cleanup-safe results; no late same-turn warning toast |
-| Versions is only a report | It queries npm on opening, lists running-environment versions, and offers only Close | Compact Updates inventory/actions with independent component lifecycles |
+| Versions is only a report (inventory fixed in UP-10) | At UP-00 it queried npm on opening and offered only Close | Now three compact local/cached-first views, independent explicit checks and Details; component mutation bindings remain later packages |
 | No manager discovery/updater | Version source and manual pipx instructions exist; no installation classification or handoff | Published-release discovery and verified official-tag pipx execution after earlier stages |
 | Missing observation/discovery cache (fixed in UP-07/UP-08) | At UP-00, readiness cache was not structured version history and stopped versions were lost | Now disposable source/time/immutable-identity evidence and distinct attempts, outside metadata; replacement/journals invalidate or qualify history |
 | Latest/policy semantics (fixed in UP-07/UP-08) | At UP-00, npm latest outside 2.x was refused and Manual/Pinned hid explicit comparisons | Now latest supported stable metadata selection, exact consent/revalidation and explicit comparisons without weakening policy |
@@ -295,7 +297,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-08 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
+All tasks below are pending except UP-00..UP-08, UP-10 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -307,12 +309,13 @@ Default priority: finish correctness (UP-06), shared evidence/discovery (UP-07 +
 UI with optional background scheduling (UP-10 + UP-09), environment actions/recovery (UP-11),
 base actions/refresh (UP-12 + UP-13), manager discovery/classification (UP-14 + UP-15), manager
 handoff (UP-16), replacement/recovery (UP-17), then evidence consolidation (UP-18). This is
-**nine remaining cycles at consolidation approval instead of thirteen** (seven after UP-07/UP-08), not
+**nine remaining cycles at consolidation approval instead of thirteen** (UP-10 now split from
+UP-09; UP-09 plus six later packages remain), not
 a quota or permission to combine
 unrelated risks. Read-only manager discovery can be developed independently of base refresh;
 manager execution remains later and must not delay the earlier component workflows. UP-18 is
-not release preparation. UP-00..UP-08 are DONE; all later tasks are PENDING. The next package
-is UP-10 + UP-09, implementing manual/cached UI before optional scheduling. UP-03's initially DNS-blocked
+not release preparation. UP-00..UP-08 and UP-10 are DONE; UP-09 and the other later tasks are
+PENDING. Next is UP-09, without making the delivered manual UI depend on it. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
@@ -326,7 +329,8 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-06 | DONE: clear obsolete advisories | UP-00 | Category-owned warning/success/unknown replacement, status ownership and same-turn toast cleanup; 26 new mocked-check/image/readiness pilot cases at 80x24/100x30, four full compatibility suites; evidence below |
 | PERF | DONE: one-time test-performance investigation | Between UP-06 and UP-07 + UP-08, by owner request; not a new product dependency | Repeat baseline/after timings and collection/fixture/process profiling; same 1263 IDs/outcomes, 708 equivalent parser queries; two test-local improvements, risk-based local cadence, unchanged CI/release gates; evidence below |
 | UP-07 + UP-08 | DONE: shared observations, compatible discovery and policy comparisons | UP-02, UP-05 | Structured source/time/identity, private disposable local/remote cache, stopped history/Unknown, lifecycle qualification and partial Docker results; bounded stable supported-major selection, exact confirmed targets, Manual/Pinned explicit comparisons and shared eligibility. 125 new default-suite cases, four complete compatibility suites, scoped real Debian/Arch update/rollback/recovery/restore/probe checks; evidence below. Scheduler/Updates UI remain pending |
-| UP-10 + UP-09 | Compact Updates inventory, then optional background discovery | UP-01, UP-06, UP-07 + UP-08; **no UP-10 dependency on UP-09** | UP-10 independently delivers three local/cached-first subviews, manual Check, independent loading/errors, Details and keyboard/focus at 80x24/larger, with no network on opening and no premature manager execution. UP-09 adds default-off scheduling, attempt-based 24-hour persistence including failures/restarts, coalescing/rate limits and quiet deduplication, with no start/probe/update side effects. Separate UI/pilot/terminal and cache/preferences/scheduler gates; stop after verified UP-10 if the combined package is too large |
+| UP-10 | DONE: compact manual/cached Updates inventory; approved split checkpoint | UP-01, UP-06, UP-07 + UP-08; **no UP-09 dependency** | Three local/cached-first views, independent manual checks/errors/progress, Details and keyboard/focus/Cancel at 80x24/larger; no network/probe on opening or premature manager execution. 39 new default-suite cases, four complete compatibility suites and real terminal/Docker/OpenCode evidence below. Component mutations stay pending |
+| UP-09 | PENDING: optional background discovery | UP-07 + UP-08; delivered UP-10/preferences for presentation | Default-off scheduling, attempt-based 24-hour persistence including failures/restarts, coalescing/rate limits and quiet deduplication, with no start/probe/update side effects. Separate cache/preferences/scheduler/host/pilot gates; manual UI remains independently usable |
 | UP-11 | Environment actions and recovery | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers with exact consent and locked revalidation; pin/network/running-state refusals, stopped final state and recovery; real Docker/OpenCode and terminal tests. Recovery is an independent gate, not bundled with base or manager work |
 | UP-12 + UP-13 | Base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Inventory, Build/Rebuild/Check/Rollback, rollback-preserving replacement and exact target/state/mode consent; explicit cached versus Refresh & Rebuild in CLI/TUI, pull/no-cache without prune. Verify both distributions under isolated tags, failed-candidate safety, CLI/TUI parity, pinned creation and unchanged retained containers/layers; cached and full-refresh results are separate evidence |
 | UP-14 + UP-15 | Manager release discovery and verified installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Bounded official published-full-release discovery, strict tags/semver/no implicit downgrade, local inventory retained on GitHub failure; actual official-tag pipx identity including custom paths/interpreter/source/launcher, safe manual guidance otherwise. Separate provider and real isolated pipx/foreign/shadowed-launcher tests. Optional daily-source hookup only if UP-09 exists; neither discovery nor classification requires it or exposes execution |
@@ -1359,6 +1363,112 @@ a materially different architecture, record the blocker and ask the owner before
   `test_quality.py test_language.py test_user_docs.py test_cli_structure.py` with the corresponding
   verified venv and `/tmp/opencode/up0708-doc-<venv>` basetemp. Whitespace checks clean.
 
+### UP-10 — 2026-10-30 — independently useful manual/cached Updates UI
+
+- Resumed clean `work/updates` at `cacffea`; read contract/local permissions, TODO, BASELINE,
+  ARCHITECTURE, D-056/D-057 and the running roadmap. Verified own-rootless daemon: no containers
+  or volumes, same four original full image IDs. No unrelated user changes or new host authority.
+- The approved UP-10/UP-09 package is **split at UP-10**. This screen/data/worker integration and
+  its real-terminal findings are substantial enough to warrant an independently verified commit.
+  No scheduling/preference was started. UP-09 is next, not silently marked complete, and the
+  manual UI remains useful with it absent. UP-11/recovery and manager/base action packages remain
+  distinct; no mutation handler is bypassed or represented as implemented UI.
+- Minimal reproducer: changed `test_no_registry_call_until_requested` to assert that opening `v`
+  does not invoke npm: **2 failures** before implementation, both observed an unwanted request.
+  Root cause: old action awaited one combined active inventory/npm report before presentation.
+- New `updates_tui.py`: Manager/Base Images/Environment OpenCode subviews, retained `v`/toolbar,
+  stable per-view selection, one compact responsive table and selected summary, explicit Check,
+  full plain read-only Details, keyboard focus/Enter/Tab/Esc and owned Cancel/Close. Installed
+  manager version is local; release/installation eligibility is explicitly not assessed. Disabled
+  mutation controls explain the staged limit; Details retains existing CLI capabilities/guidance.
+  Metadata state is not actual Docker state; base labels are not binary evidence or OS freshness.
+- `environment_history` reads qualified cache without Docker; `environment_version(check=False)`
+  inspects state/identity/cache without executing OpenCode or recording attempts. Defaults preserve
+  active CLI/readiness checks. Small consumer defect reproduced/fixed: a pending journal stays
+  visible even if its container is absent. No executor, journal, schema or lifecycle rewrite.
+  `updates.py` reads immutable base identity, declared OS/revision/build provenance and qualified
+  image evidence without helpers. Missing/foreign/unknown/old/newer/different definitions do not
+  authorize replacement. Selected explicit base Check uses the existing bounded immutable helper.
+- Base/environment local inspections publish independently from npm. Explicit Check runs one
+  selected-object probe and a separate npm request, coalesced only while in flight in this screen;
+  both views share the result. Fresh/cached/failed source facts stay distinct, successful evidence
+  retains its original time, full failures/empty-inventory discovery remain accessible in Details.
+  Never starts stopped/never-created containers. Policy comparisons remain explicit information,
+  not execution authority. Cancel/Close use UP-05 cancellation plus screen liveness and per-object
+  generation tokens; no queued late/old inventory result replaces a newer Check/replacement screen.
+- Real terminal found an actual UI defect absent from default headless pilots: existing dashboard
+  advisory toasts covered lower controls (and Manager detail at 80x24). Updates now collapses only
+  its toast-rack geometry, shows a compact notice count and full messages in Details, retaining
+  notification/advisory objects and dashboard status ownership. The notice-count timer is UI-only;
+  it does not perform discovery or touch Docker. Regression explicitly enables the production
+  toast rack, rather than clearing advisories or assuming headless tests represent a real terminal.
+- Failure/rerun trail: first affected run 5 failed/49 passed (four old report-shape assertions and
+  an import-order lint failure), next 1 failed/111 passed (unused imports/test variable lint),
+  then 50 passed. First full suite **1 failed/1360 passed/68 skipped**, 151.38 s: existing
+  no-distribution-branches gate matched a new `for distro in` loop; renamed to surrounding `d`
+  convention, with no weakened gate. Lowest-endpoint affected subset **181 passed**, 90.70 s.
+  Toast reproduction iterations first exposed omitted pilot toast rack, then toolkit inline
+  display overriding the first CSS approach; assertions stayed, geometry-based fix passes.
+  Final reviewed UI/data/diagnostic/quality/docs subset **151 passed**, 61.92 s, before full matrix.
+
+  | Final product-code layer | Result |
+  |---|---|
+  | Complete Python 3.11/current | 1365 passed, 68 opt-in skips, 153.47 s |
+  | Complete Python 3.11/lowest | 1365 passed, 68 opt-in skips, 148.59 s; two known Typer deprecations |
+  | Complete Python 3.14/current | 1365 passed, 68 opt-in skips, 152.04 s |
+  | Complete Python 3.14/lowest | 1365 passed, 68 opt-in skips, 147.78 s; two known Typer deprecations |
+  | Final scoped real Docker/OpenCode/terminal | **8 passed/136 logged checks**, no skips/deselections, `up10-verified`, 193.19 s |
+
+  Full commands: `env PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q --tb=short
+  --junitxml=.work/up10/final-<label>.xml --basetemp=/tmp/opencode/up10-final<label>`;
+  venv/labels `venv311/311`, `venv311low/311low`, `venv314/314`, `venv314low/314low`.
+  Serial foreground, Python 3.11.18/3.14.8, pytest 9.2.0, current Typer 0.27.3/Textual 8.2.8,
+  lowest 0.16.0/4.0.0, all four `pip check` runs clean. **1433 ordered IDs/outcomes exactly match**.
+  39 new default-suite cases; prior assertions migrated for selected explicit checks/independent
+  ordering rather than removed. Four new opt-in terminal cases explain 68 rather than 64 skips.
+- Real command: `env PYTHONPATH="$PWD/src" OCS_TEST_DOCKER=1 OCS_TEST_RUN=up10-verified
+  .work/venv311/bin/python -m pytest -q -rA --tb=short tests/integration/test_43_diagnostics.py
+  tests/integration/test_44_version_evidence.py tests/integration/test_51_updates.py
+  --junitxml=.work/up10/real-verified.xml --basetemp=/tmp/opencode/up10-verified-real`.
+  First `up10-terminal`: four bodies completed but **4 teardown errors**, 34 passed/30 failed
+  checks, 440.96 s. Besides overlays, the terminal harness sent Escape+next key together (an Alt
+  sequence); split events, retaining every check. `up10-terminal-proof`: **4 passed/64 checks**,
+  36.23 s. Reviewed-product `up10-final`: **8 passed/136 checks**, 162.51 s. Final harness review
+  then added test-prefix/label/manifest recording for transient Check helpers, following test_43;
+  no product change or source mock. Reran all eight in `up10-verified` above, with every helper
+  manifested. No failed check is suppressed or inferred from a completed test body.
+- Terminal source harness substitutes npm's URL with a real loopback HTTP server and names/labels/
+  manifests transient probe resources. No public npm/GitHub or paid provider is contacted in
+  terminal rows; HTTP transport/owned child and Docker/probes are real. Both retained distributions
+  at 80x24/120x40 verify immediate Manager state, no request on opening/view changes, selected
+  stopped history/comparison, visible primary controls, Details, cached success after HTTP 503,
+  independent progress and keyboard Cancel, exact final stopped/StartedAt/byte-identical metadata,
+  no helper leaks, normal Close/Q and terminal restoration. Lifecycle/probe rows retain actual
+  2.2.0 -> explicit 2.1.4 -> checkpoint rollback, same-version verification, SIGKILL recovery,
+  recreation/file-only restore invalidation, data/configuration markers and owned bounded cleanup.
+  Inputs are retained Debian 12/revision 1 and Arch/revision 1, not rebuilt current definitions.
+- Logs/XML in `.work/up10/`; all real manifests/logs `.work/logs/up10-{terminal,terminal-proof,
+  final,verified}*`. Guarded product cleanup/leak checks ran in every attempt, failed or successful.
+  Ending verified inventory has zero containers/volumes, no run helpers and the same four original
+  full tagged-image IDs. Only test-owned snapshot/checkpoint/runtime resources were removed by
+  guarded product cleanup. Backup/cache/terminal scripts/logs remain in ignored `.work/`.
+- README/guide/Unreleased/engineering facts updated; dashboard illustration regenerated using
+  the existing fake-data script. Legacy `test_50_tui.py` expectations now enter Environment view
+  after `v`, but its complete broader workflow is not rerun in this scope. No new full campaign,
+  fresh base build, installed pipx/manager, privileged/socket/service, provider/paid call or manual
+  observation evidence. Version/assets/schemas/dependencies/CI/release gates unchanged. No release,
+  version bump, merge, push or upload. Checkpoint locally and STOP after final package/doc checks.
+- Final packaging: local `python -m build --no-isolation` sdist/wheel, strict twine and
+  `.github/scripts/check_dist.py` pass; all four changed/new modules (`opencode_versions.py`,
+  `tui.py`, `updates.py`, `updates_tui.py`) match wheel bytes. Hashes:
+  `.work/up10/verified-source-sha256.json`; final artifacts `.work/up10/package-final/`.
+  Final engineering/document/CLI/quality follow-up **41 passed**, 3.03 s, after the test-only
+  helper-manifest extension; final prose-only follow-up separately recorded in the local log.
+  No product changes after the full matrix; focused repeats are not extra complete suites.
+  `git diff --check` clean. Core lifecycle, runtime identity, base locks, diagnostics/probes,
+  worker adapter, cache storage, preferences, image assets, versions, schemas, dependencies,
+  CI, AGENTS and RELEASING are byte-unchanged from `cacffea`.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
@@ -1366,31 +1476,33 @@ a materially different architecture, record the blocker and ask the owner before
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
    `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, UP-06 `d7e587e`,
-   PERF `6b53f46`, then the UP-07/UP-08 package commit. Recover PERF's measured verification cadence from
+   PERF `6b53f46`, UP-07/UP-08 `cacffea`, then the UP-10 package commit. Recover PERF's measured verification cadence from
    BASELINE; it does not reduce the shared/high-risk or real gates for the next package.
     Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
-    category-owned advisory clearing, identity-bound evidence/discovery and exact targets are
-    implemented. Image assets, manager
+     category-owned advisory clearing, identity-bound evidence/discovery, exact targets and
+     manual/cached Updates UI are implemented. Image assets, manager
    version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Select **UP-10 + UP-09**, implementing UP-10's independently useful manual/cached Updates UI
-   first: replace Versions with three compact local/cached-first subviews (Manager, Bases,
-   Environment OpenCode), retain `v`, explicit Check/Details, independent errors/loading, reasons
-   for unavailable actions and 80x24/larger keyboard/focus/Cancel behavior. Use the implemented
-   source/time/identity/discovery/eligibility contracts; do not parse readiness strings or use
-   build labels/history as runtime proof. Opening the new screen must not query the network.
-   Avoid image helpers for ordinary inventory and never start stopped containers implicitly.
-   Manager discovery/classification/execution and component action packages remain separate;
-   do not present pending capabilities as working or bypass existing handlers/recovery journals.
-   Only after the manual/cached UI is verified, add optional default-off UP-09 scheduling if the
-   cycle remains manageable: at most one attempt per source/24h including failures/restarts,
-   persisted attempts, coalescing/rate limits and quiet deduplication, no daemon/install/start.
-   Cache is per-key atomic storage, not yet an in-flight coordinator. No discovery-cache lock
-   may be held while acquiring mutation locks. If split, stop after tested UP-10, not on an
-   unverified combined UI/scheduler. Preserve UP-05 publication/bounds, UP-06 status ownership,
-   exact plans, schemas, pins, base guards and journals. No new host/service/network permission.
+3. Select **UP-09**, completing the split package after independently verified UP-10: inspect
+   `preferences.py`, dashboard lifecycle and current cache/source callers, then implement optional
+   **default-off** metadata discovery while the dashboard runs. At most one attempt per source
+   per 24h, including failures/restarts/interruption; persist attempt claims before the request,
+   coalesce manual/background/in-flight work and respect numeric/date Retry-After including long
+   pauses. Quiet deduplicated availability only for eligible notice policy; no per-environment
+   toast storm, process/service daemon, automatic install/start or image/runtime probes. npm is
+   implemented; GitHub discovery remains UP-14, so leave only a truthful later source hookup,
+   not speculative manager checks. Short CLI commands must not acquire unsolicited network work.
+   UP-10 currently coalesces npm only per open screen; it is not a cross-caller/cross-process
+   coordinator. Cache per-key replacement is last-completion-wins; do not pretend it is scheduling.
+   Keep success, attempts, installed observations and journals separate; no discovery-cache
+   synchronization while acquiring mutation locks. Retain manual UI with scheduling off/unavailable,
+   on-opening no implicit Check, stopped Unknown/history and no helper inventory. Add actual
+   persistence/restart/failure/concurrency/rate-limit/preference/quiet-policy host/pilot tests.
+   Manager/base/environment mutations remain their later independent packages. Preserve UP-05
+   bounds/publication, UP-06 status ownership, exact targets, pins, schemas, base guards and journals.
+   Do not revive speculative performance work or infer any new host/service/network permission.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.

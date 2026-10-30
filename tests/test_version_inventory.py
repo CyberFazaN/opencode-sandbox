@@ -10,8 +10,8 @@ from typer.testing import CliRunner
 
 from opencode_sandbox import core as c
 from opencode_sandbox import opencode_versions as v
-from opencode_sandbox import tui
 from opencode_sandbox.cli import app
+from opencode_sandbox.updates_tui import UpdatesScreen
 
 
 @pytest.fixture
@@ -56,14 +56,27 @@ def assert_local_rows(text):
     assert "current" not in text and "update available" not in text
 
 
-def assert_read_only_checks(inventory, *, check=True):
+def assert_read_only_checks(inventory, *, check=True, ordered=True):
     assert {p: p.read_bytes() for p in inventory.files} == inventory.files
     assert inventory.events.count(("registry",)) == int(check)
-    if check:
+    if check and ordered:
         # Local collection must not depend on a successful registry check.
         assert inventory.events[-1] == ("registry",)
     assert {a[1] for a in inventory.events if a[0] == "inspect"} == set(inventory.states)
     assert len([a for a in inventory.events if a[0] == "exec"]) == 1  # running only
+
+
+async def check_updates(app, pilot):
+    await pilot.press("v", "3")
+    await settle(pilot)
+    screen = app.screen
+    assert isinstance(screen, UpdatesScreen)
+    table = screen.query_one("#updates-table")
+    running = next(m for m in c.all_envs() if m["name"] == "ocs-test-up02-running")
+    table.move_cursor(row=table.get_row_index(running["id"]))
+    await pilot.press("c")
+    await settle(pilot)
+    return screen
 
 
 REGISTRY_ERRORS = [
@@ -90,13 +103,13 @@ def test_cli_inventory_survives_registry_failure(inventory, error):
 def test_tui_inventory_survives_registry_failure(inventory, error):
     inventory.discovery["error"] = error
     async def t(app, pilot):
-        await pilot.press("v")
-        await settle(pilot)
-        assert isinstance(app.screen, tui.ReportScreen)
-        assert_local_rows(app.screen.report)
-        assert f"npm registry check failed: {c.error_text(error)}" in app.screen.report
-        assert any(n.message == "Version check failed" for n in app._notifications)
-        assert_read_only_checks(inventory)
+        screen = await check_updates(app, pilot)
+        rows = {i["name"]: i for i in screen.items["environments"].values()}
+        assert rows["ocs-test-up02-running"]["version"] == "2.1.4"
+        assert rows["ocs-test-up02-stopped"]["state"] == "stopped"
+        assert rows["ocs-test-up02-created"]["state"] == "not-created"
+        assert f"Check failed: {c.error_text(error)}" in screen.discovery_text()
+        assert_read_only_checks(inventory, ordered=False)
         await pilot.press("escape")
         assert len(app.screen_stack) == 1
     run(t, (80, 24))
@@ -132,10 +145,22 @@ def test_local_source_failure_does_not_hide_registry_result(monkeypatch, invento
         check(result.output)
     else:
         async def t(app, pilot):
-            await pilot.press("v")
+            # The new UI enumerates local metadata independently of the CLI's active report.
+            await pilot.press("v", "3")
             await settle(pilot)
-            check(app.screen.report)
-            assert any(n.message == "Version check failed" for n in app._notifications)
+            screen = app.screen
+            def fail_metadata(): raise error
+            monkeypatch.setattr(c, "all_envs", fail_metadata)
+            await pilot.press("escape", "v", "3", "c")
+            await settle(pilot)
+            screen = app.screen
+            assert screen.inventory_error == c.error_text(error)
+            assert not screen.items["environments"]
+            if registry_ok:
+                assert "npm: 2.2.0" in screen.discovery_text() and "Check failed" not in screen.discovery_text()
+            else:
+                assert "Check failed: Registry unavailable [test]" in screen.discovery_text()
+            assert inventory.events.count(("registry",)) == 1
         run(t, (80, 24))
 
 
@@ -186,10 +211,17 @@ def test_bad_rows_do_not_hide_other_environments(monkeypatch, inventory, fronten
         assert "check failed" in result.stderr and "ownership refused" in result.stderr
     else:
         async def t(app, pilot):
-            await pilot.press("v")
-            await settle(pilot)
-            check(app.screen.report)
-            assert any(n.message == "Version check failed" for n in app._notifications)
+            screen = await check_updates(app, pilot)
+            rows = {i["name"]: i for i in screen.items["environments"].values()}
+            assert rows[bad_policy["name"]]["error"].startswith("TypeError:")
+            assert rows[bad_docker["name"]]["error"] == "Container ownership refused [test]"
+            assert screen.item_summary(rows[bad_format["name"]]) == f"check failed ({c.error_text(row_error)})"
+            assert rows["ocs-test-up02-stopped"]["state"] == "stopped"
+            assert rows["ocs-test-up02-created"]["state"] == "not-created"
+            text = screen.item_summary(rows["ocs-test-up02-running"])
+            if registry_ok: assert "update available: 2.1.4 -> 2.2.0" in text
+            else: assert "Check failed: Registry unavailable [test]" in screen.discovery_text()
+            assert_read_only_checks(inventory, ordered=False)
         run(t, (80, 24))
 
 
