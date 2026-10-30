@@ -7,6 +7,7 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, Vertical
+from textual.notifications import Notification
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -206,7 +207,10 @@ class Dashboard(App):
 
     def on_mount(self) -> None:
         self._operation_pending = False
-        self._runtime_waiters = set()
+        self._runtime_waiters = {}
+        self._runtime_notification = None
+        self._advisories = {}
+        self._status_owner = None
         self.query_one("#envs", DataTable).add_columns("Name", "Kind", "State", "Profile", "Source", "ID")
         self.action_refresh()
         # CLI changes made while the dashboard is open (H08); only metadata file stats are read.
@@ -234,71 +238,103 @@ class Dashboard(App):
         from . import readiness
         try:
             check = readiness.daemon_check()
-            if check.status != readiness.PASSED:
-                publish(self, self._show_prerequisites, check.detail)
-                return
-            publish(self, self._prerequisites_ready)
-            support = readiness.resource_support_check()
-            publish(self, self._show_resource_support, support)
-            images = [item for item in readiness.image_checks() if item.status != readiness.PASSED]
-            if images:
-                publish(self, self._show_image_checks, images)
         except Exception as exc:
             publish(self, self._show_prerequisites, c.error_text(exc))
             return
+        if check.status != readiness.PASSED:
+            publish(self, self._show_prerequisites, check.detail)
+            return
+        publish(self, self._prerequisites_ready)
+        try:
+            support = readiness.resource_support_check()
+        except Exception as exc:
+            support = readiness.Check("resource-support", "Resource-limit support", readiness.NOT_CHECKED,
+                                      f"check could not run: {c.error_text(exc)}")
+        publish(self, self._show_resource_support, support)
+        try:
+            images = readiness.image_checks()
+        except Exception as exc:
+            images = [readiness.Check("images", "Base images", readiness.NOT_CHECKED,
+                                      f"check could not run: {c.error_text(exc)}")]
+        publish(self, self._show_image_checks, images)
+
+    def _replace_advisory(self, category, summary=None, *, title="", detail="") -> None:
+        """UI-thread replacement of just this category, including success with no new toast."""
+        previous = self._advisories.pop(category, None)
+        if previous is not None:
+            self._unnotify(previous[1], refresh=False)
+        if summary is not None:
+            note = Notification(detail, title=title, severity="warning", timeout=30, markup=False)
+            self._advisories[category] = (summary, note)
+            # Register synchronously, like Textual's notify handler: a queued warning must not
+            # arrive after a same-turn success. Own the object, not every notice with this title.
+            self._notifications.add(note)
+        self._refresh_notifications()
+        if not self._operation_pending and not self._runtime_waiters \
+                and (summary is not None or self._status_owner == "advisory"):
+            self._advisory_status()
+
+    def _advisory_status(self) -> None:
+        # A successful image check must not conceal an outstanding daemon/resource warning.
+        for category in ("daemon", "resources", "images"):
+            if category in self._advisories:
+                self.query_one("#status", Static).update(self._advisories[category][0])
+                self._status_owner = "advisory"
+                return
+        self.query_one("#status", Static).update("Ready")
+        self._status_owner = None
 
     def _show_resource_support(self, check) -> None:
         from . import readiness
-        for note in list(self._notifications):
-            if note.title == "Resource-limit support": self._unnotify(note)
-        status = self.query_one("#status", Static)
-        if check.status != readiness.PASSED:
-            if not self._operation_pending:
-                status.update("Resource-limit support needs attention. Details: opencode-sandbox doctor")
+        if check.status not in (readiness.PASSED, readiness.NOT_APPLICABLE):
+            state = "could not be verified" if check.status == readiness.NOT_CHECKED else "needs attention"
             text = "\n".join(readiness.format_report({"checks": [vars(check)]}))
-            self.notify(text, title="Resource-limit support", severity="warning", timeout=30)
-        elif not self._operation_pending and str(status.render()).startswith("Resource-limit support needs attention"):
-            status.update("Ready")
+            self._replace_advisory("resources", f"Resource-limit support {state}. Details: opencode-sandbox doctor",
+                                   title="Resource-limit support", detail=text)
+        else:
+            self._replace_advisory("resources")
 
     def _show_image_checks(self, checks) -> None:
         from . import readiness
-        if not self._operation_pending:
-            self.query_one("#status", Static).update("Base image checks need attention. Details: opencode-sandbox doctor")
-        self.notify("\n".join(readiness.format_report({"checks": [vars(item) for item in checks]})),
-                    title="Base images need attention", severity="warning", timeout=30)
+        checks = [item for item in checks if item.status not in (readiness.PASSED, readiness.NOT_APPLICABLE)]
+        if checks:
+            state = "could not be completed" if all(item.status == readiness.NOT_CHECKED for item in checks) else "need attention"
+            text = "\n".join(readiness.format_report({"checks": [vars(item) for item in checks]}))
+            self._replace_advisory("images", f"Base image checks {state}. Details: opencode-sandbox doctor",
+                                   title="Base images need attention", detail=text)
+        else:
+            self._replace_advisory("images")
 
     def _show_prerequisites(self, detail: str) -> None:
-        if not self._operation_pending:
-            self.query_one("#status", Static).update(
-                "Docker is not ready: environments cannot start. Details: opencode-sandbox doctor")
-        self.notify(f"{detail}\nDetails: opencode-sandbox doctor", title="Docker is not ready",
-                    severity="warning", timeout=30)
+        self._replace_advisory("daemon", "Docker is not ready: environments cannot start. Details: opencode-sandbox doctor",
+                               title="Docker is not ready", detail=f"{detail}\nDetails: opencode-sandbox doctor")
 
     def _prerequisites_ready(self) -> None:
-        for note in list(self._notifications):
-            if note.title == "Docker is not ready":
-                self._unnotify(note)
-        status = self.query_one("#status", Static)
-        if not self._operation_pending and str(status.render()).startswith("Docker is not ready"):
-            status.update("Ready")
+        self._replace_advisory("daemon")
 
     def _runtime_notice(self, message, worker) -> None:
         if not self.is_running or (message and worker.is_cancelled):
             return
         if message:
             first = not self._runtime_waiters
-            self._runtime_waiters.add(worker)
+            self._runtime_waiters[worker] = message
             if not self._operation_pending:
                 self.query_one("#status", Static).update(message)
-            if first: self.notify(message, title="Docker readiness", timeout=10)
+                self._status_owner = "runtime"
+            if first:
+                self._runtime_notification = Notification(message, title="Docker readiness", timeout=10, markup=False)
+                self._notifications.add(self._runtime_notification)
+                self._refresh_notifications()
         else:
-            self._runtime_waiters.discard(worker)
-            if not self._runtime_waiters:
-                for note in list(self._notifications):
-                    if note.title == "Docker readiness": self._unnotify(note)
-            status = self.query_one("#status", Static)
-            if not self._runtime_waiters and str(status.render()).startswith("Waiting for Docker readiness"):
-                status.update("Ready")
+            self._runtime_waiters.pop(worker, None)
+            if not self._runtime_waiters and self._runtime_notification is not None:
+                self._unnotify(self._runtime_notification)
+                self._runtime_notification = None
+            if not self._operation_pending and self._status_owner == "runtime":
+                if self._runtime_waiters:
+                    self.query_one("#status", Static).update(next(reversed(self._runtime_waiters.values())))
+                else:
+                    self._advisory_status()
 
     @staticmethod
     def _metadata_state():
@@ -621,6 +657,7 @@ class Dashboard(App):
         self.push_screen(RecoveryScreen())
 
     def _set_busy(self, message: str) -> None:
+        self._status_owner = None  # operation progress/results are not advisory-owned text
         self.query_one("#status", Static).update(message)
 
     def _finished(self, message: str, error: bool = False) -> None:

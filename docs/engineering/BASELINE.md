@@ -25,10 +25,12 @@ TUI. UP-03 implements daemon-wide base build/publication guards, cleanup/creatio
 and locked image revalidation. UP-04 adds alias-consolidated rollback inventory, explicit copy
 selection and immutable consent/revalidation. UP-05 bounds short host/network diagnostics and
 container probes, owns client/helper cleanup and prevents late canceled read-only UI results.
+UP-06 replaces/clears category-owned daemon/resource/image advisories and readiness notices,
+with explicit status ownership preserving active operations and cleanup-safe completion results.
 The Versions interface, discovery policy and independent mutation lifecycles remain unchanged;
-UP-06 is next. No image-definition, schema or manager-version change was made.
+UP-07 + UP-08 is next. No image-definition, schema or manager-version change was made.
 
-UP-01..UP-05 verification is below; commands, initial failures and handoff are in the roadmap.
+UP-01..UP-06 verification is below; commands, initial failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -90,6 +92,17 @@ test-only image namespace for new base images and the socket-activation opt-in a
 in `RELEASING.md` ("Verify").
 
 ## Verification
+
+### Unpublished UP-06 and roadmap consolidation — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Full unit/host/Textual-pilot/local-process suite, Python 3.11.18 and 3.14.8, current/lowest dependencies | **1201 passed, 62 opt-in skips in each of four serial foreground runs**; Typer 0.27.3/Textual 8.2.8 and 0.16.0/4.0.0. Only the two known lowest-Typer/Click deprecations. Includes Ruff/shellcheck, language/links/CLI checks and existing host terminal fixtures |
+| New advisory pilot cases | **26 cases**, mocked checks/Docker and real isolated metadata: original missing-image warning then successful Refresh at 80x24/100x30; same-turn and repeated warning/unknown/success transitions; overlapping categories; unrelated same-title notices; expired notice cleanup; active mutation progress and completion/recovery result preservation; overlapping readiness waits; phase-error attribution; skipped categories not guessed successful; Docker-free metadata refresh; replaced worker cannot publish late warnings |
+| Reproductions and reruns | Original regression **2 failed**, 1.51 s, before patch. New same-turn readiness notification regression **2 failed/79 passed**, exposing a queued toast after cleanup; fixed with owned synchronous notification registration. Two focused iterations also found single Ruff nested-if failures (167 and 191 passed respectively); corrected with no suppression. All four final suites pass |
+| Package | Python 3.11 local 6.1.0 sdist/wheel, strict twine and `check_dist.py` passed; changed product module `tui.py` byte-identical in wheel. No upload/global installation/installed-manager run |
+| Resources / real layers | Read-only own-rootless inventory before/after: zero containers/volumes, unchanged four original full tagged-image IDs. No Docker resources created/changed/deleted; no cleanup needed. No new real Docker mutation, real OpenCode, isolated pipx, advisory-specific real-terminal or manual observation evidence claimed; UP-05's scoped real results remain historical for UP-06 |
+| Planning | D-057 and the roadmap consolidation checkpoint group related work and remove artificial dependencies without reducing acceptance gates. The planning-only language/links/CLI subset passed **27 tests** before UP-06. UP-00..UP-06 complete; next UP-07 + UP-08 together; no release work |
 
 ### Unpublished UP-05 — 2026-10-30
 

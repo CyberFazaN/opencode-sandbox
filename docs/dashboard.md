@@ -27,12 +27,20 @@ usable for everything that does not need Docker. `opencode-sandbox doctor` shows
 After the daemon is verified, the same worker checks managed base-image revisions. A
 "Base images need attention" notice uses the same results and commands as `doctor`. It is
 advisory, not a request to replace an existing environment, and never rebuilds an image.
-Rerun `doctor` for fresh results after changing images;
+Press `r` for fresh dashboard results after changing images, or rerun `doctor`;
 [maintenance.md](maintenance.md#base-image-definitions) explains the cases.
 
 The same worker also reports [resource-limit support](maintenance.md#resource-limit-support).
 Missing support or unavailable evidence gets an advisory notice, not an identity failure or
 an automatic host repair. CPU/memory/PID capability reports do not prove kernel enforcement.
+
+Refresh replaces each checked category's old notice rather than stacking repeated warnings.
+Success clears that category; an unavailable check replaces its old warning with an unverified
+result, not a claim that the problem is fixed. A category skipped because Docker is unavailable
+is not marked successful. Clearing one category leaves other notices intact and reveals any
+remaining advisory in the status line. New advisories do not overwrite active operation progress;
+clearing advisories or readiness waits does not erase an operation's completion/recovery result.
+Metadata-only refresh does not recheck or clear these advisories.
 
 ## Keys
 

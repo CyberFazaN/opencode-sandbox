@@ -16,19 +16,21 @@ Priority: correctness/reliability fixes -> shared observations/discovery -> comp
 and existing operations -> explicit base refresh -> verified pipx manager self-update.
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
-UP-13, and UP-14 + UP-15: nine planned remaining cycles, not thirteen. Base refresh does not
-depend on environment recovery; manager discovery does not depend on base refresh. Tightly
+UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen (eight now remain
+after UP-06). Base refresh does not depend on environment recovery; manager discovery does not
+depend on base refresh. Tightly
 related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
 package or safety boundary, not mechanically after each ID. Environment recovery, manager
 handoff, replacement and failure recovery retain independent verification gates. The working
 roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
 
-Current checkpoint: UP-00..UP-05 complete. Explicit reports, honest partial inventory, shared
+Current checkpoint: UP-00..UP-06 complete. Explicit reports, honest partial inventory, shared
 base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.
 Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
-their existing timing. Next: UP-06, clear obsolete advisory categories without erasing progress.
+their existing timing. Dashboard advisories now replace/clear by category without erasing active
+progress. Next: UP-07 + UP-08 together, shared observations, compatible discovery and comparisons.
 The manager version remains 6.1.0.
-Completion does not authorize a version bump, release preparation, tag, push or publication.
+Completion does not authorize a merge, version bump, release preparation, tag, push or publication.
 
 ## Delivered in 6.1.0
 

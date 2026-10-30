@@ -48,6 +48,13 @@ passed**, final `up05-final`. The initial missing-tool stdout classification fai
 and rerun, not suppressed. These scoped results do not renew full campaign, privileged,
 model-provider or real-terminal/manual evidence; no release-readiness claim follows.
 
+UP-06 adds 26 mocked-check/pilot regressions at 80x24/100x30 for category-owned advisory clearing,
+unknown/repeated/overlapping results, progress ownership and cancellation-safe publication.
+The full unit/host/pilot suites pass on all four Python/dependency combinations (BASELINE).
+No new real-Docker/OpenCode, advisory-specific real-terminal or manual observation is claimed;
+earlier scoped real PASS entries are not renewed by this UI-only change. D-057 consolidates
+remaining work packages/dependencies, not the independent recovery/safety verification gates.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

@@ -10,7 +10,8 @@ Approved staged architecture: D-056 and the [Updates working roadmap](updates/RO
 UP-01 implements generic reports and the Agent Context presentation correction; UP-02 preserves
 independent local/registry version results. UP-03 adds daemon-wide base coordination and locked
 image revalidation; UP-04 adds explicit identity-bound rollback-copy selection; UP-05 bounds
-diagnostic execution and owns client/probe cleanup. The Updates
+diagnostic execution and owns client/probe cleanup. UP-06 replaces/clears category-owned dashboard
+advisories while preserving operation status. The Updates
 interface, disposable version observations/discovery cache and other staged corrections remain pending.
 
 ## Boundaries
@@ -129,6 +130,19 @@ liveness both before queuing and on the UI thread. No late result from a cancele
 This neither implements mutation Cancel nor replaces journals/recovery; base candidate cleanup
 gets its own uncancelled inspection after an interrupted probe. Full reports can take multiple
 per-call budgets, and the existing Versions interface still waits for its attempts before display.
+
+Dashboard startup/explicit Refresh publishes complete base-image check results, including success.
+Daemon, resource-support and image advisories own their notification objects and share an explicit
+status owner, not rendered-text prefix matching. Category replacement is synchronous on the UI
+thread so a queued old toast cannot arrive after success; unrelated notifications, even with the
+same title, are untouched. Unknown replaces that category's old result; a phase exception belongs
+to its own category, not a false daemon failure. An unverified daemon skips downstream checks
+without inventing success. When no operation/readiness wait owns the line, outstanding daemon,
+resource and image advisories have that priority; clearing one reveals the remaining advisory.
+Readiness waits retain worker ownership and their own notification, restore a remaining wait or
+advisory only when they owned the status, and cannot erase mutation progress/results. Operation
+guards are unchanged; metadata-only refresh stays Docker-free. No observations/discovery cache or
+Updates screen is introduced by this correction.
 
 ## Data and Docker objects
 

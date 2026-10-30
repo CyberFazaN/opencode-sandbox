@@ -28,6 +28,9 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   owned clients on timeout or cancellation. Container probes have their own deadlines; interrupted
   image helpers get bounded, label-checked cleanup. Canceled read-only dashboard workers cannot
   publish late results. Builds, installs, commits and interactive commands keep their existing timing.
+- Dashboard refresh replaces or clears only its own daemon, resource-support and base-image
+  advisories, including successful checks. Unknown results replace obsolete warnings without
+  claiming success, and advisory/readiness cleanup preserves active operation progress and results.
 
 ## 6.1.0 — 2026-10-30
 

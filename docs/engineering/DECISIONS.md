@@ -914,6 +914,9 @@ Owner decision, 2026-10-30, after an independent review of every change since 6.
 
 ## D-056 Updates architecture and execution order — accepted for implementation
 
+Workflow/stage dependencies are partially superseded by D-057; the architecture/safety contract
+below is unchanged.
+
 Owner approval after the 6.1.0 release: improve discovery, version evidence, notifications,
 execution and recovery without replacing working lifecycle mechanisms. **Implementation is
 staged.** UP-00 persisted the plan only; UP-01 implements the generic explicitly titled report
@@ -921,7 +924,8 @@ and Agent Context heading/fallback correction; UP-02 preserves independent inven
 results; UP-03 implements shared base guards, lock order and guarded revalidation (fixed private
 `/tmp` namespace, no override-dependent fallback); UP-04 implements alias-consolidated explicit
 rollback selection and immutable consent; UP-05 adds bounded host/network diagnostics, finite
-container probes, owned helper/client cleanup and cancellation-safe read-only publication.
+container probes, owned helper/client cleanup and cancellation-safe read-only publication;
+UP-06 implements category-owned advisory replacement/clearing and progress-safe status ownership.
 All other tasks remain pending. Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from

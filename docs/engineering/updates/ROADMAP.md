@@ -2,10 +2,12 @@
 
 ## Status and authority
 
-- **UP-00..UP-05 complete. Next: UP-06 only.** UP-00 persisted the plan; UP-01 fixes report
+- **UP-00..UP-06 complete. Next: UP-07 + UP-08 together.** UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
   results; UP-03 implements shared base guards; UP-04 implements identity-bound explicit rollback
-  selection; UP-05 bounds short diagnostics and owns client/probe cleanup. The initially
+  selection; UP-05 bounds short diagnostics and owns client/probe cleanup; UP-06 replaces/clears
+  category-owned advisories without erasing active progress. D-057 consolidates the remaining
+  packages and removes artificial dependencies, without weakening verification gates. The initially
   DNS-blocked packaged-definition gate now passes, alongside retained
   fixtures, as qualified below. Not a release proposal.
 - Entry point: [TODO](../../../TODO.md#active-updates-architecture-and-ux). Durable approval:
@@ -31,7 +33,7 @@ Source paths below describe the UP-00 starting point, not a substitute for readi
 again per task. UP-01 fixes report/Agent Context presentation; UP-02 fixes inventory loss on
 remote failure; UP-03 fixes base guard scope and cleanup/creation races; UP-04 removes rollback
 creation-time guessing; UP-05 bounds short diagnostics/probes and canceled result publication.
-Other findings remain present.
+UP-06 fixes category-owned advisory clearing/status. Other findings remain present.
 Source inspection is not regression or real-operation evidence.
 
 | Finding | Current implementation | Required correction |
@@ -42,7 +44,7 @@ Source inspection is not regression or real-operation evidence.
 | Cleanup does not guard all base copies (fixed in UP-03) | At UP-00, rollback-copy cleanup had no base guard | Candidates, copies and identifiable untagged replaced bases take build then publication, rechecking identity/ownership/local references; busy/unsafe resources remain |
 | Rollback guesses wrong order (fixed in UP-04) | At UP-00, `rollback_base` maximized Docker image creation time | Alias-consolidated immutable inventory, one-copy default, explicit multi-copy selection even with `--yes`, consent/current-base revalidation and current-definition verification |
 | Diagnostic calls can hang (fixed for short checks in UP-05) | At UP-00, general `core.call`/version probes had no execution deadline | Finite read-only allowlist/explicit probe scopes, total HTTP child budget, bounded output/client reaping, container-side limits, label-checked helper cleanup and cancellation-safe read-only UI publication; long mutations keep their existing timing |
-| Obsolete image advisories linger | `_show_image_checks` posts warnings, but successful image checks do not clear prior image notices/status | Replace/clear the category on new evidence without overwriting active operation progress |
+| Obsolete image advisories linger (fixed in UP-06) | At UP-00, `_show_image_checks` posted warnings, but successful checks were not published | Complete results replace/clear owned daemon/resource/image notices; explicit status ownership preserves active progress and cleanup-safe results; no late same-turn warning toast |
 | Versions is only a report | It queries npm on opening, lists running-environment versions, and offers only Close | Compact Updates inventory/actions with independent component lifecycles |
 | No manager discovery/updater | Version source and manual pipx instructions exist; no installation classification or handoff | Published-release discovery and verified official-tag pipx execution after earlier stages |
 | No update-discovery cache | `latest` queries npm each time; readiness cache is separate and is not structured version history | Disposable observations/discovery, not authoritative environment-state additions |
@@ -288,7 +290,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-05. D-057 consolidates closely related remaining
+All tasks below are pending except UP-00..UP-06. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -300,11 +302,12 @@ Default priority: finish correctness (UP-06), shared evidence/discovery (UP-07 +
 UI with optional background scheduling (UP-10 + UP-09), environment actions/recovery (UP-11),
 base actions/refresh (UP-12 + UP-13), manager discovery/classification (UP-14 + UP-15), manager
 handoff (UP-16), replacement/recovery (UP-17), then evidence consolidation (UP-18). This is
-**nine planned remaining cycles instead of thirteen**, not a quota or permission to combine
+**nine remaining cycles at consolidation approval instead of thirteen** (eight after UP-06), not
+a quota or permission to combine
 unrelated risks. Read-only manager discovery can be developed independently of base refresh;
 manager execution remains later and must not delay the earlier component workflows. UP-18 is
-not release preparation. UP-00..UP-05 are DONE; all other tasks are PENDING. The next package
-is UP-06 only. UP-03's initially DNS-blocked
+not release preparation. UP-00..UP-06 are DONE; all other tasks are PENDING. The next package
+is UP-07 + UP-08 together. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
@@ -315,13 +318,13 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-03 | DONE: shared base coordination | UP-00 | Secure shared namespace and lock ordering; guarded build/swap/rollback/cleanup/creation; host multiprocess and real-Docker races across data/context aliases pass with retained fixtures; packaged-definition gate resolved during UP-04 |
 | UP-04 | DONE: explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; 49 mocked/host regressions and 4 packaged/retained real cases with CLI swap/layer preservation |
 | UP-05 | DONE: bounded diagnostic execution | UP-00 | Total network/short subprocess budgets, response limits and owned cleanup/cancellation; container-side bounds; long mutations unaffected; 51 new host/mocked/pilot cases and real Docker probe/base regressions, evidence below |
-| UP-06 | Clear obsolete advisories | UP-00 | Warning-to-success/unknown/new-warning transitions replace the right category and preserve busy state; readiness/image pilot regressions |
+| UP-06 | DONE: clear obsolete advisories | UP-00 | Category-owned warning/success/unknown replacement, status ownership and same-turn toast cleanup; 26 new mocked-check/image/readiness pilot cases at 80x24/100x30, four full compatibility suites; evidence below |
 | UP-07 + UP-08 | Shared observations, compatible discovery and policy comparisons | UP-02, UP-05 | Structured source/time/identity, disposable local/remote cache, stopped history/Unknown, lifecycle invalidation and partial Docker results; bounded compatible stable npm resolution even when latest changes major, exact confirmed targets, Manual/Pinned explicit comparisons and shared CLI/TUI eligibility. Unit/host/lifecycle, cache corruption, source failure and policy regressions; scheduler/UI not required |
 | UP-10 + UP-09 | Compact Updates inventory, then optional background discovery | UP-01, UP-06, UP-07 + UP-08; **no UP-10 dependency on UP-09** | UP-10 independently delivers three local/cached-first subviews, manual Check, independent loading/errors, Details and keyboard/focus at 80x24/larger, with no network on opening and no premature manager execution. UP-09 adds default-off scheduling, attempt-based 24-hour persistence including failures/restarts, coalescing/rate limits and quiet deduplication, with no start/probe/update side effects. Separate UI/pilot/terminal and cache/preferences/scheduler gates; stop after verified UP-10 if the combined package is too large |
 | UP-11 | Environment actions and recovery | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers with exact consent and locked revalidation; pin/network/running-state refusals, stopped final state and recovery; real Docker/OpenCode and terminal tests. Recovery is an independent gate, not bundled with base or manager work |
 | UP-12 + UP-13 | Base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Inventory, Build/Rebuild/Check/Rollback, rollback-preserving replacement and exact target/state/mode consent; explicit cached versus Refresh & Rebuild in CLI/TUI, pull/no-cache without prune. Verify both distributions under isolated tags, failed-candidate safety, CLI/TUI parity, pinned creation and unchanged retained containers/layers; cached and full-refresh results are separate evidence |
 | UP-14 + UP-15 | Manager release discovery and verified installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Bounded official published-full-release discovery, strict tags/semver/no implicit downgrade, local inventory retained on GitHub failure; actual official-tag pipx identity including custom paths/interpreter/source/launcher, safe manual guidance otherwise. Separate provider and real isolated pipx/foreign/shadowed-launcher tests. Optional daily-source hookup only if UP-09 exists; neither discovery nor classification requires it or exposes execution |
-| UP-16 | Installation exclusion and terminal handoff | UP-15, UP-05 | Supported instances coordinate across data directories; safe self-contained helper/interpreter/external pipx, clean TUI exit before mutation, startup exclusion and narrow verification path; process and pty tests |
+| UP-16 | Installation exclusion and terminal handoff | UP-14 + UP-15, UP-05 | Supported instances coordinate across data directories; safe self-contained helper/interpreter/external pipx, clean TUI exit before mutation, startup exclusion and narrow verification path; process and pty tests |
 | UP-17 | Manager replacement, verification and failure recovery | UP-16 | Exact confirmed target and revalidation, actual fresh-process verification, no automatic restart. Independently verify (1) replacement/success and (2) failure/interruption states, private recovery record and instructions before/during/after install. Separate focused commits/checkpoints for these gates; isolated pipx and real terminal evidence, never inferred backup/rollback safety |
 | UP-18 | Cross-layer verification and record consolidation | UP-01..UP-17 | Run affected/full regressions, required real combinations, dependency endpoints, docs/CLI/packaging checks; record evidence/limits, promote durable facts and retire the effort record when complete; no release work |
 
@@ -421,7 +424,7 @@ land; do not announce planned functionality as delivered in this documentation-o
 
 ## Risks and remaining implementation questions
 
-No unresolved product decision blocks UP-06. The following are implementation proofs to resolve
+No unresolved product decision blocks UP-07 + UP-08. The following are implementation proofs to resolve
 in the named task, not permission to reopen settled UX or add infrastructure. If evidence needs
 a materially different architecture, record the blocker and ask the owner before proceeding.
 
@@ -1061,28 +1064,118 @@ a materially different architecture, record the blocker and ask the owner before
   Reviewed dependency/acceptance preservation; whitespace checks clean. Planned local commit:
   `docs: consolidate Updates work packages and dependencies`.
 
+### UP-06 — 2026-10-30 — category-owned advisories and progress-safe clearing
+
+- Continued after the owner-requested consolidation checkpoint `fae56f3`, without a redundant
+  STOP/Continue. UP-06 remains a coherent UI-correctness package; observations/discovery and new
+  Updates actions were not folded into this patch. Git started clean at UP-05 `32861c6` before
+  the planning changes; no unrelated user changes were present.
+- Reproduced a missing-image warning followed by successful explicit Refresh at 80x24 and
+  100x30: **2 failed**, 1.51 s, before patching. Root cause: `_prerequisites_worker` filtered out
+  passing image results and did not publish success, while `_show_image_checks` only added
+  notifications. Other clearing paths guessed status ownership from rendered-text prefixes and
+  removed notifications by shared title, risking unrelated notices and operation progress.
+- The worker now publishes complete image results. Resource/image phase exceptions become
+  `not checked` in their own category rather than a false daemon failure, and independent checks
+  continue. If daemon verification fails, downstream checks remain skipped, not marked passed.
+  `tui_runtime.publish` and its cancellation/app-liveness guards are unchanged.
+- A small UI-local category map owns notification objects and advisory summaries. Warning/unknown
+  results replace only their category; success clears it. Unknown is not a fresh success or a
+  missing-image claim. Same-title unrelated notices are not owned and remain. Notice registration
+  is synchronous on the UI thread using Textual's existing notification collection/refresh path,
+  so same-turn warning then success cannot enqueue an obsolete toast afterward. No persistent
+  cache, metadata/schema field or general notification framework was added.
+- Explicit status ownership replaces prefix guessing. Active mutation progress is guarded;
+  clearing cannot erase a completed operation/recovery result. If an advisory owns the line,
+  clearing reveals remaining daemon, resource then image advisories, or Ready. Readiness waits
+  retain per-worker messages and their own notification; the last cleanup restores a remaining
+  advisory only if readiness still owned the line, never an active mutation's status. A replaced/
+  canceled worker cannot publish obsolete image warnings. Metadata-only refresh stays Docker-free.
+- Added **26 regressions**: two original-image reproducer cases in `test_image_readiness.py` and
+  24 in `test_advisory_tui.py`. Both 80x24 and 100x30 cover repeated/same-turn warning, unknown,
+  new warning and success, overlapping categories and waiters, unrelated same-title notices,
+  expired/dismissed notice cleanup, mutation progress/failure-result preservation, phase-specific
+  unknown/error results, skipped checks, no-Docker metadata refresh and late canceled publication.
+  Tests use mocked checks/Docker, real isolated metadata and Textual pilots; worker completion
+  and events make transitions deterministic rather than depending on long sleeps.
+- New regression exposed an additional same-turn readiness-toast race: **79 passed/2 failed**,
+  10.00 s. A queued readiness toast could appear after its cleanup had run. Applied the same
+  owned-object/synchronous registration boundary to that existing notice; no unrelated toast is
+  removed. Two intermediate affected runs found single Ruff SIM102 failures (**167 passed/1
+  failed**, 15.03 s; **191 passed/1 failed**, 19.96 s); combined nested conditions, no suppression.
+  These were rerun in all final suites, not skipped or relaxed.
+
+  | Full suite / venv | Result / basetemp |
+  |---|---|
+  | Python 3.11.18, Typer 0.27.3/Textual 8.2.8, `venv311` | **1201 passed, 62 opt-in skips**, 105.94 s; `/tmp/opencode/up06-full311` |
+  | Python 3.11.18, Typer 0.16.0/Textual 4.0.0, `venv311low` | **1201 passed, 62 opt-in skips**, 103.94 s; `/tmp/opencode/up06-full311low` |
+  | Python 3.14.8, current, `venv314` | **1201 passed, 62 opt-in skips**, 106.52 s; `/tmp/opencode/up06-full314` |
+  | Python 3.14.8, lowest, `venv314low` | **1201 passed, 62 opt-in skips**, 104.42 s; `/tmp/opencode/up06-full314low` |
+
+  Serial foreground commands: `PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q
+  --basetemp=<above>`, pytest 9.2.0. Includes mocked Docker, real host files/Git/local processes,
+  Textual pilots, existing host terminal fixtures, Ruff/shellcheck, English, links/anchors and
+  CLI/help consistency. Only the two known lowest-Typer/Click deprecations. The 62 skips are
+  real/privileged/socket-activation opt-ins, not waived failures.
+- Local Python 3.11 sdist/wheel built with `python -m build --no-isolation --outdir
+  .work/up06-package` (log `.work/up06-package-build.log`); strict twine and `check_dist.py` pass.
+  Changed product module `tui.py` is byte-identical in the wheel. No install or upload. Reviewed
+  product/test/document diffs, notification ownership, status precedence and source-error bounds.
+  Core lifecycle/runtime identity/base locks/worker publication/assets/dependencies/workflows/
+  manager version and schemas are unchanged from UP-05.
+- Ending read-only own-rootless inventory matches the initial inventory: zero containers/volumes,
+  same four original full tagged-image IDs. No real Docker resources created/changed/deleted,
+  no cleanup required. Not re-established: real-Docker mutations/OpenCode, isolated pipx, new
+  advisory-specific real-terminal/pty or manual observation, privileged/socket-activation or
+  provider calls. Prior real evidence is not relabelled as new UI evidence. Package checks are
+  local only; no release readiness, merge, push, publication or version bump.
+- Updated Unreleased, dashboard guide, TODO, architecture, baseline, campaign qualification,
+  D-056 implementation status and this record. UP-16 now explicitly depends on both discovery
+  and classification in the grouped UP-14 + UP-15 package (exact target plus install identity),
+  not just classification. **UP-00..UP-06 complete; next UP-07 + UP-08 together.** Eight planned
+  packages remain. Planned local commit: `fix: clear category-owned dashboard advisories`.
+  Stop at this completed package boundary after recording final document checks and committing.
+- Final evidence-document subset initially **109 passed/1 failed**, 17.22 s: a planning commit
+  hash in BASELINE violated the existing public-record/internal-reference rule. Removed the hash
+  from BASELINE and retained traceability here, without changing the test or its scope.
+- Final repeat: **110 passed, no skips**, 17.32 s, Python 3.11.18/current dependencies,
+  `PYTHONPATH="$PWD/src" .work/venv311/bin/python -m pytest -q tests/test_advisory_tui.py
+  tests/test_image_readiness.py tests/test_diagnostic_tui.py tests/test_quality.py
+  tests/test_language.py tests/test_user_docs.py tests/test_cli_structure.py
+  --basetemp=/tmp/opencode/up06-docs-rerun`. Final whitespace checks clean. UP-06 complete;
+  stop after local commit, then resume the grouped UP-07 + UP-08 package from this handoff.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
    ARCHITECTURE for implemented behavior, not proposed functionality. Check Git status, branch,
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
-   `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, then the roadmap consolidation commit. Shared base guards, immutable explicit
-   rollback and short diagnostic/probe bounds/ownership are implemented. Image assets, manager
+   `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, then the UP-06 commit.
+   Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
+   category-owned advisory clearing are implemented. Image assets, manager
    version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Select **UP-06 only**: reproduce a base-image warning followed by success leaving the old
-   toast/status behind. Inspect `_prerequisites_worker`, `_show_image_checks`, resource/daemon
-   advisory handling and active-operation progress ownership in `tui.py`. Replace/clear only the
-   relevant advisory category on new success/unknown/new-warning evidence, without erasing an
-   active mutation's progress or another category's notice. Keep UP-05 cancellation-safe publication
-   and read-only metadata refresh boundaries. Add deterministic 80x24/larger pilot transitions,
-   repeated checks and overlapping busy-state regressions; use real terminal observation only if
-   actually executed, never relabel prior evidence. Preserve base/policy/journal/security behavior.
-   Do not combine observations/cache/discovery, Updates UI, refresh or manager-updater work.
-   No host network/service changes are authorized.
+3. Select **UP-07 + UP-08 as one package**: inspect current version/identity observations,
+   lifecycle invalidation points and CLI/TUI report consumers; reproduce stopped-version history
+   loss, unsupported-major npm-latest selection and suppressed Manual/Pinned explicit comparisons.
+   Establish a structured source/time/immutable-object identity contract with disposable local/
+   remote caches outside authoritative metadata. Keep successful evidence and failed attempts
+   distinct, handle corrupt/missing/future-time cache safely, preserve partial local inventory.
+   Tie environment observations to container/image identity and invalidate/qualify replacement,
+   restore, rollback and interrupted/failed updates; creation labels are not runtime evidence.
+   Resolve latest supported stable from bounded npm metadata even when latest changes major;
+   exclude prereleases by default, preserve explicit compatible alternatives and execution/pin
+   restrictions, and confirm/revalidate exact targets without substitution. Share comparisons/
+   eligibility with CLI/TUI; Manual suppresses unsolicited notices, not explicit comparisons.
+   Add unit/host/cache/lifecycle regressions and affected scoped real verification where needed.
+   Do not start stopped containers for discovery, add scheduling, implement the Updates screen,
+   introduce a universal executor or change schemas. Preserve UP-05 bounds/publication, UP-06
+   ownership, base guards and journals. Related subtask commits need no STOP; if scope exceeds
+   the cycle, checkpoint the tested data contract and exact remaining gate. No host network/
+   service changes are authorized. After this package, UI UP-10 is not blocked by scheduler UP-09.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.
