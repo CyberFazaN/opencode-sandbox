@@ -32,6 +32,22 @@ def _no_real_daemon_identity(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_host_docker_cli(request, monkeypatch):
+    """A Docker CLI call that no test double intercepts behaves as on a host without the CLI
+    (the hosted Arch Linux job), so results never depend on whether this host has one. Tests
+    that mock subprocess.run themselves replace this; `real_session` tests use a fake binary."""
+    if request.node.get_closest_marker("real_session"):
+        return
+    real = c.subprocess.run
+
+    def run(argv, *args, **kwargs):
+        if isinstance(argv, (list, tuple)) and argv and str(argv[0]) == "docker":
+            raise FileNotFoundError(2, "No such file or directory", "docker")
+        return real(argv, *args, **kwargs)
+    monkeypatch.setattr(c.subprocess, "run", run)
+
+
+@pytest.fixture(autouse=True)
 def _no_real_resource_probe(monkeypatch):
     """Unit/pilot runs use explicit healthy daemon evidence, never an installed host Docker CLI.
 
