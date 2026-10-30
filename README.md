@@ -96,8 +96,9 @@ on your host's distribution.
 The Debian image is Debian 13 since 6.1.0 (6.0.0 used Debian 12). Neither a manager upgrade
 nor a base rebuild upgrades an existing container's OS: Debian 12 environments and system
 backups stay on Debian 12, which has LTS-only security support until 2028-06-30. See
-[base-image guidance](docs/workspaces.md#distributions-and-images). No real model provider has
-been tested with OpenCode 2.x; the tests use a fake OpenAI-compatible provider.
+[base-image guidance](docs/workspaces.md#distributions-and-images). One real model provider was
+tested with OpenCode 2.x: OpenRouter (`z-ai/glm-5.3-flash`); the automated tests use a fake
+OpenAI-compatible provider.
 
 ## Install
 

@@ -36,13 +36,27 @@ installation on both endpoints with `pipx_smoke.sh`, 27-file byte comparison and
 `doctor` exit 0; scoped real Docker `test_20`, `test_35` and `test_65`: 4 tests, 66 checks,
 0 failed, nothing left behind. Details: BASELINE ("6.1.0 release tree").
 
+## I04 (2026-10-30)
+
+Owner consent for every row, including the privileged rows and C10, and an owner-provided,
+budget-limited OpenRouter key for one real-provider check. Result: **PASS**. The complete
+campaign through a pipx installation of a local `v6.1.0` test tag passed 56 tests / 513 checks
+with nothing skipped. No-cache builds of both images and the real-provider check (13 checks)
+also passed; details are in BASELINE ("6.1.0 release tree"). The first attempt stopped at two
+harness setup gaps: pipx was missing from the runner venv, and the volatile runtime unit
+directory was absent after a reboot. RELEASING now names both. The key was kept out of every
+file and log and deleted after the check. The owner may revoke it.
+
+The user documents no longer say that no real provider was tested. README, `docs/opencode.md`
+and `docs/providers.md` name the one tested provider.
+
 ## Next
 
-1. **I04**: the full real campaign on this branch through an installed pipx manager, both base
-   images built under a test-only namespace (RELEASING "Verify"), the retained Debian 12 row
-   with the published `v6.0.0` installed separately as `OCS_TEST_LEGACY_MANAGER`. The
-   privileged rows and C10 (`ocs-test-act-*` units, renamed and not yet rerun) need the owner's
-   renewed consent.
-2. **I06**: release decision from CAMPAIGN; then the owner updates the ruleset, re-dates the
-   CHANGELOG if needed, and this directory is removed before the release commit is tagged.
-3. No push, tag, release or upload without explicit authorization.
+1. **I06**: the release decision report from CAMPAIGN (READY / READY WITH ACCEPTED RISKS /
+   NOT READY). Expected risks: D09 host reboot BLOCKED (P2), the hosted CI matrix not yet run,
+   Arch-only real host, one real model provider.
+2. Finalization: move the evidence into the top-level records, remove this directory, re-date
+   the CHANGELOG if it is published after 2026-10-30, rerun the quick checks.
+3. Publication steps, each with the owner's explicit permission: ruleset update (owner), push
+   and pull request (first hosted CI), merge commit, annotated tag, draft release, owner
+   publishes, GitHub pipx smoke, post-release "Unreleased" section.

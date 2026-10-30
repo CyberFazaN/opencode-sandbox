@@ -46,8 +46,11 @@ to its launcher. Without it that row explicitly skips and cannot establish the c
 gate. To build and test new base images without replacing the user's base tags, run the
 campaign against disposable installed test venvs whose site-packages carry a test-only hook
 that sets `distros.REPOSITORY` to an `ocs-test-*` name from `OCS_TEST_IMAGE_REPOSITORY`; the
-product has no such override and the hook must never ship. Run the both-image gates on the
-selected release tree.
+product has no such override and the hook must never ship. Put the hook into the installed
+manager's venv and into the runner venv (its helper snippets read the same namespace); the
+runner also needs `pyte` and `pipx`. Build both base images into that namespace before the run
+(the campaign compares the tagged images before and after) and remove them afterwards. Run the
+both-image gates on the selected release tree.
 
 ```sh
 OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 OCS_TEST_PIPX_BUILD=1 \
@@ -58,7 +61,9 @@ OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 OCS_TEST_PIPX_BUILD=1 \
 C10's extra opt-in authorizes temporary `ocs-test-act-*` user units and a separate no-network
 rootless daemon, not a restart of the existing daemon. It needs `dockerd-rootless.sh` and
 `rootlesskit` on PATH, a working user systemd manager/runtime unit directory, and the existing
-`ubuntu:24.04` custom-test image. The row re-establishes cold state before each manager call;
+`ubuntu:24.04` custom-test image. The runtime unit directory `$XDG_RUNTIME_DIR/systemd/user`
+is volatile and absent after a reboot until something creates it; create it empty for the run
+and remove it afterwards. The row re-establishes cold state before each manager call;
 the campaign's initial doctor cannot count as cold-start evidence. Without this opt-in C10
 skips and is not a PASS. `test_36_socket_activation.py` records and cleans only its named units,
 runtime directory, isolated Docker objects and manager data; read its scope before granting it.

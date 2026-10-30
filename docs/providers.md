@@ -50,5 +50,7 @@ it, but OpenCode's V2 documentation does not describe it, so prefer the configur
   budget-limited keys.
 - Credentials created inside the container (for example OpenCode's own login) live in the home
   volume and are part of backups. Profiles are not part of backups.
-- The project's tests use a fake OpenAI-compatible provider and dummy keys; no real model
-  provider has been tested with OpenCode 2.x.
+- The project's automated tests use a fake OpenAI-compatible provider and dummy keys. One
+  real provider was tested with OpenCode 2.2.0: OpenRouter (`OPENROUTER_API_KEY`,
+  `openrouter/z-ai/glm-5.3-flash`), including that the key stays out of process listings,
+  the container definition, the home volume and backups. Other providers are untested.

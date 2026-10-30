@@ -49,7 +49,7 @@ root; retiring installer checks does not retire that boundary.
 |---|---|---|---|---|
 | B01 | P0 | Manager as root refuses the user's daemon; no container and nothing under `/root` changed | `test_70_privileged.py`: `test_root_is_refused`; installer-only assertions removed, manager assertions retained | PASS (6.1.0 candidate real, explicitly authorized sudo; installed manager refused, root tree/container/source ownership assertions passed) |
 | B09 | P0 | pipx from a Git tag (D-042): clean install in a private HOME/PIPX_HOME, selected Python used by the installed application (not the source tree), every image asset installed, `--help`, `doctor` verified | `test_65_pipx.py` (a `git+file` clone with local test tags) | PASS (D-049 real on 3.11/3.14; interpreter asserted, six assets installed) |
-| B10 | P0 | The pipx installation creates, starts and uses an environment; a full image build and verification from the installed package's assets | `test_65_pipx.py`; the image build with `OCS_TEST_PIPX_BUILD=1` (into an `ocs-test-` tag, removed afterwards); the campaign run through the pipx launcher with `OCS_TEST_MANAGER` (`test_10_lifecycle.py`, `test_35_prerequisites.py`, `test_40_opencode.py`, `test_50_tui.py`) | PASS (6.1.0 candidate real create/start/exec at both endpoints; installed-pipx image build and whole 56-test/513-check campaign, both-image first prompts) |
+| B10 | P0 | The pipx installation creates, starts and uses an environment; a full image build and verification from the installed package's assets | `test_65_pipx.py`; the image build with `OCS_TEST_PIPX_BUILD=1` (into an `ocs-test-` tag, removed afterwards); the campaign run through the pipx launcher with `OCS_TEST_MANAGER` (`test_10_lifecycle.py`, `test_35_prerequisites.py`, `test_40_opencode.py`, `test_50_tui.py`) | PASS (6.1.0 release tree: installed-pipx image build and whole 56-test/513-check campaign, both-image first prompts; candidate: real create/start/exec at both endpoints) |
 | B11 | P0 | Upgrade/downgrade between tags: `pipx upgrade` and `pipx reinstall` keep a tag spec, including interpreter repair with `reinstall --python`; `pipx install` without `--force` refuses, `pipx install --force <spec>@<tag>` moves to the other tag and back; environments survive | `test_65_pipx.py` | PASS (D-049 real on 3.11/3.14) |
 | B12 | P1 | `pipx uninstall` removes its launcher and keeps environments, containers and volumes; a foreign/legacy launcher and its target are neither replaced nor deleted; after the test removes its own legacy launcher a working pipx launcher can be installed | `test_65_pipx.py`; the transition from a legacy source installation is documented, not automatic | PASS (D-049 real on 3.11/3.14; volume presence and foreign target contents checked) |
 
@@ -66,7 +66,7 @@ root; retiring installer checks does not retire that boundary.
 | C07 | P2 | A failed image update keeps the previous image | `tests/test_opencode_versions.py` (failure paths of `build` and `update-base`); a real failed build was observed when an upstream release broke the build | PASS (real; not repeated in the latest run, the failure path is unit-tested) |
 | C08 | P1 | First start fails (published host port taken): no container is left, `config apply` fixes the port, start works | `test_26_port_and_snapshot.py` (Debian; the port is held by a socket of the test) | PASS (real) |
 | C09 | P1 | Host prerequisites diagnosed (D-042, D-043): no Docker CLI, a context that does not exist, a missing socket, a file instead of a socket, a TCP endpoint, no Git, no terminal; `--help`/`--version`/`list` work without Docker; distinct exit codes 5–8 and 2; the dashboard opens without Docker and says so | `test_35_prerequisites.py`, the missing-context row of `test_30_faults.py`; `tests/test_prerequisites.py`, `tests/test_runtime_identity.py`; test contexts only in a private `DOCKER_CONFIG`, the user's Docker configuration unchanged | PASS (D-049 real, pty on 3.11; earlier D-048 real 3.14; shared checks unchanged) |
-| C10 | P1 | Cold Rootless Docker/socket activation: bounded secure readiness, fast warm path, transient/permanent distinction, responsive CLI/TUI progress/cancel | `test_36_socket_activation.py` (explicit separate-user-unit opt-in), `tests/test_docker_readiness.py`, identity/prerequisite/pilot regressions; design: D-052 | PASS (6.1.0 candidate full installed-pipx campaign re-established all four cases/14 checks on the isolated inherited listener; existing-daemon restart is separately D09, not cold-start evidence; D-052 source/wheel evidence retained) |
+| C10 | P1 | Cold Rootless Docker/socket activation: bounded secure readiness, fast warm path, transient/permanent distinction, responsive CLI/TUI progress/cancel | `test_36_socket_activation.py` (explicit separate-user-unit opt-in), `tests/test_docker_readiness.py`, identity/prerequisite/pilot regressions; design: D-052 | PASS (6.1.0 release-tree and candidate full installed-pipx campaigns each re-established all four cases on the isolated inherited listener; existing-daemon restart is separately D09, not cold-start evidence; D-052 source/wheel evidence retained) |
 
 ## D. Lifecycle, persistence, concurrency
 
@@ -119,7 +119,7 @@ root; retiring installer checks does not retire that boundary.
 | G01 | P0 | Versions are read from the binaries | `test_40_opencode.py`; `tests/test_opencode_versions.py`, `tests/test_hardening.py` | PASS (real OpenCode) |
 | G02 | P0 | Registry lookup without host npm; pinned policy | `test_30_faults.py`, `test_40_opencode.py` (the pinned policy refuses other versions without downloading anything); `tests/test_opencode_versions.py` | PASS (real) |
 | G03 | P0 | Base and environment update, rollback, failure | `test_12_image_compatibility.py`, `test_30_faults.py`, `test_80_combinations.py`; scoped Campaign base verification in BASELINE; `tests/test_opencode_lifecycle.py`, `tests/test_opencode_versions.py` | PASS (6.1.0 candidate actual environment replacement/rollback on 12/13, complete faults; 13 additional base-workflow checks on both images, exact base-ID rollback, old/new/pinned data/configuration and actual old-OS refusal) |
-| G04 | P0 | The first prompt receives the guidance | `test_40_opencode.py`: complete guidance verbatim and explicit current base OS in the first agent request, network none, fake in-container provider; `tests/test_agent_context_integration.py`. Real model providers remain untested | PASS (6.1.0 candidate, D-054 installed wheel: real OpenCode 2.2.0/pty on Debian 13 and retained Arch; full guidance/first-request OS, dummy provider and unchanged user configuration) |
+| G04 | P0 | The first prompt receives the guidance | `test_40_opencode.py`: complete guidance verbatim and explicit current base OS in the first agent request, network none, fake in-container provider; `tests/test_agent_context_integration.py`. Real provider: OpenRouter `z-ai/glm-5.3-flash` through the installed manager (BASELINE "6.1.0 release tree"); other providers untested | PASS (6.1.0 release tree: real OpenCode 2.2.0/pty on Debian 13 and Arch with full guidance/first-request OS, dummy provider and unchanged user configuration; the real OpenRouter model answered the Debian 13 base OS from the guidance in its first prompt) |
 | G05 | P0 | Agent Context refreshed without recreation; settings and retained base provenance reflected | `test_10_lifecycle.py`, `test_12_image_compatibility.py`, `test_40_opencode.py`, `test_80_combinations.py`; `tests/test_agent_context.py`, `tests/test_environment_definition.py`, `tests/test_hardening.py` | PASS (6.1.0 candidate both images/current 13/retained 12, restored/derived/checkpoint layers and first requests; metadata-only/offline unknown cases unit/pilot) |
 | G06 | P1 | Existing OpenCode configuration preserved | `test_12_image_compatibility.py`, `test_40_opencode.py`, `test_80_combinations.py` | PASS (6.1.0 candidate real prompts, system/no-system restores, actual environment/base version workflows and rollback; user configuration bytes unchanged) |
 | G07 | P1 | `exec` is not managed (no provider profile) | `test_20_security.py` | PASS (real) |
@@ -147,7 +147,7 @@ root; retiring installer checks does not retire that boundary.
 | I01 | P0 | Fault injection | `test_30_faults.py`, `test_70_privileged.py`; see D05, D06, D09, E02, G03 | PASS (real) |
 | I02 | P1 | No leaks | The campaign's session end (`conftest.py`, `campaign.py`): guarded cleanup, checked inventory, labels/tags/processes; `test_70_privileged.py`; `tests/test_campaign_safety.py` | PASS (6.1.0 candidate full real/extra sessions and final six-directory checks; failed inventory cannot certify empty state; failed-run cleanup completed after explicit host recovery; only manifested test resources removed) |
 | I03 | P1 | Performance baseline | Median durations per command from the campaign log (every command is logged with its duration); small test workspaces; no targets defined | PASS (real; durations recorded in the run log, no targets) |
-| I04 | P0 | Full regression at the release revision | The whole current real campaign, both distributions and packaged image build; retained privileged rows with consent; campaign through a pipx installation of a test tag. Evidence: `BASELINE.md` | NOT TESTED (release tree 6.1.0 prepared; the candidate's complete evidence (four 969-pass suites, both packages/pipx/builds, full 56-test/513-check installed campaign) predates the version and document changes; rerun the real campaign on the release tree) |
+| I04 | P0 | Full regression at the release revision | The whole current real campaign, both distributions and packaged image build; retained privileged rows with consent; campaign through a pipx installation of a test tag. Evidence: `BASELINE.md` | PASS (6.1.0 release tree: complete campaign through a pipx installation of a local `v6.1.0` test tag, both base images built from the installed package into a test-only namespace, privileged and C10 rows with consent, published `v6.0.0` as the legacy manager: 56 tests, 513 checks, 0 failed, 0 skipped; plus no-cache builds of both images and one real model provider) |
 | I05 | P0 | Documentation matches the code: every command and option named in the product, `README.md` and `docs/` exists; relative links and anchors resolve; code blocks fit 80 columns; the install commands name the release tag; active documents are English; new instructions in the guides were measured | `tests/test_cli_structure.py`, `tests/test_user_docs.py`, `tests/test_language.py`, `tests/test_disclosure.py`; review of `README.md`, `CHANGELOG.md` and the guides against the code and `--help` | PASS (review, unit) |
 | I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | NOT TESTED (version 6.1.0 and Beta decided, D-055; waits for I04 on the release tree and the owner's publication decision) |
 
@@ -180,16 +180,16 @@ installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 
 | Priority | Rows | PASS | PASS in part | BLOCKED | NOT TESTED | FAIL |
 |---|---|---|---|---|---|---|
-| P0 | 46 | 44 | 0 | 0 | 2 | 0 |
+| P0 | 46 | 45 | 0 | 0 | 1 | 0 |
 | P1 | 33 | 33 | 0 | 0 | 0 | 0 |
 | P2 | 5 | 4 | 1 | 0 | 0 | 0 |
-| All | 84 | 81 | 1 | 0 | 2 | 0 |
+| All | 84 | 82 | 1 | 0 | 1 | 0 |
 
 - PASS in part: D09 (the host reboot is BLOCKED with accepted risk and a next step).
-- C10 was re-established in the complete installed-pipx campaign of the 6.1.0 candidate, not
-  just host sockets or warmed direct Docker. That run passed 56 tests/513 checks.
-- I04 and I06 wait for the real campaign on the 6.1.0 release tree and the owner's publication
-  decision; the candidate's complete evidence is retained, not counted as the release run.
+- C10 was re-established in the complete installed-pipx campaigns of the 6.1.0 candidate and
+  of the release tree, not just host sockets or warmed direct Docker.
+- I04 passed on the 6.1.0 release tree (56 tests/513 checks). I06 waits for the release
+  decision report and the owner's publication decision.
 - H05: an intermittent session-test failure was traced to a launch-ownership race and fixed
   (D-054); the first real run also found a terminal-restoration defect, retained as failing
   evidence and fixed before the successful scoped rerun.
@@ -197,7 +197,7 @@ installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
   (review), A03 (unit), D10 (lookup logic), E03 (crafted archives against the real extractor),
   H07 (pilot).
 - PASS rows with an accepted limitation inside the row: C01 (another user's daemon represented
-  by another user's socket), C06 (label forgery through the same daemon), G04 (a fake model
-  provider, no real one).
+  by another user's socket), C06 (label forgery through the same daemon), G04 (one real model
+  provider, OpenRouter; the automated rows use a fake one).
 - Accepted product limitations: `docs/security.md` ("Known limitations"); accepted residuals:
   `DECISIONS.md` D-025..D-034.

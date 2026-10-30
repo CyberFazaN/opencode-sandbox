@@ -72,7 +72,7 @@ in `RELEASING.md` ("Verify").
 
 Release branch `release/6.1.0`: version, CHANGELOG, documents and records only; product
 modules other than `__version__`, image assets and schemas are identical to the verified
-candidate below.
+candidate below. Everything in this table ran on the release tree itself.
 
 | Layer | Result |
 |---|---|
@@ -82,7 +82,11 @@ candidate below.
 | pipx (CI-equivalent) | Installation of the branch from a `git+file` URL into isolated pipx directories on 3.11.18 and 3.14.8: `pipx_smoke.sh` passed (version, installed package and assets, `doctor` exit 8 for a missing context); 27 installed files byte-identical to the tree; read-only `doctor` against the real daemon exit 0, identity verified, resource support passed, the retained revision-1 Debian base warned as expected, no data directory written |
 | Repeated in a fresh clone | The four suites (same counts), Ruff/actionlint/offline zizmor, both-endpoint package and release checks, `git+file` pipx on both endpoints with a byte-identical payload and real read-only `doctor` exit 0 |
 | Real Docker, scoped | `test_20_security`, `test_35_prerequisites` and `test_65_pipx` (pipx tag install/upgrade/downgrade/uninstall from a disposable clone) on 3.14.8: 4 tests, 66 checks passed, 0 failed; guarded cleanup, no containers or volumes left, image inventory unchanged |
-| Not yet run on this tree | The full real campaign (I04), privileged rows, C10, image builds, hosted CI |
+| Full real campaign (I04) through an installed pipx manager | `pipx install git+file://…@v6.1.0` of a local test tag (in a disposable clone of the branch) on Python 3.14.8 as `OCS_TEST_MANAGER`; both base images built from the installed package's assets into a test-only `ocs-test-610` namespace (Debian 13 revision 2, Arch revision 1, OpenCode 2.2.0); the published `v6.0.0` installed from GitHub as `OCS_TEST_LEGACY_MANAGER` against the retained Debian 12 base; `OCS_TEST_PRIVILEGED=1`, `OCS_TEST_SOCKET_ACTIVATION=1`, `OCS_TEST_PIPX_BUILD=1`: 56 tests, 513 checks passed, 0 failed, 0 skipped (11 min 2 s). Nothing left with the run's data-directory label, tagged images unchanged, C10 units and runtime tree removed, the user's daemon active after the privileged restarts |
+| Harness setup found by the first I04 attempt | The runner venv lacked pipx (`test_65`) and the volatile `$XDG_RUNTIME_DIR/systemd/user` did not exist after a reboot (C10's fixture refuses to start without it); both provided, then the complete rerun above. No product failure |
+| Base images without the layer cache | The product's `build_image`/`verify_image` with `--no-cache` (not `--pull`, which could move the user's base tag) from the installed package: Debian 13 (52 s) and Arch (213 s) built every `RUN` step against current upstream packages and passed verification |
+| Real model provider | Installed 6.1.0 manager, isolated data: `providers set` at a hidden pty prompt (not echoed; 0600 profile; `providers list` names only), a Debian 13 `ocs-test-610` environment with network bridge, the user model `openrouter/z-ai/glm-5.3-flash`; the managed `run` opened the real OpenCode 2.2.0 TUI and the model answered `BASEOS=Debian 13` from the injected guidance without tools; terminal restored. The key was in no host process argument list, not in the container definition, home volume, workspace, `/tmp`, data directory, configuration (other than the profile) or the backup: 13 checks passed |
+| Not run on this tree | Hosted CI (first run with the release pull request), a host reboot (D09) |
 
 ### 6.1.0 candidate — 2026-10-29–30
 
@@ -156,8 +160,9 @@ test-isolation limitations of the host-process signal tests: `TODO.md` ("Optiona
 
 ## Unverified behaviour
 
-- A real model provider with OpenCode 2.x (the first prompt was verified with a fake
-  OpenAI-compatible provider inside the container).
+- Real model providers other than OpenRouter with `z-ai/glm-5.3-flash` (OpenCode 2.2.0,
+  Debian 13, verified at the 6.1.0 release tree), and a real provider on the Arch image; the
+  automated first-prompt rows use a fake OpenAI-compatible provider inside the container.
 - A host reboot (daemon restart, stop/start and a SIGKILL of the daemon unit were tested). Next
   step: reboot, then `opencode-sandbox start NAME` and `check NAME` on a test environment.
 - Another user's real rootless dockerd (another user's socket and a real rootful dockerd were
