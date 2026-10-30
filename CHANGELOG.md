@@ -4,6 +4,8 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
 ## 6.1.0 — 2026-10-30
 
 Compatibility and reliability update (Beta). Python 3.11 or newer; the Debian base image is now
