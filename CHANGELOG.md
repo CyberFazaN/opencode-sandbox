@@ -6,6 +6,13 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+### Fixed
+
+- The dashboard's Agent Context preview has its own environment-specific heading instead of
+  "OpenCode versions". When container inspection fails, it explains the configured-settings
+  fallback and leaves saved guidance unverified rather than incorrectly calling it outdated.
+  Readiness, cleanup and version reports retain their own headings in a shared read-only view.
+
 ## 6.1.0 — 2026-10-30
 
 Compatibility and reliability update (Beta). Python 3.11 or newer; the Debian base image is now

@@ -2,8 +2,9 @@
 
 ## Status and authority
 
-- **UP-00: planning persistence only.** No implementation has started. This record captures the
-  owner's approved discussion and latest Build instructions, not a new release proposal.
+- **UP-00 and UP-01 complete. Next: UP-02 only.** UP-00 persisted the plan; UP-01 adds the
+  generic explicitly titled report and fixes Agent Context presentation/fallback. This record
+  captures the owner's approved discussion and implementation checkpoints, not a release proposal.
 - Entry point: [TODO](../../../TODO.md#active-updates-architecture-and-ux). Durable approval:
   [D-056](../DECISIONS.md#d-056-updates-architecture-and-execution-order--accepted-for-implementation).
   Current implemented behavior/evidence: [ARCHITECTURE](../ARCHITECTURE.md) and
@@ -20,12 +21,13 @@
 
 ## Reconciliation with the starting implementation
 
-Source paths below are starting points, not a substitute for reading the code again per task.
-The findings are still present. Source inspection is not regression or real-operation evidence.
+Source paths below describe the UP-00 starting point, not a substitute for reading the code
+again per task. UP-01 fixes the report/Agent Context finding; other findings remain present.
+Source inspection is not regression or real-operation evidence.
 
 | Finding | Current implementation | Required correction |
 |---|---|---|
-| Wrong Agent Context heading | `tui._agent_context_worker` uses `OpenCodeVersionsScreen` without a title; its default is OpenCode versions | Generic report with required explicit title; correct Agent Context heading/capitalization |
+| Wrong Agent Context heading (fixed in UP-01) | At UP-00, `tui._agent_context_worker` used `OpenCodeVersionsScreen` without a title; its default was OpenCode versions | Now `ReportScreen` with required explicit title; Agent Context heading/capitalization corrected, failed inspection is visibly unverified |
 | Remote failure hides inventory | `cli.opencode_versions` and `tui._opencode_versions_worker` query npm before enumerating environments | Local results survive remote failure; failures remain visible and CLI exit semantics remain truthful |
 | Base coordination is too narrow | `core.lock` stores locks below the chosen data directory; `update_base`, `rollback_base` and `core.base_tag_lock` use it for shared tags | One daemon-scoped lock namespace for builds, swaps, rollback, cleanup and base-based creation |
 | Cleanup does not guard all base copies | `cleanup._classify_image` guards build candidates, but not rollback copies | Cover candidates, rollback copies and relevant replaced images; recheck identity/eligibility under shared guards |
@@ -277,21 +279,21 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00. Stage order is mandatory; within correctness, complete
-one focused task per cycle. Dependencies are technical prerequisites, not permission to run extra
+All tasks below are pending except UP-00 and UP-01. Stage order is mandatory; within correctness,
+complete one focused task per cycle. Dependencies are technical prerequisites, not permission to run extra
 tasks in a cycle. Split an oversized task into documented subcycles without changing scope.
 Every task must reproduce the defect where applicable, add regressions, rerun affected tests,
 review the diff and update user/engineering documents with actual behavior and evidence.
 
 Priority stages: UP-01..UP-06 correctness first; UP-07..UP-09 shared observations/discovery;
 UP-10..UP-12 Updates UI and existing actions; UP-13 base refresh; UP-14..UP-17 manager updates.
-UP-18 consolidates evidence without preparing a release. Every task has status PENDING except
-UP-00, completed by the documentation-only commit containing this checkpoint.
+UP-18 consolidates evidence without preparing a release. UP-00 and UP-01 are DONE; all other
+tasks are PENDING. The next unblocked task is UP-02 only.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
 |---|---|---|---|
-| UP-00 | Persist approved plan | Owner approval | Documentation only; decision/status links, complete scope/dependencies/test gates and resume record; commit and STOP |
-| UP-01 | Generic report and Agent Context heading | UP-00 | Explicit titles for all report callers; consistent Agent Context labels/fallback wording; pilot regressions for Agent Context, Versions, readiness and cleanup, including 80x24 |
+| UP-00 | DONE: persist approved plan | Owner approval | Documentation-only commit `3552f67`; decision/status links, complete scope/dependencies/test gates and resume record |
+| UP-01 | DONE: generic report and Agent Context heading | UP-00 | Explicit titles for all report callers; consistent Agent Context labels/fallback wording; pilot regressions for Agent Context, Versions, readiness and cleanup, including 80x24; evidence below |
 | UP-02 | Preserve inventory on remote failure | UP-00 | CLI/TUI local rows survive npm failure; per-item errors isolated, explicit check failure still reported; offline/partial-result regressions without starting containers |
 | UP-03 | Shared base coordination | UP-00 | Secure shared namespace, lock ordering and build/publication guards cover build/swap/rollback/cleanup/creation; multiprocess host and real-Docker race tests across data directories/context aliases |
 | UP-04 | Explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; cached-build/downgrade/tie/changed-or-missing-copy regressions and real swap preservation |
@@ -423,18 +425,103 @@ a materially different architecture, record the blocker and ask the owner before
 - UP-00 completes with that documentation-only commit. **STOP.** All implementation tasks remain
   pending; the next cycle is UP-01 only.
 
+### UP-01 — 2026-10-30 — generic report and Agent Context presentation
+
+- Recovered the instructions, full roadmap, current-state records and clean `work/updates` at
+  UP-00 `3552f67`. Read-only daemon reconciliation matched UP-00: verified own rootless identity,
+  no containers/volumes, retained Debian/Arch bases revision 1 with OpenCode 2.2.0. No later work
+  invalidated the plan. Local instructions' old "no running effort" snapshot is superseded by
+  TODO and this record; its permissions remain unchanged.
+- Reproduced the heading defect with a pilot assertion at 80x24: both no-container and failed
+  observation paths displayed `OpenCode versions (no automatic updates)` instead of
+  `Agent Context — NAME` (2 failures before the patch). A second reproducer saved valid observed
+  Debian 12/network-none guidance, then made inspection fail: the configuration-only comparison
+  incorrectly called the saved guidance missing/outdated (1 failure before the patch).
+- Root cause: four unrelated reports shared a versions-named modal with an implicit title.
+  Agent Context also hid its observation fallback and compared that preview against the file
+  as though it had fresh container evidence. All four callers (Versions, Agent Context,
+  readiness and cleanup) now use `ReportScreen` with a required explicit keyword title and
+  plain-text heading. Existing report contents, scrolling and Close/Esc remain available.
+- Agent Context heading, action label, binding description and body use consistent capitalization.
+  A failed observation now displays its reason and configured-settings fallback, with an
+  unverified on-disk status; it does not run the misleading comparison. Successful inspection
+  keeps the current/missing-or-outdated comparison. Preview remains read-only and never starts
+  a container; generation, CLI verification and lifecycle behavior are unchanged.
+- Added pilot regressions for observed/missing/offline/current/outdated guidance, saved-file
+  preservation, all caller titles including failure results, required explicit title, literal
+  markup, long heading, keyboard scrolling/focus/Close/Esc, hidden dashboard keys and 80x24/larger
+  layouts. The existing readiness and cleanup workflow tests now assert their report subjects.
+- Early test correction: the first focused run was 89 passed/4 failed because the new test
+  assumed a public `Static.markup` property; the second had the same counts because it used an
+  unbound Ctrl+End key. Inspected Textual's bindings/API; assert literal rendered content and use
+  Page Down instead. All four scrolling/closing cases passed after correction; no product
+  behavior was relaxed to satisfy these test mistakes. Final runs below pass those cases.
+- Verification (serial foreground runs, absolute PYTHONPATH, isolated paths, pytest 9.2.0):
+
+  | Run | Result |
+  |---|---|
+  | Full suite, Python 3.11.18, Typer 0.27.3, Textual 8.2.8 | **982 passed, 56 opt-in skips**, 90.56 s; unit/mocked Docker, real host files/Git/local processes and existing host terminal fixtures |
+  | Affected subset, Python 3.11.18, Typer 0.16.0, Textual 4.0.0 | **198 passed, no skips**, 54.82 s |
+  | Affected subset, Python 3.14.8, Typer 0.27.3, Textual 8.2.8 | **198 passed, no skips**, 56.37 s |
+  | Affected subset, Python 3.14.8, Typer 0.16.0, Textual 4.0.0 | **198 passed, no skips**, 54.70 s |
+  | Final affected subset including updated records/illustration, Python 3.11.18, Typer 0.27.3, Textual 8.2.8 | **198 passed, no skips**, 56.06 s |
+
+  The lowest-dependency runs emitted only the two already documented Typer/Click deprecations.
+  The full-suite skips are the real-campaign, privileged and socket-activation opt-ins, not
+  waived failures. Ruff/shellcheck, language, document/link/anchor and CLI-structure checks are
+  included. Commands (the subset uses each named venv and a distinct short basetemp):
+
+  ```sh
+  PYTHONPATH="$PWD/src" .work/venv311/bin/python -m pytest -q \
+    --basetemp=/tmp/opencode/up01-full311
+  PYTHONPATH="$PWD/src" .work/venv311low/bin/python -m pytest -q \
+    tests/test_tui.py tests/test_readiness.py tests/test_cleanup.py \
+    tests/test_agent_context.py tests/test_tui_text.py \
+    tests/test_image_readiness.py tests/test_quality.py tests/test_language.py \
+    tests/test_user_docs.py tests/test_cli_structure.py \
+    --basetemp=/tmp/opencode/up01-low311
+  ```
+
+  Repeat the second command with `.work/venv314/bin/python` and basetemp
+  `/tmp/opencode/up01-current314`, and with `.work/venv314low/bin/python` and basetemp
+  `/tmp/opencode/up01-low314`, for the two 3.14 results above. The final repeat uses
+  `.work/venv311/bin/python` and `/tmp/opencode/up01-final311`.
+- README, dashboard/OpenCode guides, Unreleased, architecture, baseline, campaign qualification
+  and TODO now describe only the delivered correction. Regenerated `docs/images/dashboard.svg`
+  with `PYTHONPATH="$PWD/src" .work/venv311/bin/python tests/dashboard_screenshot.py
+  docs/images/dashboard.svg` (fake data, not a manual UI observation).
+- Reviewed the product/test/document diff and the regenerated SVG's text changes (Agent Context
+  capitalization plus fresh fake IDs/time). All four report callers supply explicit titles;
+  no versions-specific component/IDs or inconsistent Agent Context labels remain in source.
+  `git diff --check` is clean; static gates required no exclusions or suppressions.
+- Final documentation-only rerun after the evidence updates: **27 passed, no skips** (5.45 s),
+  `.work/venv311/bin/python -m pytest -q tests/test_language.py tests/test_user_docs.py
+  tests/test_cli_structure.py --basetemp=/tmp/opencode/up01-docs-final` with absolute PYTHONPATH.
+  The ending read-only daemon check again found no containers/volumes and the same base image IDs.
+- Not re-established: report-specific real-terminal/manual observation, real Docker mutations,
+  real OpenCode, package build or isolated pipx updates; full 3.14/lowest suites were not run,
+  only the affected subsets. No mutation or version-discovery behavior changed. Recheck the
+  live-terminal reports during UP-18; do not count historical campaign PASS as new evidence.
+- No Docker resource was created, changed or deleted; no cleanup was needed. No image assets,
+  schemas, manager version, CLI commands or policy semantics changed. Planned local commit:
+  `fix: give dashboard reports explicit subject titles`. Resolve its actual hash from Git.
+- **UP-01 is complete; STOP after its local commit. Next: UP-02 only.** Remote failures still
+  hide version inventory; that defect is deliberately not fixed in this report-only cycle.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056 and this entire record. Use
    ARCHITECTURE for implemented behavior, not proposed functionality. Check Git status, branch,
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
-2. Expected branch: `work/updates`, with a documentation-only UP-00 commit after `a20f1fc`.
-   Product code, tests, image assets, manager version and schemas should still match the seed.
-   If a later checkpoint exists, its recorded task/evidence takes precedence over this snapshot.
-3. Select **UP-01 only**: reproduce the wrong Agent Context heading, inspect every
-   `OpenCodeVersionsScreen` caller, implement the generic explicitly titled report, and add
-   focused pilot regressions. Preserve report contents, safe rendering, offline fallback and
-   80x24 behavior. Do not implement the full Updates screen or another task in the same cycle.
+2. Expected branch: `work/updates`, UP-00 `3552f67` followed by the UP-01 implementation commit.
+   Only `tui.py` product behavior and its report-related tests/documents changed in UP-01. Image
+   assets, manager version and schemas still match the seed. Resolve the latest actual commit
+   from Git; if a later checkpoint exists, its task/evidence takes precedence over this snapshot.
+3. Select **UP-02 only**: reproduce npm failure hiding local rows in CLI `opencode versions
+   --check` and TUI `_opencode_versions_worker`. Separate local inventory and registry failures;
+   preserve per-row errors, explicit-check failure/exit semantics and stopped-container safety.
+   Use the existing `ReportScreen` with explicit Versions title. Add focused CLI/pilot regressions
+   without implementing observations/caching, new policy semantics or the full Updates screen.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.

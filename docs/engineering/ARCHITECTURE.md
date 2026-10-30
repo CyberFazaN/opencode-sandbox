@@ -6,11 +6,10 @@ state and verification: `BASELINE.md`. User-facing behaviour is in `README.md` a
 `docs/` (D-041; the rootless daemon setup in `docs/install.md`, the daemon identity check in
 `docs/security.md`, the injected guidance in `docs/opencode.md`).
 
-Approved next architecture, not implemented yet: D-056 and the
-[Updates working roadmap](updates/ROADMAP.md). The first cycle changes engineering documents
-only. The module map and behavior below describe the current implementation, including the
-base locks' current data-directory scope and the existing version-report limitations; they
-must not be read as evidence that the approved corrections have shipped.
+Approved staged architecture: D-056 and the [Updates working roadmap](updates/ROADMAP.md).
+UP-01 implements the generic report and Agent Context presentation correction only; the Updates
+interface and other corrections remain pending. The module map and behavior below describe the
+current implementation, including base locks' data-directory scope and version-report limitations.
 
 ## Boundaries
 
@@ -43,6 +42,14 @@ must not be read as evidence that the approved corrections have shipped.
 | `cli.py` | Typer CLI (grouped commands); no arguments starts the dashboard | D-021 |
 | `tui.py`, `management_tui.py`, `backup_tui.py`, `git_tui.py`, `preferences.py` | Textual dashboard and its screens (plain text for sandbox content, errors through `core.error_text`) | D-021, D-032, D-034 |
 | `tui_runtime.py` | Existing thread-worker adapter for scoped readiness feedback and cooperative cancellation; no UI retry loop | D-052 |
+
+`tui.ReportScreen` is the shared plain-text, scrollable read-only report for Agent Context,
+Versions, readiness and cleanup results. Its title is a required explicit keyword argument,
+rendered without markup; there is no versions-specific default. Agent Context uses
+`Agent Context — NAME`. A failed container inspection is displayed with the configured-settings
+fallback, and the saved guidance is not verified against that unobserved preview. Successful
+inspection retains the existing file comparison. Neither path writes guidance or starts a
+container; lifecycle generation and CLI verification remain unchanged.
 
 ## Docker access and identity (D-003, D-004, D-052)
 

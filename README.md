@@ -54,7 +54,8 @@ Consider something else if:
 - **OpenCode versions** managed per base image and environment: update policies, updates with
   automatic rollback on failure; OpenCode's self-update is off.
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
-  operating system); one-time initial integrations (Context7 by default).
+  operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.
+  One-time initial integrations (Context7 by default).
 - **Diagnostics**: `doctor` for the host, read-only `check NAME` per environment including
   measured network reachability, disk usage and conservative cleanup.
 

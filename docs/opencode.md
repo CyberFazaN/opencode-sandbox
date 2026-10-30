@@ -67,8 +67,10 @@ opencode-sandbox agent-context refresh NAME  # rewrite now
 ```
 
 They fall back to the configured settings (with a note) when Docker cannot be asked, with an
-unknown OS version rather than today's default. The
-guidance is descriptive, not a security policy. It was verified with OpenCode 2.1.4 and 2.2.0 on
+unknown OS version rather than today's default. The dashboard's Agent Context preview (`a`)
+also explains this fallback and leaves the on-disk guidance unverified when container inspection
+fails; a configuration-only preview cannot establish that saved observed guidance is outdated.
+The guidance is descriptive, not a security policy. It was verified with OpenCode 2.1.4 and 2.2.0 on
 Debian and Arch by capturing the first model request of a managed `run` with a fake provider,
 and with one real provider: OpenRouter (`z-ai/glm-5.3-flash`, OpenCode 2.2.0, Debian 13)
 answered from the guidance in the first prompt.

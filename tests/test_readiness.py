@@ -492,15 +492,16 @@ def test_tui_check_key_shows_the_report_and_the_details_line(monkeypatch):
 
     async def main():
         app = tui.Dashboard()
-        async with app.run_test(size=(100, 30)) as pilot:
+        async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
             assert "Readiness: not checked yet" in str(app.query_one("#details").render())
             await pilot.press("i")
             for _ in range(30):
                 await pilot.pause(); await asyncio.sleep(0.1)
-                if type(app.screen).__name__ == "OpenCodeVersionsScreen":
+                if isinstance(app.screen, tui.ReportScreen):
                     break
-            assert type(app.screen).__name__ == "OpenCodeVersionsScreen"
+            assert isinstance(app.screen, tui.ReportScreen)
+            assert str(app.screen.query_one("#report-title").render()) == "Readiness check (read-only; nothing was started or changed)"
             assert f"Readiness of {m['name']}" in app.screen.report and "[passed]" in app.screen.report
             await pilot.press("escape"); await pilot.pause()
             assert "Readiness: last check 20" in str(app.query_one("#details").render())

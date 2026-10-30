@@ -55,6 +55,13 @@ Dialogs default to Cancel. Dashboard keys are inactive while a sub-screen is ope
 project, `backup restore-check`, `backup restore-rollback` and custom images are only available
 in the CLI.
 
+The read-only Agent Context preview is titled **Agent Context — NAME**. If container inspection
+fails, it shows the reason and previews the configured settings with unknown base OS provenance.
+In that fallback, saved guidance is **not verified**, not assumed outdated. Opening the preview
+does not rewrite the saved file or start the environment; guidance is regenerated before every
+OpenCode launch. Agent Context, Versions, readiness and cleanup-result reports are scrollable;
+use Tab to reach Close, or Esc to return to the dashboard.
+
 ## State
 
 The State column is the manager's recorded state. The list updates within about 2 seconds after

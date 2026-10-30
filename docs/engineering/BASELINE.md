@@ -18,13 +18,15 @@ verification, known issues and what is not verified. Update it whenever one of t
 D-056 approves the Updates architecture and UX effort after the published 6.1.0 release.
 [TODO](../../TODO.md#active-updates-architecture-and-ux) is the entry point; the
 [working roadmap](updates/ROADMAP.md) contains tasks, acceptance criteria, evidence and handoff.
-Its first cycle persists the plan only. No product, image-definition, schema or version change
-has been made; the existing Versions dialog, policies and update behavior described by the
-implementation remain in place. The confirmed findings are not yet fixed.
+UP-00 persisted the plan; UP-01 implements explicitly titled generic reports, the Agent Context
+heading/capitalization and honest inspection-fallback wording. When inspection fails, saved
+guidance is unverified rather than judged against a configuration-only preview. The Versions
+interface, discovery, policies and mutation workflows otherwise remain unchanged; UP-02 is next.
+No image-definition, schema or manager-version change has been made.
 
-Documentation-only verification for this checkpoint is recorded in the working roadmap.
-The release evidence below is historical evidence for 6.1.0, not verification of the proposed
-Updates implementation. No release preparation or publication is authorized by this effort.
+UP-01 verification is below; detailed commands, initial failures and handoff are in the roadmap.
+Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
+No release preparation or publication is authorized by this effort.
 
 ## Supported environments
 
@@ -82,6 +84,16 @@ test-only image namespace for new base images and the socket-activation opt-in a
 in `RELEASING.md` ("Verify").
 
 ## Verification
+
+### Unpublished UP-01 — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Full unit/host/Textual-pilot/local-process suite, Python 3.11.18, current dependencies | 982 passed, 56 opt-in skips (real-campaign, privileged and socket-activation rows); mocked Docker, no live daemon operations |
+| Affected regression subset, Python 3.11.18 and 3.14.8, current/lowest dependencies | 198 passed, no skips in each of four serial runs; lowest Typer 0.16.0/Textual 4.0.0 and current 0.27.3/8.2.8; only the two known lowest-Typer/Click deprecations; final 3.11-current run includes updated records and regenerated illustration |
+| Report-specific pilot coverage | Agent Context observed/missing/offline/current/outdated, preserved saved file, Versions success/failure, readiness and cleanup titles, required title, literal markup, scrolling/focus/Close/Esc, 80x24 and larger |
+| Static/documents | Ruff and shellcheck passed in the suite; English, links/anchors and CLI structure passed; dashboard illustration regenerated with fake data |
+| Not re-established | Report-specific real terminal/manual observation, real Docker/OpenCode or pipx update/package verification; the existing host-process terminal tests in the full suite are not live-Docker evidence |
 
 ### 6.1.0 release tree — 2026-10-30
 

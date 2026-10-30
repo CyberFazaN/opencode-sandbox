@@ -162,7 +162,7 @@ class Dashboard(App):
                 Binding("r", "refresh_readiness", "Refresh", show=False), Binding("c", "current_folder", "This folder", show=False),
                 Binding("p", "providers", "Provider profiles", show=False), Binding("g", "settings", "Preferences", show=False),
                 Binding("t", "runtime", "Settings", show=False), Binding("u", "usage", "Usage", show=False),
-                Binding("v", "opencode_versions", "OpenCode versions", show=False), Binding("a", "agent_context", "Agent context", show=False),
+                Binding("v", "opencode_versions", "OpenCode versions", show=False), Binding("a", "agent_context", "Agent Context", show=False),
                 Binding("f8", "recovery", "Recovery", show=False), Binding("R", "repair_selected", "Repair", show=False),
                 Binding("e", "export_selected", "Export changes", show=False), Binding("b", "backup_selected", "Backup", show=False),
                 Binding("B", "backups", "Backups", show=False), Binding("d", "git_review", "Changes", show=False),
@@ -196,7 +196,7 @@ class Dashboard(App):
         with ItemGrid(id="actions", classes="bar", min_column_width=15):
             for label, bid in (("OpenCode", "open"), ("Shell", "shell"), ("Start", "start"), ("Stop", "stop"),
                                ("Check", "check"), ("Settings", "runtime"), ("Usage", "usage"),
-                               ("Agent context", "agentcontext"), ("Changes", "changes"), ("Export", "export"),
+                               ("Agent Context", "agentcontext"), ("Changes", "changes"), ("Export", "export"),
                                ("Backup", "backup"), ("Repair", "repair"), ("Promote", "keep")):
                 yield Button(label, id=bid, compact=True)
             yield Button("Delete", id="delete", variant="error", compact=True)
@@ -415,7 +415,7 @@ class Dashboard(App):
             self.call_from_thread(self._show_check, f"Check failed: {c.error_text(exc)}", True)
 
     def _show_check(self, text: str, failed: bool) -> None:
-        self.push_screen(OpenCodeVersionsScreen(text, title="Readiness check (read-only; nothing was started or changed)"))
+        self.push_screen(ReportScreen(text, title="Readiness check (read-only; nothing was started or changed)"))
         self.update_details()
         if failed:
             self.notify("Some checks failed", severity="error")
@@ -563,7 +563,7 @@ class Dashboard(App):
             self.call_from_thread(self._show_cleanup, f"Cleanup failed: {c.error_text(exc)}", True)
 
     def _show_cleanup(self, text: str, failed: bool) -> None:
-        self.push_screen(OpenCodeVersionsScreen(text, title="Cleanup result"))
+        self.push_screen(ReportScreen(text, title="Cleanup result"))
         if failed:
             self.notify("Some objects were not removed", severity="warning")
 
@@ -589,7 +589,7 @@ class Dashboard(App):
             self.call_from_thread(self._show_opencode_versions, c.error_text(exc), True)
 
     def _show_opencode_versions(self, message: str, error: bool) -> None:
-        self.push_screen(OpenCodeVersionsScreen(message))
+        self.push_screen(ReportScreen(message, title="OpenCode versions (no automatic updates)"))
         if error:
             self.notify("Version check failed", severity="error")
 
@@ -604,15 +604,22 @@ class Dashboard(App):
     def _agent_context_worker(self, m) -> None:
         from . import agent_context as ac
         try:
+            note = ""
             try:
                 inputs = c.guidance_inputs(m)
-            except c.SandboxError:
+            except c.SandboxError as exc:
                 inputs = c.guidance_inputs(m, observe=False)
+                note = f"Container inspection unavailable ({c.error_text(exc)}); preview uses configured settings.\n"
             content = ac.render(m, **inputs)
-            current = ac.verify(m, c.env_dir, **inputs)
-            self.call_from_thread(self.push_screen, OpenCodeVersionsScreen(
-                f"Agent context: {m['name']}\nOn-disk: {'current' if current else 'missing/outdated'}\n"
-                "Guidance is regenerated before every OpenCode launch.\n\n" + content))
+            # A configuration-only fallback cannot establish whether observed guidance is current.
+            if note:
+                on_disk = "not verified (container inspection unavailable)"
+            else:
+                on_disk = "current" if ac.verify(m, c.env_dir, **inputs) else "missing/outdated"
+            self.call_from_thread(self.push_screen, ReportScreen(
+                f"Agent Context: {m['name']}\n{note}On-disk: {on_disk}\n"
+                "Guidance is regenerated before every OpenCode launch.\n\n" + content,
+                title=f"Agent Context — {m['name']}"))
         except Exception as exc:
             self.call_from_thread(self.notify, c.error_text(exc), severity="error")
 
@@ -948,25 +955,25 @@ class DiskScreen(ModalScreen[bool | None]):
         self.dismiss({"disk-cleanup": False, "disk-cleanup-all": True}.get(event.button.id))
 
 
-class OpenCodeVersionsScreen(ModalScreen[None]):
-    """Read-only version report. No automatic container updates."""
-    CSS = "OpenCodeVersionsScreen {align: center middle;} #versions-panel {width: 90%; height: 85%; border: round $accent; padding: 0 1; background: $surface;} #versions-report {height: 1fr;}"
+class ReportScreen(ModalScreen[None]):
+    """Read-only plain-text report; every caller must name its subject explicitly."""
+    CSS = "ReportScreen {align: center middle;} #report-panel {width: 90%; height: 85%; border: round $accent; padding: 0 1; background: $surface;} #report-text {height: 1fr;}"
     BINDINGS = [Binding("escape", "close", "Close")]
 
     def action_close(self) -> None:
         self.dismiss(None)
 
-    def __init__(self, report: str, title: str = "OpenCode versions (no automatic updates)"):
+    def __init__(self, report: str, *, title: str):
         super().__init__()
         self.report = report
         self.title_text = title
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="versions-panel"):
-            yield Static(self.title_text)
-            yield TextArea(self.report, read_only=True, id="versions-report")
-            yield Button("Close", id="close-versions")
+        with Vertical(id="report-panel"):
+            yield Static(self.title_text, markup=False, id="report-title")
+            yield TextArea(self.report, read_only=True, id="report-text")
+            yield Button("Close", id="report-close")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "close-versions":
+        if event.button.id == "report-close":
             self.dismiss(None)

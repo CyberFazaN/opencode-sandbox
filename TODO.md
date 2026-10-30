@@ -17,9 +17,10 @@ and existing operations -> explicit base refresh -> verified pipx manager self-u
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 stages. Each task includes its own tests and documentation, then a local commit and STOP.
 
-Current checkpoint: planning persisted only; no implementation started. Next: UP-01, the generic
-report component and Agent Context heading. Runtime behavior and the manager version remain
-6.1.0. Completion does not authorize a version bump, release preparation, tag, push or publication.
+Current checkpoint: UP-00 and UP-01 complete. Reports now require explicit titles, Agent Context
+has its own heading, and an unavailable inspection leaves saved guidance unverified. Next:
+UP-02, preserve local version inventory on remote failure. The manager version remains 6.1.0.
+Completion does not authorize a version bump, release preparation, tag, push or publication.
 
 ## Delivered in 6.1.0
 

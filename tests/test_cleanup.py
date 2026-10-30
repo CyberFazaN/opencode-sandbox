@@ -422,8 +422,10 @@ def test_tui_disk_screen_confirms_before_removing(world):
             app.screen.query_one("#confirm").press()
             for _ in range(50):
                 await pilot.pause(); await asyncio.sleep(0.05)
-                if type(app.screen).__name__ == "OpenCodeVersionsScreen":
+                if isinstance(app.screen, tui.ReportScreen):
                     break
+            assert isinstance(app.screen, tui.ReportScreen)
+            assert str(app.screen.query_one("#report-title").render()) == "Cleanup result"
             assert "Removed: environment container" in app.screen.report
     asyncio.run(main())
     assert f"ocs-{GONE}" not in {x["Name"][1:] for x in d.containers.values()}
