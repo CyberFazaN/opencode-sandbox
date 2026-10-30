@@ -906,8 +906,8 @@ Owner decision, 2026-10-30, after an independent review of every change since 6.
 - Development status stays **Beta**: real evidence covers one host distribution, a fake model
   provider, and hosted CI has not yet run the revised matrix.
 - The stabilization working records end with this release (D-045): their durable facts are in
-  BASELINE, DECISIONS (D-047..D-054), ISSUES, CAMPAIGN, RELEASING and TODO; Git history keeps the
-  cycle records. Supersedes D-047's record location; its priorities remain the roadmap in TODO.
+  BASELINE, DECISIONS (D-047..D-054), ISSUES, CAMPAIGN, RELEASING and TODO. Supersedes D-047's
+  record location; its priorities remain the roadmap in TODO.
   The internal-reference checks also refuse the removed plan's task labels.
 - Install examples name `v6.1.0` and the 3.11 floor; this supersedes D-049's note that they kept
   naming the 6.0.0 tag.
