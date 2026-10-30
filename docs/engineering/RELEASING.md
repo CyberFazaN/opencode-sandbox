@@ -83,6 +83,8 @@ rootlesskit's `10.0.2.2` and `example.invalid`/`example.org` addresses are expec
 
 1. If CI job names changed since the last release, update the required status checks of the
    `main` ruleset first; otherwise the pull request waits for checks that no longer report.
+   The checks are the expanded matrix job names (for example `Unit tests (Python 3.11, current
+   dependencies)`); take them from the release pull request's first run.
    Merge the release branch into `main` with a merge commit; push `main` and wait for CI.
 2. Create and push an annotated tag on that merge commit:
 
