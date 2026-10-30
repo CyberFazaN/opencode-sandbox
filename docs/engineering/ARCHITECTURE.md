@@ -7,9 +7,10 @@ state and verification: `BASELINE.md`. User-facing behaviour is in `README.md` a
 `docs/security.md`, the injected guidance in `docs/opencode.md`).
 
 Approved staged architecture: D-056 and the [Updates working roadmap](updates/ROADMAP.md).
-UP-01 implements the generic report and Agent Context presentation correction only; the Updates
-interface and other corrections remain pending. The module map and behavior below describe the
-current implementation, including base locks' data-directory scope and version-report limitations.
+UP-01 implements generic reports and the Agent Context presentation correction; UP-02 preserves
+independent local/registry version results. The Updates interface and other corrections remain
+pending. The current implementation still has data-directory-scoped base locks and no disposable
+version observations/discovery cache.
 
 ## Boundaries
 
@@ -147,6 +148,15 @@ change bundles and backups are refused inside any environment's workspace. Metad
 `workspace: {mode, path}`; `workspaces.path(m)` is what Docker mounts.
 
 ## OpenCode (D-007, D-008, D-018, D-019, D-009)
+
+`opencode_versions.versions_report` composes local inventory and an optional npm lookup for both
+CLI and TUI. Local collection precedes discovery, and either source's failure leaves the other's
+results intact. Per-environment and formatting errors keep their subject and unexpected error
+type instead of discarding other rows. CLI `opencode versions` prints available rows to stdout,
+errors to stderr and exits 2 on a partial/failed report; the dashboard displays them together
+with its failure notice. Without `--check`, the CLI never queries npm. This is a read-only report,
+not a new update executor, observation cache or concurrent discovery service. Existing policy
+comparisons remain unchanged; only running containers are queried for their binary version.
 
 OpenCode V2 (`@opencode/cli` 2.x, no other major) is installed in the base images; every
 container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`. Updates are journalled with a `docker commit`

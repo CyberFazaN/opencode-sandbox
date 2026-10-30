@@ -2,9 +2,9 @@
 
 ## Status and authority
 
-- **UP-00 and UP-01 complete. Next: UP-02 only.** UP-00 persisted the plan; UP-01 adds the
-  generic explicitly titled report and fixes Agent Context presentation/fallback. This record
-  captures the owner's approved discussion and implementation checkpoints, not a release proposal.
+- **UP-00..UP-02 complete. Next: UP-03 only.** UP-00 persisted the plan; UP-01 fixes report
+  subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
+  results. This record captures approved design and implementation checkpoints, not a release proposal.
 - Entry point: [TODO](../../../TODO.md#active-updates-architecture-and-ux). Durable approval:
   [D-056](../DECISIONS.md#d-056-updates-architecture-and-execution-order--accepted-for-implementation).
   Current implemented behavior/evidence: [ARCHITECTURE](../ARCHITECTURE.md) and
@@ -22,13 +22,14 @@
 ## Reconciliation with the starting implementation
 
 Source paths below describe the UP-00 starting point, not a substitute for reading the code
-again per task. UP-01 fixes the report/Agent Context finding; other findings remain present.
+again per task. UP-01 fixes report/Agent Context presentation; UP-02 fixes inventory loss on
+remote failure. Other findings remain present.
 Source inspection is not regression or real-operation evidence.
 
 | Finding | Current implementation | Required correction |
 |---|---|---|
 | Wrong Agent Context heading (fixed in UP-01) | At UP-00, `tui._agent_context_worker` used `OpenCodeVersionsScreen` without a title; its default was OpenCode versions | Now `ReportScreen` with required explicit title; Agent Context heading/capitalization corrected, failed inspection is visibly unverified |
-| Remote failure hides inventory | `cli.opencode_versions` and `tui._opencode_versions_worker` query npm before enumerating environments | Local results survive remote failure; failures remain visible and CLI exit semantics remain truthful |
+| Remote failure hides inventory (fixed in UP-02) | At UP-00, CLI and TUI queried npm before enumerating environments | Shared `versions_report` retains independent source results and per-row errors; CLI stderr/exit 2 and TUI error notice keep partial failures visible |
 | Base coordination is too narrow | `core.lock` stores locks below the chosen data directory; `update_base`, `rollback_base` and `core.base_tag_lock` use it for shared tags | One daemon-scoped lock namespace for builds, swaps, rollback, cleanup and base-based creation |
 | Cleanup does not guard all base copies | `cleanup._classify_image` guards build candidates, but not rollback copies | Cover candidates, rollback copies and relevant replaced images; recheck identity/eligibility under shared guards |
 | Rollback guesses wrong order | `rollback_base` maximizes Docker image creation time | Explicit choice among distinct copies, immutable identity and current-definition verification |
@@ -279,7 +280,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00 and UP-01. Stage order is mandatory; within correctness,
+All tasks below are pending except UP-00..UP-02. Stage order is mandatory; within correctness,
 complete one focused task per cycle. Dependencies are technical prerequisites, not permission to run extra
 tasks in a cycle. Split an oversized task into documented subcycles without changing scope.
 Every task must reproduce the defect where applicable, add regressions, rerun affected tests,
@@ -287,14 +288,14 @@ review the diff and update user/engineering documents with actual behavior and e
 
 Priority stages: UP-01..UP-06 correctness first; UP-07..UP-09 shared observations/discovery;
 UP-10..UP-12 Updates UI and existing actions; UP-13 base refresh; UP-14..UP-17 manager updates.
-UP-18 consolidates evidence without preparing a release. UP-00 and UP-01 are DONE; all other
-tasks are PENDING. The next unblocked task is UP-02 only.
+UP-18 consolidates evidence without preparing a release. UP-00..UP-02 are DONE; all other
+tasks are PENDING. The next unblocked task is UP-03 only.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
 |---|---|---|---|
 | UP-00 | DONE: persist approved plan | Owner approval | Documentation-only commit `3552f67`; decision/status links, complete scope/dependencies/test gates and resume record |
 | UP-01 | DONE: generic report and Agent Context heading | UP-00 | Explicit titles for all report callers; consistent Agent Context labels/fallback wording; pilot regressions for Agent Context, Versions, readiness and cleanup, including 80x24; evidence below |
-| UP-02 | Preserve inventory on remote failure | UP-00 | CLI/TUI local rows survive npm failure; per-item errors isolated, explicit check failure still reported; offline/partial-result regressions without starting containers |
+| UP-02 | DONE: preserve inventory on remote failure | UP-00 | CLI/TUI local rows survive npm failure; per-item errors isolated, explicit check failure still reported; offline/partial-result regressions without starting containers; evidence below |
 | UP-03 | Shared base coordination | UP-00 | Secure shared namespace, lock ordering and build/publication guards cover build/swap/rollback/cleanup/creation; multiprocess host and real-Docker race tests across data directories/context aliases |
 | UP-04 | Explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; cached-build/downgrade/tie/changed-or-missing-copy regressions and real swap preservation |
 | UP-05 | Bounded diagnostic execution | UP-00 | Network/short subprocess deadlines and owned cleanup/cancellation; container-side probe bounds; long builds/updates not assigned short diagnostic limits; real local-process/pilot and scoped Docker leak checks |
@@ -377,7 +378,7 @@ land; do not announce planned functionality as delivered in this documentation-o
 
 ## Risks and remaining implementation questions
 
-No unresolved product decision blocks UP-01. The following are implementation proofs to resolve
+No unresolved product decision blocks UP-03. The following are implementation proofs to resolve
 in the named task, not permission to reopen settled UX or add infrastructure. If evidence needs
 a materially different architecture, record the blocker and ask the owner before proceeding.
 
@@ -508,20 +509,109 @@ a materially different architecture, record the blocker and ask the owner before
 - **UP-01 is complete; STOP after its local commit. Next: UP-02 only.** Remote failures still
   hide version inventory; that defect is deliberately not fixed in this report-only cycle.
 
+### UP-02 — 2026-10-30 — preserve inventory across discovery failures
+
+- Recovered instructions, roadmap/current-state records and clean `work/updates` at `d7d6a1f`.
+  No intervening changes invalidated the design. Read-only daemon inventory again matched UP-01:
+  own rootless identity verified, zero containers/volumes, retained Debian/Arch revision-1 bases
+  with OpenCode 2.2.0. No Docker mutation was needed for this task.
+- Minimal reproducer: three local environments (running, stopped and not created), fake Docker
+  and an npm failure. Both CLI and 80x24 pilot tests failed before the patch: CLI stdout was
+  empty and TUI showed only the registry error; the event trace never reached local inspection.
+  Root cause was the registry-first shared failure scope, not missing local metadata.
+- Added `opencode_versions.versions_report`: a small read-only composition of existing local
+  inventory, lookup and row formatting. Local collection comes first; the optional registry
+  lookup and each row have separate failure boundaries. It returns available lines and explicit
+  errors, with source/row identity and `core.error_text` preserving unexpected exception types.
+  It neither replaces an updater nor introduces observations, cache persistence or schema fields.
+- CLI and TUI now share this report. CLI available rows stay on stdout, errors go to stderr and
+  a failed/partial report exits 2, including failed environment rows that previously could exit
+  0. The dashboard shows lines and errors together with its failure notice and retains UP-01's
+  explicit Versions title. Successful discovery is labelled `npm registry` consistently in both
+  interfaces. No failure is presented as current or update available without a comparison target.
+- Expanded per-environment isolation to malformed policy values and ordinary unexpected errors;
+  one bad row cannot discard healthy rows. Stopped/not-created inspection stays nonintrusive,
+  no-check CLI never calls npm, and existing Notify/Manual/Pinned comparison behavior is retained.
+  Updates, policy changes, checkpoints, ownership/rootless checks and user configuration are untouched.
+- Regression coverage: 32 new inventory cases in `tests/test_version_inventory.py` use mocked
+  Docker/npm and real isolated metadata. Cover offline, timeout, HTTP/rate-limit and malformed
+  response errors, unexpected source errors, failed local source with successful/failed registry,
+  malformed policy, ownership refusal, formatting failure, stdout/stderr/exit status, empty data,
+  unchanged metadata, no stopped/created startup, policy comparisons, and 80x24 pilot results/Esc.
+  Existing Versions pilot expectations now require surviving rows after registry failure.
+- Static review initially flagged four broad report catches (BLE001). Keeping broad isolation at
+  this read-only boundary preserves the TUI's prior protection against unexpected row failures,
+  instead of narrowing catches merely to appease the linter. Added four local, reasoned BLE001
+  annotations, following the module's existing error-reporting convention; no blanket config
+  exclusion. Extended the existing AST quality gate to `opencode_versions.py`: every broad catch
+  must report its exception through `core.error_text`. Unexpected-source/row tests prove typed
+  visible errors, not swallowed failures. Ruff and the quality suite pass with that contract.
+- Verification, serial foreground, pytest 9.2.0 and absolute PYTHONPATH:
+
+  | Run | Result |
+  |---|---|
+  | Full suite, Python 3.11.18, Typer 0.27.3, Textual 8.2.8 | **1015 passed, 56 opt-in skips**, 99.05 s; mocked Docker, unit/host/files/Git/local-process and existing host terminal fixtures |
+  | Affected subset, Python 3.11.18, Typer 0.16.0, Textual 4.0.0 | **220 passed, no skips**, 60.54 s |
+  | Affected subset, Python 3.14.8, Typer 0.27.3, Textual 8.2.8 | **220 passed, no skips**, 61.51 s |
+  | Affected subset, Python 3.14.8, Typer 0.16.0, Textual 4.0.0 | **220 passed, no skips**, 59.41 s |
+  | Final subset including updated engineering records, Python 3.11.18, Typer 0.27.3, Textual 8.2.8 | **220 passed, no skips**, 67.11 s |
+
+  Lowest-dependency runs emitted only the two documented Typer/Click deprecations. Skips in the
+  full suite are the real-campaign, privileged and socket-activation opt-ins, not waived failures.
+  Earlier focused runs also passed (109 cases, then 129 after expanding the failure matrix).
+  Commands for the full suite and affected subset:
+
+  ```sh
+  PYTHONPATH="$PWD/src" .work/venv311/bin/python -m pytest -q \
+    --basetemp=/tmp/opencode/up02-full311
+  PYTHONPATH="$PWD/src" .work/venv311low/bin/python -m pytest -q \
+    tests/test_version_inventory.py tests/test_opencode_versions.py \
+    tests/test_opencode_lifecycle.py tests/test_tui.py tests/test_quality.py \
+    tests/test_cli_robustness.py tests/test_prerequisites.py tests/test_language.py \
+    tests/test_user_docs.py tests/test_cli_structure.py \
+    --basetemp=/tmp/opencode/up02-low311
+  ```
+
+  The subset's other runs use `.work/venv314/bin/python` with
+  `/tmp/opencode/up02-current314` and `.work/venv314low/bin/python` with
+  `/tmp/opencode/up02-low314`; the final repeat uses `.work/venv311/bin/python` with
+  `/tmp/opencode/up02-final311`. Static, language, document links/anchors and CLI checks are included.
+- Updated README, dashboard/OpenCode guides, command help, Unreleased and the engineering records
+  for delivered behavior. No new commands/options, manager version, image definition or schema.
+  Planned local commit: `fix: preserve version inventory when discovery fails`; resolve its actual
+  hash from Git. No push, merge, release preparation, tag, publication or uploads are authorized.
+- Reviewed the product/test/document diff, including the new inventory tests. Whitespace checks
+  are clean. Compared unchanged version/image assets/core/runtime-identity/cleanup and workflow
+  paths with UP-01. The ending read-only daemon inventory again has no containers/volumes and
+  the same base image IDs as the start; no user resource was touched.
+- Final documentation-only check: **27 passed, no skips**, 5.47 s, Python 3.11.18; command
+  `.work/venv311/bin/python -m pytest -q tests/test_language.py tests/test_user_docs.py
+  tests/test_cli_structure.py --basetemp=/tmp/opencode/up02-docs-final` with absolute PYTHONPATH.
+- Not re-established: report-specific real terminal/manual observation, live npm discovery or
+  outage, real Docker/OpenCode, package build or pipx update. Existing loopback HTTP tests exercise
+  the unchanged lookup locally, not the public npm service. Full 3.14/lowest suites were not run,
+  only affected subsets. Short local diagnostics remain unbounded until UP-05, and progressive
+  partial rendering/observations/caching remain later tasks; this report appears after the attempts.
+- No Docker resources were created, changed or deleted; no cleanup was needed. **UP-02 complete;
+  STOP after the local commit. Next: UP-03 only**, shared daemon-wide base coordination.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056 and this entire record. Use
    ARCHITECTURE for implemented behavior, not proposed functionality. Check Git status, branch,
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
-2. Expected branch: `work/updates`, UP-00 `3552f67` followed by the UP-01 implementation commit.
-   Only `tui.py` product behavior and its report-related tests/documents changed in UP-01. Image
-   assets, manager version and schemas still match the seed. Resolve the latest actual commit
-   from Git; if a later checkpoint exists, its task/evidence takes precedence over this snapshot.
-3. Select **UP-02 only**: reproduce npm failure hiding local rows in CLI `opencode versions
-   --check` and TUI `_opencode_versions_worker`. Separate local inventory and registry failures;
-   preserve per-row errors, explicit-check failure/exit semantics and stopped-container safety.
-   Use the existing `ReportScreen` with explicit Versions title. Add focused CLI/pilot regressions
-   without implementing observations/caching, new policy semantics or the full Updates screen.
+2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, then the UP-02 commit.
+   Product changes so far are limited to `tui.py`, `cli.py` and `opencode_versions.py` reports,
+   plus related tests/documents. Image assets, manager version and schemas still match the seed.
+   Resolve the latest actual commit from Git; later checkpoint evidence takes precedence.
+3. Select **UP-03 only**: inventory the base lock participants in `core.py`, `opencode_versions.py`
+   and `cleanup.py`, including build/tag replacement, rollback-copy/candidate cleanup and pin
+   checking/container creation. Reproduce cross-data-directory divergence, then implement the
+   approved secure user-private daemon/distribution build/publication guards outside product
+   overrides and prove the lock order. Include host multiprocess tests and scoped real-Docker
+   races using test-only tags and a resource manifest; preserve existing bases/copies. Resolve
+   namespace/fallback safety from evidence. Do not also implement explicit rollback selection,
+   diagnostic deadlines, observations/caching or the full Updates interface in that cycle.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.

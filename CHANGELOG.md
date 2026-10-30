@@ -12,6 +12,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   "OpenCode versions". When container inspection fails, it explains the configured-settings
   fallback and leaves saved guidance unverified rather than incorrectly calling it outdated.
   Readiness, cleanup and version reports retain their own headings in a shared read-only view.
+- OpenCode version inventory in the CLI and dashboard keeps available local rows when npm
+  discovery fails, and keeps registry results when local inventory fails. Per-environment errors
+  do not hide other rows. The CLI reports partial failures on stderr with exit status 2;
+  stopped containers are never started for discovery.
 
 ## 6.1.0 — 2026-10-30
 

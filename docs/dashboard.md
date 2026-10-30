@@ -62,6 +62,12 @@ does not rewrite the saved file or start the environment; guidance is regenerate
 OpenCode launch. Agent Context, Versions, readiness and cleanup-result reports are scrollable;
 use Tab to reach Close, or Esc to return to the dashboard.
 
+The Versions report (`v`) keeps available local rows if its npm check fails and shows the
+registry error alongside them. A local inventory failure likewise does not hide a successful
+registry check. Per-environment errors remain visible without discarding other rows, and a
+failure notice accompanies partial results. Discovery never starts stopped containers or
+installs updates; an unavailable registry is not an "up to date" result.
+
 ## State
 
 The State column is the manager's recorded state. The list updates within about 2 seconds after

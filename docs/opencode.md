@@ -102,6 +102,13 @@ that environment's OS and system layer.
 | `opencode update-base [--version X] [--distro ID]` | Rebuild a base image, keep a rollback copy |
 | `opencode rollback-base [--distro ID] --yes` | Swap a base image with its newest rollback copy |
 
+**Partial results.** `opencode versions --check` keeps available local version/policy rows when
+npm discovery fails; a failed discovery is not an up-to-date result. Registry results also
+remain available if local inventory fails. Per-environment inspection, policy or formatting
+errors are reported without hiding other environments. Available rows go to stdout, errors to
+stderr; any report error gives exit status 2. Without `--check`, the command never queries npm.
+Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
+
 **Policies.** `notify` (the default) reports available updates with `versions --check`;
 `manual` reports nothing; `pinned` refuses updates to other versions, refuses to create a
 container from a base image built with another version, and reports a version changed outside

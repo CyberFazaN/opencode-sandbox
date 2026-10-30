@@ -136,9 +136,37 @@ def versions():
     for m in c.all_envs():
         try:
             out.append({"name": m["name"], "id": m["id"], "policy": policy(m), **environment_version(m)})
-        except c.SandboxError as exc:
-            out.append({"name": m["name"], "id": m["id"], "policy": None, "state": f"error: {exc}", "version": None})
+        except Exception as exc:  # noqa: BLE001 — batch inventory reports each failure with its type
+            out.append({"name": m["name"], "id": m["id"], "policy": None, "state": f"error: {c.error_text(exc)}", "version": None})
     return out
+
+
+def versions_report(*, check=False):
+    """Return (lines, errors) for CLI/TUI inventory and an independent optional npm check.
+
+    Keep local rows even when discovery fails, and still attempt discovery if local inventory
+    fails. Callers must display the errors and signal the partial failure, not just the rows.
+    """
+    errors = []
+    try:
+        items = versions()
+    except Exception as exc:  # noqa: BLE001 — report boundary; never hide the independent source
+        items = []
+        errors.append(f"Local version inventory failed: {c.error_text(exc)}")
+    newest = None
+    if check:
+        try:
+            newest = latest()
+        except Exception as exc:  # noqa: BLE001 — report boundary; retain local inventory on failure
+            errors.append(f"npm registry check failed: {c.error_text(exc)}")
+    lines = [f"npm registry: {newest}"] if newest is not None else []
+    for item in items:
+        try:
+            line = f"{item['name']}: {environment_line(item, newest)}"
+            (errors if item["policy"] is None else lines).append(line)
+        except Exception as exc:  # noqa: BLE001 — one failed row must not discard the other rows
+            errors.append(f"{item['name']}: check failed ({c.error_text(exc)})")
+    return lines, errors
 
 
 def _content(image):

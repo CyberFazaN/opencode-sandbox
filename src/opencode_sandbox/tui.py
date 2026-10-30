@@ -576,15 +576,8 @@ class Dashboard(App):
     def _opencode_versions_worker(self):
         from . import opencode_versions as v
         try:
-            latest = v.latest()
-            rows = []
-            for item in v.versions():
-                try:
-                    rows.append(f"{item['name']}: {v.environment_line(item, latest)}")
-                except Exception as exc:
-                    rows.append(f"{item['name']}: check failed ({c.error_text(exc)})")
-            message = f"Latest OpenCode: {latest}\n" + "\n".join(rows)
-            self.call_from_thread(self._show_opencode_versions, message, False)
+            lines, errors = v.versions_report(check=True)
+            self.call_from_thread(self._show_opencode_versions, "\n".join([*lines, *errors]), bool(errors))
         except Exception as exc:
             self.call_from_thread(self._show_opencode_versions, c.error_text(exc), True)
 

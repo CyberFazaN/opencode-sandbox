@@ -37,10 +37,10 @@ def _broad_handlers(tree):
                 yield node
 
 
-@pytest.mark.parametrize("module", sorted(p.name for p in SRC.glob("*tui.py")))
-def test_every_broad_catch_in_the_dashboard_reports_the_error(module):
-    """A dashboard action or worker may catch every error (the dashboard must keep running), but
-    it must show it: through core.error_text, so an unexpected error is named by its type."""
+@pytest.mark.parametrize("module", [*sorted(p.name for p in SRC.glob("*tui.py")), "opencode_versions.py"])
+def test_every_broad_catch_in_dashboard_and_version_reports_shows_the_error(module):
+    """A dashboard action or batch report may catch every error to preserve partial results, but
+    must show it through core.error_text, so an unexpected error is named by its type."""
     tree = ast.parse((SRC / module).read_text(encoding="utf-8"))
     offenders = []
     for handler in _broad_handlers(tree):

@@ -23,10 +23,11 @@ complete verification of the 6.1.0 implementation. I04 and I06 must be re-establ
 release tree. B01 retains the manager's refusal of another user's daemon when run as
 root; retiring installer checks does not retire that boundary.
 
-Unpublished Updates work (D-056): UP-01 corrects the shared report presentation and Agent Context
-heading/fallback. New evidence is unit/host/pilot only (BASELINE and the Updates working roadmap).
-The real/pty PASS entries below are historical, not new verification of those changed reports;
-the report-specific real-terminal checks remain to be re-established in UP-18.
+Unpublished Updates work (D-056): UP-01 corrects shared reports and Agent Context heading/fallback;
+UP-02 preserves independent local/registry inventory results and surfaces partial failures. New
+report evidence is unit/host/pilot only (BASELINE and the Updates working roadmap). The real/pty
+PASS entries below are historical, not new verification of these changes; report-specific
+real-terminal and live-source checks remain to be re-established in UP-18.
 
 ## Legend
 

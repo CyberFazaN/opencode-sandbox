@@ -52,7 +52,8 @@ Consider something else if:
 - **Backups and recovery**: verified cold backups, restores into new environments, snapshots,
   and journalled operations with explicit recovery commands.
 - **OpenCode versions** managed per base image and environment: update policies, updates with
-  automatic rollback on failure; OpenCode's self-update is off.
+  automatic rollback on failure; OpenCode's self-update is off. Local version inventory remains
+  available when registry discovery fails.
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
   operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.
   One-time initial integrations (Context7 by default).

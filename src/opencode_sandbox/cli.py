@@ -45,12 +45,15 @@ def _root(version: bool = typer.Option(False, "--version", callback=_print_versi
 
 @opencode_app.command("versions")
 def opencode_versions(check: bool=typer.Option(False,"--check",help="Also query the npm registry: environments with the notify policy report available updates")):
-    """OpenCode version and policy of every environment (running containers only; stopped ones are not started)."""
+    """OpenCode version and policy of every environment (running containers only; stopped ones are not started).
+
+    Available rows survive failed checks; errors go to stderr and exit status is 2.
+    """
     from . import opencode_versions as v
-    newest=v.latest() if check else None
-    if newest: typer.echo(f"npm registry: {newest}")
-    for item in v.versions():
-        typer.echo(f"{item['name']}: {v.environment_line(item,newest)}")
+    lines,errors=v.versions_report(check=check)
+    for line in lines: typer.echo(line)
+    for error in errors: typer.echo(error,err=True)
+    if errors: raise typer.Exit(2)
 
 @opencode_app.command("status")
 def opencode_status(name: str):

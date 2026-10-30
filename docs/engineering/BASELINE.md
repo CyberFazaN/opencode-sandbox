@@ -18,13 +18,13 @@ verification, known issues and what is not verified. Update it whenever one of t
 D-056 approves the Updates architecture and UX effort after the published 6.1.0 release.
 [TODO](../../TODO.md#active-updates-architecture-and-ux) is the entry point; the
 [working roadmap](updates/ROADMAP.md) contains tasks, acceptance criteria, evidence and handoff.
-UP-00 persisted the plan; UP-01 implements explicitly titled generic reports, the Agent Context
-heading/capitalization and honest inspection-fallback wording. When inspection fails, saved
-guidance is unverified rather than judged against a configuration-only preview. The Versions
-interface, discovery, policies and mutation workflows otherwise remain unchanged; UP-02 is next.
-No image-definition, schema or manager-version change has been made.
+UP-00 persisted the plan; UP-01 implements explicitly titled generic reports and the Agent
+Context heading/capitalization and inspection-fallback correction. UP-02 preserves independent
+local/registry version results, isolates failed rows and reports partial failure in both CLI and
+TUI. The existing Versions interface, lookup provider, policies and mutation workflows otherwise
+remain unchanged; UP-03 is next. No image-definition, schema or manager-version change was made.
 
-UP-01 verification is below; detailed commands, initial failures and handoff are in the roadmap.
+UP-01/UP-02 verification is below; commands, initial failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 
@@ -84,6 +84,16 @@ test-only image namespace for new base images and the socket-activation opt-in a
 in `RELEASING.md` ("Verify").
 
 ## Verification
+
+### Unpublished UP-02 — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Full unit/host/Textual-pilot/local-process suite, Python 3.11.18, current dependencies | 1015 passed, 56 opt-in skips (real-campaign, privileged and socket-activation rows); mocked Docker, no live daemon mutations |
+| Affected regression subset, Python 3.11.18 and 3.14.8, current/lowest dependencies | 220 passed, no skips in each of four serial runs; Typer 0.16.0/Textual 4.0.0 and current 0.27.3/8.2.8; only the known lowest-Typer/Click deprecations; final 3.11-current run includes updated engineering records |
+| New report coverage | Mocked offline/timeout/HTTP/invalid-response and unexpected registry failures, failed local source, both-source failures, malformed policy/ownership refusal/formatting errors with surviving rows, CLI stdout/stderr/exit 2, 80x24 pilots, metadata unchanged, no stopped/created starts, no network without explicit check, unchanged policy comparisons |
+| Static/documents | Ruff/shellcheck, English, links/anchors and CLI structure passed in the suite; broad report handlers are checked for typed error presentation, with narrowly documented BLE001 annotations rather than a blanket exclusion |
+| Not re-established | Report-specific real terminal/manual observation, live npm outage/discovery, real Docker/OpenCode, package build or pipx updates; existing loopback HTTP and host-process fixtures are not evidence of a live service outage |
 
 ### Unpublished UP-01 — 2026-10-30
 

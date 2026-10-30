@@ -243,10 +243,11 @@ def test_no_registry_call_until_requested(monkeypatch, fake_runtime, failed):
         assert str(app.screen.query_one("#report-title").render()) == "OpenCode versions (no automatic updates)"
         assert app.screen.query_one("#report-text", TextArea).read_only
         if failed:
-            assert app.screen.report == "Registry unavailable [test]"
+            assert "npm registry check failed: Registry unavailable [test]" in app.screen.report
+            assert "ocs-qa-g09:" in app.screen.report
             assert any(n.message == "Version check failed" for n in app._notifications)
         else:
-            assert "Latest OpenCode: 2.1.4" in app.screen.report and "ocs-qa-g09:" in app.screen.report
+            assert "npm registry: 2.1.4" in app.screen.report and "ocs-qa-g09:" in app.screen.report
         assert not any(a[0] in ("build", "commit") for a in fake_runtime)
     run(t, (80, 24))
 
