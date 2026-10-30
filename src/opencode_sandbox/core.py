@@ -24,7 +24,7 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import distros, runtime_identity
+from . import diagnostics, distros, runtime_identity
 
 APP = "opencode-sandbox"
 BASE = Path(os.getenv("OPENCODE_SANDBOX_HOME", Path.home()/".local/share"/APP)).expanduser()
@@ -96,9 +96,22 @@ def run_program(argv, *, check=False, **kwargs):
     except FileNotFoundError as exc:
         raise missing_program(os.path.basename(str(argv[0]))) from exc
 
-def call(argv, *, capture=False, check=True, cwd=None, env=None):
+def call(argv, *, capture=False, check=True, cwd=None, env=None, timeout=None, max_output=diagnostics.MAX_OUTPUT):
     try:
-        p = subprocess.run([str(x) for x in argv], cwd=cwd, env=env, text=True, capture_output=capture, check=False)
+        if timeout is None:
+            p = subprocess.run([str(x) for x in argv], cwd=cwd, env=env, text=True, capture_output=capture, check=False)
+        else:
+            feedback = _RUNTIME_FEEDBACK.get() or {}
+            p = diagnostics.run(argv, timeout=timeout, cancelled=feedback.get("cancelled"),
+                                max_output=max_output, cwd=cwd, env=env, launch_guard=_session_launch_signals)
+            if not capture:
+                print(p.stdout, end="")
+                print(p.stderr, end="", file=sys.stderr)
+    except diagnostics.Cancelled:
+        raise runtime_identity.Cancelled() from None
+    except diagnostics.Failure as exc:
+        # Never include argv/output here: diagnostics can inspect secret-bearing configuration.
+        raise SandboxError(str(exc)) from exc
     except FileNotFoundError as exc:
         raise missing_program(os.path.basename(str(argv[0]))) from exc
     except OSError as exc:
@@ -161,8 +174,25 @@ def docker_endpoint():
     if _ENDPOINT is None: verify_runtime()
     return _ENDPOINT
 
+_DIAGNOSTIC_TIMEOUT = ContextVar("diagnostic_timeout", default=None)
+
+@contextmanager
+def diagnostic_timeout(timeout):
+    """Explicitly scope one owned probe/cleanup call, not an enclosing build/update operation."""
+    token = _DIAGNOSTIC_TIMEOUT.set(timeout)
+    try: yield
+    finally: _DIAGNOSTIC_TIMEOUT.reset(token)
+
 def docker(*args, capture=False, check=True):
-    return call(["docker", "-H", docker_endpoint(), *args], capture=capture, check=check, env=runtime_identity.docker_env())
+    # Only known finite read-only CLI operations get automatic diagnostic bounds. In particular,
+    # never infer that an arbitrary exec/run or a mutation is short from capture=True.
+    read_only = args[:2] in (("image", "inspect"), ("image", "ls"), ("container", "inspect"),
+                            ("container", "ls"), ("volume", "inspect"), ("volume", "ls"), ("system", "df")) \
+                or args[:1] in (("ps",), ("info",)) or (args[:1] == ("stats",) and "--no-stream" in args)
+    timeout = _DIAGNOSTIC_TIMEOUT.get()
+    if timeout is None and read_only: timeout = diagnostics.TIMEOUT
+    return call(["docker", "-H", docker_endpoint(), *args], capture=capture, check=check,
+                env=runtime_identity.docker_env(), timeout=timeout)
 
 def docker_info():
     """Fresh read-only daemon evidence on the pinned endpoint; bounded/cancellable, no replay.
@@ -1541,9 +1571,9 @@ def _image_facts(distro):
 def verify_image(distro, tag, version):
     """Refuse a built image whose OS, tools or OpenCode version differ from the registry."""
     from . import opencode_versions as v
+    from . import probes
     # Same hardening as an environment's container (start()).
-    p=docker("run","--rm","--network","none","--security-opt","no-new-privileges:true",*helper_labels("image-verify"),
-             "--entrypoint","sh",tag,"-c",_image_facts(distro),capture=True)
+    p=probes.image(tag,"sh","-c",_image_facts(distro))
     lines=p.stdout.splitlines()
     reported=dict(line[len("ocs-os: "):].partition("=")[::2] for line in lines if line.startswith("ocs-os: "))
     reported={key:value.strip().strip('"\'') for key,value in reported.items()}

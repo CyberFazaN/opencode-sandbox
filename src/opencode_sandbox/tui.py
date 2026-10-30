@@ -23,7 +23,7 @@ from textual.widgets import (
 from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
 from . import core as c
-from .tui_runtime import work
+from .tui_runtime import publish, work
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -235,16 +235,16 @@ class Dashboard(App):
         try:
             check = readiness.daemon_check()
             if check.status != readiness.PASSED:
-                self.call_from_thread(self._show_prerequisites, check.detail)
+                publish(self, self._show_prerequisites, check.detail)
                 return
-            self.call_from_thread(self._prerequisites_ready)
+            publish(self, self._prerequisites_ready)
             support = readiness.resource_support_check()
-            self.call_from_thread(self._show_resource_support, support)
+            publish(self, self._show_resource_support, support)
             images = [item for item in readiness.image_checks() if item.status != readiness.PASSED]
             if images:
-                self.call_from_thread(self._show_image_checks, images)
+                publish(self, self._show_image_checks, images)
         except Exception as exc:
-            self.call_from_thread(self._show_prerequisites, c.error_text(exc))
+            publish(self, self._show_prerequisites, c.error_text(exc))
             return
 
     def _show_resource_support(self, check) -> None:
@@ -410,9 +410,9 @@ class Dashboard(App):
             report = readiness.run(m)
             text = (f"Readiness of {m['name']} [{m['id']}]\nSummary: {readiness.summary(report)}\n\n"
                     + "\n".join(readiness.format_report(report)))
-            self.call_from_thread(self._show_check, text, readiness.failed(report))
+            publish(self, self._show_check, text, readiness.failed(report))
         except Exception as exc:
-            self.call_from_thread(self._show_check, f"Check failed: {c.error_text(exc)}", True)
+            publish(self, self._show_check, f"Check failed: {c.error_text(exc)}", True)
 
     def _show_check(self, text: str, failed: bool) -> None:
         self.push_screen(ReportScreen(text, title="Readiness check (read-only; nothing was started or changed)"))
@@ -496,9 +496,9 @@ class Dashboard(App):
     def _usage_worker(self,m):
         try:
             result=c.runtime_usage(m)
-            self.app.call_from_thread(self._show_usage, m["name"], result)
+            publish(self.app, self._show_usage, m["name"], result)
         except Exception as exc:
-            self.app.call_from_thread(self._show_usage_error, c.error_text(exc))
+            publish(self.app, self._show_usage_error, c.error_text(exc))
 
     def _show_usage(self, name, data):
         if data.get("state") == "running":
@@ -527,9 +527,9 @@ class Dashboard(App):
         from . import cleanup
         try:
             inv = cleanup.inventory()
-            self.call_from_thread(self._show_disk, inv)
+            publish(self, self._show_disk, inv)
         except Exception as exc:
-            self.call_from_thread(self.notify, f"Disk usage failed: {c.error_text(exc)}", severity="error")
+            publish(self, self.notify, f"Disk usage failed: {c.error_text(exc)}", severity="error")
 
     def _show_disk(self, inv) -> None:
         self.push_screen(DiskScreen(inv), lambda superseded: self._confirm_cleanup(inv, superseded))
@@ -577,9 +577,9 @@ class Dashboard(App):
         from . import opencode_versions as v
         try:
             lines, errors = v.versions_report(check=True)
-            self.call_from_thread(self._show_opencode_versions, "\n".join([*lines, *errors]), bool(errors))
+            publish(self, self._show_opencode_versions, "\n".join([*lines, *errors]), bool(errors))
         except Exception as exc:
-            self.call_from_thread(self._show_opencode_versions, c.error_text(exc), True)
+            publish(self, self._show_opencode_versions, c.error_text(exc), True)
 
     def _show_opencode_versions(self, message: str, error: bool) -> None:
         self.push_screen(ReportScreen(message, title="OpenCode versions (no automatic updates)"))
@@ -609,12 +609,12 @@ class Dashboard(App):
                 on_disk = "not verified (container inspection unavailable)"
             else:
                 on_disk = "current" if ac.verify(m, c.env_dir, **inputs) else "missing/outdated"
-            self.call_from_thread(self.push_screen, ReportScreen(
+            publish(self, self.push_screen, ReportScreen(
                 f"Agent Context: {m['name']}\n{note}On-disk: {on_disk}\n"
                 "Guidance is regenerated before every OpenCode launch.\n\n" + content,
                 title=f"Agent Context — {m['name']}"))
         except Exception as exc:
-            self.call_from_thread(self.notify, c.error_text(exc), severity="error")
+            publish(self, self.notify, c.error_text(exc), severity="error")
 
     def action_recovery(self) -> None:
         from .management_tui import RecoveryScreen

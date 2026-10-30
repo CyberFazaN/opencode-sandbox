@@ -20,16 +20,20 @@ WORKER = r'''
 import json, os, re, sys
 from pathlib import Path
 from dataclasses import replace
-from opencode_sandbox import core as c, cleanup as cl, distros, integrations as ig, opencode_versions as v
+from opencode_sandbox import core as c, cleanup as cl, distros, integrations as ig, opencode_versions as v, probes
 repo, distro, action, manifest, run, mode = sys.argv[1:]
 assert re.fullmatch(r'ocs-test-[a-z0-9-]+', repo)
 retained = distros.get(distro).image
 distros.REPOSITORY = repo
 d = distros.get(distro)
+probes.PREFIX = 'ocs-test-' + run + '-probe-'
 def note(line):
     with open(manifest, 'a') as f: f.write(line + '\n')
 real_docker = c.docker
 def docker(*args, **kwargs):
+    if args[0] == 'run' and '--name' in args and args[args.index('--name')+1].startswith(probes.PREFIX):
+        note('container ' + args[args.index('--name')+1] + ' test=' + run)
+        args = (args[0], '--label', 'org.opencode-sandbox.test=' + run, *args[1:])
     if args[0] == 'build':
         tag = args[args.index('-t') + 1]
         note('image ' + tag)

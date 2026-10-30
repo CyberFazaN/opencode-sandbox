@@ -40,6 +40,14 @@ replaced-base preservation. All four packaged/retained cases passed with running
 writable-layer markers intact (76 checks). Full campaign/pty evidence is not renewed by these
 scoped tests; commands and remaining gates are in the Updates roadmap.
 
+UP-05 adds host-process/loopback-HTTP deadlines, cancellation/reaping and 80x24 pilot regressions.
+`test_43_diagnostics.py` covers real bounded exec/image probes on retained Debian/Arch, canceled
+client cleanup, missing timeout-tool refusal/restoration, no stopped-environment startup and
+writable-layer preservation. Together with the four base-race variants: **6 tests/106 checks
+passed**, final `up05-final`. The initial missing-tool stdout classification failure was fixed
+and rerun, not suppressed. These scoped results do not renew full campaign, privileged,
+model-provider or real-terminal/manual evidence; no release-readiness claim follows.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

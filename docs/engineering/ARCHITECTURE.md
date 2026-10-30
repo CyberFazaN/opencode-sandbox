@@ -9,7 +9,8 @@ state and verification: `BASELINE.md`. User-facing behaviour is in `README.md` a
 Approved staged architecture: D-056 and the [Updates working roadmap](updates/ROADMAP.md).
 UP-01 implements generic reports and the Agent Context presentation correction; UP-02 preserves
 independent local/registry version results. UP-03 adds daemon-wide base coordination and locked
-image revalidation; UP-04 adds explicit identity-bound rollback-copy selection. The Updates
+image revalidation; UP-04 adds explicit identity-bound rollback-copy selection; UP-05 bounds
+diagnostic execution and owns client/probe cleanup. The Updates
 interface, disposable version observations/discovery cache and other staged corrections remain pending.
 
 ## Boundaries
@@ -31,6 +32,7 @@ interface, disposable version observations/discovery cache and other staged corr
 | `core.py` | Paths, locks, metadata (schema 2), labels, Docker access, create/start/stop/session/exec, snapshot, recreate and recovery journals, export, delete, image build, `error_text` | D-001..D-004, D-016, D-026, D-027, D-030, D-031, D-033, D-034 |
 | `runtime_identity.py` | Bounded acquisition and authenticated rootless response-sender proof; shared by CLI/TUI and standalone stdlib diagnostic | D-003, D-048, D-052 |
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
+| `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
 | `agent_context.py` | Renders, verifies and refreshes the injected guidance | D-008, D-018 |
@@ -43,7 +45,7 @@ interface, disposable version observations/discovery cache and other staged corr
 | `cleanup.py` | Disk usage inventory and cleanup limited to this data directory's objects | D-011 |
 | `cli.py` | Typer CLI (grouped commands); no arguments starts the dashboard | D-021 |
 | `tui.py`, `management_tui.py`, `backup_tui.py`, `git_tui.py`, `preferences.py` | Textual dashboard and its screens (plain text for sandbox content, errors through `core.error_text`) | D-021, D-032, D-034 |
-| `tui_runtime.py` | Existing thread-worker adapter for scoped readiness feedback and cooperative cancellation; no UI retry loop | D-052 |
+| `tui_runtime.py` | Thread-worker adapter for scoped readiness/diagnostic cancellation and guarded read-only result publication; no UI retry loop | D-052, D-056 |
 
 `tui.ReportScreen` is the shared plain-text, scrollable read-only report for Agent Context,
 Versions, readiness and cleanup results. Its title is a required explicit keyword argument,
@@ -95,6 +97,38 @@ host repair, service query or filesystem delegation assumptions. Missing evidenc
 success. Doctor/check/dashboard share advisory results and upstream hints; doctor exit semantics
 and mutation preflights are unchanged. Reported capability and matched container settings are
 explicitly not measurements of kernel enforcement.
+
+UP-05 adds a separate short-diagnostic path: `core.docker` bounds a finite allowlist of read-only
+inspect/list/info/disk-usage/stats-no-stream calls (eight seconds/1 MiB combined output).
+`core.call` only uses `diagnostics.run` when given an explicit timeout; the default subprocess
+path for mutations and arbitrary user exec remains unbounded. The runner owns a new client session,
+incrementally drains bounded nonblocking pipes, checks a monotonic total budget and worker
+cancellation, kills only its process group and reaps the direct client. Exit observation uses
+`waitid(WNOWAIT)` so the leader reserves the group ID until the final cleanup signal. Launch uses
+the existing callable-signal deferral guard, never a child-inherited signal mask or worker-thread
+signal changes. Cleanup waits are bounded and failures are reported, not claimed as reaped.
+
+The npm lookup executes the standalone stdlib `http_probe.py` under an isolated interpreter,
+with an eight-second total parent budget and a 64 KiB response limit, including slow DNS/body
+reads. Cancellation terminates/reaps that owned child; no persistent downloader/thread or host npm.
+Existing daemon-identity acquisition and resource-support mechanisms retain their own budgets.
+
+`probes.exec` wraps only diagnostics in a container-side GNU timeout process group (five seconds
+for versions, ten for comprehensive readiness). `probes.image` adds a unique name/token, manager/
+data/helper labels, network none and pull never; full image verification has 30 seconds. Clients
+get three seconds' grace. A canceled/dead host client does not prove exec ended: container timers
+bound ordinary groups even after disconnection. Missing/custom timeout tooling never authorizes an
+unbounded retry. Interrupted image-helper cleanup uses separate non-cancelable three-second
+inspect/removal calls; full immutable container ID plus invocation/manager/data/helper labels are
+required before removal. An inaccessible daemon means unconfirmed cleanup with a named leftover,
+not a success claim. Normal helpers self-remove. No environment stop, host socket mount or new
+persistent state. Host/process bounds are not a hostile-container boundary or daemon-liveness promise.
+
+Read-only dashboard workers publish through `tui_runtime.publish`, checking cancellation/app
+liveness both before queuing and on the UI thread. No late result from a canceled/replaced check.
+This neither implements mutation Cancel nor replaces journals/recovery; base candidate cleanup
+gets its own uncancelled inspection after an interrupted probe. Full reports can take multiple
+per-call budgets, and the existing Versions interface still waits for its attempts before display.
 
 ## Data and Docker objects
 

@@ -30,7 +30,7 @@ def inventory(monkeypatch):
     def docker(*args, **kwargs):
         if args[:2] == ("image", "inspect"):  # dashboard's independent startup advisory
             return SimpleNamespace(returncode=1, stdout="", stderr="No such image")
-        assert args == ("exec", c.cname(running), "opencode", "--version"), args
+        assert args == ("exec", c.cname(running), "timeout", "--signal=KILL", "5s", "opencode", "--version"), args
         events.append(args)
         return SimpleNamespace(returncode=0, stdout="opencode v2.1.4\n", stderr="")
 

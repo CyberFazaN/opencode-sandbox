@@ -145,7 +145,8 @@ def test_build_refuses_image_whose_os_differs_from_the_registry(monkeypatch):
         v.update_base("2.1.4")
     assert not any(a[0] == "tag" for a in calls)
     run = next(a for a in calls if a[0] == "run")
-    assert ("--security-opt", "no-new-privileges:true") == run[4:6]
+    index = run.index("--security-opt")
+    assert run[index:index+2] == ("--security-opt", "no-new-privileges:true")
 
 
 def test_base_rollback_refuses_an_old_os_without_moving_or_removing_its_tag(monkeypatch):
@@ -268,7 +269,7 @@ def test_npm_install_is_bounded(monkeypatch):
     versions = iter(["2.1.2\n", "2.1.3\n"])
     def docker(*a, **k):
         calls.append(a)
-        if a[:3] == ("exec", c.cname(m), "opencode"):
+        if a[:2] == ("exec", c.cname(m)) and a[-2:] == ("opencode", "--version"):
             return SimpleNamespace(returncode=0, stdout=next(versions), stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)

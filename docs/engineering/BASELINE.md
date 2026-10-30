@@ -23,10 +23,12 @@ Context heading/capitalization and inspection-fallback correction. UP-02 preserv
 local/registry version results, isolates failed rows and reports partial failure in both CLI and
 TUI. UP-03 implements daemon-wide base build/publication guards, cleanup/creation coordination
 and locked image revalidation. UP-04 adds alias-consolidated rollback inventory, explicit copy
-selection and immutable consent/revalidation. The existing Versions interface, lookup provider
-and policies remain unchanged; UP-05 is next. No image-definition, schema or manager-version change was made.
+selection and immutable consent/revalidation. UP-05 bounds short host/network diagnostics and
+container probes, owns client/helper cleanup and prevents late canceled read-only UI results.
+The Versions interface, discovery policy and independent mutation lifecycles remain unchanged;
+UP-06 is next. No image-definition, schema or manager-version change was made.
 
-UP-01..UP-04 verification is below; commands, initial failures and handoff are in the roadmap.
+UP-01..UP-05 verification is below; commands, initial failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 
@@ -86,6 +88,18 @@ test-only image namespace for new base images and the socket-activation opt-in a
 in `RELEASING.md` ("Verify").
 
 ## Verification
+
+### Unpublished UP-05 — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Full unit/host/Textual-pilot/local-process suite, Python 3.11.18 and 3.14.8, current/lowest dependencies | **1175 passed, 62 opt-in skips in each of four serial foreground runs**; Typer 0.27.3/Textual 8.2.8 and 0.16.0/4.0.0. Only the two known lowest-Typer/Click deprecations. Includes Ruff/shellcheck, language/links/CLI checks and existing host terminal fixtures |
+| New host/mocked/HTTP/pilot cases | 51 cases: finite read-only allowlist versus unbounded mutations, timeout/cancel/overflow/interrupt reaping, retained pipes/descendants, reserved PGID and launch-signal ownership, no output/argument leakage on bound failures, total DNS/slow-drip HTTP bounds, label/full-ID helper cleanup/refusals, timeout-tool errors on both output streams, 80x24 responsive cancellation and no late publication |
+| Scoped real Docker/OpenCode | `test_42_base_coordination.py` plus new `test_43_diagnostics.py`: final **6 passed, 106 logged checks, no skips/deselections**, `up05-final`, 87.01 s. Four packaged/retained base-race variants retain immutable selection/pins/layers; two diagnostic cases use retained Debian 12/revision 1 and Arch/revision 1, OpenCode 2.2.0, network none. Real exec/image deadlines, canceled-host-client bounds, immutable label-checked helper removal, missing timeout-tool refusal/restoration, no stopped-container startup, byte-identical stopped-check metadata and writable-layer preservation |
+| Real defect/rerun | First diagnostic-only real attempt: **2 failed**, Docker's missing-executable message appeared on stdout rather than stderr. Classification now checks both; host regression added. Diagnostic rerun **2 passed/28 checks**, then combined runs **6 passed/106 checks** before and after final PGID-reservation review. No failure suppressed, no unbounded fallback added |
+| Package | Python 3.11 local sdist/wheel 6.1.0, strict twine and `check_dist.py` passed; all eight added/changed product modules byte-identical in wheel, including standalone HTTP child. No upload, global installation or fresh pipx run |
+| Resources | Four real runs used manifests, test helper names/labels, guarded product cleanup and leak checks. Ending verified daemon: zero containers/volumes, same four original full tagged-image IDs, no run-labelled helpers. Test-only timeout-tool renames restored before environment deletion. Shared base lock files/build cache retained; no daemon/network/host service changes |
+| Not re-established / boundaries | No full real campaign, new real-terminal/manual observation, privileged restart/socket activation, model-provider use, installed-manager/pipx execution or public npm outage/discovery. HTTP failure evidence uses real loopback transport and a controlled DNS-blocking child. Full reports can consume multiple per-call budgets. Bounds are not a hostile-container or daemon-liveness guarantee; inaccessible cleanup is explicitly unconfirmed. Long mutations/user sessions remain unbounded by these diagnostic limits; existing journals/recovery stay authoritative |
 
 ### Unpublished UP-04 — 2026-10-30
 

@@ -42,12 +42,18 @@ def _no_host_docker_cli(request, monkeypatch):
     if request.node.get_closest_marker("real_session"):
         return
     real = c.subprocess.run
+    real_popen = c.subprocess.Popen
 
     def run(argv, *args, **kwargs):
         if isinstance(argv, (list, tuple)) and argv and str(argv[0]) == "docker":
             raise FileNotFoundError(2, "No such file or directory", "docker")
         return real(argv, *args, **kwargs)
     monkeypatch.setattr(c.subprocess, "run", run)
+    def popen(argv, *args, **kwargs):
+        if isinstance(argv, (list, tuple)) and argv and str(argv[0]) == "docker":
+            raise FileNotFoundError(2, "No such file or directory", "docker")
+        return real_popen(argv, *args, **kwargs)
+    monkeypatch.setattr(c.subprocess, "Popen", popen)
 
 
 @pytest.fixture(autouse=True)

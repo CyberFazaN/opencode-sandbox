@@ -28,7 +28,7 @@ def daemon(monkeypatch, classification, reason="reason"):
 def host(monkeypatch, missing=()):
     """Hermetic host: which programs exist, their --version, and a Docker that answers nothing."""
     monkeypatch.setattr(shutil, "which", lambda name: None if name in missing else f"/usr/bin/{name}")
-    monkeypatch.setattr(c, "run_program", lambda argv, **k: SimpleNamespace(returncode=0, stdout=f"{argv[0]} version 1\n"))
+    monkeypatch.setattr(c, "call", lambda argv, **k: SimpleNamespace(returncode=0, stdout=f"{argv[0]} version 1\n"))
     monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="no"))
 
 

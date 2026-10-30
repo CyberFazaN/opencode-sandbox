@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.error
-import urllib.request
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 from . import core as c
-from . import distros
+from . import distros, probes
 
 # `opencode --version` prints "opencode v2.1.4"; npm metadata and pins use "2.1.4".
 VERSION = re.compile(r"^(?:opencode\s+)?v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$")
@@ -66,17 +66,13 @@ def describe(installed, newest):
 
 
 def latest(timeout=8):
-    """Read npm registry metadata without requiring npm or Node on the host."""
-    request = urllib.request.Request(REGISTRY, headers={"Accept": "application/json", "User-Agent": "opencode-sandbox-manager"})
+    """One total bounded npm request, including DNS/TLS/body reads; no host npm or Node."""
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            if response.status != 200:
-                raise c.SandboxError(f"npm registry HTTP {response.status}")
-            raw = response.read(65537)
-            if len(raw) > 65536:
-                raise c.SandboxError("npm registry response too large")
-        return normalize(json.loads(raw)["version"])
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, TypeError) as exc:
+        p = c.call([sys.executable, "-I", "-B", str(Path(__file__).with_name("http_probe.py")), REGISTRY, str(timeout)],
+                   capture=True, check=False, timeout=timeout, max_output=65536)
+        if p.returncode: raise c.SandboxError(p.stderr.strip() or "registry request failed")
+        return normalize(json.loads(p.stdout)["version"])
+    except (c.SandboxError, OSError, ValueError, KeyError, TypeError) as exc:
         raise c.SandboxError(f"Cannot check OpenCode npm registry: {exc}") from exc
 
 
@@ -112,9 +108,7 @@ def set_policy(m, mode, version=None):
 
 
 def image_version(image):
-    p = c.docker("run", "--rm", "--network", "none", "--security-opt", "no-new-privileges:true",
-                 *c.helper_labels("version-probe"), "--entrypoint", "opencode", image,
-                 "--version", capture=True)
+    p = probes.image(image, "opencode", "--version", timeout=probes.EXEC_TIMEOUT)
     return normalize(p.stdout)
 
 
@@ -124,7 +118,7 @@ def environment_version(m):
         return {"state": "not-created", "version": None}
     if not state.get("Running"):
         return {"state": "stopped", "version": None}
-    p = c.docker("exec", c.cname(m), "opencode", "--version", capture=True, check=False)
+    p = probes.exec(m, "opencode", "--version")
     try:
         return {"state": "running", "version": normalize(p.stdout) if p.returncode == 0 else None}
     except c.SandboxError:
@@ -219,7 +213,7 @@ def update_base(version, distro=None, *, keep_previous=True):
                     c.docker("image", "rm", old["Id"], capture=True, check=False)
             return {"version": version, "previous_image": previous, "image": d.image}
         finally:
-            with c.base_lock(d.id, "publication"):
+            with c.runtime_feedback(progress=None, cancelled=None), c.base_lock(d.id, "publication"):
                 if c.inspect_base_image(d, candidate, missing=True):
                     c.docker("image", "rm", candidate, capture=True, check=False)
 
@@ -275,7 +269,9 @@ def environment_line(item, newest=None):
 
 
 def _exec_version(m):
-    return normalize(c.docker("exec", c.cname(m), "opencode", "--version", capture=True).stdout)
+    p = probes.exec(m, "opencode", "--version")
+    if p.returncode: raise c.SandboxError(f"OpenCode version probe failed (exit {p.returncode})")
+    return normalize(p.stdout)
 
 
 def _restore_checkpoint(m, result):

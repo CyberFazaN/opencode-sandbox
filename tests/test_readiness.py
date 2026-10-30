@@ -83,6 +83,8 @@ class FakeDocker:
             return ok("[{}]") if a[-1] in self.images else fail("Error: No such image")
         if a[0] == "exec":
             argv = a[2:]
+            if argv[:2] == ("timeout", "--signal=KILL"):
+                argv = argv[3:]
             if argv[:2] == ("python3", "-c"):
                 if self.probe_rc:
                     return fail("exec: python3: not found", self.probe_rc)

@@ -262,7 +262,7 @@ def test_docker_calls_use_the_endpoint_fixed_at_first_verification(monkeypatch):
 
     monkeypatch.setattr(rid, "verify", verify)
     monkeypatch.setenv("DOCKER_HOST", "tcp://evil:2375")
-    monkeypatch.setattr(c.subprocess, "run", lambda argv, **k: runs.append((argv, k["env"])) or
+    monkeypatch.setattr(c.diagnostics, "run", lambda argv, **k: runs.append((argv, k["env"])) or
                         SimpleNamespace(returncode=0, stdout="", stderr=""))
     c.docker("ps")
     c.ensure_runtime(False)

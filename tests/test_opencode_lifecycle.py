@@ -37,6 +37,8 @@ class FakeDocker:
 
     def __call__(self, *args, capture=False, check=True):
         self.calls.append(args)
+        if args[:1] == ("exec",) and args[2:4] == ("timeout", "--signal=KILL"):
+            args = (*args[:2], *args[5:])
         op = args[0]
         if op == "commit":
             self.images.add(args[2])
@@ -117,7 +119,7 @@ def test_update_repairs_a_broken_installation(monkeypatch):
     real = fake.__call__
 
     def broken(*args, capture=False, check=True):
-        if args[0] == "exec" and args[2:4] == ("opencode", "--version") and fake.version == "2.1.4":
+        if args[0] == "exec" and args[-2:] == ("opencode", "--version") and fake.version == "2.1.4":
             fake.calls.append(args)
             raise c.SandboxError("Command failed (255): docker exec")
         return real(*args, capture=capture, check=check)

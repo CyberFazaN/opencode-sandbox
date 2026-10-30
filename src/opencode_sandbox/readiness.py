@@ -12,13 +12,13 @@ import os
 import re
 import secrets
 import socket
-import subprocess
 import tempfile
 import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from . import core as c
+from . import probes
 
 PASSED, WARNING, FAILED, NOT_CHECKED, NOT_APPLICABLE = "passed", "warning", "failed", "not checked", "not applicable"
 ORDER = (PASSED, WARNING, FAILED, NOT_CHECKED, NOT_APPLICABLE)
@@ -102,10 +102,14 @@ def host_checks():
             hint = "See the daemon identity below" if name == "docker" else c.PROGRAM_HINTS[name]
             out.append(Check(name, title, FAILED, f"not found on PATH (needed for {needed})", hint))
             continue
-        p = c.run_program([path, "--version"], capture_output=True, text=True, check=False, timeout=30,
-                          stdin=subprocess.DEVNULL)
+        try:
+            p = c.call([path, "--version"], capture=True, check=False, timeout=8)
+        except c.SandboxError as exc:
+            out.append(Check(name, title, NOT_CHECKED, f"program found, version check failed: {exc}"))
+            continue
         version = (p.stdout or "").strip().splitlines()[:1]
-        out.append(Check(name, title, PASSED, f"{version[0] if version else 'version unknown'} ({path})"))
+        out.append(Check(name, title, PASSED if p.returncode == 0 else NOT_CHECKED,
+                         f"{version[0] if version else 'version unknown'} ({path}; exit {p.returncode})"))
     return out
 
 
@@ -325,7 +329,7 @@ def _inspect(m):
 
 
 def _exec(m, *argv):
-    return c.docker("exec", c.cname(m), *argv, capture=True, check=False)
+    return probes.exec(m, *argv, timeout=10)
 
 
 def operation_check(m, state):

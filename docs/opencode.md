@@ -110,6 +110,23 @@ errors are reported without hiding other environments. Available rows go to stdo
 stderr; any report error gives exit status 2. Without `--check`, the command never queries npm.
 Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
 
+**Bounded checks.** Short Docker inventory/inspect calls have an eight-second per-call deadline
+and a 1 MiB combined output limit. The npm check has one eight-second total budget, including DNS,
+TLS and response reading (64 KiB maximum), without host npm/Node. A running-container version
+probe has a five-second container-side limit; the host client gets three extra seconds for Docker
+transport/completion. Image definition/tool verification has a separate 30-second probe limit.
+Timeout or unavailable tooling is not a verified version, a missing image, or an up-to-date result.
+
+Container probes require a compatible GNU `timeout` tool (present in the registry images); a
+custom image without it is not probed without a bound. A cancelled host client may leave its
+command running briefly, but the container-side timer still bounds the ordinary probe process
+group. Named image helpers run with network disabled and no implicit pull. Interrupted helpers
+get bounded cleanup by invocation labels and full container ID, never by a name alone; if removal
+cannot be confirmed, the error names the helper for later `disk cleanup --yes` after Docker is
+available and the helper has stopped. Checks never stop an existing environment. These limits do
+not impose short deadlines on builds, installs, checkpoints/commits, or interactive user commands;
+canceling a dashboard check is not a claim that a mutation was canceled or rolled back.
+
 **Concurrent base operations.** Builds and rollback share daemon/distribution guards across
 data directories and context aliases. A long build does not block creation from the current
 base; publication waits for a pin check and container creation to finish. Rebuild and rollback

@@ -20,6 +20,22 @@ Each result of `check` is `passed`, `warning`, `failed`, `not checked` (with the
 example a stopped container) or `not applicable`; the exit status is 1 if any check failed. The
 report is cached: `status NAME` and the dashboard show its summary without asking Docker again.
 
+Short Docker inventory/inspect/stats and host-version diagnostics have finite per-call deadlines
+and output limits; a timeout is reported, never interpreted as object absence. Existing daemon
+identity/resource-support budgets remain separate. Container readiness probes have a ten-second
+container-side limit (OpenCode version: five seconds) and three seconds of client transport grace.
+They require compatible timeout tooling; unavailable tooling is `not checked`/unavailable, not
+permission to retry unbounded. No stopped environment is started for a check.
+
+Dashboard read-only workers cooperatively cancel their owned diagnostic clients and ignore late
+results after cancellation or shutdown. Killing a Docker client alone does not stop a container's
+exec command: its container-side timer remains responsible for the bounded ordinary process group.
+Image probes use disposable named helpers and label-checked cleanup, not an environment stop.
+If Docker is unavailable, removal may be unconfirmed and the error names the leftover helper;
+retry normal labelled cleanup after it stops. This is not a security boundary against deliberately
+modified container tools/processes or a guarantee while the daemon/container cannot run. Builds,
+installs, commits and user sessions do not inherit these short diagnostic deadlines.
+
 ### Resource-limit support
 
 `doctor`, `check NAME` and the dashboard share a read-only daemon support

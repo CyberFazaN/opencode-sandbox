@@ -24,6 +24,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   aliases, defaults only for one distinct copy, and requires `--copy` for several, even with
   `--yes`; `--list` shows full identities and aliases. Confirmation and execution bind to the
   same immutable copy/current base, preserving verification and the replaced image.
+- Short Docker diagnostics and npm checks now have total execution/output bounds and reap their
+  owned clients on timeout or cancellation. Container probes have their own deadlines; interrupted
+  image helpers get bounded, label-checked cleanup. Canceled read-only dashboard workers cannot
+  publish late results. Builds, installs, commits and interactive commands keep their existing timing.
 
 ## 6.1.0 — 2026-10-30
 

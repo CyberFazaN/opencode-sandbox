@@ -8,6 +8,18 @@ from . import core as c
 from . import runtime_identity as rid
 
 
+def publish(app, callback, *args, **kwargs):
+    """Read-only worker results cannot outlive cancellation, replacement or app shutdown."""
+    worker = get_current_worker()
+    def show():
+        if app.is_running and not worker.is_cancelled:
+            callback(*args, **kwargs)
+    if app.is_running and not worker.is_cancelled:
+        try: app.call_from_thread(show)
+        except RuntimeError:
+            if app.is_running and not worker.is_cancelled: raise
+
+
 def work(*args, **kwargs):
     def decorate(fn):
         @wraps(fn)

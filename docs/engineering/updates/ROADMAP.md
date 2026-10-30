@@ -2,10 +2,11 @@
 
 ## Status and authority
 
-- **UP-00..UP-04 complete. Next: UP-05 only.** UP-00 persisted the plan; UP-01 fixes report
+- **UP-00..UP-05 complete. Next: UP-06 only.** UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
   results; UP-03 implements shared base guards; UP-04 implements identity-bound explicit rollback
-  selection. The initially DNS-blocked packaged-definition gate now passes, alongside retained
+  selection; UP-05 bounds short diagnostics and owns client/probe cleanup. The initially
+  DNS-blocked packaged-definition gate now passes, alongside retained
   fixtures, as qualified below. Not a release proposal.
 - Entry point: [TODO](../../../TODO.md#active-updates-architecture-and-ux). Durable approval:
   [D-056](../DECISIONS.md#d-056-updates-architecture-and-execution-order--accepted-for-implementation).
@@ -26,7 +27,8 @@
 Source paths below describe the UP-00 starting point, not a substitute for reading the code
 again per task. UP-01 fixes report/Agent Context presentation; UP-02 fixes inventory loss on
 remote failure; UP-03 fixes base guard scope and cleanup/creation races; UP-04 removes rollback
-creation-time guessing. Other findings remain present.
+creation-time guessing; UP-05 bounds short diagnostics/probes and canceled result publication.
+Other findings remain present.
 Source inspection is not regression or real-operation evidence.
 
 | Finding | Current implementation | Required correction |
@@ -36,7 +38,7 @@ Source inspection is not regression or real-operation evidence.
 | Base coordination is too narrow (fixed in UP-03) | At UP-00, base locks used the selected data directory | Shared UID/canonical verified endpoint/distribution guards in a fixed private `/tmp` namespace, with no override-dependent fallback |
 | Cleanup does not guard all base copies (fixed in UP-03) | At UP-00, rollback-copy cleanup had no base guard | Candidates, copies and identifiable untagged replaced bases take build then publication, rechecking identity/ownership/local references; busy/unsafe resources remain |
 | Rollback guesses wrong order (fixed in UP-04) | At UP-00, `rollback_base` maximized Docker image creation time | Alias-consolidated immutable inventory, one-copy default, explicit multi-copy selection even with `--yes`, consent/current-base revalidation and current-definition verification |
-| Diagnostic calls can hang | `core.call` has no execution deadline; version probes use it; worker cancellation does not stop arbitrary child work | Bounded short diagnostics, owned/reaped clients and bounded or cleaned container-side probes |
+| Diagnostic calls can hang (fixed for short checks in UP-05) | At UP-00, general `core.call`/version probes had no execution deadline | Finite read-only allowlist/explicit probe scopes, total HTTP child budget, bounded output/client reaping, container-side limits, label-checked helper cleanup and cancellation-safe read-only UI publication; long mutations keep their existing timing |
 | Obsolete image advisories linger | `_show_image_checks` posts warnings, but successful image checks do not clear prior image notices/status | Replace/clear the category on new evidence without overwriting active operation progress |
 | Versions is only a report | It queries npm on opening, lists running-environment versions, and offers only Close | Compact Updates inventory/actions with independent component lifecycles |
 | No manager discovery/updater | Version source and manual pipx instructions exist; no installation classification or handoff | Published-release discovery and verified official-tag pipx execution after earlier stages |
@@ -283,7 +285,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-04. Stage order is mandatory; within correctness,
+All tasks below are pending except UP-00..UP-05. Stage order is mandatory; within correctness,
 complete one focused task per cycle. Dependencies are technical prerequisites, not permission to run extra
 tasks in a cycle. Split an oversized task into documented subcycles without changing scope.
 Every task must reproduce the defect where applicable, add regressions, rerun affected tests,
@@ -291,8 +293,8 @@ review the diff and update user/engineering documents with actual behavior and e
 
 Priority stages: UP-01..UP-06 correctness first; UP-07..UP-09 shared observations/discovery;
 UP-10..UP-12 Updates UI and existing actions; UP-13 base refresh; UP-14..UP-17 manager updates.
-UP-18 consolidates evidence without preparing a release. UP-00..UP-04 are DONE; all other
-tasks are PENDING. The next unblocked task is UP-05 only. UP-03's initially DNS-blocked
+UP-18 consolidates evidence without preparing a release. UP-00..UP-05 are DONE; all other
+tasks are PENDING. The next unblocked task is UP-06 only. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
@@ -302,7 +304,7 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-02 | DONE: preserve inventory on remote failure | UP-00 | CLI/TUI local rows survive npm failure; per-item errors isolated, explicit check failure still reported; offline/partial-result regressions without starting containers; evidence below |
 | UP-03 | DONE: shared base coordination | UP-00 | Secure shared namespace and lock ordering; guarded build/swap/rollback/cleanup/creation; host multiprocess and real-Docker races across data/context aliases pass with retained fixtures; packaged-definition gate resolved during UP-04 |
 | UP-04 | DONE: explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; 49 mocked/host regressions and 4 packaged/retained real cases with CLI swap/layer preservation |
-| UP-05 | Bounded diagnostic execution | UP-00 | Network/short subprocess deadlines and owned cleanup/cancellation; container-side probe bounds; long builds/updates not assigned short diagnostic limits; real local-process/pilot and scoped Docker leak checks |
+| UP-05 | DONE: bounded diagnostic execution | UP-00 | Total network/short subprocess budgets, response limits and owned cleanup/cancellation; container-side bounds; long mutations unaffected; 51 new host/mocked/pilot cases and real Docker probe/base regressions, evidence below |
 | UP-06 | Clear obsolete advisories | UP-00 | Warning-to-success/unknown/new-warning transitions replace the right category and preserve busy state; readiness/image pilot regressions |
 | UP-07 | Shared local observations | UP-01..UP-06 | Structured source/time/identity, disposable cache, stopped history/Unknown, lifecycle invalidation and partial Docker results; unit/host and lifecycle regressions |
 | UP-08 | Compatible discovery and policy comparisons | UP-07 | Bounded npm lookup/caching; latest supported stable despite another-major latest; exact confirmed targets; Manual/Pinned explicit comparisons; shared CLI/TUI eligibility and error tests |
@@ -382,7 +384,7 @@ land; do not announce planned functionality as delivered in this documentation-o
 
 ## Risks and remaining implementation questions
 
-No unresolved product decision blocks UP-05. The following are implementation proofs to resolve
+No unresolved product decision blocks UP-06. The following are implementation proofs to resolve
 in the named task, not permission to reopen settled UX or add infrastructure. If evidence needs
 a materially different architecture, record the blocker and ask the owner before proceeding.
 
@@ -390,7 +392,7 @@ a materially different architecture, record the blocker and ask the owner before
 |---|---|---|
 | Secure shared lock root on hosts with/without a usable runtime directory | Resolved in UP-03 | Fixed `/tmp/opencode-sandbox-locks-<UID>/`; no runtime/HOME/TMPDIR fallback; ownership/no-follow/inode checks, process/alias convergence, legacy-manager boundary documented |
 | Scope/order of base cleanup guards and publication identity checks | Resolved in UP-03/UP-04 | Base participants guarded; immutable copy/current-base consent rechecked before verification/publication; host and packaged/retained real races pass; failed/changed inspect refuses mutation |
-| Container-side probe deadline tools and cleanup on missing/custom tooling | UP-05 | Never start stopped environments; own/reap only diagnostic resources, fail as unavailable/Unknown instead of weakening checks |
+| Container-side probe deadline tools and cleanup on missing/custom tooling | Resolved in UP-05 within documented trust/liveness limits | GNU timeout required, no unbounded fallback or stopped-container start; owned client reaping and label/full-ID helper removal; real Debian/Arch timeout/cancellation/missing-tool/leak checks pass; inaccessible daemon means unconfirmed cleanup |
 | Cache location, invalidation and compatible npm metadata size | UP-07/UP-08 | Disposable bounded data; independent sources; policy/version semantics; no readiness-string parsing or metadata migration |
 | Daily throttle across failure, restart, time changes and overlapping callers | UP-09 | Attempt-based persistence, rate-limit handling, no network flood; explicit checks remain usable |
 | Exact manager command names and small CLI help integration | UP-14..UP-17 | Preserve existing capabilities, share handlers and validate every documented command/option before user docs name it |
@@ -865,28 +867,160 @@ a materially different architecture, record the blocker and ask the owner before
   Planned local commit: `fix: require explicit base rollback selection`; resolve its actual hash
   from Git. **UP-04 complete; STOP after local commit. Next UP-05 only.**
 
+### UP-05 — 2026-10-30 — bounded diagnostics and owned probe cleanup
+
+- Recovered repository/local instructions, TODO, baseline, architecture, D-056 and the full effort
+  record. Clean `work/updates` at UP-04 `8291e9c`; own rootless daemon verified, zero containers/
+  volumes, same four original tagged-image IDs. No later work invalidated the task. Disposable
+  rootless tests remain authorized; privileged/service/network/retained-image changes are not.
+- Reproduced cancellation before patching with a real sleeping fake Docker executable: canceled
+  `image inspect` waited for its client and returned normally (**1 failed**, 1.02 s). Root cause:
+  `core.call` used plain unbounded `subprocess.run`, worker cancellation only reached readiness,
+  version `exec`/image helpers had no container-side timer, and urllib's socket timeout did not
+  bound the entire DNS/TLS/slow-body operation. Canceled thread status was not process ownership.
+- Inventoried finite Docker metadata/usage calls, host-version checks, npm lookup, running-image/
+  environment versions, update verification, full image verification, comprehensive readiness
+  execs and read-only TUI workers. Kept the existing daemon identity/resource support budgets,
+  rootless proof, base guards, immutable rollback plans, journals/install script and user exec.
+- Added the focused stdlib `diagnostics.py` runner. One monotonic budget covers client execution
+  and pipe draining; nonblocking selectors enforce a combined 1 MiB output bound. It owns a new
+  process session/group, polls cancellation, kills only that group and reaps the direct client
+  with a bounded wait. No abandoned downloader/reader thread. `waitid(WNOWAIT)` reserves the
+  exited leader's PID/group identity until cleanup signals are sent, avoiding a reused-group
+  signal. Reused the existing callable-signal launch guard so SIGINT/TERM/HUP cannot unwind
+  creation before the client reference is registered; no inherited mask or worker signal changes.
+- `core.call` opts in only with an explicit timeout; `core.docker` automatically bounds a finite
+  allowlist of inspect/list/info/system-df/stats-no-stream calls (eight seconds). Arbitrary
+  run/exec, build, install, commit, start/stop and user sessions retain their old timing. A narrow
+  context scopes individual owned probes and cleanup calls, never a whole mutation. Bound
+  failures do not echo argv or captured configuration output, and do not become object absence.
+- npm still uses the existing latest endpoint/resolution policy, but a standalone stdlib
+  `http_probe.py` child under `python -I -B` now gives the parent a total eight-second request
+  budget, including DNS/TLS/body reads, cancellation and a 64 KiB response bound. No host npm,
+  persistent service, new discovery source/cache, automatic lookup or retry loop. Existing HTTP
+  errors/malformed JSON/version failures remain visible as registry errors; local rows survive.
+- `probes.exec` applies GNU timeout only to diagnostic commands: five seconds for OpenCode
+  versions, ten for readiness probes. `probes.image` uses a unique name/token, manager/data/helper
+  labels, network none, pull never and container-side timeout (version five; OS/tool verification
+  30 seconds); host clients get three seconds' transport/completion grace. Custom/missing timeout
+  tooling fails rather than falling back unbounded. A canceled Docker client may leave its exec
+  briefly active, but its ordinary process group remains container-timed. This is not protection
+  against hostile modified tools/detached processes or a promise while the container cannot run.
+- Interrupted image-helper cleanup gets uncancelled bounded inspect/removal calls (three seconds
+  each), requires invocation/manager/data/helper labels and full immutable container ID, then
+  removes only that helper. Foreign/malformed/failed inspection refuses removal. If the daemon
+  is inaccessible, report the named helper and unconfirmed cleanup for later normal labelled
+  cleanup after it stops, not a removal claim. No existing environment is stopped. Base candidate
+  cleanup gets its own uncancelled inspection after an interrupted probe; guard order stays intact.
+- Read-only prerequisite/readiness/Versions/usage/disk/Agent Context workers publish through a
+  small `tui_runtime.publish` gate that checks worker cancellation and app liveness before queueing
+  and again on the UI thread. This prevents obsolete results after canceled/replaced work. It
+  does not add mutation Cancel, advisory-category clearing, partial discovery rendering or an
+  Updates UI. A worker canceled during an existing mutation still relies on existing journals/
+  recovery; killing its diagnostic client is not a claim that its mutation stopped/rolled back.
+- Added **51** host/mocked/loopback/pilot cases: `test_diagnostics.py` (49) and
+  `test_diagnostic_tui.py` (2). Covers deadlines/cancel/output/interrupt, pipe-holding descendants,
+  reaping, reserved group identity, signal-at-spawn ownership, sanitized bound errors, finite
+  allowlist versus untouched long mutations, DNS-blocking child and slow-drip HTTP, helper label/
+  immutable-ID ownership/refusals, missing tools and 80x24 responsive cancellation/late results.
+  Updated Docker fakes to recognize the timeout wrapper without weakening their underlying
+  version/ownership/policy assertions. Unit autouse guards now block unmocked Docker `Popen` as
+  well as `run`; unit/pilot tests cannot accidentally reach the host daemon through the new path.
+- Corrections/reruns, not waived: first affected run **129 passed/45 failed**, 21.64 s, exposed
+  old fake-command shapes and old subprocess interception; adjusted those test boundaries and
+  retained explicit new wrapper/runner tests. Next **197 passed/2 failed**, 27.26 s, found one
+  remaining repair fake prefix and an unused lint annotation; fixed. Early host subset **56
+  passed/2 failed** found a pre-canceled preflight in the mutation-path test plus import/escape
+  lint mistakes. Early pilot subset **60 passed/2 failed** found its missing optional metadata
+  key assertion and lambda-style lint. Corrected tests, not product checks. Intermediate full
+  run **1169 passed/60 opt-in skips**, 97.34 s. Later full run **1173 passed/1 lint failure/62
+  opt-in skips**, 99.01 s: invalid label type raised ValueError rather than TypeError; corrected
+  the explicit type error. All final runs below pass with no suppression/blanket lint exclusions.
+- First diagnostic-only real run `up05-probes`: **2 failed**, 9.24 s. Both reached the missing
+  timeout-tool case after the preceding probe checks, but Docker returned its OCI missing-tool
+  message on **stdout**, not stderr. The command was not run unbounded; the error was misclassified.
+  Check both streams for unavailable tooling and add a host regression. Normal tooling was
+  restored and environments deleted even on failure. `up05-probes-rerun`: **2 passed, 28 checks**,
+  10.78 s. No failed scenario was skipped or weakened.
+
+  | Final full suite / venv | Result / basetemp |
+  |---|---|
+  | Python 3.11.18, current Typer 0.27.3/Textual 8.2.8, `venv311` | **1175 passed, 62 opt-in skips**, 98.84 s; `/tmp/opencode/up05-final311` |
+  | Python 3.11.18, lowest Typer 0.16.0/Textual 4.0.0, `venv311low` | **1175 passed, 62 opt-in skips**, 97.96 s; `/tmp/opencode/up05-final311low` |
+  | Python 3.14.8, current, `venv314` | **1175 passed, 62 opt-in skips**, 99.14 s; `/tmp/opencode/up05-final314` |
+  | Python 3.14.8, lowest, `venv314low` | **1175 passed, 62 opt-in skips**, 98.13 s; `/tmp/opencode/up05-final314low` |
+
+  Commands are serial foreground `PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q
+  --basetemp=<above>`, pytest 9.2.0. Only the two known lowest-Typer/Click deprecations. Includes
+  mocked Docker, real host files/processes/loopback HTTP, Textual pilots/existing host-terminal
+  fixtures, Ruff/shellcheck, English, document links and CLI/help consistency. The 62 skips are
+  opt-in real/privileged/socket-activation cases (including the two new real cases), not waived failures.
+- New real `test_43_diagnostics.py` runs on disposable network-none environments from retained
+  Debian 12/revision 1 and Arch/revision 1 (actual OpenCode 2.2.0). Proves running/image version
+  checks, container-side exec/image deadlines, ordinary descendant termination, host cancellation
+  with client reaping, timer survival after host-client termination, invocation-labelled helper
+  removal, missing timeout-tool refusal/restoration, no stopped-environment start, byte-identical
+  stopped-check metadata, explicit healthy restart and preserved writable-layer marker. It does
+  not imply new-package installation, a live model/provider call or hostile-container isolation.
+- Extended UP-03/04's existing real base harness only to manifest/name/label the newly owned
+  probe helpers. All four packaged/retained races and immutable CLI selection/pins/layer tests
+  still pass with bounded verification. Combined `up05-proof`: **6 passed/106 checks**, 85.99 s;
+  after final process-group reservation review, `up05-final`: **6 passed, 106 logged checks,
+  no skips/deselections**, 87.01 s. Packaged cases use current Debian 13/revision 2 and Arch/
+  revision 1 with eligible build cache, not full refresh. Final evidence `.work/logs/up05-final*`.
+
+  ```sh
+  OCS_TEST_DOCKER=1 OCS_TEST_RUN=up05-final PYTHONPATH="$PWD/src" \
+    .work/venv311/bin/python -m pytest -q tests/integration/test_42_base_coordination.py \
+    tests/integration/test_43_diagnostics.py --basetemp=/tmp/opencode/up05-final
+  ```
+
+- All four real runs manifested their test resources and used guarded product cleanup/leak
+  checks. Ending own-rootless inventory is verified, zero containers/volumes, exactly the four
+  starting full tagged-image IDs, no helpers carrying any run's test label. Original base/upstream/
+  custom images and retained copies unchanged; temporary timeout-tool renames restored; socket
+  aliases removed; shared lock files/build cache intentionally retained. No host setup/network/
+  default-context change, daemon restart, real credential or paid model use.
+- Local Python 3.11 sdist/wheel built with `python -m build --no-isolation --outdir
+  .work/up05-package`; strict twine and `check_dist.py` passed. All eight new/changed product
+  modules are byte-identical in the wheel, including the isolated HTTP child. No upload/global
+  installation/fresh pipx run. Not re-established: full real campaign, privileged daemon/socket
+  activation, real-terminal/manual observation, installed-manager/pipx or public npm outage/
+  discovery. Loopback/controlled DNS tests are not evidence of a live npm outage.
+- Reviewed all product/test diffs and cleanup/identity/timing boundaries. Updated Unreleased,
+  OpenCode/maintenance guides, architecture, baseline, campaign, D-056 status and TODO. No version,
+  schema, image-definition/assets, runtime-identity proof, base-lock protocol, dependencies or
+  workflow changes. Final product/early-guide diagnostic+pilot/static/docs subset: **91 passed,
+  no skips**, 10.56 s, venv311, `tests/test_diagnostics.py tests/test_diagnostic_tui.py
+  tests/test_quality.py tests/test_language.py tests/test_user_docs.py tests/test_cli_structure.py`,
+  `/tmp/opencode/up05-review`; final full suites above include those tests. Later evidence-only
+  documentation/regression repeat: **91 passed, no skips**, 10.36 s, same modules/venv311,
+  `/tmp/opencode/up05-docs-final`. Whitespace checks are clean. Planned local commit:
+  `fix: bound diagnostic clients and container probes`. **UP-05 complete; STOP after local
+  commit. Next UP-06 only**, obsolete advisory-category clearing without losing active progress.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056 and this entire record. Use
    ARCHITECTURE for implemented behavior, not proposed functionality. Check Git status, branch,
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
-   `40211ab`, then the UP-04 commit. Shared base guards and identity-bound explicit rollback
-   selection are implemented. Image assets, manager version and schemas still match the seed.
+   `40211ab`, UP-04 `8291e9c`, then the UP-05 commit. Shared base guards, immutable explicit
+   rollback and short diagnostic/probe bounds/ownership are implemented. Image assets, manager
+   version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Select **UP-05 only**: reproduce unbounded short version/diagnostic execution and cancellation
-   ownership. Inventory `core.call`/`docker`, version queries/image helpers, CLI/TUI workers and
-   existing readiness deadline mechanisms. Add bounded short subprocess/network diagnostics,
-   owned/reaped clients and cancellation waits, plus container-side probe bounds or cleanup of
-   only their owned exec/helper resources. Killing a Docker client or canceling a Textual thread
-   does not prove container-side work stopped. Never start a stopped environment merely to check,
-   and do not put blanket short timeouts on builds, installs, commit or other legitimate long
-   mutations. Use host-process/pilot regressions and scoped real Docker leak checks. Preserve
-   UP-03 guard order, UP-04 immutable consent/current-definition verification and existing
-   journals/recovery. Do not combine advisory clearing (UP-06), observations/cache, refresh or
-   Updates UI work. No host network/service changes are authorized.
+3. Select **UP-06 only**: reproduce a base-image warning followed by success leaving the old
+   toast/status behind. Inspect `_prerequisites_worker`, `_show_image_checks`, resource/daemon
+   advisory handling and active-operation progress ownership in `tui.py`. Replace/clear only the
+   relevant advisory category on new success/unknown/new-warning evidence, without erasing an
+   active mutation's progress or another category's notice. Keep UP-05 cancellation-safe publication
+   and read-only metadata refresh boundaries. Add deterministic 80x24/larger pilot transitions,
+   repeated checks and overlapping busy-state regressions; use real terminal observation only if
+   actually executed, never relabel prior evidence. Preserve base/policy/journal/security behavior.
+   Do not combine observations/cache/discovery, Updates UI, refresh or manager-updater work.
+   No host network/service changes are authorized.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.
