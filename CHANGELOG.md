@@ -58,7 +58,7 @@ Debian 13. Tested with real Docker on Arch Linux only.
 
 - Root-level `install.sh` and `setup-rootless.sh`. Existing installations and environments are
   not modified; remove a 6.0.0 source installation with `./install.sh uninstall` from the 6.0.0
-  sources ([docs/install.md](docs/install.md#moving-from-a-legacy-source-installation)).
+  sources ([docs/install.md](https://github.com/CyberFazaN/opencode-sandbox/blob/v6.1.0/docs/install.md#moving-from-a-legacy-source-installation)).
 
 ## 6.0.0 — 2026-10-29
 
