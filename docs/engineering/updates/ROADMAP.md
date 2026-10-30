@@ -15,8 +15,11 @@
 - Working branch: `work/updates`, created from clean `main` at `a20f1fc` (also `origin/main`).
   Manager version: 6.1.0; latest published tag: v6.1.0. No subsequent implementation work was
   present when this cycle began. The approved assumptions still match the implementation.
-- One coherent task per cycle: investigate/reproduce, implement narrowly, test, review, update
-  records, commit locally, then STOP. On Continue, recover from these files and Git, not memory.
+- One coherent work package per cycle: investigate/reproduce, implement narrowly, test, review,
+  update records and commit locally, then checkpoint. The owner's consolidation approval (D-057)
+  permits tightly related subtasks in the same cycle, with separate focused commits where useful;
+  do not require STOP/Continue between those subtasks. Stop at the package boundary, an unsafe or
+  oversized scope, or a blocker. On Continue, recover from these files and Git, not memory.
 - This is the single detailed running-effort record under D-045. Do not add a parallel plan or
   task database. Retire it only after its durable facts/evidence are in the permanent records.
 - No version bump, release preparation, release tag, push, package upload, remote issue creation,
@@ -285,16 +288,23 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-05. Stage order is mandatory; within correctness,
-complete one focused task per cycle. Dependencies are technical prerequisites, not permission to run extra
-tasks in a cycle. Split an oversized task into documented subcycles without changing scope.
+All tasks below are pending except UP-00..UP-05. D-057 consolidates closely related remaining
+tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
+are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
+tightly related subtasks in one cycle when manageable; use separate focused commits and tested
+checkpoints as appropriate. Split an oversized package at a safe boundary, not by weakening tests.
 Every task must reproduce the defect where applicable, add regressions, rerun affected tests,
 review the diff and update user/engineering documents with actual behavior and evidence.
 
-Priority stages: UP-01..UP-06 correctness first; UP-07..UP-09 shared observations/discovery;
-UP-10..UP-12 Updates UI and existing actions; UP-13 base refresh; UP-14..UP-17 manager updates.
-UP-18 consolidates evidence without preparing a release. UP-00..UP-05 are DONE; all other
-tasks are PENDING. The next unblocked task is UP-06 only. UP-03's initially DNS-blocked
+Default priority: finish correctness (UP-06), shared evidence/discovery (UP-07 + UP-08), compact
+UI with optional background scheduling (UP-10 + UP-09), environment actions/recovery (UP-11),
+base actions/refresh (UP-12 + UP-13), manager discovery/classification (UP-14 + UP-15), manager
+handoff (UP-16), replacement/recovery (UP-17), then evidence consolidation (UP-18). This is
+**nine planned remaining cycles instead of thirteen**, not a quota or permission to combine
+unrelated risks. Read-only manager discovery can be developed independently of base refresh;
+manager execution remains later and must not delay the earlier component workflows. UP-18 is
+not release preparation. UP-00..UP-05 are DONE; all other tasks are PENDING. The next package
+is UP-06 only. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
@@ -306,21 +316,48 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-04 | DONE: explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; 49 mocked/host regressions and 4 packaged/retained real cases with CLI swap/layer preservation |
 | UP-05 | DONE: bounded diagnostic execution | UP-00 | Total network/short subprocess budgets, response limits and owned cleanup/cancellation; container-side bounds; long mutations unaffected; 51 new host/mocked/pilot cases and real Docker probe/base regressions, evidence below |
 | UP-06 | Clear obsolete advisories | UP-00 | Warning-to-success/unknown/new-warning transitions replace the right category and preserve busy state; readiness/image pilot regressions |
-| UP-07 | Shared local observations | UP-01..UP-06 | Structured source/time/identity, disposable cache, stopped history/Unknown, lifecycle invalidation and partial Docker results; unit/host and lifecycle regressions |
-| UP-08 | Compatible discovery and policy comparisons | UP-07 | Bounded npm lookup/caching; latest supported stable despite another-major latest; exact confirmed targets; Manual/Pinned explicit comparisons; shared CLI/TUI eligibility and error tests |
-| UP-09 | Opt-in background discovery | UP-08 | Off by default; per-source attempt-based 24-hour bound across restart/failure, coalescing, rate limits and quiet deduplication; no start/probe/update side effects; cache/preferences/pilot tests |
-| UP-10 | Compact Updates inventory | UP-09 | Three subviews, local/cached first, independent loading/errors, selected Details, focus/navigation at 80x24 and larger; manager execution not exposed prematurely; pilot and real-terminal checks |
-| UP-11 | Environment actions and recovery | UP-10 | Existing Check/Start/Policy/Update/Rollback/Recover handlers with exact consent and locked revalidation; pin/network/running-state refusals, stopped final state and recovery; real Docker/OpenCode and terminal tests |
-| UP-12 | Base actions using existing safe lifecycle | UP-10, UP-03, UP-04, UP-08 | Inventory and cached Build/Rebuild/Check/Rollback, preserving replacement and exact target/state consent; CLI/TUI parity, pinned-creation and retained-layer regressions |
-| UP-13 | Full base refresh | UP-11, UP-12 | Explicit cached versus Refresh & Rebuild in CLI/TUI, pull/no-cache without prune, candidate failure safety; both distributions built under isolated test tags; existing containers/layers unchanged |
-| UP-14 | Manager release discovery | UP-13 | Bounded official published-full-release provider, strict tags/semver/no implicit downgrade; manager UI/CLI discovery and optional daily source integration; local inventory survives GitHub failure |
-| UP-15 | Verified installation classification | UP-14 | Actual official-tag pipx identity including custom paths, interpreter/source/launcher; safe manual guidance otherwise; real isolated pipx classification and foreign/shadowed launcher tests |
+| UP-07 + UP-08 | Shared observations, compatible discovery and policy comparisons | UP-02, UP-05 | Structured source/time/identity, disposable local/remote cache, stopped history/Unknown, lifecycle invalidation and partial Docker results; bounded compatible stable npm resolution even when latest changes major, exact confirmed targets, Manual/Pinned explicit comparisons and shared CLI/TUI eligibility. Unit/host/lifecycle, cache corruption, source failure and policy regressions; scheduler/UI not required |
+| UP-10 + UP-09 | Compact Updates inventory, then optional background discovery | UP-01, UP-06, UP-07 + UP-08; **no UP-10 dependency on UP-09** | UP-10 independently delivers three local/cached-first subviews, manual Check, independent loading/errors, Details and keyboard/focus at 80x24/larger, with no network on opening and no premature manager execution. UP-09 adds default-off scheduling, attempt-based 24-hour persistence including failures/restarts, coalescing/rate limits and quiet deduplication, with no start/probe/update side effects. Separate UI/pilot/terminal and cache/preferences/scheduler gates; stop after verified UP-10 if the combined package is too large |
+| UP-11 | Environment actions and recovery | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers with exact consent and locked revalidation; pin/network/running-state refusals, stopped final state and recovery; real Docker/OpenCode and terminal tests. Recovery is an independent gate, not bundled with base or manager work |
+| UP-12 + UP-13 | Base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Inventory, Build/Rebuild/Check/Rollback, rollback-preserving replacement and exact target/state/mode consent; explicit cached versus Refresh & Rebuild in CLI/TUI, pull/no-cache without prune. Verify both distributions under isolated tags, failed-candidate safety, CLI/TUI parity, pinned creation and unchanged retained containers/layers; cached and full-refresh results are separate evidence |
+| UP-14 + UP-15 | Manager release discovery and verified installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Bounded official published-full-release discovery, strict tags/semver/no implicit downgrade, local inventory retained on GitHub failure; actual official-tag pipx identity including custom paths/interpreter/source/launcher, safe manual guidance otherwise. Separate provider and real isolated pipx/foreign/shadowed-launcher tests. Optional daily-source hookup only if UP-09 exists; neither discovery nor classification requires it or exposes execution |
 | UP-16 | Installation exclusion and terminal handoff | UP-15, UP-05 | Supported instances coordinate across data directories; safe self-contained helper/interpreter/external pipx, clean TUI exit before mutation, startup exclusion and narrow verification path; process and pty tests |
-| UP-17 | Manager replacement, verification and recovery | UP-16 | Exact confirmed target and revalidation, actual fresh-process verification, failure classes/recovery record/instructions, no automatic restart; isolated pipx success/failure/interruption plus real terminal evidence |
+| UP-17 | Manager replacement, verification and failure recovery | UP-16 | Exact confirmed target and revalidation, actual fresh-process verification, no automatic restart. Independently verify (1) replacement/success and (2) failure/interruption states, private recovery record and instructions before/during/after install. Separate focused commits/checkpoints for these gates; isolated pipx and real terminal evidence, never inferred backup/rollback safety |
 | UP-18 | Cross-layer verification and record consolidation | UP-01..UP-17 | Run affected/full regressions, required real combinations, dependency endpoints, docs/CLI/packaging checks; record evidence/limits, promote durable facts and retire the effort record when complete; no release work |
 
+### Consolidation rationale and safe checkpoints
+
+- **UP-07 + UP-08:** observation identity, disposable cache and comparison semantics are a shared
+  data contract. Implement/test it together instead of publishing a provisional model in one cycle
+  only to reshape it in the next. Local observations and remote discovery remain independent
+  sources; invalidation and failed-attempt tests are mandatory. No scheduler or screen dependency.
+- **UP-10 + UP-09:** share presentation/preferences integration in one package if manageable, but
+  implement and verify manual/cached UI first. UP-10 must run with scheduling absent or disabled;
+  UP-09 uses the shared provider/cache contract, not the Updates screen as its execution engine.
+  If split for scope, UP-10 is a deliverable checkpoint, not blocked by pending UP-09.
+- **UP-12 + UP-13:** one base-action/confirmation path should select cached/full-refresh behavior,
+  rather than a UI rewrite in the next cycle. Environment journals/recovery do not participate in
+  base builds, so remove UP-13 -> UP-11. Candidate verification, immutable consent, rollback-copy
+  preservation and both-distribution real tests remain gates, not optional polish.
+- **UP-14 + UP-15:** manager availability and installation eligibility form one read-only summary,
+  but can fail independently and must be tested separately. Remove UP-14 -> UP-13: GitHub/pipx
+  inspection does not consume a base build. Shared cache and UI hookups are explicit integration
+  dependencies only. Installation classification is not authorization to replace it.
+- **Do not consolidate UP-11, UP-16 or UP-17 with adjacent packages.** Environment recovery,
+  installation exclusion/terminal handoff, replacement and failure recovery each require runnable,
+  independently evidenced checkpoints. UP-17's success and failure gates may share a cycle only
+  when both fit; split before higher-risk fault injection if necessary. Restore/rollback safety,
+  lock ordering, pre-replacement recovery instructions and fresh-process verification are unchanged.
+
+Every checkpoint records completed and pending IDs/subtasks, commands/results, limitations,
+resources and exact next gate so context compaction is safe even inside a grouped package.
+Do not stop mechanically after a related subtask commit; do not continue into an independent
+package merely because tests pass. A blocker in optional scheduling or one component must not
+block independent usable work or be hidden as success. Historical UP-00..UP-05 STOP instructions
+below describe those past cycles, not a renewed one-ID-per-cycle constraint.
+
 No implementation task is complete because it appears in this table. Manager scope is included
-now, but must not delay UP-01..UP-13. Do not add predicted commands/options to user-facing docs
+now, but must not delay the earlier component workflows. Do not add predicted commands/options to user-facing docs
 before they exist. Preserve existing CLI paths; add only necessary manager/refresh/copy-selection
 capabilities and validate their final names/help through the existing CLI-structure tests.
 
@@ -999,13 +1036,38 @@ a materially different architecture, record the blocker and ask the owner before
   `fix: bound diagnostic clients and container probes`. **UP-05 complete; STOP after local
   commit. Next UP-06 only**, obsolete advisory-category clearing without losing active progress.
 
+### Roadmap consolidation — 2026-10-30 — owner-approved work packages
+
+- Recovered clean `work/updates` at UP-05 `32861c6`, instructions, TODO, baseline, architecture,
+  D-056 and the roadmap. Verified own-rootless read-only inventory: zero containers/volumes and
+  the same four original full tagged-image IDs. No resources created; no cleanup required.
+- Reviewed source boundaries in `opencode_versions.py`, `preferences.py`, `tui.py` and existing
+  recovery/base handlers. Observations and compatible lookup share data/comparison contracts;
+  scheduling is optional to a manually checked UI; environment journals do not participate in
+  base refresh; GitHub/pipx inspection does not consume base builds. These findings support the
+  revised technical dependencies, not new product-operation evidence.
+- Grouped UP-07 + UP-08, UP-10 + UP-09 (UI independently first), UP-12 + UP-13 and UP-14 + UP-15;
+  kept all IDs and acceptance criteria, reducing planned remaining cycles from thirteen to nine.
+  Removed the three artificial dependencies and blanket stage-order gating. Kept UP-11, UP-16
+  and UP-17 separately scoped, with independent replacement-success/failure-recovery gates.
+- D-057 records the owner's workflow revision and supersedes the older one-ID/STOP instructions
+  for this effort; machine/security/publication permissions are unchanged. Updated TODO and
+  BASELINE. This documentation checkpoint is followed by UP-06 in this execution cycle, not an
+  unnecessary STOP. No code/schema/version change or release work.
+- Verification: Python 3.11.18/current dependencies, `PYTHONPATH="$PWD/src"
+  .work/venv311/bin/python -m pytest -q tests/test_language.py tests/test_user_docs.py
+  tests/test_cli_structure.py --basetemp=/tmp/opencode/up-plan-revision`: **27 passed, no skips**,
+  5.55 s. Document language/links/CLI checks, not a full suite or new real-operation evidence.
+  Reviewed dependency/acceptance preservation; whitespace checks clean. Planned local commit:
+  `docs: consolidate Updates work packages and dependencies`.
+
 ## Resume and context-compaction handoff
 
-1. Read repository/local instructions, TODO, BASELINE, D-056 and this entire record. Use
+1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
    ARCHITECTURE for implemented behavior, not proposed functionality. Check Git status, branch,
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
-   `40211ab`, UP-04 `8291e9c`, then the UP-05 commit. Shared base guards, immutable explicit
+   `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, then the roadmap consolidation commit. Shared base guards, immutable explicit
    rollback and short diagnostic/probe bounds/ownership are implemented. Image assets, manager
    version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
@@ -1025,8 +1087,9 @@ a materially different architecture, record the blocker and ask the owner before
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.
 5. Review/stage only intended changes; commit locally. Record task status, test results, blockers
-   and the next unblocked task in this file before committing, so the commit is self-contained.
-   Leave a clean checkpoint, summarize the actual commit/tests/limitations, then STOP.
+   and the next unblocked package/gate in this file before committing, so the commit is self-contained.
+   Related subtasks may continue within the approved package after a focused commit. At the package
+   or safety boundary leave a clean checkpoint, summarize actual commits/tests/limitations, then STOP.
 6. Never infer permission to merge, push, tag, publish, bump the version or start release work
    from Continue, task completion, passing tests or the end of this roadmap. Additional unrelated
    stabilization work is expected before a human separately considers another release.

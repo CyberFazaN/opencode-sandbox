@@ -12,10 +12,16 @@ dependencies, acceptance criteria, verification matrix and next-cycle handoff ar
 [Updates working roadmap](docs/engineering/updates/ROADMAP.md). This is the active effort;
 the optional and deferred items below are not competing implementation permission.
 
-Order: correctness/reliability fixes -> shared observations/discovery -> compact Updates TUI
+Priority: correctness/reliability fixes -> shared observations/discovery -> compact Updates TUI
 and existing operations -> explicit base refresh -> verified pipx manager self-update.
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
-stages. Each task includes its own tests and documentation, then a local commit and STOP.
+work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
+UP-13, and UP-14 + UP-15: nine planned remaining cycles, not thirteen. Base refresh does not
+depend on environment recovery; manager discovery does not depend on base refresh. Tightly
+related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
+package or safety boundary, not mechanically after each ID. Environment recovery, manager
+handoff, replacement and failure recovery retain independent verification gates. The working
+roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
 
 Current checkpoint: UP-00..UP-05 complete. Explicit reports, honest partial inventory, shared
 base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.

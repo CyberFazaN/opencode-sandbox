@@ -31,6 +31,8 @@ UP-06 is next. No image-definition, schema or manager-version change was made.
 UP-01..UP-05 verification is below; commands, initial failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
+D-057 consolidates the remaining work into related packages with technical-only dependencies;
+it changes workflow, not delivered product behavior or the independent recovery verification gates.
 
 ## Supported environments
 

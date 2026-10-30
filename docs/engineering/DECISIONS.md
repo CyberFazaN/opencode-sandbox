@@ -993,3 +993,30 @@ D-042/D-044/D-048's pipx update UX without reviving a separate installer, taking
 launchers, changing distribution channels or weakening prerequisite checks. Unaffected decisions
 remain accepted. Detailed alternatives, dependencies and test gates are in the working record;
 implemented facts must be promoted to the current-state records before that record is retired.
+
+## D-057 Consolidated Updates work packages and technical dependencies — accepted
+
+Owner approval during unpublished D-056 development: reduce unnecessary STOP/Continue cycles,
+not implementation scope or safety evidence. This supersedes only D-056's strictly serial stage
+order and one-ID/local-commit/STOP rhythm, not its architecture or acceptance criteria.
+
+- Keep completed IDs/evidence; group remaining UP-07 + UP-08 (observations/discovery/comparisons),
+  UP-10 + UP-09 (manual/cached UI first, optional scheduler), UP-12 + UP-13 (base actions and
+  cached/full refresh), and UP-14 + UP-15 (manager discovery/classification). Retain original IDs
+  for traceability and mark partial package completion explicitly.
+- Remove UP-10 -> UP-09, UP-13 -> UP-11 and UP-14 -> UP-13 as technical prerequisites. Scheduling
+  is optional to the UI; base refresh does not use environment recovery; read-only GitHub/pipx
+  discovery does not use base refresh. Distinguish actual data/UI integration dependencies from
+  preferred work order. Manager execution remains later and must not delay earlier workflows.
+- A coherent cycle may include tightly related subtasks and separate focused commits, each with
+  tests, review and current records. Stop at a work-package boundary, a safety/context boundary
+  or a blocker; split an oversized package without weakening correctness or tests. This owner
+  approval supersedes older one-task-per-cycle instructions for this effort only.
+- Environment recovery (UP-11), installation exclusion/terminal handoff (UP-16), and replacement/
+  failure recovery (UP-17) remain separate from adjacent packages. Replacement success and failure
+  recovery have independent verification gates and checkpoints, not an inferred rollback claim.
+  Preserve exact consent, journals/checkpoints, rootless/ownership checks, rollback copies,
+  terminal restoration, external helper independence and fresh-process installation verification.
+- Keep nine planned remaining packages at approval, not a mandatory cycle count. The detailed
+  dependency/acceptance table and handoff remain in [updates/ROADMAP.md](updates/ROADMAP.md).
+  No version bump, merge, release work, push, tag, upload or publication is authorized.
