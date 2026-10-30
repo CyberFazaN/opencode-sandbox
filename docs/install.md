@@ -18,32 +18,34 @@ tells you what is still missing.
 | Requirement | Notes |
 |---|---|
 | Linux | Any distribution that meets the requirements below is meant to work. Tested with real Docker: Arch Linux only; see [the tested environment](../README.md#tested-environment). |
-| Python 3.14 or newer | For pipx. If your distribution ships an older Python, install 3.14 alongside it and name it with `--python` (below). |
-| pipx and Git | From your distribution's packages, for example `sudo pacman -S python-pipx git` on Arch Linux. |
+| Python 3.11 or newer | For the application's venv (tested: 3.11 and 3.14). Release 6.0.0 required 3.14 or newer. pipx can run on a different Python; select the application's interpreter with `--python`. |
+| pipx and Git | Install them using your distribution's official documentation. pipx installs the application, not Docker. |
 | Network access during installation | pipx downloads the source from GitHub and the Python dependencies (Typer, Textual and theirs) from PyPI. |
 | Docker in rootless mode | Your own rootless daemon; see [Prepare Docker](#prepare-docker). |
-| Kernel and system support for rootless Docker | Subordinate UID and GID ranges for your user and `newuidmap`/`newgidmap`; unprivileged user namespaces (some distributions restrict them by policy, for example AppArmor on recent Ubuntu releases; Docker's rootless guide describes what to allow); cgroup v2 with the `cpu`, `memory` and `pids` controllers delegated to your user, because the manager sets CPU, memory and process limits on every container. Steps 2 and 4 of [Prepare Docker](#prepare-docker) check them. |
+| Kernel and system support for rootless Docker | Subordinate UID and GID ranges for your user and `newuidmap`/`newgidmap`; unprivileged user namespaces (some distributions restrict them by policy); cgroup v2 with the `cpu`, `memory` and `pids` controllers delegated to your user's daemon, because the manager sets CPU, memory and process limits on every container. See [Prepare Docker](#prepare-docker) for upstream guidance and the limits of the application's checks. |
 | Disk space | Each base image is about 2.2 GB (Debian) or 2.4 GB (Arch); a build also leaves several GB of Docker build cache. |
 
-The base images (Debian 12 or Arch Linux) are the distribution inside the containers. Choose
+The base images (Debian 13 or Arch Linux) are the distribution inside the containers. Choose
 either one on any host; they are independent of the distribution your host runs.
 
 ## Install the application
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.0.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
 opencode-sandbox --version
 ```
 
-The `@v6.0.0` at the end selects a release tag; the available releases are on the project's
+The `@v6.1.0` at the end selects a release tag; the available releases are on the project's
 GitHub releases page. Dependencies are resolved at install time within the version ranges the
 project declares; there is no lock file.
 
-If pipx runs on a Python older than 3.14, the installation fails. Name a newer interpreter:
+pipx normally uses its own interpreter for the application venv. If that is older than the
+selected release supports, installation fails. Name an installed interpreter explicitly when
+needed:
 
 ```sh
-pipx install --python python3.14 \
-  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.0.0
+pipx install --python python3.11 \
+  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
 ```
 
 `opencode-sandbox --help`, `--version` and `doctor` work without Docker.
@@ -55,84 +57,84 @@ The manager only uses **your own rootless Docker daemon**, reached through a Doc
 remote (`tcp://`, `ssh://`) endpoints; [security.md](security.md#daemon-identity) explains the
 check.
 
-These steps change your system. Read each one before running it; the ones with `sudo` need an
-administrator.
+### Set up the daemon separately
 
-1. **Packages.** Install Docker and its rootless tools (`dockerd-rootless.sh`,
-   `dockerd-rootless-setuptool.sh`, `rootlesskit` and a network driver such as `slirp4netns`).
-   Package names differ between distributions; Docker's rootless guide
-   (<https://docs.docker.com/engine/security/rootless/>) lists them for the distributions it
-   covers. On Arch Linux, the tested host:
+Use [Docker's official Rootless mode installation guide](https://docs.docker.com/engine/security/rootless/)
+and your Linux distribution's official documentation for the packages and setup procedure that
+match your system. Arch Linux users should also consult the
+[ArchWiki Rootless Docker daemon section](https://wiki.archlinux.org/title/Docker#Rootless_Docker_daemon):
+Arch may have its own packaging and setup conventions rather than Docker's upstream setup tool.
+This guide deliberately does not duplicate those host installation procedures.
 
-   ```sh
-   sudo pacman -S docker slirp4netns fuse-overlayfs
-   ```
+The resulting setup must meet the [requirements above](#requirements): a daemon running as your
+normal user, subordinate UID/GID mappings, working unprivileged user namespaces, and cgroup v2
+with `cpu`, `memory` and `pids` delegated for container resource limits. Docker's
+[resource-limit guidance](https://docs.docker.com/engine/security/rootless/tips/#limiting-resources)
+explains the required cgroup support and how to check it. Without that support, Docker may
+ignore resource-limit flags. Follow upstream and distribution guidance rather than changing
+host security policy just to bypass an error.
 
-   There, `dockerd-rootless.sh` and `dockerd-rootless-setuptool.sh` are not in the official
-   repositories. Get them from the AUR package `docker-rootless-extras`, or take the two
-   scripts from the upstream Docker release that matches `docker --version` and put them in
-   `~/.local/bin`.
+### Select the context and check readiness
 
-2. **Subordinate IDs.** `/etc/subuid` and `/etc/subgid` need a range for your user (for example
-   `you:100000:65536`). Check with `grep "^$USER:" /etc/subuid /etc/subgid`. If a range is
-   missing, an administrator adds one that does not overlap existing ranges, for example
-   `sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$USER"`.
+The manager uses the context named `rootless` by default. You do not need to switch your Docker
+default context. `docker context ls` lists existing contexts; if yours has another name, set
+`OPENCODE_SANDBOX_DOCKER_CONTEXT` to that name. The context must point to the daemon's own local
+Unix socket. `DOCKER_HOST` and `DOCKER_CONTEXT` are ignored by the manager, so setting those
+variables alone is not enough.
 
-3. **The rootless daemon.** Follow Docker's rootless guide for your version
-   (<https://docs.docker.com/engine/security/rootless/>). Usually:
+Run the application's shared CLI/dashboard diagnostics after setup:
 
-   ```sh
-   dockerd-rootless-setuptool.sh install
-   systemctl --user enable --now docker
-   ```
+```sh
+opencode-sandbox doctor
+```
 
-   The setup tool creates a user service and a Docker context named `rootless`. If your setup
-   created no context, add one yourself:
+It lists Python, Git and the Docker CLI, checks daemon identity, and reports resource-limit
+support, base images and Docker storage. It must print `Daemon identity: verified`; otherwise read the reason and hint.
+The [exit status](troubleshooting.md#exit-status) distinguishes a missing program, missing
+context, unavailable daemon and refused endpoint. These checks never install packages, issue
+service-start commands or configure Docker. Connecting can trigger a socket-activated daemon
+that you already configured. Readiness waits up to 10 seconds for a slow response, with a
+waiting notice and cancellation; a ready daemon causes no retry delay. The dashboard reports
+daemon, resource-support and base-image problems at startup; daemon checks run again before
+Docker operations.
 
-   ```sh
-   docker context create rootless \
-     --docker "host=unix://$XDG_RUNTIME_DIR/docker.sock"
-   ```
+**A verified identity does not prove that resource limits can be enforced.** `doctor`
+separately reports cgroup version/driver and Docker-reported CPU quota, memory and PID
+limit support. Missing capabilities produce a warning; unavailable or unrecognized evidence is
+`not checked`, not success. This is not a measurement of kernel enforcement or a host policy
+verification, and it does not check user-namespace policy. Use the upstream resource-limit and
+[rootless troubleshooting guidance](https://docs.docker.com/engine/security/rootless/troubleshoot/)
+for those prerequisites. A successful `doctor` exit is not a complete host-setup certification;
+resource/image/storage warnings and unknown checks may accompany exit 0. Nothing repairs host
+settings or blocks existing environments automatically.
 
-   On a host without systemd, start the daemon the way Docker's guide describes for your setup;
-   the manager only needs the context. You don't need to switch your default context
-   (`docker context use`); the manager picks the context `rootless` itself. To use a context with another name, set
-   `OPENCODE_SANDBOX_DOCKER_CONTEXT`. On recent kernels the daemon may need the `nf_tables`
-   module (`sudo modprobe nf_tables`). Keeping the daemon running after you log out
-   (`loginctl enable-linger`) is optional.
+### Build the sandbox images
 
-4. **Check.** Run the manager's diagnostics:
+A missing base image is expected on first run: `doctor` warns and names the build command.
+It also warns about old or unverifiable image-revision labels; a newer image needs review,
+not a blind rebuild. These [base-image checks](maintenance.md#base-image-definitions) never
+change or block existing environments, and image warnings do not change `doctor`'s exit status.
+Build the image for each distribution you want to use:
 
-   ```sh
-   opencode-sandbox doctor
-   ```
+```sh
+opencode-sandbox build                # Debian 13
+opencode-sandbox build --distro arch  # Arch Linux, optional
+```
 
-   It must print `Daemon identity: verified`. Otherwise it says what is wrong, and the exit
-   status tells the cases apart ([troubleshooting.md](troubleshooting.md#exit-status)).
+A build downloads the distribution's base image from Docker Hub, operating-system packages,
+and OpenCode (npm package `@opencode/cli`: the release npm marks as latest, or the 2.x version
+you pass with `--opencode-version`; only OpenCode 2.x is installed). The Arch build also builds
+the AUR helper `paru`. A build takes a few minutes and installs packages only inside the image,
+never on your host. Afterwards `opencode-sandbox doctor` lists the base images. Once you have
+an environment, `opencode-sandbox check NAME` checks its readiness without starting or changing
+it; some checks require an already running container.
 
-   `doctor` does not check cgroup delegation. Check it yourself; the output must contain `cpu`,
-   `memory` and `pids`:
-
-   ```sh
-   u=$(id -u); d=/sys/fs/cgroup/user.slice/user-$u.slice
-   cat "$d/user@$u.service/cgroup.controllers"
-   ```
-
-   systemd's own user service unit delegates them (measured with systemd 262 on the tested Arch
-   Linux host); otherwise Docker's rootless guide ("Limiting resources") shows how to enable it.
-
-5. **Base images.** Build the image for each distribution you want to use:
-
-   ```sh
-   opencode-sandbox build                # Debian 12, the default
-   opencode-sandbox build --distro arch  # Arch Linux, optional
-   ```
-
-   A build downloads the distribution's base image from Docker Hub, operating-system packages,
-   and OpenCode (npm package `@opencode/cli`: the release npm marks as latest, or the 2.x
-   version you pass with `--opencode-version`; only OpenCode 2.x is installed). The Arch build also builds the AUR helper `paru`. A build takes a few
-   minutes and installs packages only inside the image, never on your host. Afterwards
-   `opencode-sandbox doctor` lists the base images.
+Release 6.0.0 built Debian 12 (image revision 1); 6.1.0 builds Debian 13 (revision 2). After
+upgrading from 6.0.0, explicitly rebuild the Debian base when `doctor` reports revision 1.
+Neither upgrading the manager nor rebuilding the base upgrades an existing container.
+Stop/start, recreation and backups with the system layer keep its OS;
+[workspaces.md](workspaces.md#distributions-and-images) explains the explicit choice for a new
+OS. No metadata migration is needed.
 
 Continue with [getting-started.md](getting-started.md).
 
@@ -169,47 +171,39 @@ volumes and images, backups, exports and provider profiles stay. To remove those
 directories ([concepts.md](concepts.md#where-things-live)) and, if you want, the base images
 (`docker --context rootless image rm opencode-sandbox:debian opencode-sandbox:arch`).
 
-## Install from a source checkout
+pipx from a GitHub release tag is the only recommended application installation method. There
+is no application installer or Rootless Docker setup script since 6.1.0. For a
+contributor's local development venv, see
+[CONTRIBUTING.md](../CONTRIBUTING.md#development-setup); that is not another user installer.
 
-For development, or to run a version that is not tagged, a checkout of the repository has its
-own installer. Use either pipx or `install.sh`, not both: they write the same launcher
-`~/.local/bin/opencode-sandbox` and do not replace each other's. pipx warns
-"Not modifying" and still reports success; `install.sh` refuses and names
-`pipx uninstall opencode-sandbox`. Uninstall one before installing the other, and check which
-one runs with `command -v opencode-sandbox`.
+## Moving from a legacy source installation
+
+Release 6.0.0 included an application installer, `install.sh`. Its launcher can shadow a pipx
+installation: pipx may warn "Not modifying" yet report a successful installation. First inspect
+what runs:
 
 ```sh
-git clone https://github.com/CyberFazaN/opencode-sandbox.git
-cd opencode-sandbox
-./install.sh doctor              # read-only diagnostics
-./install.sh install --dry-run   # show the plan, write nothing
-./install.sh install             # asks before every write
+command -v opencode-sandbox
+pipx list
 ```
 
-- Run it as your normal user, never with `sudo`. It needs a terminal for its confirmations.
-- It runs the command `python`, not `python3`. Where only `python3` exists (Debian and Ubuntu
-  without the `python-is-python3` package, for example), use pipx instead.
-- It creates a versioned virtual environment under
-  `~/.local/share/opencode-sandbox-manager/releases/` (`$XDG_DATA_HOME/opencode-sandbox-manager/`
-  if set), points `current` at it and offers the launcher. It refuses foreign launchers and
-  symlinked target directories.
-- `./install.sh setup-rootless` walks through the Docker preparation above and shows what is
-  missing; it changes nothing without asking, never runs `sudo` itself and leaves `/etc/subuid`,
-  `/etc/subgid`, the setup tool, lingering and firewalls to you. `--dry-run` only shows the
-  checks. It suggests Arch Linux packages and offers only a systemd user service. The package
-  check and `./install.sh install --offer-packages` (which asks before `sudo pacman -S` for
-  missing packages from the enabled repositories) work on Arch Linux only; on other
-  distributions `install.sh` prints a warning and skips them. `--build-image` asks before
-  building the Debian image.
-- `./install.sh update` installs a new release and switches `current`; a failed update leaves the
-  previous release active.
-- After a Python minor upgrade of the host (for example 3.14 to 3.15) the installed release no
-  longer starts, because its virtual environment was built for the previous Python: run
-  `./install.sh update` (`./install.sh doctor` reports it).
-- Rollback has no command:
-  `cd ~/.local/share/opencode-sandbox-manager && ls releases`, then
-  `ln -sfn releases/<previous> .current.tmp && mv -Tf .current.tmp current`.
-  Old releases are never pruned automatically; to remove old releases, delete their
-  directories under `releases/` except the one `current` points to (`readlink current`).
-- `./install.sh uninstall` removes the releases, `current` and the launcher only; environments,
-  backups, profiles and Docker data are kept.
+A legacy launcher normally points into
+`~/.local/share/opencode-sandbox-manager/current/bin/` (or the corresponding `XDG_DATA_HOME`
+location), not pipx's venv. Inspect that launcher's symlink target before changing anything.
+
+If it is the legacy application, use your trusted **old checkout** of the release that installed
+it (for example the `v6.0.0` sources). From that old checkout only, run
+`./install.sh uninstall` as your normal user and review its confirmation. The old uninstaller
+removes its application releases and launcher, not environments, backups, profiles or Docker
+objects. Releases from 6.1.0 on no longer contain that script. If you do not have the old sources,
+obtain that release's trusted sources first; do not substitute a script from an unknown source.
+
+Then follow [Install the application](#install-the-application). If pipx was already installed
+behind the legacy launcher, repeat its release-tag installation with `--force` to create the
+launcher, then check `command -v opencode-sandbox`, `pipx list` and
+`opencode-sandbox --version`. No environment migration or base-image rebuild is needed for
+this installation-path change.
+
+If the launcher belongs to another program or you cannot identify it safely, **do not delete**
+it or any data directories; resolve the collision before installing. The application does not
+take over foreign launchers or automatically remove old installations.

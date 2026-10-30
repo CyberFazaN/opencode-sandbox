@@ -1,8 +1,10 @@
 """A managed session whose host client goes away (terminal closed) is hung up
 inside the container instead of running on unattended."""
 import os
+import pty
 import signal
 import subprocess
+import termios
 import time
 from types import SimpleNamespace
 
@@ -16,6 +18,7 @@ def env(monkeypatch):
     m = c.create("ocs-qa-hup", "scratch")
     monkeypatch.setattr(c, "start", lambda m: None)
     monkeypatch.setattr(c, "observed_runtime", lambda m: None)
+    monkeypatch.setattr(c, "image_definition", lambda m, **k: None)  # session fixture: provenance uninspected
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "profile_mismatch", lambda m: None)
     return m
@@ -93,6 +96,7 @@ FAKE_DOCKER = """#!/bin/sh
 echo "$*" >> "$OCS_FAKE_LOG"
 case "$*" in *ocs-hangup*) exit 0;; esac
 case "$*" in *" exec -it "*)
+  [ -n "$OCS_FAKE_RAW" ] && stty raw -echo
   [ -n "$OCS_FAKE_QUICK" ] && exit 0
   sleep 60 & child=$!
   trap 'echo client-hangup >> "$OCS_FAKE_LOG"; kill $child; exit 129' HUP
@@ -115,12 +119,34 @@ c.guidance_inputs = lambda m, **k: {}
 import signal
 from opencode_sandbox.cli import _exit_on_signal
 signal.signal(signal.SIGTERM, _exit_on_signal)
+signal.signal(signal.SIGHUP, _exit_on_signal)
 m = c.create("ocs-qa-wd", "scratch", provisioning=ig.request([]))
 sys.exit(c.interactive(m))
 """
 
 
-def _manager(tmp_path, monkeypatch, quick=False):
+LAUNCH_SIGNAL = '''
+# Interrupt _fork_exec before Popen stores its returned PID. The child is already running,
+# just as in the captured failure; waiting for its trap makes the ordering deterministic.
+import os, time, subprocess
+original_fork = subprocess._fork_exec
+def interrupted_fork(*args, **kwargs):
+    pid = original_fork(*args, **kwargs)
+    if "-it" in args[0]:
+        log = Path(os.environ["OCS_FAKE_LOG"])
+        deadline = time.monotonic() + 10
+        while not (log.exists() and "client-started" in log.read_text()):
+            if time.monotonic() >= deadline:
+                raise RuntimeError("fake client startup timed out")
+            time.sleep(.01)
+        Path(sys.argv[1], "launch-pid").write_text(str(pid))
+        os.kill(os.getpid(), int(os.environ["OCS_FAKE_LAUNCH_SIGNAL"]))
+    return pid
+subprocess._fork_exec = interrupted_fork
+'''
+
+
+def _manager(tmp_path, monkeypatch, quick=False, launch_signal=None, raw_terminal=False, stdin=subprocess.DEVNULL):
     import sys
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -128,8 +154,11 @@ def _manager(tmp_path, monkeypatch, quick=False):
     (bin_dir / "docker").chmod(0o755)
     log = tmp_path / "docker.log"
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "OCS_FAKE_LOG": str(log),
-           **({"OCS_FAKE_QUICK": "1"} if quick else {})}
-    proc = subprocess.Popen([sys.executable, "-c", MANAGER, str(tmp_path)], env=env, stdin=subprocess.DEVNULL)
+           **({"OCS_FAKE_QUICK": "1"} if quick else {}),
+           **({"OCS_FAKE_RAW": "1"} if raw_terminal else {}),
+           **({"OCS_FAKE_LAUNCH_SIGNAL": str(launch_signal)} if launch_signal else {})}
+    code = MANAGER.replace('m = c.create', LAUNCH_SIGNAL + '\nm = c.create') if launch_signal else MANAGER
+    proc = subprocess.Popen([sys.executable, "-c", code, str(tmp_path)], env=env, stdin=stdin)
     return proc, log
 
 
@@ -199,3 +228,55 @@ def test_sigterm_ends_the_client_and_hangs_up_once(tmp_path, monkeypatch):
     finally:
         if proc.poll() is None:
             proc.kill()
+
+
+@pytest.mark.real_session
+@pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGHUP, signal.SIGINT])
+def test_signal_during_client_creation_reaps_client_and_hangs_up_once(tmp_path, monkeypatch, sig):
+    proc, log = _manager(tmp_path, monkeypatch, launch_signal=sig)
+    try:
+        rc = proc.wait(timeout=20)
+        assert rc == (-signal.SIGINT if sig == signal.SIGINT else 128 + sig)
+        assert _wait_for(log, "client-hangup") and _wait_for(log, "ocs-hangup")
+        assert log.read_text().count("ocs-hangup") == 1
+        pid = int((tmp_path / "launch-pid").read_text())
+        assert not os.path.exists(f"/proc/{pid}")  # reaped, not just signaled
+        assert _watchdogs() == []
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait()
+        # A failing pre-fix regression must not leave the intentionally orphaned fake client.
+        path = tmp_path / "launch-pid"
+        if path.exists():
+            pid = int(path.read_text())
+            try:
+                from pathlib import Path
+                environ = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+                if os.fsencode(f"OCS_FAKE_LOG={log}") in environ:
+                    os.kill(pid, signal.SIGHUP)
+            except OSError:
+                pass
+
+
+@pytest.mark.real_session
+@pytest.mark.parametrize("sig", [None, signal.SIGTERM, signal.SIGHUP])
+def test_client_terminal_modes_are_restored(tmp_path, monkeypatch, sig):
+    """A client may exit without undoing raw mode; the manager owns terminal restoration."""
+    master, slave = pty.openpty()
+    before = termios.tcgetattr(slave)
+    proc = None
+    try:
+        proc, log = _manager(tmp_path, monkeypatch, quick=sig is None, raw_terminal=True, stdin=slave)
+        if sig is not None:
+            assert _wait_for(log, "client-started")
+            assert termios.tcgetattr(slave) != before
+            proc.send_signal(sig)
+        assert proc.wait(timeout=20) == (128 + sig if sig is not None else 0)
+        assert termios.tcgetattr(slave) == before
+    finally:
+        if proc is not None:
+            if proc.poll() is None: proc.kill()
+            proc.wait()
+        os.close(slave)
+        os.close(master)

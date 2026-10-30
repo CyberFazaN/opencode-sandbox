@@ -156,10 +156,10 @@ class Campaign:
         label = self.python(f"import os; os.environ['OPENCODE_SANDBOX_HOME']={str(self.data)!r}\n"
                             "from opencode_sandbox import core; print(core.data_id())").stdout.strip()
         left = {kind: self.docker(kind, "ls", "-a" if kind == "container" else "-q", "-q", "--filter",
-                                  f"label=org.opencode-sandbox.data-dir={label}", check=False).stdout.split()
+                                  f"label=org.opencode-sandbox.data-dir={label}").stdout.split()
                 for kind in ("container", "volume")}
-        left["image"] = self.docker("image", "ls", "-q", "--filter", f"label=org.opencode-sandbox.data-dir={label}",
-                                    check=False).stdout.split()
+        left["image"] = self.docker("image", "ls", "-q", "--filter",
+                                    f"label=org.opencode-sandbox.data-dir={label}").stdout.split()
         self.note(f"left with this data directory's label: {left}")
         for path in self.short_dirs:
             shutil.rmtree(path, ignore_errors=True)
@@ -173,7 +173,11 @@ GUARD = """import os, sys
 os.environ['OPENCODE_SANDBOX_HOME'], os.environ['OPENCODE_SANDBOX_CONFIG'] = %r, %r
 from opencode_sandbox import cleanup
 ours = %r
-bad = [i.name for i in cleanup.inventory().eligible(False)
+inventory = cleanup.inventory()
+if inventory.errors:
+    print('guard: inventory unavailable; refusing cleanup')
+    sys.exit(1)
+bad = [i.name for i in inventory.eligible(False)
        if not (any(x in i.name or x == (i.owner or '') for x in ours) or i.name.startswith('.backup-')
                or i.name.startswith('ocs-qa-helper-'))]
 print('guard: not ours:', bad)

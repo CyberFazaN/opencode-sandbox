@@ -23,6 +23,7 @@ class FakeContainer:
         monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
         monkeypatch.setattr(c, "inspect_container", self.inspect)
         monkeypatch.setattr(c, "observed_runtime", lambda m: None)
+        monkeypatch.setattr(c, "image_definition", lambda m, **k: None)  # executor fixture: provenance uninspected
         monkeypatch.setattr(c, "docker", self.docker)
 
     def inspect(self, m):

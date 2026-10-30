@@ -8,9 +8,10 @@
 - **Workspace** (`/workspace`): **managed** (the default): kept in the manager's data directory,
   empty or a copy of a folder, never your original; or **direct** (not recommended): your
   existing folder itself. See [workspaces.md](workspaces.md).
-- **Distribution**: the base image an environment is created from, fixed at creation: Debian 12
-  (`debian`, the default) or Arch Linux (`arch`); or a custom image. It is the operating system
-  inside the container, independent of your host's Linux distribution.
+- **Distribution**: the family selected at creation: Debian (`debian`, the default) or Arch
+  Linux (`arch`); or a custom image. The current Debian base definition is 13. The container's
+  base OS version comes from the image actually used, not the latest registry definition;
+  retained containers may still use Debian 12. It is independent of your host's distribution.
 - **Provider profile**: a named set of model-provider credentials on the host, mounted read-only
   into the container ([providers.md](providers.md)).
 - **Settings**: CPU, memory and process limits, the network mode, published ports and the

@@ -7,7 +7,7 @@ launchers are touched; Docker is the user's rootless daemon through the unchange
 Measured and asserted: install, run without the source tree, the bundled image assets, an
 environment created, started and used; `pipx upgrade` and `pipx reinstall` keep a tag spec as it
 is, `pipx install --force <spec>@<tag>` moves to another tag (also back), data survive both and
-`pipx uninstall`; an install.sh launcher and a pipx launcher never replace each other.
+`pipx uninstall`; pipx never replaces or deletes a foreign or legacy launcher.
 
 OCS_TEST_PIPX_BUILD=1 adds a full image build from the installed package's assets into an
 `ocs-test-` tag (downloads the distribution's base image; both are removed again when they were
@@ -72,13 +72,15 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
         return p.stdout.strip().rsplit(" ", 1)[-1] if p.returncode == 0 else None
 
     # B09 install from a tag, run without the source tree
-    p = px("install", f"{url}@v{v1}")
+    p = px("install", "--python", sys.executable, f"{url}@v{v1}")
     ck(p.returncode == 0 and launcher.is_symlink() and version() == v1, f"B09 pipx install @v{v1}: launcher, --version {version()}")
     venv_python = pipx_home / "venvs" / "opencode-sandbox" / "bin" / "python"
-    where = camp._run([str(venv_python), "-I", "-c", ("import json, opencode_sandbox, opencode_sandbox.distros as d; print(json.dumps("
-                       "[opencode_sandbox.__file__, sorted(str(p.relative_to(d.IMAGES)) for p in d.IMAGES.rglob('*') if p.is_file())]))")],
+    where = camp._run([str(venv_python), "-I", "-c", ("import json, sys, opencode_sandbox, opencode_sandbox.distros as d; print(json.dumps("
+                       "[opencode_sandbox.__file__, sorted(str(p.relative_to(d.IMAGES)) for p in d.IMAGES.rglob('*') if p.is_file()), "
+                       "list(sys.version_info[:2])]))")],
                       check=True, env=env)
-    module, assets = json.loads(where.stdout)
+    module, assets, python_version = json.loads(where.stdout)
+    ck(python_version == list(sys.version_info[:2]), f"B09 application venv uses the selected Python {python_version}")
     ck(module.startswith(str(pipx_home)) and not module.startswith(str(ROOT / "src")),
        f"B09 the installed package runs, not the source tree ({module})")
     ck(assets == sorted(str(p.relative_to(ROOT / "src/opencode_sandbox/assets/images"))
@@ -98,7 +100,7 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
 
     if os.environ.get("OCS_TEST_PIPX_BUILD") == "1":
         tag = "ocs-test-pipx-build:debian"
-        source = "node:24-bookworm"
+        source = "node:24-trixie"
         had_source = camp.docker("image", "inspect", source, check=False).returncode == 0
         camp.note(f"image {tag} (build from the installed assets); {source} present before: {had_source}")
         build = camp._run([str(venv_python), "-I", "-c",
@@ -116,6 +118,8 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
     ck(version() == v1, f"B11 pipx upgrade keeps the tag spec (still {version()})")
     px("reinstall", "opencode-sandbox", check=False)
     ck(version() == v1, f"B11 pipx reinstall keeps the tag spec (still {version()})")
+    px("reinstall", "--python", sys.executable, "opencode-sandbox")
+    ck(version() == v1, "B11 pipx interpreter repair via reinstall --python keeps the tag")
     plain = px("install", f"{url}@v{v2}", check=False)
     ck(version() == v1 and "--force" in plain.stdout + plain.stderr, "B11 pipx install without --force does not replace an installation")
     px("install", "--force", f"{url}@v{v2}")
@@ -126,29 +130,30 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
     spec = json.loads(px("list", "--json").stdout)["venvs"]["opencode-sandbox"]["metadata"]["main_package"]["package_or_url"]
     ck(spec == f"{url}@v{v1}", f"B11 pipx records the tag spec ({spec})")
 
-    # B12 uninstall keeps data; launchers of install.sh and pipx never replace each other
+    # B12 uninstall keeps data; pipx never takes ownership of a foreign/legacy launcher
     eid = camp.ids[NAME]
     px("uninstall", "opencode-sandbox")
     ck(not launcher.exists() and not launcher.is_symlink(), "B12 pipx uninstall removes the launcher")
     ck((camp.data / "environments" / eid / "metadata.json").is_file()
-       and camp.docker("container", "inspect", f"ocs-{eid}", check=False).returncode == 0,
+       and camp.docker("container", "inspect", f"ocs-{eid}", check=False).returncode == 0
+       and camp.docker("volume", "inspect", f"ocs-home-{eid}", check=False).returncode == 0,
        "B12 pipx uninstall keeps environments, their containers and volumes")
-    release = home / ".local/share/opencode-sandbox-manager/current/bin/opencode-sandbox"
+    release = home / "legacy-application/bin/opencode-sandbox"
     release.parent.mkdir(parents=True)
-    release.write_text("#!/bin/sh\necho install.sh-release\n")
+    release.write_text("#!/bin/sh\necho legacy-release\n")
     release.chmod(0o755)
     bindir.mkdir(parents=True, exist_ok=True)
     launcher.symlink_to(release)
     p = px("install", f"{url}@v{v1}", check=False)
     ck(os.readlink(launcher) == str(release) and "Not modifying" in p.stdout + p.stderr,
-       "B12 pipx does not replace an install.sh launcher (warns 'Not modifying')")
+       "B12 pipx does not replace a foreign/legacy launcher (warns 'Not modifying')")
     px("uninstall", "opencode-sandbox")
-    ck(os.readlink(launcher) == str(release), "B12 pipx uninstall leaves the install.sh launcher")
+    ck(os.readlink(launcher) == str(release) and release.read_text() == "#!/bin/sh\necho legacy-release\n",
+       "B12 pipx uninstall leaves the foreign/legacy launcher and target untouched")
     launcher.unlink()
-    shutil.rmtree(home / ".local/share/opencode-sandbox-manager")
+    shutil.rmtree(home / "legacy-application")
     px("install", f"{url}@v{v1}")
-    p = camp._run(["bash", str(ROOT / "install.sh"), "doctor"], check=False, env=env)
-    ck(p.returncode == 1 and "pipx uninstall opencode-sandbox" in p.stderr and os.readlink(launcher).startswith(str(pipx_home)),
-       "B12 install.sh refuses a pipx launcher and says how to resolve it")
+    ck(launcher.is_symlink() and launcher.resolve().is_relative_to(pipx_home) and version() == v1,
+       "B12 removing only the test's legacy launcher permits a working pipx launcher")
     px("uninstall", "opencode-sandbox")
     ck(not (pipx_home / "venvs" / "opencode-sandbox").exists(), "B12 nothing of the pipx installation is left in PIPX_HOME")

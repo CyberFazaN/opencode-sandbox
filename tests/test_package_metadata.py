@@ -3,7 +3,8 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+CONFIG = tomllib.loads((ROOT / "pyproject.toml").read_text())
+PROJECT = CONFIG["project"]
 REPOSITORY = "https://github.com/CyberFazaN/opencode-sandbox"
 
 
@@ -29,3 +30,10 @@ def test_project_urls_point_to_the_repository():
 
 def test_readme_states_independence():
     assert "not affiliated with or endorsed by the OpenCode project" in " ".join((ROOT / "README.md").read_text().split())
+
+
+def test_verified_python_floor_and_lint_target_agree():
+    assert PROJECT["requires-python"] == ">=3.11"
+    assert CONFIG["tool"]["ruff"]["target-version"] == "py311"
+    for minor in range(11, 15):
+        assert f"Programming Language :: Python :: 3.{minor}" in PROJECT["classifiers"]

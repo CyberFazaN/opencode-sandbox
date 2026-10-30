@@ -32,8 +32,7 @@ In scope: ways in which OpenCode Sandbox itself fails to keep a boundary it clai
 - credentials leak into logs, metadata, process listings, exports or backups;
 - the `changes` commands let the sandbox's repository run code on the host or write outside the
   target repository;
-- a backup restore writes outside its target, or `disk cleanup` removes objects it does not own;
-- the installer (`install.sh`) can be made to write outside its own directories.
+- a backup restore writes outside its target, or `disk cleanup` removes objects it does not own.
 
 Out of scope: the limitations documented in [docs/security.md](docs/security.md#what-it-does-not-give-you),
 for example container escapes through kernel or Docker bugs, network access in `bridge` mode, the

@@ -50,7 +50,7 @@ def test_prerequisites_are_diagnosed(campaign, checks):
         ("--version without Docker", no_docker, ["--version"], 0, "opencode-sandbox "),
         ("list without Docker", no_docker, ["list"], 0, "ocs-test-prereq"),
         ("doctor without the Docker CLI", no_docker, ["doctor"], 7, "Daemon identity: missing"),
-        ("start without the Docker CLI", no_docker, ["start", "ocs-test-prereq"], 7, "pacman -S docker"),
+        ("start without the Docker CLI", no_docker, ["start", "ocs-test-prereq"], 7, "Install Docker with rootless support"),
         ("doctor, context does not exist", dict(env, OPENCODE_SANDBOX_DOCKER_CONTEXT="ocs-test-absent"), ["doctor"], 8,
          "Docker context 'ocs-test-absent' does not exist"),
         ("doctor, socket missing", dict(env, OPENCODE_SANDBOX_DOCKER_CONTEXT="ocs-test-nosocket"), ["doctor"], 5,

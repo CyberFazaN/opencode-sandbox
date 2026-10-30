@@ -8,6 +8,7 @@ import email.parser
 import re
 import sys
 import tarfile
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -40,7 +41,8 @@ def check(dist):
         names = set(wheel.namelist())
         info = f"opencode_sandbox-{v}.dist-info"
         meta = email.parser.Parser().parsestr(wheel.read(f"{info}/METADATA").decode())
-        expected = {"Name": "opencode-sandbox", "Version": v, "Requires-Python": ">=3.14", "License-Expression": "MIT"}
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+        expected = {"Name": "opencode-sandbox", "Version": v, "Requires-Python": project["requires-python"], "License-Expression": "MIT"}
         problems += [f"wheel metadata {key}: {meta.get(key)!r}, expected {value!r}"
                      for key, value in expected.items() if meta.get(key) != value]
         if f"{info}/licenses/LICENSE" not in names:
@@ -63,6 +65,9 @@ def check(dist):
                 problems.append(f"sdist: {required} missing")
         if any(n.startswith("tests/") for n in names):
             problems.append("sdist contains tests (MANIFEST.in prunes them)")
+        for retired in ("install.sh", "setup-rootless.sh"):
+            if retired in names:
+                problems.append(f"sdist contains retired installer {retired}")
     return problems
 
 

@@ -2,7 +2,6 @@
 from pathlib import Path
 
 from rich.text import Text
-from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -11,6 +10,7 @@ from textual.widgets import Button, DataTable, Input, Static
 
 from . import core as c
 from .backup import backup_info, list_backups, restore, verify
+from .tui_runtime import work
 
 
 class BackupScreen(Screen):

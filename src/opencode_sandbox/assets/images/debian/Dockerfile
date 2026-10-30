@@ -1,6 +1,6 @@
 # Build context: assets/images/ (shared files in common/). Labels come from the registry
 # (distros.py) at build time.
-FROM node:24-bookworm
+FROM node:24-trixie
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
  bash ca-certificates curl wget git git-lfs openssh-client python3 python3-pip python3-venv \

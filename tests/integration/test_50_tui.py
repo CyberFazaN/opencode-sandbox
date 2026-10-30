@@ -6,6 +6,7 @@ import re
 import shlex
 import signal
 import subprocess
+import termios
 from pathlib import Path
 
 import pytest
@@ -160,3 +161,28 @@ def test_dashboard_against_real_docker(campaign, checks):
     (folder / "host-file.txt").unlink()
     folder.rmdir()
     camp.note(f"removed host dir {folder}")
+
+
+@pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGHUP])
+def test_cli_signal_ends_attached_shell(campaign, checks, sig):
+    """H05: a graceful manager signal ends/reaps its real client and token-scoped shell."""
+    camp, ck = campaign, checks
+    name = f"ocs-test-session-{sig.name.lower()}"
+    eid = camp.create(name, "--no-integrations")
+    camp.ocs("config", "apply", name, "--network", "none", "--yes")
+    t = Term([*MANAGER, "shell", name], 100, 30, env=camp.env, log=camp.log)
+    try:
+        ck(t.wait_for(r"root@|# ?$", 60), f"H05 {sig.name}: real shell opened")
+        before, clients = tokens(camp, eid), host_clients(eid)
+        camp.note(f"session signal {sig.name}: manager={t.pid}, clients={clients}, tokens={before}")
+        os.kill(t.pid, sig)
+        code = t.exit_code(30)
+        ck(code == 128 + sig, f"H05 {sig.name}: manager preserves the signal exit ({code})")
+        gone = camp.wait_for(lambda: not tokens(camp, eid) and not host_clients(eid), 20, 0.1)
+        ck(bool(before) and len(clients) == 1 and gone,
+           f"H05 {sig.name}: token processes and host client gone")
+        flags = termios.tcgetattr(t.fd)[3]
+        ck(flags & termios.ECHO and flags & termios.ICANON, f"H05 {sig.name}: terminal echo/canonical mode restored")
+    finally:
+        t.close()
+    camp.delete(name)

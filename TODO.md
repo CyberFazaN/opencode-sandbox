@@ -1,80 +1,80 @@
-# Deferred features (backlog)
+# Roadmap and backlog
 
-These features are explicitly **out of scope for 6.0.0**. Do not implement them unless an
-existing architectural defect requires it. They are recorded with their prerequisites so a
-later release can pick them up without guessing.
+OpenCode Sandbox is Beta. The priorities remain dependable existing workflows, data safety,
+recovery, compatibility and usable diagnostics, not feature expansion. Work proceeds one
+coherent task per cycle: investigate, implement, verify, document, commit on a topic branch,
+merge when verified, then stop.
 
-## Environment presets and reusable templates
+## Delivered in 6.1.0
 
-Possible capabilities:
-- Built-in presets for common use cases (e.g. "offline review", "web development").
-- User-defined presets.
-- Reusable resource, network, distribution and integration selections.
-- Creating an environment from a template in one step.
+Simplified Rootless Docker guidance, pipx as the only installation method, the Python 3.11
+floor, base-image revision diagnostics, the Debian 13 default with retained-OS provenance,
+bounded readiness with socket-activation identity, resource-limit support diagnostics and the
+session-termination fix. Details: [CHANGELOG.md](CHANGELOG.md); evidence:
+[BASELINE.md](docs/engineering/BASELINE.md); decisions D-047 to D-055.
 
-Architectural prerequisites (already in place, not a template framework):
-- One validated settings model for creation parameters (distribution, workspace mode,
-  runtime limits, network, ports, provider profile, initial integrations) — produced by the
-  central change plan (D-010) and the creation flow (D-021).
-- The declarative distribution registry (D-005) and integration catalog (D-009).
-- A clear separation between manager-owned settings and OpenCode-owned configuration, so a
-  template never claims to manage OpenCode's current plugins/MCP servers.
+### Existing evidence to retain, not reimplement
 
-## Configuration export and import
+- pipx clean install, tag-based upgrade/downgrade, uninstall and packaged image assets are
+  verified; keep these tests.
+- Unit CI tests Python 3.11 and 3.14 with the current and lowest direct dependencies (Textual
+  4.0 and Typer 0.16) and the Arch userland; do not add a second CI framework.
+- Journals, backup validation, ownership checks and cleanup boundaries have unit, host and
+  real-campaign evidence. Rerun affected paths after changes; do not replace them with new
+  abstractions merely for stabilization.
 
-A related extension of the template system.
+## Optional Polish
 
-Possible capabilities:
-- Export an environment's manager-owned configuration without project data.
-- Import it to create an equivalent environment.
-- Share reusable configurations.
-- Exclude secrets by default (provider profiles are never exported; only profile names).
-- Validate schema and compatibility (metadata `schema`, distribution ids, manager version).
+Useful when a concrete usability problem or maintenance saving justifies a small task; not a
+reason to postpone the required objectives:
 
-Prerequisites: the same settings model as templates; a documented, versioned export schema;
-validation shared with `create`; explicit handling of host-specific values (direct workspace
-paths, published host ports) that must not be imported silently.
+- Recovery Center buttons for the journals that currently name a working CLI recovery command
+  (container recreation, restore resume/rollback, OpenCode update and delete). Share existing
+  handlers; do not introduce a parallel recovery mechanism.
+- A warning before starting a second managed OpenCode session, after reproducing the UX problem.
+- A real campaign on another Linux host (for example Debian, Ubuntu or Fedora), if a disposable
+  host is available. Record it before calling that host tested; Arch remains the only real-tested
+  host otherwise, with the limitation visible.
+- Dockerfile linting if a lightweight check adds useful findings beyond build verification.
+- A short terminal recording of the verified first-run workflow.
+- Signed commits/tags only after the owner chooses and prepares keys.
+- Host-process signal tests: count only the test's own session watchdogs (a real session or a
+  concurrent suite on the same host makes them fail), and start the child processes with the
+  default SIGINT disposition (they fail when pytest runs as a background job that ignores it).
+- `status NAME` prints its distribution line only after the daemon is verified; show the
+  metadata-only description when Docker is unavailable.
+- A readiness deadline reached just before the Docker CLI starts is reported as a CLI failure
+  (the classification is correct, the message is not).
 
-## Images and OpenCode
+## Deferred
 
-- `doctor` warns when a base image was built from an older image definition than the installed
-  manager ships (`org.opencode-sandbox.image-revision` lower than the registry's revision).
-  Required before the first release that changes an image definition.
-- Default image on Debian 13: Debian 12 (`node:24-bookworm`) has had LTS-only security support
-  since 2026-07-11 (until 2028-06-30). Needs a new image revision and a full campaign run.
-- Containers: drop further capabilities (e.g. `AUDIT_WRITE`, `SETFCAP`) once measured against
-  package installs on both images (D-033).
-- Lint the Dockerfiles (hadolint).
-- Prebuilt base images on a registry (today every host builds them locally; publishing would
-  need registry trust, image signing and licence compliance for the bundled packages).
+Worth keeping, but not needed for a dependable stable release:
 
-## Distribution and installation
+- **Environment presets/templates:** built-in or user-defined reusable creation settings. Needs
+  the existing validated settings model (D-010/D-021), distribution/integration registries and a
+  strict boundary between manager settings and user-owned OpenCode configuration; no template
+  framework now.
+- **Configuration export/import:** share manager-owned settings, not projects or credentials.
+  Needs a versioned schema, validation shared with creation and explicit handling of direct host
+  paths, ports and profile names. Never silently import host access.
+- **Prebuilt images:** registry trust, signing and package licence obligations are more work than
+  their current benefit; keep local builds.
+- **An AUR package:** pipx from GitHub remains the recommended application installation method;
+  do not create another distribution path during stabilization.
+- **Further capability drops** (for example `AUDIT_WRITE`, `SETFCAP`): only after measuring package
+  installs on both images; do not trade compatibility for unmeasured hardening (D-033).
+- **A dependency constraints/lock file:** existing dependency-range CI is the present regression
+  guard; reconsider a lock only for a demonstrated reproducibility problem.
+- **Hosted rootless Docker CI:** retain the local release campaign; avoid runner/daemon setup
+  infrastructure without a clear maintenance owner and practical benefit.
+- **Documentation website and code of conduct:** separate project/community needs, not product
+  reliability blockers. Markdown documentation remains the source of truth.
+- **Reusable workflow self-repository syntax:** leave the currently linted release call alone
+  until actionlint supports GitHub's `uses: $/...` syntax; no stabilization value in churn.
 
-- An AUR package for Arch Linux.
-- Host portability (D-046): `install.sh` finds `python3` as well as `python`, and its package check
-  covers other package managers or is dropped in favour of the documentation; `setup-rootless.sh`
-  without Arch-specific suggestions; `doctor` checks cgroup controller delegation and reports a
-  user-namespace restriction.
-- Real test campaigns on other host distributions (for example Debian, Ubuntu, Fedora), recorded
-  in `BASELINE.md` and `CAMPAIGN.md` before they are called tested.
-- Retire `install.sh` once the pipx installation from GitHub has proven itself (D-042).
-- Until then: an installer option to prune old releases, and a constraints/lock file for the
-  Python dependencies (D-033).
-- A Python requirement below 3.14, if a real test campaign on that Python passes.
+## Retired ideas
 
-## Testing and project infrastructure
-
-- Run the suite against the declared lower bounds (Textual 4.0, Typer 0.16).
-- A rootless Docker integration job on hosted CI runners (today the real campaign runs only on
-  the maintainer's Arch Linux VM); it would also give real evidence on Ubuntu (D-046).
-- A documentation website, if the Markdown documentation outgrows GitHub's rendering.
-- A terminal recording of a typical session; a code of conduct; signed commits and tags.
-
-## Dashboard and sessions
-
-- Recovery Center actions for every journal (container recreate-recover, backup restore-resume
-  and restore-rollback, opencode update-recover, delete retry). Today the dashboard offers repair
-  and the settings-change recovery and names the CLI command for the others (D-032).
-- Warning at `run` when a managed OpenCode session is already running in the container.
-- Workflows: use GitHub's self-repository syntax (`uses: $/...`) for the reusable CI call in
-  `release.yml` once actionlint accepts it (zizmor recommends it; it is ignored inline until then).
+Do not port the old installer's package-manager detection, release-pruning option or rootless
+setup prompts into a replacement installer/wizard. Removing that installation path eliminates
+those tasks; prerequisite diagnostics belong to the application, host setup to upstream and
+distribution documentation.

@@ -95,7 +95,6 @@ def test_daemon_hints_name_the_published_setup_guide():
     assert rid.SETUP_GUIDE == f"{REPOSITORY}/blob/main/docs/install.md#prepare-docker"
     for classification in (rid.MISMATCH, rid.UNAVAILABLE, rid.MISSING, rid.NOT_CONFIGURED):
         assert rid.SETUP_GUIDE in rid.HINTS[classification], classification
-    assert "ROOTLESS-ARCH" not in (ROOT / "install.sh").read_text()
 
 
 def test_code_blocks_fit_80_columns():
@@ -120,7 +119,7 @@ def test_every_guide_is_indexed_and_linked_from_the_readme():
 
 def test_user_documents_do_not_mention_internal_records():
     """D-037/D-038: no development history, audit or task references in the user documentation."""
-    pattern = re.compile(r"V6-ISS|\bISSUE-|\bAUD-|\baudit|\b[TR]\d\d\b|\bRF\b|\b5\.\d+\.\d+|\b5\.x\b|6\.1\.0|docs/history|docs/engineering"
+    pattern = re.compile(r"V6-ISS|\bISSUE-|\bAUD-|\baudit|\b[TR]\d\d\b|\bRF\b|\b5\.\d+\.\d+|\b5\.x\b|\bS0\d[ab]?\b|docs/history|docs/engineering"
                          r"|ROOTLESS-ARCH|AGENT-CONTEXT\.md", re.IGNORECASE)
     found = [(path.name, m.group(0)) for path in user_documents() for m in pattern.finditer(path.read_text())]
     assert found == []
@@ -135,8 +134,43 @@ def test_documents_do_not_require_arch_linux_as_the_host():
     found = [(path.name, line.strip()) for path in files for line in path.read_text().splitlines() if pattern.search(line)]
     assert found == []
     requirements = (DOCS / "install.md").read_text()
-    for prerequisite in ("| Linux |", "newuidmap", "user namespaces", "cgroup v2", "pacman -S python-pipx git` on Arch Linux"):
+    for prerequisite in ("| Linux |", "newuidmap", "user namespaces", "cgroup v2", "distribution's official documentation"):
         assert prerequisite in requirements, prerequisite
+
+
+def test_rootless_setup_points_to_upstream_and_distribution_documentation():
+    text = (DOCS / "install.md").read_text()
+    setup = text.split("## Prepare Docker\n", 1)[1].split("\n## ", 1)[0]
+    assert "https://docs.docker.com/engine/security/rootless/" in setup
+    assert "https://wiki.archlinux.org/title/Docker#Rootless_Docker_daemon" in setup
+    assert "distribution's official documentation" in setup
+    assert "packaging and setup conventions" in setup
+
+
+def test_rootless_setup_does_not_duplicate_host_installation_recipes():
+    text = (DOCS / "install.md").read_text()
+    setup = text.split("## Prepare Docker\n", 1)[1].split("\n## ", 1)[0]
+    # The guide owns context selection, diagnostics and image builds, not host configuration.
+    recipes = re.compile(r"\b(?:sudo|pacman|apt-get|dnf|usermod|modprobe|loginctl|systemctl)\b"
+                         r"|dockerd-rootless-setuptool\.sh install|docker context create"
+                         r"|/etc/(?:subuid|subgid|systemd)|curl\b[^\n]*\|\s*(?:ba)?sh")
+    assert recipes.findall(setup) == []
+
+
+def test_rootless_readiness_uses_application_diagnostics_and_discloses_limits():
+    text = (DOCS / "install.md").read_text()
+    setup = " ".join(text.split("## Prepare Docker\n", 1)[1].split("\n## ", 1)[0].split())
+    for expected in ("opencode-sandbox doctor", "Daemon identity: verified", "opencode-sandbox check NAME",
+                     "Docker-reported CPU quota, memory and PID limit support",
+                     "not a measurement of kernel enforcement", "does not check user-namespace policy",
+                     "does not prove that resource limits can be enforced", "DOCKER_HOST", "DOCKER_CONTEXT"):
+        assert expected in setup, expected
+    assert "https://docs.docker.com/engine/security/rootless/tips/#limiting-resources" in setup
+
+
+def test_troubleshooting_does_not_refer_to_numbered_host_setup_steps():
+    text = (DOCS / "troubleshooting.md").read_text()
+    assert not re.search(r"install\.md#prepare-docker\), step \d", text)
 
 
 def test_the_dashboard_screenshot_can_be_regenerated():
@@ -153,12 +187,12 @@ def test_the_dashboard_screenshot_can_be_regenerated():
 # D-037/D-038/D-045: the public tree has no references to private records or earlier versions.
 RECORD_REFERENCES = re.compile(
     r"V6-ISS|\bISSUE-\d|\bOBS-\d|\bAUD-\d|\b[TR]\d\d\b|\bRF\b|\bP0\d\b|(?<!no-)\baudit|[Rr]emediation|TEST-RESULTS"
-    r"|docs/history|engineering/history|qa-v5|publication/|\b5\.x\b|\bv5\b|\b5\.\d+\.\d+|6\.1\.0")
+    r"|docs/history|engineering/history|qa-v5|publication/|stabilization/|\b5\.x\b|\bv5\b|\b5\.\d+\.\d+|\bS0\d[ab]?\b")
 # Commit hashes in documents (the workflows pin actions by commit SHA on purpose).
 COMMIT_HASH = re.compile(r"\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
 CODE_REFERENCES = re.compile(
     r"V6-ISS|\bISSUE-\d|\bOBS-\d|\bAUD-\d|(?<!no-)\baudit|[Rr]emediation|TEST-RESULTS|docs/history|engineering/history"
-    r"|qa-v5|ocs-test-[tr]\d\d-|\"t1\d-")
+    r"|qa-v5|ocs-test-[tr]\d\d-|\"t1\d-|\bS0\d[ab]?\b|ocs-test-s0\d")
 
 
 def public_records():
@@ -177,7 +211,7 @@ def test_public_records_have_no_internal_references():
 
 
 def test_code_and_tests_have_no_internal_references():
-    files = [ROOT / "install.sh", ROOT / "setup-rootless.sh", ROOT / "pyproject.toml",
+    files = [ROOT / "pyproject.toml",
              *(p for top in ("src", "tests") for p in sorted((ROOT / top).rglob("*"))
                if p.is_file() and "__pycache__" not in p.parts and not any(x.endswith(".egg-info") for x in p.parts)
                and p.suffix in (".py", ".sh", ".json", ""))]

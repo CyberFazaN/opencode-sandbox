@@ -436,7 +436,7 @@ def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
         assert (m["kind"], m["distro"], m["profile"], m["provisioning"]["requested"]) == ("project", "arch", "work", [])
         assert m["source"] == str(folder.resolve())
         details = str(app.query_one("#details").render())
-        for text in ("Distribution: Arch Linux rolling", "Provider profile: work", f"managed copy of {folder.resolve()}",
+        for text in ("Distribution: Arch Linux (OS version not inspected)", "Provider profile: work", f"managed copy of {folder.resolve()}",
                      "Settings: ", "network bridge", "Readiness: "):
             assert text in details, text
     run(t, (120, 40))

@@ -1,7 +1,6 @@
 """Git change review screen; writes to original repos only through explicit staging."""
 from pathlib import Path
 
-from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, Vertical
@@ -16,6 +15,7 @@ from .gitflow import (
     review_branch_diff,
     stage_changes,
 )
+from .tui_runtime import work
 
 
 class GitScreen(Screen):

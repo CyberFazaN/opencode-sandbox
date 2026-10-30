@@ -13,8 +13,8 @@ from types import SimpleNamespace
 from unittest import mock
 
 from opencode_sandbox import core as c
+from opencode_sandbox import readiness, tui
 from opencode_sandbox import runtime_identity as rid
-from opencode_sandbox import tui
 
 SIZE = (100, 30)
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "docs" / "images" / "dashboard.svg"
@@ -35,7 +35,8 @@ def render(size=SIZE) -> str:
                 mock.patch.object(c, "_ENDPOINT", None), mock.patch.object(c, "docker", lambda *a, **k: done), \
                 mock.patch.object(c, "ensure_runtime", lambda *a, **k: None), \
                 mock.patch.object(c, "inspect_container", lambda m: None), \
-                mock.patch.object(rid, "verify", lambda *a, **k: identity):
+                mock.patch.object(rid, "verify", lambda *a, **k: identity), \
+                mock.patch.object(readiness, "image_checks", list):  # the illustration assumes current base images
             for name, kind, distro, state, profile, source, settings in reversed(ENVIRONMENTS):  # newest first
                 m = c.create(name, "scratch", profile=profile, distro=distro)
                 m.update(kind=kind, status=state, source=source)

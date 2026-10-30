@@ -10,13 +10,17 @@ import re
 import secrets
 import shlex
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
+import termios
+import threading
 import time
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -109,13 +113,48 @@ def call(argv, *, capture=False, check=True, cwd=None, env=None):
 # The context is resolved to its unix:// endpoint once per process (D-003); later context
 # edits cannot redirect an already verified manager to another daemon.
 _ENDPOINT = None
+_RUNTIME_LOCK = threading.Lock()
+_RUNTIME_GENERATION = 0
+_RUNTIME_LAST = None
+_RUNTIME_FEEDBACK = ContextVar("runtime_feedback", default=None)
+
+def _runtime_progress(message):
+    if message: print(message, file=sys.stderr, flush=True)
+
+@contextmanager
+def runtime_feedback(*, progress=_runtime_progress, cancelled=None, timeout=runtime_identity.READINESS_TIMEOUT):
+    """Scoped CLI/worker feedback; never installs process-wide UI callbacks."""
+    token = _RUNTIME_FEEDBACK.set({"progress": progress, "cancelled": cancelled, "timeout": timeout})
+    try: yield
+    finally: _RUNTIME_FEEDBACK.reset(token)
 
 def verify_runtime(strict=True):
     """Verify the daemon identity (D-003); return the Identity, raising unless verified when strict."""
-    global _ENDPOINT
-    ident=runtime_identity.verify(CONTEXT, endpoint=_ENDPOINT)
-    if ident.verified: _ENDPOINT=ident.endpoint
-    elif strict: raise PrerequisiteError(ident.message(), runtime_identity.EXIT_CODES[ident.classification])
+    global _ENDPOINT, _RUNTIME_GENERATION, _RUNTIME_LAST
+    budget = runtime_identity.Budget(**(_RUNTIME_FEEDBACK.get() or {"progress": _runtime_progress}))
+    generation = _RUNTIME_GENERATION
+    acquired = False
+    try:
+        while not _RUNTIME_LOCK.acquire(blocking=False):
+            budget.pause(0.05)
+        acquired = True
+        budget.remaining()
+        if generation != _RUNTIME_GENERATION:
+            ident = _RUNTIME_LAST  # overlapping callers share only this completed acquisition
+        else:
+            ident = runtime_identity.verify(CONTEXT, endpoint=_ENDPOINT, budget=budget)
+            if budget.cancelled and budget.cancelled(): raise runtime_identity.Cancelled()
+            if ident.verified:
+                budget.remaining()  # a canceled/expired preflight must not permit mutation
+                _ENDPOINT = ident.endpoint
+            _RUNTIME_LAST = ident
+            _RUNTIME_GENERATION += 1
+    except runtime_identity.Deadline as exc:
+        ident = runtime_identity.Identity(runtime_identity.UNAVAILABLE, CONTEXT, _ENDPOINT, reasons=(str(exc),))
+    finally:
+        if acquired: _RUNTIME_LOCK.release()
+        if budget.notified and budget.progress: budget.progress(None)
+    if not ident.verified and strict: raise PrerequisiteError(ident.message(), runtime_identity.EXIT_CODES[ident.classification])
     return ident
 
 def docker_endpoint():
@@ -124,6 +163,26 @@ def docker_endpoint():
 
 def docker(*args, capture=False, check=True):
     return call(["docker", "-H", docker_endpoint(), *args], capture=capture, check=check, env=runtime_identity.docker_env())
+
+def docker_info():
+    """Fresh read-only daemon evidence on the pinned endpoint; bounded/cancellable, no replay.
+
+    Never expose the raw response/error: info can contain proxy URLs and other host details.
+    """
+    endpoint = docker_endpoint()
+    feedback = _RUNTIME_FEEDBACK.get() or {}
+    budget = runtime_identity.Budget(5, cancelled=feedback.get("cancelled"))
+    try:
+        out, error = runtime_identity._docker(["-H", endpoint, "info", "--format", "{{json .}}"], budget=budget)
+    except runtime_identity.Deadline as exc:
+        raise SandboxError("Docker info query exceeded the 5-second diagnostic budget") from exc
+    if error: raise SandboxError("Docker info query failed; check daemon status/logs and rerun doctor")
+    try:
+        info = json.loads(out)
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise SandboxError("Docker info query returned invalid JSON") from exc
+    if not isinstance(info, dict): raise SandboxError("Docker info query returned invalid data (expected an object)")
+    return info
 
 def docker_cli():
     """Shell-ready docker prefix for hints shown to the user."""
@@ -700,9 +759,36 @@ def observed_runtime(m):
     return {"network":host.get("NetworkMode"),"cpus":str(nano/1e9) if nano else "unlimited",
             "memory":shown if memory else "unlimited","pids":pids if pids>0 else "unlimited"}
 
+def image_definition(m, *, container=False):
+    """Read base provenance from the owned container, else the selected creation image.
+
+    A retained container's inherited labels cannot follow a later move of the base tag.
+    Derived/restored images inherit their base labels. Unknown labels never fall back to
+    the current registry version. No container is started and no metadata is changed.
+    """
+    distro=env_distro(m)
+    if distro is None: return None
+    if container: assert_owned(m)
+    p=docker("container" if container else "image","inspect","--format","{{json .Config.Labels}}",
+             cname(m) if container else env_image(m),capture=True,check=False)
+    if p.returncode: return None
+    try: labels=json.loads(getattr(p,"stdout","") or "")
+    except ValueError: return None
+    return distros.image_definition(distro.id,labels)
+
+def distribution_description(m, definition=None):
+    """A pure metadata-only view is deliberately versionless; do not contact Docker for UI rows."""
+    distro=env_distro(m)
+    if distro is None: return f"custom image {custom_image(m) or env_image(m)}"
+    if definition is not None and definition.matches(distro):
+        return f"{distro.name} {definition.version} (base image labels)"
+    return f"{distro.name} (OS version not inspected)"
+
 def guidance_inputs(m, *, observe=True):
     """Keyword arguments for agent_context.render/refresh/verify of this environment."""
-    return {"image":env_image(m),"runtime":runtime_settings(m),"observed":observed_runtime(m) if observe else None}
+    observed=observed_runtime(m) if observe else None
+    definition=image_definition(m,container=observed is not None) if observe else None
+    return {"image":env_image(m),"runtime":runtime_settings(m),"observed":observed,"definition":definition}
 
 def pending_operation(m):
     """The refusal for an environment with a journalled operation. The lock is
@@ -796,7 +882,12 @@ def start(m, *, _resume_recreate=False):
                         # Re-checked whenever Docker creates the mount; never created or repaired here.
                         workspaces.recheck(m)
                     # No container yet: the configured values are what docker run applies below.
-                    guidance = ac.refresh(m, env_dir, **guidance_inputs(m, observe=False))
+                    inputs = guidance_inputs(m, observe=False)
+                    # The selected image is local and the base-tag lock is held. Capture its
+                    # provenance even when this environment has no pending integrations to
+                    # trigger a post-start refresh (e.g. a retained/restored environment).
+                    inputs["definition"] = image_definition(m)
+                    guidance = ac.refresh(m, env_dir, **inputs)
                     # Never pull a manager image (its name is local); drop capabilities an agent
                     # does not need: raw sockets, device nodes.
                     args=["run","-d","--name",cname(m),"--init","--security-opt","no-new-privileges:true",
@@ -959,21 +1050,66 @@ def interactive(m, shell=False):
     if rc < 0: hangup_session(m, token)  # the docker client itself was killed
     return rc
 
+@contextmanager
+def _session_launch_signals():
+    """Do not unwind Popen before it returns the PID of an already-running client.
+
+    Defer callable exit handlers only through creation/registration, then restore and deliver
+    the first signal inside the caller's cleanup guard. Never mask signals (the child would
+    inherit that mask), change ignored/default dispositions, or install handlers in a worker.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    handlers, pending = {}, []
+
+    def defer(signum, frame):
+        if not pending: pending.append((signum, frame))
+
+    try:
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            handler = signal.getsignal(sig)
+            if callable(handler):
+                handlers[sig] = handler
+                signal.signal(sig, defer)
+        yield
+    finally:
+        for sig, handler in handlers.items():
+            signal.signal(sig, handler)
+        if pending:
+            signum, frame = pending[0]
+            handlers[signum](signum, frame)
+
 def docker_attached(*args, on_start=None):
     """An interactive docker client on this terminal; `on_start(pid)` once it runs. Exit code."""
+    argv, env = ["docker", "-H", docker_endpoint(), *args], runtime_identity.docker_env()
+    terminal = None
     try:
-        p = subprocess.Popen(["docker", "-H", docker_endpoint(), *args], env=runtime_identity.docker_env())
-    except OSError as exc:
-        raise SandboxError(f"Cannot execute docker: {exc}") from exc
+        fd = sys.stdin.fileno()
+        terminal = fd, termios.tcgetattr(fd)
+    except (AttributeError, OSError, ValueError, termios.error):
+        pass  # no usable terminal (e.g. a pipe); never change another terminal
+    p = None
     try:
-        if on_start: on_start(p.pid)
+        with _session_launch_signals():
+            try:
+                p = subprocess.Popen(argv, env=env)
+            except OSError as exc:
+                raise SandboxError(f"Cannot execute docker: {exc}") from exc
+            if on_start: on_start(p.pid)
         return p.wait()
     except BaseException:
-        if p.poll() is None:
-            p.send_signal(1)  # SIGHUP, as a closing terminal would
+        if p is not None and p.poll() is None:
+            p.send_signal(signal.SIGHUP)  # as a closing terminal would
             try: p.wait(5)
-            except subprocess.TimeoutExpired: p.kill()
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait()  # reap the forced exit too
         raise
+    finally:
+        if terminal is not None:
+            try: termios.tcsetattr(terminal[0], termios.TCSANOW, terminal[1])
+            except (OSError, ValueError, termios.error): pass  # closed/hung-up terminal must not replace the session exit
 
 # The manager itself can die without running any cleanup (SIGKILL, OOM killer): its docker client
 # then keeps the terminal and the session keeps running in the container. A watchdog

@@ -29,7 +29,7 @@ This is context, not a security boundary. Actual access depends on Docker mounts
 - Installing system packages: `pacman -Syu --needed PACKAGE` as root (needs network; Arch does not support partial upgrades, so this also upgrades the container's other packages).
 - AUR packages: `ocs-aur -S PACKAGE` (as root) runs paru as the unprivileged build user `aurbuild` in /var/lib/aurbuild (never in /workspace) and installs the result with pacman. `paru` and `makepkg` refuse to run as root, and sudo cannot raise privileges here. Review first with `ocs-aur -Gp PACKAGE` (prints the PKGBUILD); installed packages run as root.
 - The managed base image includes: bash, git, git-lfs, python3, pip3, node, npm, opencode, rg, jq, curl, gcc, cmake, makepkg, paru, ocs-aur.
-- Tools may have been changed after image creation; check only when the task needs an exact version or availability.
+- Build labels describe the base, not later OS/package changes. Inspect /etc/os-release or tools only when the task needs an exact version or availability.
 
 ## Working behavior
 - Start with the user's task; avoid a full system inventory or repeated probing.

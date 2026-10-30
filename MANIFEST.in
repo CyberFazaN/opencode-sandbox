@@ -1,4 +1,6 @@
 # The sdist is the buildable package only; the tests need the whole repository (documents,
 # fixtures, integration campaign) and come from a checkout or a tagged source archive.
 prune tests
+# Retired host/application installers must not reappear through a stale source manifest.
+exclude install.sh setup-rootless.sh
 global-exclude __pycache__ *.py[cod]

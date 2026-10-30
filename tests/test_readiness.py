@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 
 from opencode_sandbox import agent_context as ac
 from opencode_sandbox import core as c
+from opencode_sandbox import distros
 from opencode_sandbox import integrations as ig
 from opencode_sandbox import readiness as r
 from opencode_sandbox import runtime_identity as rid
@@ -41,6 +42,7 @@ class FakeDocker:
         self.env = ["PATH=/usr/bin", "OPENCODE_DISABLE_AUTOUPDATE=1"]
         self.images = {"opencode-sandbox:debian"}
         self.base_label = "2.2.0"
+        self.definition_labels = {distros.LABEL + "managed": "true", **distros.get(distros.DEFAULT).image_labels()}
         self.volume = {"Name": c.volume(m), "Labels": {"org.opencode-sandbox.id": m["id"]}}
         self.owner = m["id"]
         self.probe = lambda spec: dict(GOOD)
@@ -65,6 +67,8 @@ class FakeDocker:
                 return ok(self.owner + "\n")
             if fmt == "{{json .HostConfig}}":
                 return ok(json.dumps(self.host))
+            if fmt == "{{json .Config.Labels}}":
+                return ok(json.dumps(self.definition_labels))
             if fmt == "{{json .Mounts}}":
                 return ok(json.dumps(self.mounts))
             if fmt == "{{json .}}":
@@ -72,6 +76,8 @@ class FakeDocker:
         if a[:2] == ("volume", "inspect"):
             return ok(json.dumps([self.volume])) if self.volume else fail("Error: no such volume")
         if a[:2] == ("image", "inspect"):
+            if "--format" in a and a[3] == "{{json .Config.Labels}}":
+                return ok(json.dumps(self.definition_labels)) if a[-1] in self.images else fail("Error: No such image")
             if "--format" in a and "opencode-version" in a[3]:
                 return ok(self.base_label + "\n")
             return ok("[{}]") if a[-1] in self.images else fail("Error: No such image")
@@ -127,7 +133,7 @@ def test_healthy_running_environment_passes_and_the_check_is_read_only(monkeypat
     ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
     result = checks(m)
     assert {k: v["status"] for k, v in result.items()} == {
-        "daemon": "passed", "workspace": "passed", "operation": "passed", "image": "passed", "container": "passed",
+        "daemon": "passed", "resource-support": "passed", "workspace": "passed", "operation": "passed", "image": "passed", "container": "passed",
         "volume": "passed", "runtime": "passed", "network": "passed", "ports": "not applicable",
         "reachability": "passed", "profile": "passed", "agent-context": "passed",
         "agent-context-delivery": "passed", "opencode": "passed", "storage": "not checked"}
@@ -218,7 +224,7 @@ def test_container_and_volume_checks(monkeypatch):
     result = checks(m)
     assert result["container"]["status"] == "failed" and "ownership mismatch" in result["container"]["detail"]
     # The other checks still report; container-dependent ones say why they did not run.
-    assert len(result) == 15 and result["volume"]["status"] == "passed" and result["profile"]["status"] == "passed"
+    assert len(result) == 16 and result["volume"]["status"] == "passed" and result["profile"]["status"] == "passed"
     assert result["network"]["status"] == result["opencode"]["status"] == "not checked"
     assert result["network"]["detail"] == "container not inspected"
 

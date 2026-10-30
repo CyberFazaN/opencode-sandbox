@@ -30,7 +30,7 @@ def test_interactive_refreshes_guidance_and_launches_standalone(monkeypatch):
     assert not ac.path(m, c.env_dir).exists()
     assert c.interactive(m) == 0
     assert ac.verify(m, c.env_dir, image=c.env_image(m), runtime=c.runtime_settings(m))
-    args = commands[0]
+    args = next(a for a in commands if a[0] == "exec")
     script = args[args.index("-c") + 1]
     assert args[0] == "exec" and args[-3:-1] == (ac.CONTAINER_PATH, ac.SYSTEM_CONFIG)
     assert "['opencode','--standalone']" in script
@@ -44,7 +44,8 @@ def test_launch_guidance_describes_the_observed_container(monkeypatch):
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "profile_mismatch", lambda m: None)
     monkeypatch.setattr(c, "observed_runtime", lambda m: {**c.runtime_settings(m), "network": "none"})
-    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(c, "assert_owned", lambda m: None)  # the mocked observation is of an owned container
+    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr=""))
     assert c.interactive(m) == 0
     text = ac.path(m, c.env_dir).read_text()
     assert "Networking mode: none" in text and "current configuration (network bridge)" in text

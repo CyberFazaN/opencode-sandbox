@@ -16,12 +16,22 @@ uploaded to a package index, and no wheels are attached. Only the maintainer cre
    ("Supported environments") if the test platform changed.
 6. If an image definition changed in a way that needs a rebuild (`image-revision` in
    `src/opencode_sandbox/distros.py`), say so in the CHANGELOG: existing base images are not
-   rebuilt by an upgrade (`opencode-sandbox build`). A `doctor` warning for outdated base images
-   is a deferred item (`TODO.md`) that should land before the first such release.
+   rebuilt by an upgrade (`opencode-sandbox build`). Verify the shared `doctor`/dashboard
+   revision warning and explicit rebuild hint (D-050); never require migrating existing
+   containers just to clear a base-tag warning.
+
+Historical PASS rows of an earlier release do not establish changed behaviour (for example a new
+Python floor or base definition); verify the changed paths and the final release tree.
 
 ## 2. Verify
 
 On the branch:
+
+Run the suite and package checks on the lowest supported Python (3.11) and the current Arch
+Python (CI also pins 3.14 as an explicit endpoint), with the current and the lowest direct
+dependencies. Do not infer a full Docker/OpenCode campaign on every Python from those tests.
+Run the suites serially and in the foreground: the host-process signal tests count every
+session watchdog on the host and need a default SIGINT disposition (`TODO.md`).
 
 ```sh
 .venv/bin/python -m pytest -q
@@ -30,12 +40,35 @@ On the branch:
 
 Then the real campaign on the maintainer's disposable Arch Linux VM (`CONTRIBUTING.md`):
 
+For retained-OS compatibility (`test_12_image_compatibility.py`), install the previous release's
+manager separately against a retained base of its definition and set `OCS_TEST_LEGACY_MANAGER`
+to its launcher. Without it that row explicitly skips and cannot establish the compatibility
+gate. To build and test new base images without replacing the user's base tags, run the
+campaign against disposable installed test venvs whose site-packages carry a test-only hook
+that sets `distros.REPOSITORY` to an `ocs-test-*` name from `OCS_TEST_IMAGE_REPOSITORY`; the
+product has no such override and the hook must never ship. Put the hook into the installed
+manager's venv and into the runner venv (its helper snippets read the same namespace); the
+runner also needs `pyte` and `pipx`. Build both base images into that namespace before the run
+(the campaign compares the tagged images before and after) and remove them afterwards. Run the
+both-image gates on the selected release tree.
+
 ```sh
 OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 OCS_TEST_PIPX_BUILD=1 \
+  OCS_TEST_SOCKET_ACTIVATION=1 \
   .venv/bin/python -m pytest -rA tests/integration
 ```
 
-and the campaign against a pipx installation of a local test tag (`OCS_TEST_MANAGER`, see
+C10's extra opt-in authorizes temporary `ocs-test-act-*` user units and a separate no-network
+rootless daemon, not a restart of the existing daemon. It needs `dockerd-rootless.sh` and
+`rootlesskit` on PATH, a working user systemd manager/runtime unit directory, and the existing
+`ubuntu:24.04` custom-test image. The runtime unit directory `$XDG_RUNTIME_DIR/systemd/user`
+is volatile and absent after a reboot until something creates it; create it empty for the run
+and remove it afterwards. The row re-establishes cold state before each manager call;
+the campaign's initial doctor cannot count as cold-start evidence. Without this opt-in C10
+skips and is not a PASS. `test_36_socket_activation.py` records and cleans only its named units,
+runtime directory, isolated Docker objects and manager data; read its scope before granting it.
+
+Also run the campaign against a pipx installation of a local test tag (`OCS_TEST_MANAGER`, see
 `BASELINE.md`). Record the results in `BASELINE.md` ("Verification") and the status column of
 `CAMPAIGN.md`. Release only when every P0 and P1 row is PASS with real evidence, or BLOCKED with
 an accepted risk and a reproducible next step (`AGENTS.md`, "Release rule"). New defects: fix
@@ -48,7 +81,9 @@ rootlesskit's `10.0.2.2` and `example.invalid`/`example.org` addresses are expec
 
 ## 3. Tag and publish
 
-1. Merge the release branch into `main` with a merge commit; push `main` and wait for CI.
+1. If CI job names changed since the last release, update the required status checks of the
+   `main` ruleset first; otherwise the pull request waits for checks that no longer report.
+   Merge the release branch into `main` with a merge commit; push `main` and wait for CI.
 2. Create and push an annotated tag on that merge commit:
 
    ```sh

@@ -157,9 +157,9 @@ def build(distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
 
 @app.command(rich_help_panel=HOST)
 def doctor():
-    """Check the host: programs, the Docker daemon identity, base images and storage (per environment: check NAME).
+    """Check host programs, daemon identity, resource-limit support, base images and storage (per environment: check NAME).
 
-    Read-only; works without Docker. Exit status: 0 ready; 3 the Docker socket is served by a proxy; 4 not your own rootless daemon; 5 the daemon is not reachable; 6 an unsupported endpoint; 7 a required program (Docker CLI, Git) is missing; 8 the Docker context is not configured.
+    Read-only; works without Docker. Exit status: 0 host programs and daemon verified (resource/image/storage warnings or unknown checks may remain); 3 the Docker socket is served by a proxy; 4 not your own rootless daemon; 5 the daemon is not reachable; 6 an unsupported endpoint; 7 a required program (Docker CLI, Git) is missing; 8 the Docker context is not configured.
     """
     from . import readiness as r
     from . import runtime_identity as rid
@@ -171,7 +171,7 @@ def doctor():
     typer.echo(ident.report())
     if not ident.verified:
         raise typer.Exit(rid.EXIT_CODES[ident.classification])
-    for line in r.format_report({"checks":[vars(x) for x in (*r.image_checks(),r.storage_check())]}):
+    for line in r.format_report({"checks":[vars(x) for x in (r.resource_support_check(),*r.image_checks(),r.storage_check())]}):
         typer.echo(line)
     df=c.docker("system","df","--format","{{.Type}}\t{{.Size}}\t{{.Reclaimable}}",capture=True,check=False)
     for line in (getattr(df,"stdout",None) or "").splitlines() if df.returncode==0 else ():
@@ -188,7 +188,8 @@ app.add_typer(agent_context_app,name="agent-context",rich_help_panel=DATA)
 def _guidance_inputs(m):
     """Observe the container when Docker answers; otherwise describe the configuration."""
     try:
-        return c.guidance_inputs(m)
+        with c.runtime_feedback(timeout=0.25, progress=None):
+            return c.guidance_inputs(m)
     except c.SandboxError as exc:
         typer.echo(f"Note: container not inspected ({exc}); using the configured runtime settings.", err=True)
         return c.guidance_inputs(m, observe=False)
@@ -291,7 +292,7 @@ def create(name:str,
            source:Path | None=typer.Option(None,"--source",help="Folder to copy into the workspace: a Git repository root is cloned (committed files only), other folders are copied without hidden files"),
            kind:str | None=typer.Option(None,"--kind",help="scratch (empty workspace) | project (a copy of --source) | quick (disposable). Default: project with --source or a direct workspace, otherwise scratch"),
            profile:str=typer.Option("default","--profile",help="Provider profile (see: providers list)"),
-           distro:str | None=typer.Option(None,"--distro",rich_help_panel=IMAGE_PANEL,help="Distribution: "+_distro_help()),
+           distro:str | None=typer.Option(None,"--distro",rich_help_panel=IMAGE_PANEL,help="Base definitions: "+_distro_help()),
            image:str | None=typer.Option(None,"--image",rich_help_panel=IMAGE_PANEL,help="Custom image instead of a distribution (no tool or OS claims in Agent Context)"),
            workspace_mode:str=typer.Option("managed","--workspace-mode",rich_help_panel=WORKSPACE_PANEL,help="managed (default: empty or a copy of --source) | direct (not recommended: the agent works in your host folder itself)"),
            workspace:Path | None=typer.Option(None,"--workspace",rich_help_panel=WORKSPACE_PANEL,help="Existing host folder to mount as /workspace with --workspace-mode direct"),
@@ -321,9 +322,8 @@ def create(name:str,
     m=c.create(name,kind,source,profile,distro=distro,image=image,workspace_mode=workspace_mode,
                workspace=workspace,consent=consent,provisioning=provisioning)
     msg(m)
-    distro_record=c.env_distro(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
-               f"Distribution: {f'{distro_record.name} {distro_record.version}' if distro_record else 'none (custom image '+m['image']+')'}\n"
+               f"Distribution: {c.distribution_description(m)}\n"
                f"Provider profile: {m['profile']}\n"
                f"Integrations (set up once at the first start): {', '.join(provisioning['requested']) or 'none'}\n"
                f"Next: opencode-sandbox run {m['name']}")
@@ -440,15 +440,17 @@ def stop(name:str):
 def status(name:str):
     """Metadata, container state, network and the last readiness result."""
     m=c.resolve(name); msg(m)
-    distro=c.env_distro(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Provider profile: {m.get('profile')}\nContainer: {c.cname(m)}\n"
-               f"Distribution: {f'{distro.name} {distro.version}' if distro else 'none (custom image)'}\nImage: {c.env_image(m)}")
+               f"Image: {c.env_image(m)}")
     c.ensure_runtime(False)
     typer.echo("Running: "+str(c.running(m)))
     from . import readiness as r
-    try: observed=c.observed_runtime(m)
-    except c.SandboxError: observed=r.UNKNOWN
+    try:
+        inputs=c.guidance_inputs(m)
+        observed,definition=inputs["observed"],inputs["definition"]
+    except c.SandboxError: observed,definition=r.UNKNOWN,None
+    typer.echo(f"Distribution: {c.distribution_description(m,definition)}")
     for line in r.network_lines(m,observed): typer.echo(line)
     typer.echo(f"Readiness: {r.cached_line(m)} (full check: opencode-sandbox check {m['name']})")
     record=m.get("provisioning") or {}

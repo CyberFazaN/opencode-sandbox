@@ -25,11 +25,11 @@ This is context, not a security boundary. Actual access depends on Docker mounts
 - Memory limit: 4g
 - Process limit: 100
 
-## Operating system (Debian 12)
-- Base OS: Debian 12. Use apt, not the host's package manager.
+## Operating system (Debian 13)
+- Base OS: Debian 13. Use apt, not the host's package manager.
 - Installing system packages: `apt-get update && apt-get install -y PACKAGE` as root (needs network).
 - The managed base image includes: bash, git, git-lfs, python3, pip3, node, npm, opencode, rg, jq, curl, gcc, cmake.
-- Tools may have been changed after image creation; check only when the task needs an exact version or availability.
+- Build labels describe the base, not later OS/package changes. Inspect /etc/os-release or tools only when the task needs an exact version or availability.
 
 ## Working behavior
 - Start with the user's task; avoid a full system inventory or repeated probing.

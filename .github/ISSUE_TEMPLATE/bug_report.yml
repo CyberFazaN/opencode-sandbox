@@ -12,7 +12,7 @@ body:
     attributes:
       label: Version
       description: Output of `opencode-sandbox --version`.
-      placeholder: opencode-sandbox 6.0.0
+      placeholder: opencode-sandbox 6.1.0
     validations:
       required: true
   - type: dropdown

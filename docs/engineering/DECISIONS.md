@@ -6,7 +6,7 @@ and the old entry's status line says so. The current design is summarised in `AR
 verification is recorded in `BASELINE.md` and the release test matrix `CAMPAIGN.md` (row IDs such
 as `B09` or `G04`).
 
-## D-001 Manager version with a single source — accepted
+## D-001 Manager version with a single source — accepted, installer reader retired by D-048
 
 The manager version has one literal, `src/opencode_sandbox/__init__.py:__version__`;
 `pyproject.toml` reads it (`dynamic = ["version"]`, `attr = "opencode_sandbox.__version__"`) and
@@ -25,7 +25,7 @@ untouched; a backup of another schema is refused with a clear message. Such data
 modified or deleted, and Docker objects the manager does not recognise are listed by cleanup as
 "not managed" (D-011), never removed.
 
-## D-003 Docker endpoint and daemon identity — accepted
+## D-003 Docker endpoint and daemon identity — accepted, installer details superseded by D-048, credential proof by D-052
 
 - Supported: the user's own rootless daemon on a local UNIX socket. The configured context
   (default `rootless`) is resolved once; TCP, SSH, npipe and TLS endpoints are `unsupported`.
@@ -238,7 +238,7 @@ slirp gateway, but the host's LAN address and the LAN are reachable from `bridge
 Reachability depends on the rootlesskit flags; readiness reports them when visible and what it
 measured (D-020), not a guarantee. Verified: row C04. Documented: `docs/security.md`.
 
-## D-016 Distribution in metadata; explicit custom images — accepted
+## D-016 Distribution in metadata; explicit custom images — accepted, installer detail superseded by D-048
 
 Metadata schema 2 requires `distro`: a registry id, or `null` for `create --image REF` (then
 `image` is required). Missing, unknown, or `null` without `image` is reported as invalid and left
@@ -248,7 +248,7 @@ choice (`--image`, no environment variable); `opencode-sandbox:*` references are
 without them. `install.sh` keeps the literal default `opencode-sandbox:debian`; a test keeps it
 equal to `distros.DEFAULT`. Verified: `tests/test_distros.py`.
 
-## D-017 Rolling releases in the registry — accepted
+## D-017 Rolling releases in the registry — accepted, Debian pin superseded by D-051
 
 `Distro.os_release` lists the `/etc/os-release` entries a build must report: Debian `ID=debian`,
 `VERSION_ID=12`; Arch `ID=arch`, `BUILD_ID=rolling` (its `VERSION_ID` is the upstream image date
@@ -257,7 +257,7 @@ verification also requires every `tools` entry on `PATH` and every `smoke` comma
 (Arch: `paru --version`, `ocs-aur --version`), running the candidate with no-new-privileges.
 Verified: `tests/test_distros.py`, `tests/test_arch_image.py`, row C02.
 
-## D-018 Agent Context content contract — accepted
+## D-018 Agent Context content contract — accepted, OS/provenance rule superseded by D-051
 
 `agent_context.render` states only what the manager configures or verifies: container, user and
 privileges; workspace and persistence; network and resources; working behaviour; one
@@ -300,7 +300,7 @@ user's OpenCode configuration is not touched.
 - Verified: `tests/test_opencode_lifecycle.py`, rows G02, G03, G09, M03. Documented:
   `docs/opencode.md`.
 
-## D-020 Readiness checks and network transparency — accepted
+## D-020 Readiness checks and network transparency — accepted, base-definition diagnostics extended by D-050
 
 - `readiness.py` serves `check NAME`, the dashboard (`i`), `status` and `doctor`. Results:
   `passed`, `warning`, `failed`, `not checked` (with reason), `not applicable`; a check that
@@ -467,7 +467,7 @@ The checks are a snapshot at start time. Verified: `tests/test_direct_restart.py
 - Verified: `tests/test_backup_restore_edge_cases.py`, `tests/test_snapshot_tag.py`,
   `tests/test_tui_text.py`, rows C08, D11.
 
-## D-033 Hardening rules and their limits — accepted
+## D-033 Hardening rules and their limits — accepted, installer details superseded by D-048
 
 - OpenCode 2.x only: every other major is refused, also when `latest` resolves to one; another
   major needs a manager release.
@@ -493,7 +493,7 @@ The checks are a snapshot at start time. Verified: `tests/test_direct_restart.py
   pruning and a dependency lock file.
 - Verified: `tests/test_hardening.py`, rows B03, C03.
 
-## D-034 Quality gates and error reporting — accepted
+## D-034 Quality gates and error reporting — accepted, script list superseded by D-048
 
 - `ruff check src tests` (default rules, measured with 0.17.3) and `shellcheck` (0.11.0) on
   `install.sh`, `setup-rootless.sh`, `pacman-retry` and `install-opencode.sh` report nothing; both
@@ -512,7 +512,7 @@ Governed the repository layout after the release preparation (which records were
 where earlier ones were kept). Still valid: `main` is the only long-lived branch; work happens on
 short-lived topic branches merged into `main` with a merge commit after review.
 
-## D-036 Licence and identity — accepted, partly superseded by D-042
+## D-036 Licence and identity — accepted, partly superseded by D-042 and D-048
 
 MIT licence, `Copyright (c) 2026 CyberFazaN`. Product "OpenCode Sandbox"; owner CyberFazaN;
 repository `CyberFazaN/opencode-sandbox`; distribution name `opencode-sandbox` (installed by pipx,
@@ -546,7 +546,7 @@ manager, its locally built base images and OpenCode have separate versions; no p
 distribution packages, Flatpak/Snap/AppImage, a containerised manager and `curl | bash` are
 rejected; an AUR package is deferred (`TODO.md`).
 
-## D-040 CI and release process — accepted, partly superseded by D-042
+## D-040 CI and release process — accepted, partly superseded by D-042 and D-049
 
 Hosted CI runs only what a hosted runner can show honestly: static checks, the fake-Docker unit
 suite, package build and wheel smoke, lowest-direct dependencies. The real campaign
@@ -578,7 +578,7 @@ options named in README and `docs/` exist); `tests/test_user_docs.py` (links and
 code blocks fit 80 columns, install commands name the release tag `v<__version__>`, every guide is
 indexed, no internal references).
 
-## D-042 pipx from GitHub, no package index; runtime prerequisites — accepted
+## D-042 pipx from GitHub, no package index; runtime prerequisites — accepted, installer retention superseded by D-048
 
 Supersedes D-039 and the package-index parts of D-036 and D-040.
 - Install: `pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@vX.Y.Z`. Nothing
@@ -593,7 +593,7 @@ Supersedes D-039 and the package-index parts of D-036 and D-040.
   work without Docker; nothing is installed or configured on the host.
 - Verified: rows B09-B12, C09. Documented: `docs/install.md`.
 
-## D-043 Prerequisite diagnostics and exit codes — accepted
+## D-043 Prerequisite diagnostics and exit codes — accepted, installer caller retired by D-048
 
 - Classifications and exit codes: `verified` 0, `unverified-proxy` 3, `mismatch` 4, `unavailable`
   5 (daemon not running or not answering), `unsupported` 6, `missing` 7 (no Docker CLI; also a
@@ -609,7 +609,7 @@ Supersedes D-039 and the package-index parts of D-036 and D-040.
 - Verified: `tests/test_prerequisites.py`, `tests/integration/test_35_prerequisites.py`, row C09.
   Documented: `docs/troubleshooting.md`.
 
-## D-044 pipx installation procedure — accepted
+## D-044 pipx installation procedure — accepted, installer interaction superseded by D-048, Python floor by D-049
 
 Measured with pipx 1.18.7.
 - `pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@vX.Y.Z` needs pipx, Git and
@@ -626,8 +626,8 @@ Measured with pipx 1.18.7.
 - `OCS_TEST_MANAGER=<launcher>` runs the real campaign against an installed manager;
   `tests/integration/test_65_pipx.py` covers rows B09-B12 in a disposable clone with test tags
   (`OCS_TEST_PIPX_BUILD=1` adds the image build).
-- Not verified: installing from the GitHub repository itself, other pipx versions, the refusal by
-  an older pipx Python.
+- Verified from the GitHub repository itself at the release of 6.0.0. Not verified: other pipx
+  versions, the refusal by an older pipx Python.
 
 ## D-045 Public engineering records — accepted
 
@@ -639,7 +639,7 @@ multi-cycle effort may live in a subdirectory of `docs/engineering/` while it ru
 from the tree when it ends; Git history keeps them. Supersedes D-024 and D-035 and the location
 rules of D-023.
 
-## D-046 Linux hosts: intended compatibility and tested evidence — accepted
+## D-046 Linux hosts: intended compatibility and tested evidence — accepted, partly superseded by D-047/D-048/D-049
 
 Supersedes the host scope of D-038.
 - The manager is intended for any Linux host that meets the technical prerequisites; Arch Linux
@@ -664,3 +664,250 @@ Supersedes the host scope of D-038.
   controller delegation or user-namespace policy. Portability work: `TODO.md`.
 - Documented: `README.md`, `docs/install.md`. Limitations: `ISSUES.md`.
 
+## D-047 Stabilization priorities and upstream-owned host setup — accepted
+
+Owner direction, 2026-10-29: prepare a dependable stable release through compatibility,
+reliability, data safety, recovery, installation simplicity, UX and documentation, not feature
+expansion. The classified backlog is `TODO.md`; the active multi-cycle plan and progress live
+in a working-record subdirectory of `docs/engineering/` (D-045; removed by D-055). Continue one verified task per cycle and retain
+all Git and publication permissions. No stable status or version is claimed by the plan.
+
+- Supersedes the hand-maintained host setup documentation approach of D-046: link Docker's
+  official rootless guide and the distribution's official documentation, with the ArchWiki for
+  Arch-specific packaging/setup conventions. Describe prerequisites and application diagnostics;
+  do not maintain host package, system configuration or daemon installation recipes.
+- Approves retiring the legacy scripts retained by D-042/D-044 and the installer-portability
+  work of D-046. Until that task is verified, the scripts still exist; no replacement installer
+  or wizard. pipx from a GitHub release tag remains the sole recommended application install.
+  Shared CLI/TUI diagnostics and safety tests must survive their removal.
+- Promote Python-floor verification (3.11 first, then newer versions as needed), Debian 13 and
+  its image-revision/old-state compatibility prerequisites. Current Python >= 3.14 and Debian 12
+  declarations remain until the corresponding implementation is verified. Full real Docker
+  campaigns are not required for every Python version; minimum/current Arch Python unit CI,
+  packaging and pipx are required.
+- Preserve existing dependency-bound CI and release-campaign evidence, but rerun changed paths;
+  do not convert historical PASS into evidence for untested configurations. A stable release
+  still needs every P0/P1 gate met or explicitly BLOCKED with accepted risk (RELEASING).
+
+## D-048 pipx-only installation; retire host setup scripts — accepted
+
+Implements the retirement approved by D-047. Removes `install.sh` and `setup-rootless.sh`, not
+replaces them. Supersedes installer-specific details of D-001/D-003/D-016/D-033/D-034/D-036 and
+installer retention, interactions and host setup of D-042/D-043/D-044/D-046; their references to
+the old scripts describe the retired behaviour, not current instructions.
+
+- pipx from a GitHub release tag is the only recommended user installation. Contributors use an
+  editable local venv. Python/package/venv creation belongs to pipx and packaging, not a second
+  installer. No host package offers, service starts, context changes, UID allocations or wizard.
+- Keep `runtime_identity.py` (including its standalone diagnostic entry point), shared host,
+  image and storage checks, and CLI/TUI classifications/exit codes. Bootstrap-only package/setup
+  instructions are upstream-owned; hints link the guide rather than assuming a setup helper or
+  systemd service. Existing cgroup/user-namespace diagnostic gaps remain explicit work (D-047).
+- Do not remove old installations or user state automatically. Transition instructions inspect
+  the launcher, then use the trusted old release's uninstaller in its old checkout before pipx.
+  A pipx venv broken by a Python minor upgrade is rebuilt with `pipx reinstall --python`; the
+  recorded tag and environment data remain separate. Never delete an unidentified launcher.
+- Retire installer-only tests and campaign rows B02–B08; retain B01's manager-as-root refusal,
+  C01's rootful/foreign/proxy refusal, C09 prerequisite/terminal checks, pipx lifecycle/data
+  retention and foreign-launcher safety. Preserve container-local install scripts and their
+  tests. Current shellcheck targets are `pacman-retry`, `install-opencode.sh` and
+  `.github/scripts/pipx_smoke.sh`; package validation rejects retired installers in the sdist.
+
+## D-049 Verified Python 3.11 floor; endpoint CI — accepted
+
+Implements D-047 (Python floor); supersedes the 3.14-only requirements of D-044/D-046 and extends D-040's
+CI endpoints. Python 3.11.18 runs the unchanged full unit/host/Textual-pilot/local-process
+suite, including filesystem/archive safety, without compatibility shims. An isolated trial
+copy verified sdist/wheel builds/content and pipx Git-tag installation, replacement in both
+directions and uninstall/data retention before the checkout's requirement was lowered.
+
+- Declare `requires-python >=3.11`, classifiers 3.11–3.14 and Ruff `py311`. The wheel checker
+  reads the requirement from `pyproject.toml`, not a second hardcoded floor. No application
+  logic, security policy, dependency bound, schema, image or manager version changes.
+- Keep existing Typer/Textual ranges and setuptools >=77. Current dependencies resolve on
+  3.11; lowest direct dependencies remain covered too. Record resolved versions and actual
+  executions in BASELINE; bounds are not locks on transitive dependencies.
+- CI runs unit/host/pilot/process, package and pipx checks on 3.11 and 3.14, retaining the
+  rolling Arch unprivileged job and lowest-direct-dependency coverage at both explicit
+  endpoints. Release-tag pipx checks cover both endpoints. No hosted Docker campaign added.
+- 3.12/3.13 are in the supported range but not separately verified; say so. A full real
+  Docker/OpenCode campaign is still required on the release host, not every Python version.
+  Revised workflows are not claimed as hosted PASS before they run.
+- Published `v6.0.0` remains Python >=3.14. Install examples still name that published tag and
+  the interpreter it needs; the new floor belongs to this checkout/the next release. No tag
+  rewrite or implicit publication. pipx's own interpreter and its application's interpreter
+  are separate; `--python` selects the latter.
+
+## D-050 Shared managed base-image definition diagnostics — accepted
+
+Implements D-047 (base-image diagnostics), extending D-020 before changing any image definition. `image_checks()`
+previously treated every successful inspect as current and every failure as missing. It now
+reads each registry base tag's `Config.Labels`, with no build/pull/container/metadata writes.
+
+- Require matching manager-managed/distribution identity and a positive canonical decimal
+  `image-revision` label. Compare with the registry; equal also checks `distro-version`.
+  Current means matching build labels, not verified OS/package currency or a security boundary.
+- Old revision: warning with the explicit distribution build command. Missing/malformed or
+  inconsistent labels: warning, review the image before a manual rebuild. Newer revision:
+  warning, check manager/release compatibility and do not rebuild merely to hide it.
+- Only a Docker `No such image` response establishes absence. Other inspect failures and invalid
+  responses are `not checked`, with an inspect hint, never a misleading build recommendation.
+  One expected inspect exception does not hide checks of the other base tags.
+- Reuse these checks in the existing dashboard startup worker after daemon verification;
+  shared report formatting and hints, plain-text advisory notices, no new UI/update subsystem.
+  Do not overwrite a pending operation's status. `doctor` exit semantics are unchanged;
+  clarify that image/storage warnings and incomplete image checks may accompany exit 0.
+- These are global registry base tags only. Keep start/pinning, per-environment readiness and
+  derived/restored images unchanged; a notice does not force OS migration or recreate a used
+  container. No image revision, distribution, schema, manager version or release status bump.
+- Regression matrix: `tests/test_image_readiness.py` plus existing readiness/prerequisite/TUI
+  coverage. Read-only real evidence and unexecuted layers are recorded separately in BASELINE.
+
+## D-051 Debian 13 definition; retain and describe old system layers — accepted
+
+Implements D-047 (Debian 13) after D-050. Supersedes D-017's Debian-12 build pin and D-018's
+registry-derived OS version/tool promises. Debian now uses `node:24-trixie`, version 13,
+image revision 2. Node 24's official image registry includes trixie; OpenCode 2.2.0 has native
+Linux packages and no declared npm engine restriction. Actual packaged build verification
+checks OS, tools, smoke commands and OpenCode. Arch's definition/revision is unchanged.
+
+- Distribution metadata still identifies the family, not an OS upgrade. No metadata/backup
+  schema or manager version/status change, no migration and no automatic base replacement.
+  Stop/start, recreation, snapshots and system-image restore preserve the existing layer.
+  Explicit no-system restore instead uses the current local base and discards system packages.
+- `ImageDefinition` validates non-secret managed/distribution/version/revision build labels.
+  For an owned container, use its inherited labels rather than a mutable base tag; otherwise
+  inspect the selected creation image, including a derived/restored image. Missing, invalid or
+  unavailable provenance is unknown, never today's registry version. This is base provenance,
+  not an observation of OS/package modifications inside the container or a security boundary.
+- Agent Context gets only inspected provenance. Current matching definitions may promise their
+  verified tools/notes; older/different definitions do not inherit a newer tool list. Offline
+  previews are versionless. First creation captures selected-image labels under the base-tag
+  lock, also when no pending integrations will trigger a later refresh. Launch regeneration
+  and user-owned OpenCode configuration separation stay unchanged.
+- CLI status uses inspected provenance. Creation output and metadata-only dashboard details
+  say the OS version is uninspected, with no Docker probing on the UI thread or new metadata
+  cache. New-environment menus/help label registry versions as build definitions.
+- Base rollback still verifies the current OS definition: a Debian-13 manager refuses a
+  Debian-12 base rollback copy instead of silently downgrading it. Copies are not automatically
+  deleted; old environments/system backups remain usable and per-environment OpenCode
+  update/rollback preserves their OS. This limitation is explicit in the guides.
+- Real verification uses the existing campaign and an isolated installed candidate. Test-only
+  tag namespace hooks stay outside the product/package; existing base tags/IDs are never
+  replaced. A pre-change installed manager creates the retained Debian-12 container/backups.
+  The exact evidence and unexecuted layers remain in BASELINE/CAMPAIGN; the final release gates
+  are not replaced by this scoped campaign.
+
+## D-052 Bounded readiness and authenticated response senders — accepted
+
+Implements D-047's bounded-readiness priority. Supersedes D-003's SO_PEERCRED-only executable proof and D-043's one-shot
+dashboard readiness behavior; endpoint/own-rootless boundaries and exit classifications stay.
+An authorized isolated real rootless daemon confirmed FD handoff through RootlessKit 3.3.0:
+SO_PEERCRED identifies user systemd even when warm; SCM_CREDENTIALS identifies dockerd. A
+retry-only patch cannot support that valid listener without weakening identity.
+
+- Enable SO_PASSCRED before connect. Refuse foreign/rootful listener identity immediately.
+  Send only HTTP/1.0 GET /info, no request body; authenticate every received byte using kernel
+  SCM_CREDENTIALS. Require one unchanged own-user dockerd sender, its existing executable and
+  user-namespace UID/GID map proof, and exact `name=rootless` in the same JSON response.
+  Do not trust a unit, path/owner, claimed HTTP PID, or forwarded rootless text. Direct and
+  inherited listeners share this proof; there is no systemd whitelist or required systemd call.
+- Bound headers to 16 KiB and the full response to 512 KiB; require HTTP 200, EOF completion,
+  consistent optional Content-Length, no transfer/content encoding or duplicate headers.
+  Reject missing/truncated/changing credentials and ancillary file descriptors (close any
+  received rights with close-on-exec protection). Recheck /proc executable/maps after reading
+  and compare process start time to detect mid-response PID reuse. This retains the existing
+  same-user process-observation/check-to-use residual, not cryptographic executable attestation
+  or protection against a hostile process with the user's daemon access. No new kernel minimum
+  beyond the existing Linux UNIX-credential/user-namespace requirements is selected.
+- One monotonic 10 s budget covers context subprocess, socket I/O and capped retry backoff;
+  100 ms polling permits cooperative cancellation. A ready endpoint has no forced sleep/notice.
+  Retry only typed reset/empty response/timeout/backlog/interruption; never missing/stale socket,
+  permissions, malformed/unsupported context, protocol/HTTP errors or identity failures.
+  Context and canonical endpoint are pinned for the entire unsuccessful acquisition too.
+  Context CLI children are killed/reaped on cancellation; bounded cleanup may add up to 0.4 s.
+- Core coalesces overlapping acquisitions only, with each caller's deadline/cancellation;
+  explicit later verification still probes again. No global Docker-command retry, mutation
+  replay, host service management, context switch or background readiness monitor.
+- CLI/standalone progress goes to stderr once after 250 ms; errors keep concrete causes/codes.
+  Existing Textual workers get scoped feedback/cancel checks. Explicit Refresh rechecks;
+  successful retry clears only prerequisite notices. Guidance/pre-attach work is off-thread;
+  interactive startup after suspend retains CLI feedback. Optional CLI previews use 250 ms.
+- Real cold-start budget evidence, proxy refusals, process/pilot/terminal tests, endpoint Python
+  and dependency verification and limits live in BASELINE/CAMPAIGN. The isolated activation
+  opt-in is not general permission to restart the user's daemon or rerun privileged rows.
+  The final full campaign and release decision remain separate.
+
+## D-053 Report resource support separately from limit configuration — accepted
+
+Reproduced a misleading success: readiness compared only Docker HostConfig CPU/memory/PID
+settings, without checking whether the daemon reported the corresponding capabilities. A
+verified rootless identity or accepted setting is not proof of kernel enforcement.
+
+- One shared `resource_support_check()` for doctor, per-environment readiness and dashboard
+  startup/explicit Refresh. Use fresh read-only Docker info on the already verified/pinned
+  endpoint; never resolve a new context or query before identity success. A five-second query
+  budget reuses D-052's child cleanup/cooperative cancellation, without retrying any operation.
+  Raw info/error text is not printed (it may contain proxy URLs/host details).
+- Require cgroup v2, the documented rootless systemd cgroup driver and exact true boolean
+  CPU CFS quota/period, memory and PID capability flags for a reported-support PASS. Explicit
+  false flags, cgroup v1 or driver none warn; absent/malformed evidence and unfamiliar versions
+  or drivers are NOT CHECKED. No mandatory systemctl/D-Bus or host cgroup filesystem probe;
+  other driver setups are not silently certified or rejected as an identity failure.
+  Ignore unrelated cpuset/I/O/swap warnings for settings the manager does not request.
+- PASS says "Docker reports" support and "enforcement not measured". The existing per-container
+  Resource limits check still compares settings, now labeled as configuration only; its id
+  and cache schema stay unchanged. The new report entry is additive, not a migration.
+- Advisory results never gate start/configuration or change metadata/host policy. Preserve
+  doctor exit meanings: host programs and identity determine exit 0, optional resource/image/
+  storage warnings or unknown checks can remain. Shared report text/hints, off-thread dashboard
+  notices preserve an active operation and clear only their own stale notice after refresh.
+  Guidance belongs to Docker/distribution docs, not repair commands or a setup wizard.
+- Regression tests cover unsupported/missing/unknown/corrupt evidence, identity refusal,
+  bounded/canceled probes, output sanitization and CLI/pilot parity. The existing C05 campaign
+  is extended to read actual cpu.max/memory.max/pids.max in a disposable rootless container
+  before/after settings changes, not merely inspect HostConfig. Evidence/limits: BASELINE.
+  No stress/OOM/fork exhaustion, host service/policy edit or extra privileged permission.
+
+## D-054 Own an interactive client before delivering catchable launch signals — accepted
+
+The release verification traced the H05 observation to SIGTERM interrupting `Popen`'s fork/exec return before the
+client PID was stored. The child was running, but client cleanup had no reference and the
+watchdog had no PID. Container hangup alone did not end the orphaned host client.
+
+- Defer callable SIGINT/SIGTERM/SIGHUP handlers only over interactive client creation and
+  watchdog PID registration, on the main thread. Restore the original handlers and invoke
+  the first pending handler inside the owned client's existing cleanup guard. Do not defer
+  the session's ordinary wait or install process-wide handlers from a worker.
+- Do not block signals (an inherited mask can disable client cleanup), use `preexec_fn` in
+  the threaded application, add a launch wrapper or change ignored/default dispositions.
+  Preserve signal exit semantics, normal exits, exactly-once token hangup and watchdog policy.
+  Explicitly wait after the fallback SIGKILL, not just after successful SIGHUP.
+- Capture the attached input terminal's attributes before client creation and restore them
+  in `finally` after client cleanup, using TCSANOW (no output drain/input flush). The real
+  SIGTERM/SIGHUP checks showed Docker can leave echo/canonical mode disabled despite ending
+  the session correctly. Never substitute another terminal for absent/non-tty stdin; a
+  closed terminal or failed restoration must not replace the session's original error/exit.
+- Scope is the demonstrated catchable-signal ownership gap, not a generic subprocess rewrite
+  or a guarantee against SIGKILL/power loss, unavailable Docker or repeated cleanup signals.
+  D-008/D-021 token and watchdog behaviour is unchanged. No schema/image/version change.
+- Verification: deterministic real fork/exec-window regressions on each Python endpoint,
+  handler/mask/worker/reaping tests, traced concurrent host reproducer before/after, and the
+  existing real terminal/OpenCode campaign. Details: BASELINE and CAMPAIGN H05.
+
+## D-055 Release 6.1.0: version, status and the end of the stabilization records — accepted
+
+Owner decision, 2026-10-30, after an independent review of every change since 6.0.0.
+- The release is **6.1.0**, not a patch release: it adds functionality (readiness and
+  socket-activation identity, resource-support and base-image diagnostics, Python 3.11 to 3.13),
+  changes the Debian default definition and removes the 6.0.0 source installer. This follows the
+  Semantic Versioning that `CHANGELOG.md` declares. The internal-reference checks of D-038 no
+  longer forbid the string `6.1.0`; it now names a public release.
+- Development status stays **Beta**: real evidence covers one host distribution, a fake model
+  provider, and hosted CI has not yet run the revised matrix.
+- The stabilization working records end with this release (D-045): their durable facts are in
+  BASELINE, DECISIONS (D-047..D-054), ISSUES, CAMPAIGN, RELEASING and TODO. Supersedes D-047's
+  record location; its priorities remain the roadmap in TODO.
+  The internal-reference checks also refuse the removed plan's task labels.
+- Install examples name `v6.1.0` and the 3.11 floor; this supersedes D-049's note that they kept
+  naming the 6.0.0 tag.

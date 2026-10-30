@@ -1,12 +1,9 @@
 """Hardening details: OpenCode major version and probe options, the Agent Context delivery check,
 links below the top level of `.git`, data-directory permissions, container capabilities, the pin
 check versus a base-image swap, `ocs-aur` option parsing, output inside a workspace, a journal's
-image removed outside the manager, the Agent Context refresh after provisioning and the installer
-after a Python upgrade. Docker is mocked."""
+image removed outside the manager and the Agent Context refresh after provisioning. Docker is mocked."""
 import os
-import re
 import subprocess
-from pathlib import Path
 
 import pytest
 from test_arch_image import aur
@@ -18,8 +15,6 @@ from opencode_sandbox import gitflow
 from opencode_sandbox import opencode_versions as v
 from opencode_sandbox import readiness as r
 from opencode_sandbox import workspace_io as wio
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class Docker:
@@ -324,24 +319,4 @@ def test_a_failed_refresh_after_provisioning_still_marks_running(first_start, mo
     c.start(m)
     now = c.resolve(m["id"])
     assert (now["status"], now.get("operation")) == ("running", None) and len(refreshes) == 2
-
-
-# --- Installer after a Python upgrade -------------------------------------------------------------
-
-def test_doctor_reports_a_release_that_no_longer_starts(tmp_path):
-    app = tmp_path / ".local/share/opencode-sandbox-manager"
-    rel = app / "releases" / "r" / "bin"
-    rel.mkdir(parents=True)
-    (rel / "python").symlink_to("/bin/false")
-    (app / "current").symlink_to(rel.parent)
-    out = subprocess.run(["bash", str(ROOT / "install.sh"), "doctor"], env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},
-                         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120, check=False)
-    assert out.returncode == 0, out.stderr
-    assert re.search(r"does not start.*install\.sh update", out.stdout), out.stdout
-
-
-def test_install_guide_documents_python_upgrades_and_old_releases():
-    text = " ".join((ROOT / "docs" / "install.md").read_text(encoding="utf-8").split())
-    assert "Python minor upgrade" in text and "./install.sh update" in text
-    assert "remove old releases" in text
 

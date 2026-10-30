@@ -4,7 +4,6 @@ from pathlib import Path
 
 from rich.markup import escape
 from rich.text import Text
-from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, Vertical
@@ -24,6 +23,7 @@ from textual.widgets import (
 from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
 from . import core as c
+from .tui_runtime import work
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -75,7 +75,7 @@ class CreateScreen(ModalScreen[dict | None]):
                           ("Quick: disposable session", "quick")], value="scratch", allow_blank=False, id="kind", compact=True)
             yield Input(placeholder="Folder to copy (Git repository: committed files only); empty = none", id="source", compact=True)
             with Collapsible(title="More options: distribution, workspace, provider profile, integrations", id="more"):
-                yield Select([(f"Distribution: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
+                yield Select([(f"Base definition: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
                               for d in distros.REGISTRY.values()], value=distros.DEFAULT, allow_blank=False, id="distro", compact=True)
                 yield Select([("Workspace: managed (empty, or a copy of the folder; default)", "managed"),
                               ("Workspace: direct host folder (not recommended)", "direct")],
@@ -159,7 +159,7 @@ class Dashboard(App):
                 Binding("o", "open_selected", "OpenCode"), Binding("s", "shell_selected", "Shell"),
                 Binding("f5", "start_selected", "Start"), Binding("f6", "stop_selected", "Stop"),
                 Binding("n", "create_environment", "New"), Binding("x", "delete_selected", "Delete"),
-                Binding("r", "refresh", "Refresh", show=False), Binding("c", "current_folder", "This folder", show=False),
+                Binding("r", "refresh_readiness", "Refresh", show=False), Binding("c", "current_folder", "This folder", show=False),
                 Binding("p", "providers", "Provider profiles", show=False), Binding("g", "settings", "Preferences", show=False),
                 Binding("t", "runtime", "Settings", show=False), Binding("u", "usage", "Usage", show=False),
                 Binding("v", "opencode_versions", "OpenCode versions", show=False), Binding("a", "agent_context", "Agent context", show=False),
@@ -206,6 +206,7 @@ class Dashboard(App):
 
     def on_mount(self) -> None:
         self._operation_pending = False
+        self._runtime_waiters = set()
         self.query_one("#envs", DataTable).add_columns("Name", "Kind", "State", "Profile", "Source", "ID")
         self.action_refresh()
         # CLI changes made while the dashboard is open (H08); only metadata file stats are read.
@@ -226,22 +227,78 @@ class Dashboard(App):
 
     @work(thread=True, exclusive=True, group="prerequisites")
     def _prerequisites_worker(self) -> None:
-        """The daemon check of `check` and `doctor`, once at start and off the UI thread: the
-        dashboard opens without Docker and says what is missing; actions check again when used."""
+        """Shared daemon/base-image checks at startup/explicit Refresh, off the UI thread.
+
+        Image warnings are advisory; they never block or change an existing environment.
+        """
         from . import readiness
         try:
             check = readiness.daemon_check()
+            if check.status != readiness.PASSED:
+                self.call_from_thread(self._show_prerequisites, check.detail)
+                return
+            self.call_from_thread(self._prerequisites_ready)
+            support = readiness.resource_support_check()
+            self.call_from_thread(self._show_resource_support, support)
+            images = [item for item in readiness.image_checks() if item.status != readiness.PASSED]
+            if images:
+                self.call_from_thread(self._show_image_checks, images)
         except Exception as exc:
             self.call_from_thread(self._show_prerequisites, c.error_text(exc))
             return
+
+    def _show_resource_support(self, check) -> None:
+        from . import readiness
+        for note in list(self._notifications):
+            if note.title == "Resource-limit support": self._unnotify(note)
+        status = self.query_one("#status", Static)
         if check.status != readiness.PASSED:
-            self.call_from_thread(self._show_prerequisites, check.detail)
+            if not self._operation_pending:
+                status.update("Resource-limit support needs attention. Details: opencode-sandbox doctor")
+            text = "\n".join(readiness.format_report({"checks": [vars(check)]}))
+            self.notify(text, title="Resource-limit support", severity="warning", timeout=30)
+        elif not self._operation_pending and str(status.render()).startswith("Resource-limit support needs attention"):
+            status.update("Ready")
+
+    def _show_image_checks(self, checks) -> None:
+        from . import readiness
+        if not self._operation_pending:
+            self.query_one("#status", Static).update("Base image checks need attention. Details: opencode-sandbox doctor")
+        self.notify("\n".join(readiness.format_report({"checks": [vars(item) for item in checks]})),
+                    title="Base images need attention", severity="warning", timeout=30)
 
     def _show_prerequisites(self, detail: str) -> None:
-        self.query_one("#status", Static).update(
-            "Docker is not ready: environments cannot start. Details: opencode-sandbox doctor")
+        if not self._operation_pending:
+            self.query_one("#status", Static).update(
+                "Docker is not ready: environments cannot start. Details: opencode-sandbox doctor")
         self.notify(f"{detail}\nDetails: opencode-sandbox doctor", title="Docker is not ready",
                     severity="warning", timeout=30)
+
+    def _prerequisites_ready(self) -> None:
+        for note in list(self._notifications):
+            if note.title == "Docker is not ready":
+                self._unnotify(note)
+        status = self.query_one("#status", Static)
+        if not self._operation_pending and str(status.render()).startswith("Docker is not ready"):
+            status.update("Ready")
+
+    def _runtime_notice(self, message, worker) -> None:
+        if not self.is_running or (message and worker.is_cancelled):
+            return
+        if message:
+            first = not self._runtime_waiters
+            self._runtime_waiters.add(worker)
+            if not self._operation_pending:
+                self.query_one("#status", Static).update(message)
+            if first: self.notify(message, title="Docker readiness", timeout=10)
+        else:
+            self._runtime_waiters.discard(worker)
+            if not self._runtime_waiters:
+                for note in list(self._notifications):
+                    if note.title == "Docker readiness": self._unnotify(note)
+            status = self.query_one("#status", Static)
+            if not self._runtime_waiters and str(status.render()).startswith("Waiting for Docker readiness"):
+                status.update("Ready")
 
     @staticmethod
     def _metadata_state():
@@ -282,6 +339,11 @@ class Dashboard(App):
                 table.move_cursor(row=table.get_row_index(previous))
         self.update_details()
 
+    def action_refresh_readiness(self) -> None:
+        """Explicit Refresh retries prerequisites; metadata auto-refresh stays Docker-free."""
+        self.action_refresh()
+        self._prerequisites_worker()
+
     def selected(self):
         table = self.query_one("#envs", DataTable)
         if not table.row_count:
@@ -318,8 +380,7 @@ class Dashboard(App):
             settings, profile = f"invalid ({exc})", m.get("profile", "default")
         try: workspace = workspaces.describe(m)
         except c.SandboxError as exc: workspace = f"invalid ({exc})"
-        distro = c.env_distro(m)
-        image = f"{distro.name} {distro.version}" if distro else f"custom image {m.get('image')}"
+        image = c.distribution_description(m)
         created = str(m.get("created") or "—")[:16].replace("T", " ")
         return (f"[b]{escape(m['name'])}[/b]  {m['kind']}  ID {m['id']}\n"
                 f"State: {m.get('status', '?')}  Operation: {m.get('operation') or '—'}  Created: {created}\n"
@@ -537,6 +598,10 @@ class Dashboard(App):
         if m is None:
             self.notify("Select an environment", severity="warning")
             return
+        self._agent_context_worker(m)
+
+    @work(thread=True, exclusive=True, group="agent-context")
+    def _agent_context_worker(self, m) -> None:
         from . import agent_context as ac
         try:
             try:
@@ -545,11 +610,11 @@ class Dashboard(App):
                 inputs = c.guidance_inputs(m, observe=False)
             content = ac.render(m, **inputs)
             current = ac.verify(m, c.env_dir, **inputs)
-            self.push_screen(OpenCodeVersionsScreen(
+            self.call_from_thread(self.push_screen, OpenCodeVersionsScreen(
                 f"Agent context: {m['name']}\nOn-disk: {'current' if current else 'missing/outdated'}\n"
                 "Guidance is regenerated before every OpenCode launch.\n\n" + content))
         except Exception as exc:
-            self.notify(c.error_text(exc), severity="error")
+            self.call_from_thread(self.notify, c.error_text(exc), severity="error")
 
     def action_recovery(self) -> None:
         from .management_tui import RecoveryScreen
@@ -724,8 +789,22 @@ class Dashboard(App):
             return
         if self._operation_pending:
             self.notify("Another operation is running", severity="warning"); return
+        self._operation_pending = True
+        self._set_busy("Checking Docker before opening the session…")
+        self._prepare_attach(m, shell)
+
+    @work(thread=True, exclusive=True, group="environment-operation")
+    def _prepare_attach(self, m, shell) -> None:
         try:
-            with self.suspend():
+            c.verify_runtime()
+            self.call_from_thread(self._attach_ready, m, shell)
+        except Exception as exc:
+            self.call_from_thread(self._finished, c.error_text(exc), True)
+
+    def _attach_ready(self, m, shell) -> None:
+        self._operation_pending = False
+        try:
+            with self.suspend(), c.runtime_feedback():
                 c.interactive(m, shell=shell)
             from .preferences import read
             if read()["refresh_on_return"]:

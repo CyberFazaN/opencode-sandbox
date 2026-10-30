@@ -1,4 +1,4 @@
-"""Agent Context rendering: shared sections, registry-driven OS section, observed runtime.
+"""Agent Context rendering: shared sections, inspected base provenance, observed runtime.
 
 Golden files: tests/golden/agent-context-*.md. After an intended wording change, regenerate with
 OCS_UPDATE_GOLDEN=1 pytest tests/test_agent_context.py and review the diff.
@@ -33,7 +33,9 @@ CASES = {
 @pytest.mark.parametrize("case", sorted(CASES))
 def test_golden(case):
     m, image, runtime = CASES[case]
-    text = a.render(m, image=image, runtime=runtime)
+    d = distros.get(m["distro"]) if m.get("distro") else None
+    definition = distros.ImageDefinition(d.id, d.version, d.revision) if d else None
+    text = a.render(m, image=image, runtime=runtime, definition=definition)
     golden = GOLDEN / f"agent-context-{case}.md"
     if os.environ.get("OCS_UPDATE_GOLDEN") == "1":
         golden.write_text(text, encoding="utf-8")
@@ -56,7 +58,8 @@ def test_shared_sections_and_no_secrets_or_host_paths(case):
 def test_os_section_claims_only_registry_facts(distro):
     """The tool list is exactly the registry's (each build verifies it); other distributions' tools never leak."""
     d = distros.REGISTRY[distro]
-    text = a.render({**M, 'distro': distro}, image=d.image, runtime=R)
+    text = a.render({**M, 'distro': distro}, image=d.image, runtime=R,
+                    definition=distros.ImageDefinition(d.id, d.version, d.revision))
     section = text.split(f"## Operating system ({d.name} {d.version})\n", 1)[1].split("\n## ", 1)[0]
     assert "- The managed base image includes: " + ", ".join(d.tools) + "." in section
     for other in distros.REGISTRY.values():
@@ -78,9 +81,10 @@ def test_custom_image_makes_no_os_tool_or_user_claims():
     assert 'includes:' not in a.render({**M, 'distro': None}, image='opencode-sandbox:debian', runtime=R)
 
 
-def test_derived_image_keeps_the_distribution():
-    """The OS comes from metadata, not from the image name."""
-    text = a.render(M, image='ocs-runtime:0123456789abcdef-aaaaaaaaaaaa', runtime=R)
+def test_derived_image_keeps_the_inspected_definition():
+    """Retained build provenance, not today's registry or the image name."""
+    text = a.render(M, image='ocs-runtime:0123456789abcdef-aaaaaaaaaaaa', runtime=R,
+                    definition=distros.ImageDefinition(M['distro'], '12', 1))
     assert 'Base OS: Debian 12' in text and 'derived from the managed base image' in text
     assert 'Custom image' not in text
     assert 'derived' not in a.render(M, image='opencode-sandbox:debian', runtime=R)
@@ -157,6 +161,8 @@ def fake_inspect(host_config):
     def docker(*args, **kwargs):
         if "{{json .State}}" in args:
             return SimpleNamespace(returncode=0, stdout=json.dumps({"Running": True}), stderr="")
+        if "{{json .Config.Labels}}" in args:
+            return SimpleNamespace(returncode=0, stdout="null", stderr="")
         assert "{{json .HostConfig}}" in args
         return SimpleNamespace(returncode=0, stdout=json.dumps(host_config), stderr="")
     return docker

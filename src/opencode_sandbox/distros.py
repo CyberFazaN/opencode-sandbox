@@ -6,6 +6,7 @@ a distribution name (a test enforces this).
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,13 +43,16 @@ class Distro:
     def dockerfile(self) -> Path:
         return IMAGES / self.id / "Dockerfile"
 
-    def context_lines(self) -> list[str]:
+    def context_lines(self, *, version: str | None = None, include_tools: bool = True) -> list[str]:
         """Agent Context lines for an environment that uses this distribution's managed image; only
         what the registry pins and every build verifies (os-release entries, tools)."""
-        return [f"- Base OS: {self.name} {self.version}. Use {self.package_manager}, not the host's package manager.",
-                f"- Installing system packages: {self.install_hint}",
-                *self.notes,
-                "- The managed base image includes: " + ", ".join(self.tools) + "."]
+        lines = [f"- Base OS: {self.name} {version or self.version}. Use {self.package_manager}, not the host's package manager.",
+                 f"- Installing system packages: {self.install_hint}"]
+        if include_tools:
+            lines += [*self.notes, "- The managed base image includes: " + ", ".join(self.tools) + "."]
+        else:
+            lines.append("- This image has a different definition from the current manager; its installed tools are not verified against that definition.")
+        return lines
 
     def image_labels(self) -> dict[str, str]:
         return {LABEL + "distro": self.id, LABEL + "distro-version": self.version,
@@ -56,8 +60,8 @@ class Distro:
 
 
 REGISTRY: dict[str, Distro] = {d.id: d for d in (
-    Distro(id="debian", name="Debian", version="12", revision=1, package_manager="apt",
-           os_release=(("ID", "debian"), ("VERSION_ID", "12")),
+    Distro(id="debian", name="Debian", version="13", revision=2, package_manager="apt",
+           os_release=(("ID", "debian"), ("VERSION_ID", "13")),
            install_hint="`apt-get update && apt-get install -y PACKAGE` as root (needs network).",
            tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "rg", "jq", "curl",
                   "gcc", "cmake")),
@@ -75,6 +79,32 @@ REGISTRY: dict[str, Distro] = {d.id: d for d in (
            aur_helper="paru"),
 )}
 DEFAULT = "debian"
+
+
+@dataclass(frozen=True)
+class ImageDefinition:
+    """Non-secret base provenance from build labels, not a claim about the live system layer."""
+    distro: str
+    version: str
+    revision: int
+
+    def matches(self, distro: Distro) -> bool:
+        return self.distro == distro.id
+
+
+def image_definition(distro_id: str, labels) -> ImageDefinition | None:
+    if not isinstance(labels, dict) or labels.get(LABEL + "managed") != "true" \
+            or labels.get(LABEL + "distro") != distro_id:
+        return None
+    version, revision = labels.get(LABEL + "distro-version"), labels.get(LABEL + "image-revision")
+    if not isinstance(version, str) or len(version) > 64 or not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]+)*|rolling)", version):
+        return None
+    if not isinstance(revision, str) or not re.fullmatch(r"[1-9][0-9]*", revision):
+        return None
+    try:
+        return ImageDefinition(distro_id, version, int(revision))
+    except ValueError:
+        return None
 
 
 def get(distro_id: str) -> Distro:

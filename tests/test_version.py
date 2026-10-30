@@ -20,8 +20,8 @@ def test_single_version_literal():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     assert "version" not in project["project"] and "version" in project["project"]["dynamic"]
     assert project["tool"]["setuptools"]["dynamic"]["version"] == {"attr": "opencode_sandbox.__version__"}
-    assert opencode_sandbox.__version__ == "6.0.0"
-    sources = [p for p in (ROOT / "src").rglob("*.py")] + [ROOT / "install.sh", ROOT / "pyproject.toml"]
+    assert opencode_sandbox.__version__ == "6.1.0"
+    sources = [p for p in (ROOT / "src").rglob("*.py")] + [ROOT / "pyproject.toml"]
     literal = re.compile(r"\b6\.\d+\.\d+\b")
     holders = [p.relative_to(ROOT).as_posix() for p in sources if literal.search(p.read_text())]
     assert holders == ["src/opencode_sandbox/__init__.py"]
@@ -30,12 +30,6 @@ def test_single_version_literal():
 def test_cli_version_option():
     p = subprocess.run([sys.executable, "-m", "opencode_sandbox.cli", "--version"], capture_output=True, text=True, check=False)
     assert p.returncode == 0 and p.stdout.strip() == f"opencode-sandbox {opencode_sandbox.__version__}"
-
-
-def test_installer_reads_version_from_package(tmp_path):
-    p = subprocess.run(["bash", str(ROOT / "install.sh"), "uninstall", "--dry-run"], capture_output=True, text=True, check=False,
-                       env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}, timeout=60)
-    assert f"OpenCode Sandbox {opencode_sandbox.__version__}" in p.stdout
 
 
 def test_resource_names_are_version_independent():

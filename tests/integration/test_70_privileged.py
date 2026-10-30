@@ -1,14 +1,10 @@
-"""Rows that need privileged host actions or change the user's daemon (campaign rows B01, B02, B08,
+"""Rows that need privileged host actions or change the user's daemon (campaign rows B01,
 C01, D09; only with the owner's consent). Opt-in on top of OCS_TEST_DOCKER=1:
 OCS_TEST_PRIVILEGED=1, and `sudo -n true` must succeed (cached or NOPASSWD credentials; nothing here
 ever waits for a password).
 
 What runs and what it touches:
-- `sudo install.sh …` / `sudo setup-rootless.sh` and the manager as root: must refuse; /root unchanged.
-- `install.sh install --offer-packages` in a throw-away HOME with a `pacman -Q` shim that reports
-  fuse-overlayfs as missing: the real `sudo pacman -S` runs and is declined at pacman's own prompt.
-- `setup-rootless.sh` answering yes: `systemctl --user enable --now docker.service` (already enabled
-  and running: no change) and `docker run --rm hello-world` (image removed afterwards if it was new).
+- The manager as root must refuse the user's daemon; /root unchanged.
 - A rootful `dockerd` started with sudo in private directories (no iptables, no bridge, vfs) and a
   socket served by another user (nobody): the manager must refuse both; stopped and removed after.
 - `systemctl --user restart|stop|start docker` and a SIGKILL of the whole daemon unit with one test
@@ -20,14 +16,10 @@ import os
 import secrets
 import shutil
 import subprocess
-import time
 from pathlib import Path
 
 import pytest
 from campaign import INSTALLED, MANAGER, ROOT, SOCKET
-
-pyte = pytest.importorskip("pyte")
-from pty_term import Term
 
 PRIVILEGED = os.environ.get("OCS_TEST_PRIVILEGED") == "1"
 pytestmark = pytest.mark.skipif(not PRIVILEGED, reason="privileged rows: set OCS_TEST_PRIVILEGED=1 (uses sudo)")
@@ -71,15 +63,9 @@ def context_env(camp, name, socket_path):
 
 
 def test_root_is_refused(campaign, checks, sudo):
-    """B01: the installer, the rootless wizard and the manager refuse to run as root."""
+    """B01: the manager as root refuses the user's rootless daemon as another user's."""
     camp, ck = campaign, checks
     before = root_tree(camp, sudo)
-    for script, args in (("install.sh", ["install"]), ("install.sh", ["install", "--dry-run"]), ("install.sh", ["doctor"]),
-                         ("install.sh", ["update"]), ("install.sh", ["uninstall"]), ("setup-rootless.sh", []),
-                         ("setup-rootless.sh", ["--dry-run"])):
-        p = sudo(camp, "bash", str(ROOT / script), *args)
-        ck(p.returncode == 1 and ("refuse root" in p.stderr or "never sudo" in p.stderr),
-           f"B01 sudo {script} {' '.join(args)}: refused ({p.returncode}: {p.stderr.strip()[-80:]})")
     # The manager as root: its own UID is 0, so the user's rootless daemon is another user's.
     work = short_dir(camp, "root")
     cfg = work / "docker-config"
@@ -100,93 +86,6 @@ def test_root_is_refused(campaign, checks, sudo):
     camp.note(f"removed host dir {work} (root-owned files of the as-root run)")
     ck(root_tree(camp, sudo) == before, "B01 nothing under /root changed")
     ck(not any(p.owner() == "root" for p in (ROOT / "src").rglob("*")), "B01 no root-owned file in the checkout")
-
-
-def test_offer_packages_runs_sudo_pacman_only_after_consent(campaign, checks, sudo):
-    """B02: a missing repository package is offered; `n` runs nothing, `y` runs the real
-    `sudo pacman -S`, which is declined at pacman's own prompt (no package change)."""
-    camp, ck = campaign, checks
-    home = Path("/tmp/opencode") / f"ocs-test-{camp.run}" / "home-b02"
-    shims = home / "shims"
-    shims.mkdir(parents=True, exist_ok=True)
-    camp.note(f"host dir {home} (throw-away HOME, pacman/sudo shims)")
-    calls = home / "sudo-calls.txt"
-    (shims / "pacman").write_text('#!/bin/sh\n[ "$1" = -Qq ] && [ "$2" = fuse-overlayfs ] && exit 1\nexec /usr/bin/pacman "$@"\n')
-    (shims / "sudo").write_text(f'#!/bin/sh\necho "$*" >> {calls}\nexec /usr/bin/sudo -n "$@"\n')
-    for shim in shims.iterdir():
-        shim.chmod(0o755)
-    env = {"HOME": str(home), "PATH": f"{shims}:/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8", "TERM": "xterm-256color",
-           "XDG_RUNTIME_DIR": os.environ.get("XDG_RUNTIME_DIR", ""), "DOCKER_CONFIG": str(Path.home() / ".docker")}
-    packages = subprocess.run(["pacman", "-Q"], capture_output=True, text=True, check=True).stdout
-
-    def install(answers):
-        t = Term(["bash", str(ROOT / "install.sh"), "install", "--offer-packages"], 120, 40, env=env, log=camp.log)
-        try:
-            prompts = (b"[y/N]", b"[Y/n]")
-            for n, answer in enumerate(answers, 1):
-                if not camp.wait_for(lambda n=n: t.pump(0.2) or sum(t.raw.count(x) for x in prompts) >= n or not t.alive, 300, 0):
-                    break
-                if sum(t.raw.count(x) for x in prompts) < n:
-                    break
-                t.send(answer + "\r", 2)
-            code = t.exit_code(300)
-            text = t.raw.decode(errors="replace")
-            camp.log(f"$ install.sh install --offer-packages (pty, answers {answers})\n{text}\nexit={code}")
-            return code, text
-        finally:
-            t.close()
-
-    code, text = install(["n", "n"])
-    ck("Not installed (verify repo availability): fuse-overlayfs" in text and "Run sudo pacman -S -- fuse-overlayfs?" in text,
-       "B02 the missing package is listed and offered")
-    ck(not calls.exists(), "B02 declined: sudo was never invoked")
-    ck(not (home / ".local/share/opencode-sandbox-manager/releases").exists(), f"B02 declined install: nothing installed ({code})")
-    code, text = install(["y", "n", "n"])
-    ran = calls.read_text() if calls.exists() else ""
-    ck(ran.strip() == "pacman -S -- fuse-overlayfs", f"B02 consent: exactly `sudo pacman -S -- fuse-overlayfs` ran ({ran.strip()})")
-    ck("Proceed with installation?" in text, "B02 the real pacman asked for its own confirmation (declined)")
-    ck(subprocess.run(["pacman", "-Q"], capture_output=True, text=True, check=True).stdout == packages, "B02 installed packages unchanged")
-    camp.log(f"B02 installer exit after pacman was declined: {code}")
-    shutil.rmtree(home)
-    camp.note(f"removed host dir {home}")
-
-
-def test_setup_rootless_guided_steps(campaign, checks):
-    """B08: the guided systemd step and the smoke test, answered with yes."""
-    camp, ck = campaign, checks
-    unit = lambda what: subprocess.run(["systemctl", "--user", what, "docker.service"], capture_output=True,
-                                       text=True, check=False).stdout.strip()
-    state = (unit("is-enabled"), unit("is-active"))
-    had_hello = camp.docker("image", "inspect", "hello-world", check=False).returncode == 0
-    pid = subprocess.run(["systemctl", "--user", "show", "-p", "MainPID", "--value", "docker.service"],
-                         capture_output=True, text=True, check=False).stdout.strip()
-    t = Term(["bash", str(ROOT / "setup-rootless.sh")], 120, 40, env=camp.env, log=camp.log)
-    try:
-        for n in (1, 2):
-            camp.wait_for(lambda n=n: t.pump(0.2) or t.raw.count(b"[y/N]") >= n or not t.alive, 300, 0)
-            if t.raw.count(b"[y/N]") >= n:
-                t.send("y\r", 2)
-        code = t.exit_code(300)
-        text = t.raw.decode(errors="replace")
-        camp.log(f"$ setup-rootless.sh (pty, yes to both)\n{text}\nexit={code}")
-    finally:
-        t.close()
-    if not had_hello:
-        camp.note("image hello-world (pulled by setup-rootless.sh)")
-    ck("Enable and start the USER docker.service?" in text and "Hello from Docker!" in text,
-       "B08 both guided steps ran after consent (systemd enable --now, hello-world)")
-    ck("Rootless engine: READY" in text and code == 0, f"B08 final check READY ({code})")
-    local_bin = Path.home() / ".local/bin/dockerd-rootless-setuptool.sh"
-    if local_bin.exists():
-        ck("[MISSING] dockerd-rootless-setuptool.sh" not in text, "B08 the setup tool in ~/.local/bin is found")
-    after_pid = subprocess.run(["systemctl", "--user", "show", "-p", "MainPID", "--value", "docker.service"],
-                               capture_output=True, text=True, check=False).stdout.strip()
-    ck((unit("is-enabled"), unit("is-active")) == state == ("enabled", "active") and after_pid == pid,
-       "B08 an enabled, running daemon is left as it was (same main PID)")
-    ck(camp.docker("ps", "-aq", "--filter", "ancestor=hello-world").stdout.strip() == "", "B08 the smoke container was removed (--rm)")
-    if not had_hello:
-        camp.docker("image", "rm", "hello-world")
-        camp.note("removed image hello-world")
 
 
 def test_rootful_and_foreign_daemons_are_refused(campaign, checks, sudo):
@@ -218,10 +117,6 @@ def test_rootful_and_foreign_daemons_are_refused(campaign, checks, sudo):
            "C01 start through the rootful daemon refused")
         listed = subprocess.run(["docker", "-H", f"unix://{sock}", "ps", "-aq"], capture_output=True, text=True, check=False).stdout
         ck(listed.strip() == "", "C01 nothing was created on the rootful daemon")
-        inst = subprocess.run(["bash", str(ROOT / "install.sh"), "doctor"], env=env, capture_output=True, text=True,
-                              stdin=subprocess.DEVNULL, check=False)
-        camp.log(f"$ install.sh doctor (rootful context)\n{inst.stdout}{inst.stderr}exit={inst.returncode}")
-        ck("Daemon identity: mismatch" in inst.stdout and "rootful" in inst.stdout, "C01 install.sh doctor: mismatch, rootful")
         camp.delete("ocs-test-viarootful")
     finally:
         pid = (work / "dockerd.pid").read_text().strip() if (work / "dockerd.pid").exists() else None
@@ -268,7 +163,30 @@ def daemon_up(camp):
     return camp.wait_for(lambda: subprocess.run(["docker", "-H", SOCKET, "info"], capture_output=True, check=False).returncode == 0, 120, 0.5)
 
 
-def test_daemon_restart_stop_and_crash(campaign, checks):
+def daemon_control(camp, *args):
+    p = subprocess.run(["systemctl", "--user", *args, "docker.service"], capture_output=True, text=True, check=False)
+    camp.log(f"$ systemctl --user {' '.join(args)} docker.service\n{p.stdout}{p.stderr}exit={p.returncode}")
+    return p
+
+
+def daemon_after_crash(camp, systemctl):
+    # "activating" includes RestartSec/auto-restart, not a failed start. A competing start
+    # counted as another burst and hit the host's existing service start limit.
+    if daemon_up(camp):
+        return True
+    if systemctl("start").returncode:
+        return False
+    return bool(daemon_up(camp))
+
+
+@pytest.fixture
+def restore_daemon_after_fault(campaign):
+    yield
+    # Restore the host even when a test assertion fails; never turn that failure into PASS.
+    assert daemon_after_crash(campaign, lambda *args: daemon_control(campaign, *args)), "host daemon recovery failed"
+
+
+def test_daemon_restart_stop_and_crash(campaign, checks, restore_daemon_after_fault):
     """D09: the user's rootless daemon is restarted, stopped and SIGKILLed while an environment runs."""
     camp, ck = campaign, checks
     others = camp.docker("ps", "-q").stdout.split()
@@ -285,9 +203,7 @@ def test_daemon_restart_stop_and_crash(campaign, checks):
         return p.returncode == 0 and p.stdout.count("ocs-test-marker") == 3
 
     def systemctl(*args):
-        p = subprocess.run(["systemctl", "--user", *args, "docker.service"], capture_output=True, text=True, check=False)
-        camp.log(f"$ systemctl --user {' '.join(args)} docker.service\n{p.stdout}{p.stderr}exit={p.returncode}")
-        return p
+        return daemon_control(camp, *args)
 
     systemctl("restart")
     ck(bool(daemon_up(camp)), "D09 daemon back after restart")
@@ -310,10 +226,7 @@ def test_daemon_restart_stop_and_crash(campaign, checks):
 
     camp.sh(eid, "echo after-crash > /workspace/crash.txt; sync")
     systemctl("kill", "--signal=KILL")
-    time.sleep(2)
-    if systemctl("is-active").stdout.strip() != "active":
-        systemctl("start")
-    ck(bool(daemon_up(camp)), "D09 daemon up after a SIGKILL of the whole unit")
+    ck(daemon_after_crash(camp, systemctl), "D09 daemon up after a SIGKILL of the whole unit")
     p = camp.ocs("start", name, check=False)
     ck(p.returncode == 0, f"D09 start after the daemon crash ({(p.stdout + p.stderr).strip()[-160:]})")
     ck(intact() and camp.sh(eid, "cat /workspace/crash.txt", check=False).stdout == "after-crash\n", "D09 crash: data intact")

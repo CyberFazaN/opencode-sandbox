@@ -57,6 +57,7 @@ def test_config_apply_preserves_omitted_settings(monkeypatch):
     real = cp.apply
     monkeypatch.setattr(cp, "apply", lambda m, changes, confirmed=None: seen.append(changes) or real(m, changes, confirmed=confirmed))
     monkeypatch.setattr(c, "inspect_container", lambda m: None)
+    monkeypatch.setattr(c, "image_definition", lambda m, container=False: None)  # guidance refresh
     result = runner.invoke(app, ["config", "apply", m["id"], "--pids", "1024", "--yes"])
     assert result.exit_code == 0, result.output
     assert seen == [{"pids": 1024}]  # only the change; merged with current values
@@ -183,6 +184,7 @@ def test_partial_runtime_updates_do_not_lose_each_other(monkeypatch):
     from opencode_sandbox import config_plan as cp
     m = c.create("ocs-qa-lost", "scratch")
     monkeypatch.setattr(c, "inspect_container", lambda m: None)
+    monkeypatch.setattr(c, "image_definition", lambda m, container=False: None)  # guidance refresh
     stale = c.resolve(m["id"])  # every caller read the environment before the others wrote
     for change in ({"cpus": 1}, {"pids": 333}, {"memory": "3g"}):
         cp.apply(stale, change)

@@ -29,6 +29,7 @@ def test_runtime_set_allowed_after_failed_first_start_but_not_other_journals(mon
     monkeypatch.setattr(c.os, "cpu_count", lambda: 4)  # default 4, so "2" is a change on any host
     m = c.create("ocs-qa-cpu", "scratch")
     monkeypatch.setattr(c, "inspect_container", lambda m: None)
+    monkeypatch.setattr(c, "image_definition", lambda m, container=False: None)  # guidance refresh
     from opencode_sandbox import config_plan as cp
     c.mark(m, "error", operation="start", last_error="Creation failed")
     assert cp.apply(m, {"cpus": "2"})["category"] == "saved"
