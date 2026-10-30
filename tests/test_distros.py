@@ -51,9 +51,7 @@ def test_no_distribution_branches_outside_the_registry_and_assets():
     assert offenders == []
 
 
-def test_installer_default_image_matches_the_registry():
-    text = (ROOT / "install.sh").read_text()
-    assert f'IMAGE="{distros.REGISTRY[distros.DEFAULT].image}"' in text and "OPENCODE_SANDBOX_IMAGE" not in text
+def test_custom_images_are_explicit_not_selected_by_environment():
     assert "OPENCODE_SANDBOX_IMAGE" not in "".join(p.read_text() for p in SRC.rglob("*.py"))
 
 

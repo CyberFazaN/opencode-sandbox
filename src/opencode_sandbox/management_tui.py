@@ -1,6 +1,5 @@
 """Provider, recovery and UI preferences screens. Never reveal credential values."""
 from rich.text import Text
-from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -9,6 +8,7 @@ from textual.widgets import Button, Checkbox, DataTable, Input, Static
 
 from . import core as c
 from . import preferences
+from .tui_runtime import work
 
 
 class ProviderScreen(Screen):

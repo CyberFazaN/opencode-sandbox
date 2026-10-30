@@ -86,13 +86,34 @@ the directory; `delete` removes only the container, the volume and the metadata.
 
 | `--distro` | Base image | Built from | Notes |
 |---|---|---|---|
-| `debian` (default) | `opencode-sandbox:debian` | `node:24-bookworm` (Debian 12) | Debian 12 receives LTS security support only (since 2026-07-11, until 2028-06-30) |
+| `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | Image revision 2 since 6.1.0; 6.0.0 built Debian 12 (revision 1) |
 | `arch` | `opencode-sandbox:arch` | `archlinux:base-devel` (rolling) | AUR packages through `ocs-aur` |
 
 Build the base image first (`opencode-sandbox build --distro ID`). The distribution is recorded
 at creation and cannot change later. `create NAME --image REF` uses a custom image instead: the
 Agent Context then makes no claims about its operating system or tools, the image needs
 `python3` for `run` and `shell`, and it is pulled at the first start if it is not present.
+
+The distribution family is fixed, not the OS of a future rebuilt base tag. Installing a newer
+manager does not rebuild images. Rebuilding a base affects future containers created from
+that base, **not existing containers**. Stop/start, settings recreation, snapshots and backups
+with the system layer retain the old OS and packages. A Debian 12 environment is still 12
+after the manager's default definition becomes 13; Debian 12 has LTS-only support until
+2028-06-30.
+
+For the new default, first explicitly run `opencode-sandbox build --distro debian`; `doctor`
+compares its revision with the installed definition. Then create a new environment and transfer
+your work, or explicitly restore with `backup restore BACKUP NEW --no-system`. The latter keeps
+workspace/home files but discards the old system layer and installed packages, using the local
+current base. A backup that includes its system image instead keeps its old OS. Do not delete
+the old environment until you have checked the new one.
+
+`status NAME` reports the base OS from the owned container's inherited build labels, or from
+the selected image when no container exists. Derived/restored images retain those labels.
+Unavailable/malformed labels are unknown, never guessed from the current definition. The
+metadata-only dashboard and `create` output do not probe Docker to invent an OS version;
+their version is marked uninspected. Build labels describe the base, not OS upgrades you made
+inside a container; inspect `/etc/os-release` there when an exact current version matters.
 
 ### Arch Linux environments
 

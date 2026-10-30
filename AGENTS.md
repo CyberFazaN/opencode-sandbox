@@ -12,11 +12,11 @@ never lift the "Never" list.
 
 ## Product contract
 
-OpenCode Sandbox is a Python >= 3.14 Typer CLI and Textual TUI that runs OpenCode V2 coding agents
+OpenCode Sandbox is a Python >= 3.11 Typer CLI and Textual TUI that runs OpenCode V2 coding agents
 in per-environment containers on the current user's **own rootless Docker daemon** (identity
 verified, never assumed). Hosts: Linux distributions that meet the prerequisites (D-046); Arch
 Linux is the development and real-test host. Base images come from a distribution
-registry (`src/opencode_sandbox/distros.py`): Debian 12 (`node:24-bookworm`, default) and Arch
+registry (`src/opencode_sandbox/distros.py`): Debian 13 (`node:24-trixie`, default) and Arch
 Linux (`archlinux:base-devel`, AUR via `ocs-aur`); OpenCode is the npm package `@opencode/cli`
 (2.x only). It supports scratch, project and quick environments; managed workspaces (empty or a
 copy) and, not recommended, direct host workspaces; provider credential profiles; Git change
@@ -42,8 +42,10 @@ it.
 commands, latest verification, unverified behaviour), `ARCHITECTURE.md`, `DECISIONS.md` (D-0xx;
 changing an accepted decision needs a new entry that supersedes it), `ISSUES.md` (known issues
 and accepted limitations; new issues are GitHub issues), `CAMPAIGN.md` (the release test matrix)
-and `RELEASING.md`. Keep them true when the code changes. Deferred ideas go to `TODO.md`; do not
-implement them unasked. User documentation: `README.md` and `docs/`.
+and `RELEASING.md`. Keep them true when the code changes. The roadmap and classified backlog is
+`TODO.md`; working records of a running multi-cycle effort live in a subdirectory of
+`docs/engineering/` and leave the tree when it ends (D-045). Deferred ideas are not
+implementation permission. User documentation: `README.md` and `docs/`.
 
 ## Working discipline
 
@@ -86,7 +88,7 @@ allocations, firewall or network settings; changing the Docker default context; 
 Docker resources or home data; reboots; opening inbound ports; global installations; destructive
 disk operations; real credentials or paid API use; network uploads; any irreversible operation.
 
-**Never:** run the installer as root; use `pip --break-system-packages`; mount the host Docker
+**Never:** install the application as root; use `pip --break-system-packages`; mount the host Docker
 socket into agent containers; use `--privileged` or host networking to bypass product boundaries;
 run `docker system prune` or delete Docker resources you did not create; run `makepkg` as root or
 build AUR packages in `/workspace`; open inbound (LAN) ports; chown, chmod or delete a direct host
@@ -95,9 +97,9 @@ tests pass; silently skip or suppress failing tests.
 
 ## Technical risks to validate
 
-- `install.sh` install/update/uninstall/doctor/verify/setup-rootless, symlink ownership, atomic
-  release switch and manual rollback; non-interactive behaviour; root refusal; consent for writes.
-  pipx installation from a tag, upgrade by tag, uninstall (`tests/integration/test_65_pipx.py`).
+- pipx installation from a tag, upgrade/downgrade by tag, uninstall and data retention
+  (`tests/integration/test_65_pipx.py`); foreign-launcher safety; prerequisite diagnostics without
+  host changes. Legacy installers are retired (D-048), not replaced by a setup wizard.
 - Daemon identity (`runtime_identity.py`: own UID, `dockerd` peer, user namespace, `rootless`
   option; proxies, rootful, other users' and remote daemons refused), container ownership and
   data-directory labels, collision safety, no privileged host access, network `bridge` versus

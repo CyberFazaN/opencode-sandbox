@@ -88,7 +88,7 @@ def test_doctor_does_not_create_app_directories(monkeypatch, tmp_path):
     monkeypatch.setattr(c,'BASE',tmp_path/'not-created-data')
     monkeypatch.setattr(c,'CONFIG',tmp_path/'not-created-config')
     monkeypatch.setattr(c,'ensure_runtime',lambda image=False: None)
-    monkeypatch.setattr(c,'docker',lambda *a,**k: SimpleNamespace(returncode=1))
+    monkeypatch.setattr(c,'docker',lambda *a,**k: SimpleNamespace(returncode=1,stdout='',stderr='daemon unavailable'))
     # Not the host's programs: the Docker CLI need not be installed for the unit suite (hosted CI).
     monkeypatch.setattr(readiness,'host_checks',lambda: [readiness.Check('python','Python',readiness.PASSED,'stub')])
     result=CliRunner().invoke(app,['doctor'])

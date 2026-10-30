@@ -39,18 +39,19 @@ isolation boundary. Read this page before you give an agent work you would not r
 ## Daemon identity
 
 Before any Docker command, the manager verifies that the Docker endpoint is your own rootless
-daemon. The same check runs in `doctor`, `check`, the dashboard and the source-checkout
-installer. It resolves the Docker context (`OPENCODE_SANDBOX_DOCKER_CONTEXT`, default
+daemon. The same check runs in `doctor`, `check`, Docker-backed operations and the dashboard.
+It resolves the Docker context (`OPENCODE_SANDBOX_DOCKER_CONTEXT`, default
 `rootless`) to its endpoint and then:
 
 - requires a local `unix://` socket without TLS material (`tcp://`, `ssh://` and TLS are
   **unsupported**);
-- connects and reads the socket peer's credentials (`SO_PEERCRED`): the peer must run as your
-  UID (otherwise **mismatch**: another user's daemon or a rootful daemon), must be `dockerd`
-  (otherwise **unverified-proxy**, for example `socat` or a socket proxy: the daemon behind it
-  is unknown), and must run in its own user namespace whose UID and GID 0 map to your UID and
-  GID (otherwise **mismatch**);
-- requires the engine to report the `rootless` security option (otherwise **mismatch**);
+- refuses a foreign/rootful socket peer, then sends a bounded read-only `/info` request;
+- requires kernel response-sender credentials (`SCM_CREDENTIALS`) for every response byte:
+  the sender must run as your UID, be `dockerd`, and live in its own user namespace whose
+  UID and GID 0 map to your UID and GID (otherwise **mismatch** or **unverified-proxy**);
+- requires the same authenticated response to report the exact `rootless` security option.
+  An inherited systemd listener is allowed only when the actual responder passes every check.
+  A proxy forwarding genuine Docker text still fails: the kernel identifies the proxy sender;
 - reports a missing socket, a refused connection or a daemon that does not answer as
   **unavailable**, a Docker CLI that is not installed as **missing**, and a context that does not
   exist or has no Docker endpoint as **not-configured**.
@@ -60,6 +61,13 @@ Only **verified** is accepted. Every Docker command then runs against that socke
 `DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_TLS_VERIFY` and `DOCKER_CERT_PATH` are ignored. Context
 names, socket paths and socket owners are shown but never trusted. What each result means for
 you: [troubleshooting.md](troubleshooting.md#daemon-identity-results).
+
+Readiness has a 10-second total acquisition budget, including context lookup. A ready daemon
+does not sleep. Only specific transport interruptions are retried; missing/stale sockets,
+permission/configuration failures and failed identity proof are not retried. Slow probes show
+one waiting notice; Ctrl+C or dashboard quit cancels the preflight. The manager never starts
+services itself, but connecting can trigger a listener you already configured for activation.
+It never retries Docker mutations.
 
 ## Host Git
 
@@ -79,8 +87,7 @@ build tools inside a managed workspace directory; use the `changes` commands ins
   later inside the directory is visible to the running container.
 - Change transfer and backups are not transactional against other processes writing at the same
   time; backups are cold.
-- A process killed with `SIGKILL` cannot clean up its temporary directories (`.backup-*`, and
-  `/tmp/ocs-install.*` of the source-checkout installer).
+- A process killed with `SIGKILL` cannot clean up its temporary directories (`.backup-*`).
 
 ## Reporting a vulnerability
 

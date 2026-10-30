@@ -60,6 +60,7 @@ def launcher(monkeypatch, tmp_path, m, show="os.environ.get('QA_KEY')"):
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "start", lambda m: None)
     monkeypatch.setattr(c, "observed_runtime", lambda m: None)
+    monkeypatch.setattr(c, "image_definition", lambda m, **k: None)  # isolate the launcher, not Docker observation
     monkeypatch.setattr(c, "profile_mismatch", lambda m: None)
     monkeypatch.setattr(c, "docker", lambda *a, **k: seen.setdefault("argv", a) and SimpleNamespace(returncode=0))
     c.interactive(m)

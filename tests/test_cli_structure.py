@@ -154,7 +154,7 @@ def test_create_defaults_and_shared_kind_rules(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert c.resolve("ocs-qa-plain")["kind"] == "scratch"
     assert "Workspace: managed, started empty" in result.output and "Next: opencode-sandbox run ocs-qa-plain" in result.output
-    assert "Distribution: Debian 12" in result.output and "Integrations (set up once at the first start): none" in result.output
+    assert "Distribution: Debian (OS version not inspected)" in result.output and "Integrations (set up once at the first start): none" in result.output
     result = runner.invoke(app, ["create", "ocs-qa-copy", "--source", str(project), "--no-integrations"])
     assert result.exit_code == 0, result.output
     assert c.resolve("ocs-qa-copy")["kind"] == "project"

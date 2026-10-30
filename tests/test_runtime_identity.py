@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from test_docker_readiness import response, server
 
 from opencode_sandbox import core as c
 from opencode_sandbox import runtime_identity as rid
@@ -42,14 +43,14 @@ def context_json(host, tls=None):
 
 @pytest.mark.parametrize("host", ["tcp://127.0.0.1:2375", "ssh://user@host", "npipe:////./pipe/docker_engine", ""])
 def test_non_unix_endpoints_are_unsupported(monkeypatch, host):
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": (context_json(host), None))
+    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker", **k: (context_json(host), None))
     ident = rid.verify("ocs-test")
     assert ident.classification == rid.UNSUPPORTED and not ident.verified
     assert "not a local unix://" in ident.message()
 
 
 def test_tls_context_is_unsupported(monkeypatch):
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": (
+    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker", **k: (
         context_json("unix:///run/user/1/docker.sock", {"docker": ["ca.pem"]}), None))
     assert rid.verify("ocs-test").classification == rid.UNSUPPORTED
 
@@ -58,27 +59,28 @@ def test_tls_context_is_unsupported(monkeypatch):
                                     'context "nope" does not exist'])
 def test_missing_context_is_not_configured(monkeypatch, answer):
     """A configuration error, not a stopped daemon: the hint says how to create the context."""
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": (None, answer))
+    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker", **k: (None, answer))
     ident = rid.verify("nope")
     assert ident.classification == rid.NOT_CONFIGURED and ident.reasons == ("Docker context 'nope' does not exist",)
-    assert "dockerd-rootless-setuptool.sh install" in ident.message() and "systemctl" not in ident.message()
+    assert "Configure a context" in ident.message() and rid.SETUP_GUIDE in ident.message()
+    assert "dockerd-rootless-setuptool" not in ident.message() and "systemctl" not in ident.message()
 
 
 def test_missing_docker_cli_is_missing():
     assert rid._docker(["version"], docker="/nonexistent/ocs-test-docker") == (None, rid.CLI_NOT_FOUND)
     ident = rid.verify("x", docker="/nonexistent/ocs-test-docker")
     assert ident.classification == rid.MISSING and "not installed" in ident.reasons[0]
-    assert "pacman -S docker" in ident.message()
+    assert "Install Docker with rootless support" in ident.message() and rid.SETUP_GUIDE in ident.message()
 
 
 def test_other_context_errors_stay_unavailable(monkeypatch):
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": (None, "permission denied"))
+    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker", **k: (None, "permission denied"))
     ident = rid.verify("x")
     assert ident.classification == rid.UNAVAILABLE and "permission denied" in ident.reasons[0]
 
 
 def test_unreadable_context_json_is_not_configured(monkeypatch):
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": ("not json", None))
+    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker", **k: ("not json", None))
     assert rid.verify("x").classification == rid.NOT_CONFIGURED
 
 
@@ -96,7 +98,7 @@ def test_relative_socket_path_is_unsupported():
 def test_context_name_comes_from_environment(monkeypatch):
     seen = []
     monkeypatch.setenv("OPENCODE_SANDBOX_DOCKER_CONTEXT", "ocs-test-ctx")
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": seen.append(argv) or (None, "nope"))
+    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker", **k: seen.append(argv) or (None, "nope"))
     assert rid.verify().context == "ocs-test-ctx" and seen[0][-1] == "ocs-test-ctx"
 
 
@@ -104,7 +106,7 @@ def test_docker_host_and_context_variables_are_noted_and_dropped(monkeypatch):
     monkeypatch.setenv("DOCKER_HOST", "tcp://evil:2375")
     monkeypatch.setenv("DOCKER_CONTEXT", "other")
     monkeypatch.setenv("DOCKER_TLS_VERIFY", "1")
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": (None, "nope"))
+    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker", **k: (None, "nope"))
     ident = rid.verify("rootless")
     assert any("DOCKER_HOST is set but ignored" in n for n in ident.notes)
     env = rid.docker_env()
@@ -134,32 +136,22 @@ def test_stale_socket_without_listener_is_unavailable(tmp_path):
 
 def test_same_user_proxy_socket_is_not_verified(tmp_path):
     """A socket served by a process of our own UID that is not dockerd (here: python)."""
-    path = str(tmp_path / "proxy.sock")
-    server = socket.socket(socket.AF_UNIX)
-    server.bind(path)
-    server.listen(1)
-    try:
+    with server(tmp_path, count=2) as endpoint:
+        path = endpoint.removeprefix("unix://")
         pid, uid, gid, conn = rid.peer_credentials(path)
         conn.close()
         assert (pid, uid, gid) == (os.getpid(), UID, GID)
-        ident = rid.verify("x", endpoint=f"unix://{path}")
-    finally:
-        server.close()
+        ident = rid.verify("x", endpoint=endpoint)
     assert ident.classification == rid.UNVERIFIED_PROXY
     assert ident.pid == os.getpid() and "not dockerd" in ident.reasons[0]
     assert "proxy" in ident.message()
 
 
 def test_symlinked_socket_path_is_resolved(tmp_path):
-    path = tmp_path / "real.sock"
-    server = socket.socket(socket.AF_UNIX)
-    server.bind(str(path))
-    server.listen(1)
-    (tmp_path / "link.sock").symlink_to(path)
-    try:
+    with server(tmp_path) as endpoint:
+        path = Path(endpoint.removeprefix("unix://"))
+        (tmp_path / "link.sock").symlink_to(path)
         ident = rid.verify("x", endpoint=f"unix://{tmp_path}/link.sock")
-    finally:
-        server.close()
     assert ident.socket == str(path) and ident.endpoint == f"unix://{path}"
     assert any("resolves to" in n for n in ident.notes)
 
@@ -218,44 +210,37 @@ def test_unreadable_namespace_is_unverified(tmp_path):
 
 @pytest.fixture
 def peer_ok(tmp_path, monkeypatch):
-    path = tmp_path / "d.sock"
-    server = socket.socket(socket.AF_UNIX)
-    server.bind(str(path))
-    server.listen(4)
     monkeypatch.setattr(rid, "inspect_peer", lambda pid, uid, gid, proc=None: (None, [], "/usr/bin/dockerd", []))
-    yield f"unix://{path}"
-    server.close()
+    return tmp_path
 
 
-@pytest.mark.parametrize("answer,expected", [((True, "[\"name=rootless\"]"), rid.VERIFIED),
-                                             ((False, "[\"name=seccomp\"]"), rid.MISMATCH),
-                                             ((None, "Cannot connect"), rid.UNAVAILABLE)])
-def test_engine_answer_decides_final_class(monkeypatch, peer_ok, answer, expected):
-    monkeypatch.setattr(rid, "engine_reports_rootless", lambda endpoint, docker="docker": answer)
-    ident = rid.verify("x", endpoint=peer_ok)
+@pytest.mark.parametrize("options,expected", [(["name=rootless"], rid.VERIFIED),
+                                             (["name=seccomp"], rid.MISMATCH)])
+def test_engine_answer_decides_final_class(peer_ok, options, expected):
+    with server(peer_ok, response(options)) as endpoint:
+        ident = rid.verify("x", endpoint=endpoint)
     assert ident.classification == expected
     assert ident.verified is (expected == rid.VERIFIED)
 
 
-def test_engine_check_uses_the_verified_endpoint(monkeypatch):
-    seen = []
-    monkeypatch.setattr(rid, "_docker", lambda argv, docker="docker": seen.append(argv) or ('["name=rootless"]', None))
-    assert rid.engine_reports_rootless("unix:///x.sock")[0] is True
-    assert seen[0][:2] == ["-H", "unix:///x.sock"]
+def test_engine_check_uses_the_verified_endpoint(monkeypatch, peer_ok):
+    monkeypatch.setattr(rid, "_docker", lambda *a, **k: pytest.fail("no second CLI connection for engine evidence"))
+    with server(peer_ok) as endpoint:
+        assert rid.verify(endpoint=endpoint).verified
 
 
 def test_exit_codes_and_json(monkeypatch, capsys):
     for cls, code in rid.EXIT_CODES.items():
-        monkeypatch.setattr(rid, "verify", lambda context=None, cls=cls: rid.Identity(cls, "x"))
+        monkeypatch.setattr(rid, "verify", lambda context=None, cls=cls, **k: rid.Identity(cls, "x"))
         assert rid.main([]) == code
     capsys.readouterr()
-    monkeypatch.setattr(rid, "verify", lambda context=None: rid.Identity(rid.UNSUPPORTED, "x"))
+    monkeypatch.setattr(rid, "verify", lambda context=None, **k: rid.Identity(rid.UNSUPPORTED, "x"))
     assert rid.main(["--json"]) == rid.EXIT_CODES[rid.UNSUPPORTED]
     assert json.loads(capsys.readouterr().out)["classification"] == rid.UNSUPPORTED
 
 
 def test_runs_as_a_script_without_the_package(tmp_path):
-    """install.sh runs the file directly with -I -B before any venv exists."""
+    """The standalone diagnostic remains usable without importing the application."""
     env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
     p = subprocess.run([sys.executable, "-I", "-B", str(ROOT / "src/opencode_sandbox/runtime_identity.py"),
                         "--context", "ocs-test-missing"], check=False, env=env, capture_output=True, text=True, timeout=60)
@@ -312,9 +297,5 @@ def test_cli_doctor_prints_report_and_fails_unless_verified(monkeypatch):
     assert "Daemon identity: unverified-proxy" in result.output and "socat" in result.output
 
 
-def test_scripts_use_the_shared_verifier():
-    for name in ("install.sh", "setup-rootless.sh"):
-        text = (ROOT / name).read_text()
-        assert "SecurityOptions" not in text and "--context rootless" not in text, name
-        assert "runtime_identity.py" in text and "-I -B" in text, name
+def test_manager_docker_access_does_not_resolve_the_context_again():
     assert "--context" not in (ROOT / "src/opencode_sandbox/core.py").read_text().split("def docker_cli")[0]

@@ -19,7 +19,7 @@ from opencode_sandbox import core as c
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "opencode_sandbox"
-SHELL_SCRIPTS = [ROOT / "install.sh", ROOT / "setup-rootless.sh", SRC / "assets/images/arch/pacman-retry",
+SHELL_SCRIPTS = [SRC / "assets/images/arch/pacman-retry",
                  SRC / "assets/images/common/install-opencode.sh", ROOT / ".github/scripts/pipx_smoke.sh"]
 
 

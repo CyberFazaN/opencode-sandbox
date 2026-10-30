@@ -23,7 +23,7 @@ FOREIGN = {"und", "nicht", "oder", "wird", "werden", "für", "auch", "sind", "da
 
 
 def active_files():
-    files = [ROOT / n for n in ACTIVE_ROOT_DOCS] + [ROOT / "install.sh", ROOT / "setup-rootless.sh", ROOT / "pyproject.toml"]
+    files = [ROOT / n for n in ACTIVE_ROOT_DOCS] + [ROOT / "pyproject.toml"]
     files += sorted((ROOT / "docs").glob("*.md"))
     files += sorted((ROOT / "docs" / "engineering").rglob("*.md"))
     files += sorted(p for p in (ROOT / ".github").rglob("*") if p.is_file())

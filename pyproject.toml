@@ -11,7 +11,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "CyberFazaN" }]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = ["typer>=0.16,<1", "textual>=4.0,<9"]  # lower bounds tested (A04): older typer breaks with click>=8.2, TUI needs textual 4
 keywords = ["opencode", "coding-agent", "sandbox", "rootless-docker", "docker", "tui"]
 classifiers = [
@@ -21,6 +21,9 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Software Development",
     "Topic :: Utilities",
@@ -49,7 +52,7 @@ opencode_sandbox = ["assets/images/*/*"]
 # Quality gate: `ruff check src` reports nothing (tests/test_quality.py).
 # Rules: ruff's default rule set (measured with ruff 0.17.3); only these are configured:
 [tool.ruff]
-target-version = "py314"
+target-version = "py311"
 
 [tool.ruff.lint.flake8-bugbear]
 # Typer declares options as default values; the call is evaluated once by design (B008).

@@ -23,10 +23,16 @@ python -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-Python 3.14 or newer is required. To run your checkout as `opencode-sandbox`, either use
-`.venv/bin/opencode-sandbox` or install it with `./install.sh`
-([docs/install.md](docs/install.md#install-from-a-source-checkout)). Do not install it with both
-`install.sh` and pipx: they use the same launcher.
+Python 3.11 or newer is required. Run your checkout with `.venv/bin/opencode-sandbox`; the local
+editable venv is for development only. For normal application installation, use pipx from a
+GitHub release tag ([docs/install.md](docs/install.md#install-the-application)). There is no
+host/application setup script or replacement wizard in the repository.
+
+CI runs the unit/host/Textual-pilot/local-process suite with current and lowest direct
+dependencies on Python 3.11 and 3.14, plus the current rolling Arch Python as an unprivileged
+user. Package and pipx jobs cover both endpoints too. Python 3.12/3.13 have not been separately
+tested; full real-Docker/OpenCode verification remains the release campaign, not a per-Python
+CI requirement. The 3.11 floor applies from 6.1.0; the 6.0.0 tag still requires Python 3.14.
 
 ## Test layers
 
@@ -55,8 +61,10 @@ manifest of what it created to `.work/logs/` and removes it again. Variables:
 | `OCS_TEST_DISTROS` | Distributions to test (default `debian arch`) |
 | `OCS_TEST_RUN` | Run id, used in names and log files |
 | `OCS_TEST_PRIVILEGED=1` | Add the rows that use `sudo` and restart or kill your daemon; read the docstring of `tests/integration/test_70_privileged.py` first |
+| `OCS_TEST_SOCKET_ACTIVATION=1` | Explicit permission for C10's separate rootless daemon and temporary `ocs-test-act-*` user units; read `test_36_socket_activation.py`; never restarts the existing daemon |
 | `OCS_TEST_PIPX_BUILD=1` | Let the pipx test also build an image from the installed package (downloads a base image) |
 | `OCS_TEST_MANAGER` | Run the campaign against an installed launcher (for example a pipx installation) instead of the source tree |
+| `OCS_TEST_LEGACY_MANAGER` | Separate pre-change launcher using a retained Debian 12 base, for the old-container/backup compatibility row; without it that row explicitly skips |
 
 The pipx test (`test_65_pipx.py`) needs pipx in the venv (`.venv/bin/pip install pipx`). Hosted CI
 (`.github/workflows/ci.yml`) runs only what a hosted runner can show: the unit suite with the

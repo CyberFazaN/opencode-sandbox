@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   tests:
-    name: Unit tests (${{ matrix.name }})
+    name: Unit tests (Python ${{ matrix.python }}, ${{ matrix.dependencies }} dependencies)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -26,26 +26,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: current dependencies
-            dependencies: ""
-          - name: lowest direct dependencies
-            dependencies: "typer==0.16.0 textual==4.0.0"
+        python: ["3.11", "3.14"]
+        dependencies: [current, lowest direct]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python }}
       - name: Install
         env:
           DEPENDENCIES: ${{ matrix.dependencies }}
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e '.[test]' ruff shellcheck-py
-          # shellcheck disable=SC2086  # a space-separated list of requirements
-          if [ -n "$DEPENDENCIES" ]; then python -m pip install $DEPENDENCIES; fi
+          python -m pip install -e '.[test]' ruff shellcheck-py pyte
+          if [ "$DEPENDENCIES" = "lowest direct" ]; then python -m pip install typer==0.16.0 textual==4.0.0; fi
+          python -m pip check
           python -m pip list | grep -iE '^(typer|textual|click|rich) '
       - name: Unit, host and Textual pilot tests (ruff and shellcheck included)
         run: python -m pytest -q -rs -p no:cacheprovider
@@ -65,29 +62,33 @@ jobs:
         with:
           persist-credentials: false
       - name: Unit tests as an unprivileged user
-        # The installer refuses root, and several tests check permissions: run as a normal user,
+        # Several tests check user ownership and permissions: run as a normal user,
         # with the usual umask (a container step may inherit 0000; the direct-workspace checks
         # then rightly refuse the world-writable test directories).
         run: |
           useradd --create-home ci
           chown -R ci: "$GITHUB_WORKSPACE"
           # shellcheck disable=SC2016  # the inner shell started by su expands $0
-          su ci -c 'umask 022 && cd "$0" && python -m venv /home/ci/venv && /home/ci/venv/bin/pip install -q -e ".[test]" ruff \
+          su ci -c 'umask 022 && cd "$0" && python -m venv /home/ci/venv && /home/ci/venv/bin/pip install -q -e ".[test]" ruff pyte \
             && /home/ci/venv/bin/python -m pytest -q -rs -p no:cacheprovider' "$GITHUB_WORKSPACE"
 
   package:
-    name: Package build and content
+    name: Package build and content (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python }}
       - name: Build and check
         run: |
           python -m pip install build twine
@@ -96,11 +97,15 @@ jobs:
           python .github/scripts/check_dist.py dist
 
   pipx:
-    name: pipx installation from the checkout
+    name: pipx installation from the checkout (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,13 +113,13 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python }}
       - name: Install with pipx (the documented mechanism, from a git+file URL)
         run: |
           python -m pip install pipx==1.18.7
           echo "PIPX_HOME=$RUNNER_TEMP/pipx" >> "$GITHUB_ENV"
           echo "PIPX_BIN_DIR=$RUNNER_TEMP/bin" >> "$GITHUB_ENV"
-          PIPX_HOME="$RUNNER_TEMP/pipx" PIPX_BIN_DIR="$RUNNER_TEMP/bin" python -m pipx install "git+file://$GITHUB_WORKSPACE"
+          PIPX_HOME="$RUNNER_TEMP/pipx" PIPX_BIN_DIR="$RUNNER_TEMP/bin" python -m pipx install --python "$(command -v python)" "git+file://$GITHUB_WORKSPACE"
       - name: Start without a source tree; doctor refuses the runner's daemon
         working-directory: ${{ runner.temp }}
         env:

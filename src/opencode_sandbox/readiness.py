@@ -116,6 +116,41 @@ def daemon_check():
     return Check("daemon", "Docker daemon", FAILED, ident.message(), "See: opencode-sandbox doctor")
 
 
+RESOURCE_HINT = ("Review Docker's rootless resource-limit requirements and your distribution's guidance: "
+                 "https://docs.docker.com/engine/security/rootless/tips/#limiting-resources. "
+                 "No host settings are changed by this check.")
+RESOURCE_FLAGS = {"CPU quota": ("CpuCfsQuota", "CpuCfsPeriod"), "memory": ("MemoryLimit",), "pids": ("PidsLimit",)}
+
+
+def resource_support_check():
+    """Daemon-reported support, not an active stress test or proof of per-container enforcement."""
+    check_id, title = "resource-support", "Resource-limit support"
+    try:
+        info = c.docker_info()
+    except c.SandboxError as exc:
+        return Check(check_id, title, NOT_CHECKED, f"support not established: {exc}", RESOURCE_HINT)
+    if not isinstance(info, dict):
+        return Check(check_id, title, NOT_CHECKED, "support not established: invalid Docker info data", RESOURCE_HINT)
+    version, driver = info.get("CgroupVersion"), info.get("CgroupDriver")
+    # Only real booleans are evidence: absent fields, strings and integers are unknown.
+    missing = [name for name, fields in RESOURCE_FLAGS.items() if any(info.get(key) is False for key in fields)]
+    unknown = [name for name, fields in RESOURCE_FLAGS.items()
+               if name not in missing and any(type(info.get(key)) is not bool for key in fields)]
+    # Do not echo arbitrary daemon fields (or warnings) into diagnostics/logs.
+    topology = f"cgroup v{version if version in ('1', '2') else 'unknown'}; "
+    topology += f"driver {driver if driver in ('systemd', 'cgroupfs', 'none') else 'unknown'}"
+    if version == "1" or driver == "none" or missing:
+        why = "Docker reports no support for " + ", ".join(missing) if missing else "rootless limits require cgroup v2 and a supported driver"
+        if unknown: why += "; support not established for " + ", ".join(unknown)
+        return Check(check_id, title, WARNING, f"{topology}; {why}; limits may be ignored", RESOURCE_HINT)
+    if version != "2" or driver != "systemd" or unknown:
+        detail = "support not established"
+        if unknown: detail += ": missing/invalid evidence for " + ", ".join(unknown)
+        return Check(check_id, title, NOT_CHECKED, f"{topology}; {detail}", RESOURCE_HINT)
+    return Check(check_id, title, PASSED,
+                 f"{topology}; Docker reports CPU quota, memory and pids support; enforcement not measured")
+
+
 def storage_check():
     root = c.docker_root()
     if root is None:
@@ -131,14 +166,59 @@ def storage_check():
 
 
 def image_checks():
+    """Managed base tags only: compare their labels with this manager's image definitions.
+
+    This does not inspect an existing container's OS or require replacing its system layer.
+    A diagnostic never rebuilds an image or gates an environment operation.
+    """
     from . import distros
-    out = []
-    for d in distros.REGISTRY.values():
-        present = not c.docker("image", "inspect", d.image, capture=True, check=False).returncode
-        out.append(Check(f"image-{d.id}", f"Base image {d.image}", PASSED if present else WARNING,
-                         d.name if present else f"missing ({d.name} environments cannot be created)",
-                         None if present else f"opencode-sandbox build --distro {d.id}"))
-    return out
+    return [_base_image_check(d) for d in distros.REGISTRY.values()]
+
+
+def _base_image_check(distro):
+    from . import distros
+    check_id, title = f"image-{distro.id}", f"Base image {distro.image}"
+    build = f"opencode-sandbox build --distro {distro.id}"
+    inspect_hint = "Check Docker's status and permissions, then rerun: opencode-sandbox doctor"
+    try:
+        p = c.docker("image", "inspect", "--format", "{{json .Config.Labels}}", distro.image, capture=True, check=False)
+    except c.SandboxError as exc:
+        return Check(check_id, title, NOT_CHECKED, f"image inspect failed: {c.error_text(exc)[:200]}", inspect_hint)
+    if p.returncode:
+        error = (p.stderr or "").strip()
+        # An inspect failure is not evidence of absence (e.g. a daemon stopped after verification).
+        if re.search(r"(?:^|\n)(?:Error(?: response from daemon)?: )?No such image(?::|$)", error, re.IGNORECASE):
+            return Check(check_id, title, WARNING, f"missing ({distro.name} environments cannot be created)", build)
+        return Check(check_id, title, NOT_CHECKED, f"image inspect failed: {error[:200] or f'exit {p.returncode}'}", inspect_hint)
+    try:
+        labels = json.loads(p.stdout or "")
+    except ValueError:
+        labels = ...
+    if labels is not None and not isinstance(labels, dict):
+        return Check(check_id, title, NOT_CHECKED, "invalid image inspect response (expected labels)", inspect_hint)
+    labels = labels or {}
+    review = f"Review the image at {distro.image} before rebuilding: {build}"
+    if labels.get(distros.LABEL + "managed") != "true" or labels.get(distros.LABEL + "distro") != distro.id:
+        return Check(check_id, title, WARNING,
+                     "present, but managed/distribution labels are missing or do not match; image revision cannot be verified", review)
+    raw = labels.get(distros.LABEL + "image-revision")
+    try:
+        revision = int(raw) if isinstance(raw, str) and re.fullmatch(r"[1-9][0-9]*", raw) else None
+    except ValueError:  # e.g. a label exceeding Python's integer-string conversion limit
+        revision = None
+    if revision is None:
+        return Check(check_id, title, WARNING,
+                     "present, but image revision cannot be verified (missing or invalid image-revision label)", review)
+    detail = f"{distro.name}; image revision {revision}"
+    if revision < distro.revision:
+        return Check(check_id, title, WARNING, f"{detail} is older than the manager definition ({distro.revision})", build)
+    if revision > distro.revision:
+        return Check(check_id, title, WARNING, f"{detail} is newer than the manager definition ({distro.revision})",
+                     "Do not rebuild just to remove this warning; check opencode-sandbox --version and the image's release notes")
+    if labels.get(distros.LABEL + "distro-version") != distro.version:
+        return Check(check_id, title, WARNING,
+                     "present, but the distribution version label does not match the manager definition; image revision cannot be verified", review)
+    return Check(check_id, title, PASSED, f"{detail} (current definition)")
 
 
 def rootlesskit_flags(proc=Path("/proc")):
@@ -339,7 +419,8 @@ def runtime_check(m, state):
     if differs:
         return Check("runtime", "Resource limits", WARNING, "configured " + ", ".join(differs), _recreate_hint(m))
     return Check("runtime", "Resource limits", PASSED,
-                 f"CPUs {configured['cpus']}, memory {configured['memory']}, processes {configured['pids']}")
+                 f"container configuration matches: CPUs {configured['cpus']}, memory {configured['memory']}, "
+                 f"processes {configured['pids']}; kernel enforcement not measured")
 
 
 def network_check(m, data):
@@ -582,7 +663,7 @@ def opencode_check(m, state, data):
     return Check("opencode", title, PASSED, line + "; self-update off")
 
 
-TITLES = {"daemon": "Docker daemon", "workspace": "Workspace", "operation": "Pending operation", "image": "Image",
+TITLES = {"daemon": "Docker daemon", "resource-support": "Resource-limit support", "workspace": "Workspace", "operation": "Pending operation", "image": "Image",
           "container": "Container", "volume": "Home volume", "runtime": "Resource limits", "network": "Network mode",
           "ports": "Published ports", "reachability": "Network reachability (measured)", "profile": "Provider profile",
           "agent-context": "Agent Context file", "agent-context-delivery": "Agent Context delivery", "opencode": "OpenCode",
@@ -608,11 +689,12 @@ def environment_checks(m):
     out.append(_guard(workspace_check, m, _id="workspace"))
     if not docker:
         out.append(_guard(operation_check, m, ..., _id="operation"))
-        out += _skipped(("image", "container", "volume", "runtime", "network", "ports", "reachability", "profile"),
+        out += _skipped(("resource-support", "image", "container", "volume", "runtime", "network", "ports", "reachability", "profile"),
                         "Docker daemon not verified")
         out.append(_guard(agent_context_check, m, observe=False, _id="agent-context"))
         out += _skipped(("agent-context-delivery", "opencode", "storage"), "Docker daemon not verified")
         return out
+    out.append(_guard(resource_support_check, _id="resource-support"))
     try:
         state, data = _inspect(m)
     except c.SandboxError as exc:

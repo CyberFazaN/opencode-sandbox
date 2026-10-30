@@ -80,7 +80,7 @@ def test_doctor_without_a_docker_cli_gives_the_install_hint_once(monkeypatch):
     daemon(monkeypatch, rid.MISSING)
     result = runner.invoke(cli.app, ["doctor"])
     assert result.exit_code == rid.EXIT_CODES[rid.MISSING]
-    assert result.output.count("pacman -S docker") == 1 and "See the daemon identity below" in result.output
+    assert result.output.count(rid.HINTS[rid.MISSING]) == 1 and "See the daemon identity below" in result.output
 
 
 @pytest.mark.parametrize("classification", [rid.MISSING, rid.NOT_CONFIGURED, rid.UNAVAILABLE, rid.UNSUPPORTED,
@@ -192,6 +192,6 @@ def test_dashboard_says_nothing_when_docker_is_ready():
     dashboard(t)
 
 
-def test_the_scripts_and_the_package_share_one_classification():
-    """install.sh/setup-rootless.sh run runtime_identity.py from the tree; the manager imports it."""
+def test_the_manager_uses_the_shared_identity_verifier():
+    """The CLI and dashboard obtain daemon classifications through core's shared verifier."""
     assert c.runtime_identity is rid and os.path.basename(rid.__file__) == "runtime_identity.py"

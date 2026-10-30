@@ -91,7 +91,7 @@ def test_versions_survive_one_invalid_policy(monkeypatch):
     assert rows["bad"]["state"].startswith("error")
 
 
-def fake_docker(calls, installed="2.1.4", same=False, os_release='ID=debian\nVERSION_ID="12"', problems=""):
+def fake_docker(calls, installed="2.1.4", same=False, os_release='ID=debian\nVERSION_ID="13"', problems=""):
     def docker(*a, **k):
         calls.append(a)
         if a[0] == "run":  # verify_image: os-release line, then `opencode --version`
@@ -115,7 +115,7 @@ def test_update_base_latest_builds_explicit_version(monkeypatch):
     assert "OPENCODE_VERSION=2.1.4" in build and "OPENCODE_VERSION=latest" not in build
     assert result["version"] == "2.1.4" and result["previous_image"].startswith("opencode-sandbox:debian-previous-")
     assert build[build.index("-t") + 1].startswith("opencode-sandbox:debian-candidate-")
-    for label in ("distro=debian", "distro-version=12", "image-revision=1", "opencode-version=2.1.4",
+    for label in ("distro=debian", "distro-version=13", "image-revision=2", "opencode-version=2.1.4",
                   "opencode-package=@opencode/cli", "managed=true"):
         assert "org.opencode-sandbox." + label in build
     assert build[-3:] == ("-f", str(c.distros.IMAGES / "debian" / "Dockerfile"), str(c.distros.IMAGES))
@@ -127,12 +127,29 @@ def test_update_base_latest_builds_explicit_version(monkeypatch):
 def test_build_refuses_image_whose_os_differs_from_the_registry(monkeypatch):
     calls = []
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
-    monkeypatch.setattr(c, "docker", fake_docker(calls, os_release='ID=debian\nVERSION_ID="13"'))
-    with pytest.raises(c.SandboxError, match="reports ID=debian, VERSION_ID=13; the registry expects ID=debian, VERSION_ID=12"):
+    monkeypatch.setattr(c, "docker", fake_docker(calls, os_release='ID=debian\nVERSION_ID="12"'))
+    with pytest.raises(c.SandboxError, match="reports ID=debian, VERSION_ID=12; the registry expects ID=debian, VERSION_ID=13"):
         v.update_base("2.1.4")
     assert not any(a[0] == "tag" for a in calls)
     run = next(a for a in calls if a[0] == "run")
     assert ("--security-opt", "no-new-privileges:true") == run[4:6]
+
+
+def test_base_rollback_refuses_an_old_os_without_moving_or_removing_its_tag(monkeypatch):
+    calls = []
+    previous = c.distros.previous_tag(c.distros.get(c.distros.DEFAULT), "0" * 12)
+    fallback = fake_docker(calls, installed="2.2.0", os_release='ID=debian\nVERSION_ID="12"')
+    def docker(*args, **kwargs):
+        if args[:2] == ("image", "ls"):
+            return SimpleNamespace(returncode=0, stdout=previous + "\n", stderr="")
+        if "--format" in args and "opencode-version" in args[3]:
+            return SimpleNamespace(returncode=0, stdout="2.2.0\n", stderr="")
+        return fallback(*args, **kwargs)
+    monkeypatch.setattr(c, "ensure_runtime", lambda *a: None)
+    monkeypatch.setattr(c, "docker", docker)
+    with pytest.raises(c.SandboxError, match="VERSION_ID=12; the registry expects ID=debian, VERSION_ID=13"):
+        v.rollback_base()
+    assert not any(a[0] == "tag" or a[:2] == ("image", "rm") for a in calls)
 
 
 def test_rolling_release_is_checked_by_build_id(monkeypatch):

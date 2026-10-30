@@ -22,15 +22,16 @@ SYSTEM_CONFIG = "/etc/opencode/opencode.json"
 OBSERVED = (("network", "network"), ("cpus", "CPU limit"), ("memory", "memory limit"), ("pids", "process limit"))
 
 
-def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None) -> str:
+def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
+           definition: distros.ImageDefinition | None = None) -> str:
     """Describe only what the manager configures or verifies for this environment.
 
     `runtime` is the configured runtime; `observed` the same keys as Docker reports them for
     the existing container (None when there is none, or Docker was not asked). Observed values
     win; a difference is stated, identical values render exactly like the configured ones.
-    The OS comes from the environment's registry distribution (metadata), never from the
-    image name; derived images (snapshot, runtime change, restore) keep it. A custom image
-    can differ in everything: never promise specific executables or users.
+    Base OS version comes from inspected build provenance, never from the current registry
+    or an image name. Missing/offline provenance is unknown. A custom image can differ in
+    everything: never promise specific executables or users.
     """
     distro = distros.get(m["distro"]) if m.get("distro") is not None else None
     actual = {**runtime, **{k: v for k, v in (observed or {}).items() if k in dict(OBSERVED)}}
@@ -84,10 +85,16 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None) 
         lines.append("- The running container was created with these values; the current configuration ("
                      + ", ".join(differs) + ") applies only after the user recreates it.")
     if distro:
-        lines += ["", f"## Operating system ({distro.name} {distro.version})", *distro.context_lines()]
+        if definition is not None and definition.matches(distro):
+            current = definition.version == distro.version and definition.revision == distro.revision
+            lines += ["", f"## Operating system ({distro.name} {definition.version})",
+                      *distro.context_lines(version=definition.version, include_tools=current)]
+        else:
+            lines += ["", "## Operating system",
+                      f"- Configured managed distribution: {distro.name}; base OS version and installed tools are unknown (image not inspected or labels unavailable)."]
         if image != distro.image:
             lines.append("- This container runs an image derived from the managed base image (snapshot, runtime change or restore).")
-        lines.append("- Tools may have been changed after image creation; check only when the task needs an exact version or availability.")
+        lines.append("- Build labels describe the base, not later OS/package changes. Inspect /etc/os-release or tools only when the task needs an exact version or availability.")
     else:
         lines += ["", "## Operating system",
                   "- Custom image: installed tools, OS and package manager are unknown; inspect only when needed."]
@@ -145,10 +152,11 @@ def path(m: dict, env_dir) -> Path:
     return directory(m, env_dir) / "context.md"
 
 
-def refresh(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None) -> Path:
+def refresh(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None,
+            definition: distros.ImageDefinition | None = None) -> Path:
     target = path(m, env_dir)
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    contents = render(m, image=image, runtime=runtime, observed=observed)
+    contents = render(m, image=image, runtime=runtime, observed=observed, definition=definition)
     fd, tmp = tempfile.mkstemp(prefix=".agent-context-", dir=target.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -163,8 +171,8 @@ def refresh(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | Non
     return target
 
 
-def verify(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None) -> bool:
+def verify(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None,
+           definition: distros.ImageDefinition | None = None) -> bool:
     target = path(m, env_dir)
-    expected = render(m, image=image, runtime=runtime, observed=observed)
+    expected = render(m, image=image, runtime=runtime, observed=observed, definition=definition)
     return target.is_file() and not target.is_symlink() and target.read_text(encoding="utf-8") == expected
-

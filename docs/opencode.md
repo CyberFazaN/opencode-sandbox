@@ -36,11 +36,13 @@ states only what the manager configures or verifies:
   listen on `0.0.0.0`), CPU, memory and process limits. When the container exists, the values
   come from Docker; if they differ from the configuration, the guidance reports the container's
   values and says that the configuration applies after recreation.
-- **Operating system:** the distribution, package manager, install hint, notes (Arch: AUR via
-  `ocs-aur`) and the tool list of the environment's distribution, recorded at `create`, never
-  guessed from the image name. Every image build checks that the listed tools exist. Snapshots,
-  runtime and restored images keep these lines and are marked as derived. Custom images get no
-  operating-system or tool claims.
+- **Operating system:** the base OS version from the owned container's inherited build labels,
+  or the selected image when no container exists; never guessed from today's registry or an
+  image name. Derived/restored images retain their base provenance. Only a matching current
+  definition gets its verified tool list/notes; an older definition does not inherit new tool
+  promises. Missing/offline provenance is unknown. Labels describe the base, not later changes
+  inside the container; inspect `/etc/os-release` only when needed. Custom images get no OS or
+  tool claims.
 - **Initial integrations:** the names requested at creation and the recorded outcome of the
   one-time setup (or "not done yet"), always followed by "may have been changed or removed
   since"; never what is configured now.
@@ -64,7 +66,8 @@ opencode-sandbox agent-context verify NAME   # compare with the container
 opencode-sandbox agent-context refresh NAME  # rewrite now
 ```
 
-They fall back to the configured settings (with a note) when Docker cannot be asked. The
+They fall back to the configured settings (with a note) when Docker cannot be asked, with an
+unknown OS version rather than today's default. The
 guidance is descriptive, not a security policy. It was verified with OpenCode 2.1.4 and 2.2.0 on
 Debian and Arch by capturing the first model request of a managed `run` with a fake provider;
 not with real model providers.
@@ -77,6 +80,12 @@ every container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`, so OpenCode's own upd
 self-update (also `update: auto` in your OpenCode configuration) are off. An `opencode upgrade`
 inside a container left world-writable files, about 940 MB of platform packages and a 470 MB
 npm cache in `/root`, and on Arch a broken binary.
+
+`opencode rollback-base` verifies a copy against the installed manager's current OS definition.
+A Debian-13 manager therefore refuses a Debian-12 base rollback copy; this is not an in-place
+OS downgrade tool. Retained Debian 12 containers and backups with their system image still
+work independently of the new base definition. Per-environment OpenCode update/rollback keeps
+that environment's OS and system layer.
 
 | Command | Does |
 |---|---|

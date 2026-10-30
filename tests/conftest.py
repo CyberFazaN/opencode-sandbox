@@ -32,6 +32,16 @@ def _no_real_daemon_identity(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_resource_probe(monkeypatch):
+    """Unit/pilot runs use explicit healthy daemon evidence, never an installed host Docker CLI.
+
+    Tests of the actual query keep its pre-fixture callable and mock only its transport.
+    """
+    monkeypatch.setattr(c, "docker_info", lambda: {"CgroupVersion": "2", "CgroupDriver": "systemd",
+        "MemoryLimit": True, "CpuCfsQuota": True, "CpuCfsPeriod": True, "PidsLimit": True})
+
+
+@pytest.fixture(autouse=True)
 def _no_real_session_processes(request, monkeypatch):
     """Interactive sessions go through the mocked `c.docker`; no watchdog process is started.
     Tests of the real processes opt out with `real_session`."""

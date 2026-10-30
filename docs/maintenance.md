@@ -2,12 +2,14 @@
 
 ## Readiness checks
 
-- `doctor` checks the host: Python, Git, the Docker CLI, the daemon identity, the base images,
+- `doctor` checks the host: Python, Git, the Docker CLI, the daemon identity, resource-limit
+  support, the base-image definitions,
   free space in Docker's data root and the build cache. It is read-only, works without Docker,
   and its exit status names the problem ([troubleshooting.md](troubleshooting.md#exit-status)).
 - `check NAME` is a comprehensive **read-only** check of one environment; nothing is started,
   stopped or changed. It covers the daemon identity, a pending operation, the workspace, the
-  image (and a pin), container and home-volume ownership, resource limits, the network mode and
+  image (and a pin), container and home-volume ownership, daemon-reported limit support and
+  container limit configuration, the network mode and
   published ports (configured versus what Docker reports, with the recreation command when they
   differ; a server listening on `127.0.0.1` only is flagged), the **measured network
   reachability** ([settings.md](settings.md#network-modes)), the provider profile (permissions,
@@ -17,6 +19,53 @@
 Each result of `check` is `passed`, `warning`, `failed`, `not checked` (with the reason, for
 example a stopped container) or `not applicable`; the exit status is 1 if any check failed. The
 report is cached: `status NAME` and the dashboard show its summary without asking Docker again.
+
+### Resource-limit support
+
+`doctor`, `check NAME` and the dashboard share a read-only daemon support
+check, after daemon identity verification. It checks cgroup version/driver and the exact
+boolean support flags for CPU quota/period, memory and PID limits. Rootless resource limits
+need the setup described in
+[Docker's resource-limit guide](https://docs.docker.com/engine/security/rootless/tips/#limiting-resources).
+No host files are read or changed to repair delegation, and no service commands run.
+
+- `passed` means **Docker reports** cgroup v2/systemd and the required capabilities. Kernel
+  enforcement has not been measured by the diagnostic.
+- `warning` means a known unsupported configuration or required capability is reported;
+  limits may be ignored. Follow upstream/distribution guidance rather than bypassing checks.
+- `not checked` means the query failed or evidence is missing, malformed or unrecognized.
+  Unknown support is not a pass. Unrelated cpuset, I/O or swap warnings do not imply that this
+  manager's CPU-quota, memory or PID settings are unsupported.
+
+The query has a five-second budget and cooperative cancellation. Dashboard notices are
+advisory and run off-thread at startup/explicit Refresh; they preserve an operation's status.
+`doctor` exit 0 still means host programs and daemon identity passed, not that every advisory
+passed. The per-container "Resource limits" result compares Docker configuration values and
+explicitly does not claim measured enforcement.
+
+### Base-image definitions
+
+`doctor` compares each managed base tag's `image-revision` label with the image definition in
+the installed manager. The dashboard runs the same checks at startup and explicit Refresh, after verifying the
+daemon, and shows non-blocking notices with the same details and hints.
+
+- **Older revision**: rebuild explicitly with the suggested command, for example
+  `opencode-sandbox build --distro debian`. Nothing rebuilds automatically.
+- **Missing or inconsistent labels**: the revision cannot be verified. Review the image at
+  that tag before deciding to rebuild it; a familiar name alone does not identify an image.
+- **Newer revision**: the image is ahead of this manager's definition. Check the manager version
+  and release notes; do not rebuild merely to remove the warning, which could replace it with
+  an older definition.
+- **Inspection failed**: `not checked`, with the reason. Check Docker's status and permissions;
+  this is not evidence that the image is missing. A confirmed missing image instead names the
+  build command.
+
+These are global base-tag checks, not an assessment of an existing container's operating
+system or its private/restored system image. They do not block existing environments, edit
+metadata or require migration. Rebuilding a base image does **not** upgrade the OS of an
+existing container. A current definition means the labels match, not that its OS packages or
+OpenCode are the latest available. `doctor` keeps its existing exit codes: image warnings or
+`not checked` results do not by themselves make a verified host exit nonzero; read the report.
 
 ## Recovery
 

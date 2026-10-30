@@ -42,12 +42,16 @@ jobs:
     uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
 
   pipx-tag:
-    name: pipx installation of the tag
+    name: pipx installation of the tag (Python ${{ matrix.python }})
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,7 +59,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python }}
       - name: Install the tag with pipx and start it
         env:
           TAG: ${{ github.ref_name }}
@@ -63,7 +67,7 @@ jobs:
         run: |
           python -m pip install pipx==1.18.7
           export PIPX_HOME="$RUNNER_TEMP/pipx" PIPX_BIN_DIR="$RUNNER_TEMP/bin"
-          python -m pipx install "git+file://$GITHUB_WORKSPACE@$TAG"
+          python -m pipx install --python "$(command -v python)" "git+file://$GITHUB_WORKSPACE@$TAG"
           cd "$RUNNER_TEMP"
           "$GITHUB_WORKSPACE/.github/scripts/pipx_smoke.sh" "$PIPX_BIN_DIR/opencode-sandbox" "$PIPX_HOME" "${TAG#v}"
 

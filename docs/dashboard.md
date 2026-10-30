@@ -12,9 +12,27 @@ of buttons acts on the manager as a whole, the bottom rows on the selected envir
 details pane shows the selected environment's state, workspace, distribution, provider profile,
 settings, last readiness result and last error.
 
-At start the dashboard checks the Docker daemon in the background. When it is not usable, the
+The distribution family is shown without guessing an OS version from the current base
+definition. Use `status NAME` for inspected base-image provenance; new-environment choices
+name the current build definitions, not an assertion that an existing container uses them.
+
+At start the dashboard checks the Docker daemon in the background. A slow
+daemon gets up to 10 seconds with a waiting notice, not a premature failure. Navigation and
+quit remain available; `r` retries prerequisites and clears their old warning on success.
+Automatic metadata refresh stays Docker-free. OpenCode/Shell readiness runs before suspending
+the dashboard, and Agent Context observation runs in a worker. When Docker is not usable, the
 status line says "Docker is not ready" and a notification gives the reason; the dashboard stays
 usable for everything that does not need Docker. `opencode-sandbox doctor` shows the details.
+
+After the daemon is verified, the same worker checks managed base-image revisions. A
+"Base images need attention" notice uses the same results and commands as `doctor`. It is
+advisory, not a request to replace an existing environment, and never rebuilds an image.
+Rerun `doctor` for fresh results after changing images;
+[maintenance.md](maintenance.md#base-image-definitions) explains the cases.
+
+The same worker also reports [resource-limit support](maintenance.md#resource-limit-support).
+Missing support or unavailable evidence gets an advisory notice, not an identity failure or
+an automatic host repair. CPU/memory/PID capability reports do not prove kernel enforcement.
 
 ## Keys
 

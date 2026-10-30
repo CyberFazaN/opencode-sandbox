@@ -12,10 +12,10 @@ OpenCode Sandbox is an independent open-source project. It is not affiliated wit
 the OpenCode project, and it is unrelated to other projects with similar names.
 
 > [!IMPORTANT]
-> **Beta, written by an AI agent.** Version 6.0.0 is the first public release. Its code, tests
-> and documentation were written with OpenCode and Claude Opus 5.5, with minimal human review.
-> The evidence for its behaviour is the automated test suite and a test campaign on real rootless Docker,
-> run on Arch Linux only (see [Tested environment](#tested-environment)); there has been no
+> **Beta, written by an AI agent.** Version 6.0.0 was the first public release; 6.1.0 is a
+> compatibility and reliability update. The code, tests and documentation were written with
+> OpenCode and Claude Opus 5.5, with minimal human review. The evidence for its behaviour is
+> the automated test suite and a test campaign on real rootless Docker, run on Arch Linux only (see [Tested environment](#tested-environment)); there has been no
 > independent human security review. Expect defects, read the [security model](docs/security.md),
 > and do not rely on it as your only protection against code you consider hostile.
 
@@ -40,7 +40,7 @@ Consider something else if:
 ## Features
 
 - **Environments**: scratch (empty), project (a Git clone or a filtered copy of a folder) and
-  disposable quick sessions; Debian 12 or Arch Linux images (AUR through `ocs-aur`), or a
+  disposable quick sessions; Debian 13 or Arch Linux images (AUR through `ocs-aur`), or a
   custom image.
 - **Managed workspaces** by default, never your original folder; direct host workspaces only with
   explicit consent and checks (not recommended).
@@ -78,37 +78,40 @@ Details: [docs/security.md](docs/security.md).
 | Component | Tested |
 |---|---|
 | Host, real rootless Docker | Arch Linux, kernel 7.2: the full test campaign |
-| Host, hosted CI only | Ubuntu 26.04 (GitHub's runner): unit tests with a simulated Docker, pipx installation |
-| Python | 3.14.8 and, in CI, 3.14.9 (3.14 or newer required) |
+| Host, hosted CI only | Ubuntu 26.04 (GitHub's runner): unit tests with a simulated Docker, pipx installation (recorded for 6.0.0 on Python 3.14.9) |
+| Python | 3.11.18 and 3.14.8, the lowest and the newest supported versions. 3.12 and 3.13 are accepted but not tested separately |
 | Docker | 29.9.2, rootless, slirp4netns |
 | pipx | 1.18.7 |
 | Typer, Textual | 0.27.3, 8.2.8 |
 | OpenCode | 2.1.4 and 2.2.0 (npm `@opencode/cli`; 2.x only) |
-| Images (inside the containers) | Debian 12 (`node:24-bookworm`, the default) and Arch Linux (`archlinux:base-devel`) |
+| Images (inside the containers) | Debian 13 (`node:24-trixie`, the default) and Arch Linux (`archlinux:base-devel`); existing Debian 12 environments from 6.0.0 keep working |
 
 The manager is meant to run on any Linux distribution that meets the
 [requirements](docs/install.md#requirements): rootless Docker with its kernel prerequisites,
-Python 3.14 or newer with pipx, and Git. Real-world testing has been done on Arch Linux only;
+Python 3.11 or newer with pipx, and Git. Real-world testing has been done on Arch Linux only;
 other distributions are untested, so compatibility with them is expected but not guaranteed. The
 image you choose for an environment is the distribution inside its container and does not depend
 on your host's distribution.
 
-Debian 12 has received LTS security support only since 2026-07-11 (until 2028-06-30); a move of
-the default image to Debian 13 is on the list of deferred work ([TODO.md](TODO.md)). No real
-model provider has been tested with OpenCode 2.x; the tests use a fake OpenAI-compatible
-provider.
+The Debian image is Debian 13 since 6.1.0 (6.0.0 used Debian 12). Neither a manager upgrade
+nor a base rebuild upgrades an existing container's OS: Debian 12 environments and system
+backups stay on Debian 12, which has LTS-only security support until 2028-06-30. See
+[base-image guidance](docs/workspaces.md#distributions-and-images). No real model provider has
+been tested with OpenCode 2.x; the tests use a fake OpenAI-compatible provider.
 
 ## Install
 
-You need Linux with Python 3.14 or newer, pipx and Git, from your distribution's packages (on
-Arch Linux: `sudo pacman -S python-pipx git`). Install the application from a release tag:
+You need Linux with Python 3.11 or newer, pipx and Git; install them using your distribution's
+documentation. Install the application from a release tag:
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.0.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
 opencode-sandbox --version
 ```
 
-To upgrade, install another tag with `--force`; `pipx upgrade` keeps the installed tag.
+To upgrade, install another tag with `--force`; `pipx upgrade` keeps the installed tag. After
+upgrading from 6.0.0, rebuild the Debian base image (`opencode-sandbox build`) when `doctor`
+reports an older image revision.
 `pipx uninstall opencode-sandbox` removes the application and keeps your environments and data.
 
 The application does not install or configure Docker. Prepare your rootless Docker daemon and the
@@ -139,7 +142,7 @@ The manager sends no telemetry. These services are contacted:
 | Service | When |
 |---|---|
 | GitHub, PyPI | Installation and upgrades with pipx (the source, then Typer, Textual and their dependencies) |
-| Docker Hub | Base image builds (`node:24-bookworm`, `archlinux:base-devel`) |
+| Docker Hub | Base image builds (`node:24-trixie`, `archlinux:base-devel`) |
 | The registry of a custom image | The first start of an environment created with `create --image` |
 | Debian or Arch package mirrors | Base image builds, and packages you install in an environment |
 | AUR, GitHub, crates.io | The Arch image build (the AUR helper `paru` and its sources); AUR packages you install |
@@ -162,7 +165,7 @@ is `bridge`.
   [maintenance](docs/maintenance.md)
 - [Dashboard](docs/dashboard.md), [security model](docs/security.md),
   [troubleshooting](docs/troubleshooting.md)
-- [Changelog](CHANGELOG.md), [deferred ideas](TODO.md), [contributing](CONTRIBUTING.md),
+- [Changelog](CHANGELOG.md), [roadmap and backlog](TODO.md), [contributing](CONTRIBUTING.md),
   [security policy](SECURITY.md)
 
 `opencode-sandbox --help` and `COMMAND --help` describe every command and option.

@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 from campaign import DISTROS, MANAGER
 
+from opencode_sandbox import distros
+
 pyte = pytest.importorskip("pyte")
 from pty_term import Term
 
@@ -70,6 +72,9 @@ def test_first_prompt_delivers_the_agent_context(campaign, checks, distro):
     ck(bool(agent), f"G04 the guidance reached the model ({len(agent)} of {len(bodies)} requests)")
     text = agent[0] if agent else ""
     ck(json.dumps(guidance, ensure_ascii=False)[1:-1] in text, "G04 the complete current guidance, verbatim")
+    definition = distros.get(distro)
+    ck(f"Base OS: {definition.name} {definition.version}." in text,
+       f"G04 first request identifies the built {definition.name} {definition.version} base")
     for marker in ("Networking mode: none", "CPU limit: 1.5", "Memory limit: 3g", "Process limit: 600",
                    "QA-MARKER-AGENTS-MD", "QA-FIRST-PROMPT", "## Operating system ("):
         ck(marker in text, f"G04 first request contains {marker!r}")
