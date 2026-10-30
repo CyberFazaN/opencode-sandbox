@@ -13,6 +13,19 @@ verification, known issues and what is not verified. Update it whenever one of t
 | Branch | `main`; topic branches are merged with merge commits; releases are annotated tags `vX.Y.Z` (`RELEASING.md`) |
 | Schemas | environment metadata 2, backup 3; other schema versions are not migrated (D-002) |
 
+## Unpublished Updates work
+
+D-056 approves the Updates architecture and UX effort after the published 6.1.0 release.
+[TODO](../../TODO.md#active-updates-architecture-and-ux) is the entry point; the
+[working roadmap](updates/ROADMAP.md) contains tasks, acceptance criteria, evidence and handoff.
+Its first cycle persists the plan only. No product, image-definition, schema or version change
+has been made; the existing Versions dialog, policies and update behavior described by the
+implementation remain in place. The confirmed findings are not yet fixed.
+
+Documentation-only verification for this checkpoint is recorded in the working roadmap.
+The release evidence below is historical evidence for 6.1.0, not verification of the proposed
+Updates implementation. No release preparation or publication is authorized by this effort.
+
 ## Supported environments
 
 - Host: Linux with the prerequisites of D-046; real evidence on Arch Linux only (kernel 7.2.11
@@ -196,10 +209,10 @@ test-isolation limitations of the host-process signal tests: `TODO.md` ("Optiona
 | `CHANGELOG.md` | Changes per release |
 | `CONTRIBUTING.md`, `SECURITY.md` | Contribution rules and test layers; vulnerability reporting and scope |
 | `AGENTS.md` | Instructions and permission boundaries for coding agents |
-| `TODO.md` | Roadmap: what 6.1.0 delivered, optional polish and deferred features |
+| `TODO.md` | Roadmap: active Updates effort, what 6.1.0 delivered, optional polish and deferred features |
 | `docs/engineering/BASELINE.md` | This file: current state |
 | `docs/engineering/ARCHITECTURE.md` | Current design and module map |
-| `docs/engineering/DECISIONS.md` | Decisions D-001..D-055 with rationale |
+| `docs/engineering/DECISIONS.md` | Decisions D-001..D-056 with rationale and implementation status |
 | `docs/engineering/ISSUES.md` | Known issues and accepted limitations |
 | `docs/engineering/CAMPAIGN.md` | Release test matrix: 84 active rows, seven installer-only rows retired; historical evidence distinguished from the release tree's pending gates |
 | `docs/engineering/RELEASING.md` | Release checklist and tag procedure |

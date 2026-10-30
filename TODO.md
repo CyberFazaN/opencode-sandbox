@@ -5,6 +5,22 @@ recovery, compatibility and usable diagnostics, not feature expansion. Work proc
 coherent task per cycle: investigate, implement, verify, document, commit on a topic branch,
 merge when verified, then stop.
 
+## Active: Updates architecture and UX
+
+Approved, unpublished development after 6.1.0 (D-056). The complete design, sequenced tasks,
+dependencies, acceptance criteria, verification matrix and next-cycle handoff are in the
+[Updates working roadmap](docs/engineering/updates/ROADMAP.md). This is the active effort;
+the optional and deferred items below are not competing implementation permission.
+
+Order: correctness/reliability fixes -> shared observations/discovery -> compact Updates TUI
+and existing operations -> explicit base refresh -> verified pipx manager self-update.
+Keep the three component lifecycles independent. Manager self-update must not delay the earlier
+stages. Each task includes its own tests and documentation, then a local commit and STOP.
+
+Current checkpoint: planning persisted only; no implementation started. Next: UP-01, the generic
+report component and Agent Context heading. Runtime behavior and the manager version remain
+6.1.0. Completion does not authorize a version bump, release preparation, tag, push or publication.
+
 ## Delivered in 6.1.0
 
 Simplified Rootless Docker guidance, pipx as the only installation method, the Python 3.11
@@ -28,9 +44,9 @@ session-termination fix. Details: [CHANGELOG.md](CHANGELOG.md); evidence:
 Useful when a concrete usability problem or maintenance saving justifies a small task; not a
 reason to postpone the required objectives:
 
-- Recovery Center buttons for the journals that currently name a working CLI recovery command
-  (container recreation, restore resume/rollback, OpenCode update and delete). Share existing
-  handlers; do not introduce a parallel recovery mechanism.
+- Recovery Center buttons for the remaining journals that name a working CLI recovery command
+  (container recreation, restore resume/rollback and delete). OpenCode update recovery belongs
+  to the active Updates effort. Share existing handlers, not a parallel recovery mechanism.
 - A warning before starting a second managed OpenCode session, after reproducing the UX problem.
 - A real campaign on another Linux host (for example Debian, Ubuntu or Fedora), if a disposable
   host is available. Record it before calling that host tested; Arch remains the only real-tested

@@ -6,6 +6,12 @@ state and verification: `BASELINE.md`. User-facing behaviour is in `README.md` a
 `docs/` (D-041; the rootless daemon setup in `docs/install.md`, the daemon identity check in
 `docs/security.md`, the injected guidance in `docs/opencode.md`).
 
+Approved next architecture, not implemented yet: D-056 and the
+[Updates working roadmap](updates/ROADMAP.md). The first cycle changes engineering documents
+only. The module map and behavior below describe the current implementation, including the
+base locks' current data-directory scope and the existing version-report limitations; they
+must not be read as evidence that the approved corrections have shipped.
+
 ## Boundaries
 
 - One host user, that user's own **rootless** Docker daemon, one container per environment.

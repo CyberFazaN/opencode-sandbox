@@ -911,3 +911,79 @@ Owner decision, 2026-10-30, after an independent review of every change since 6.
   The internal-reference checks also refuse the removed plan's task labels.
 - Install examples name `v6.1.0` and the 3.11 floor; this supersedes D-049's note that they kept
   naming the 6.0.0 tag.
+
+## D-056 Updates architecture and execution order — accepted for implementation
+
+Owner approval after the 6.1.0 release: improve discovery, version evidence, notifications,
+execution and recovery without replacing working lifecycle mechanisms. **Not implemented at
+this checkpoint.** The first Build cycle is documentation persistence only. Current behavior
+remains as described by the code and ARCHITECTURE until the corresponding tasks are verified.
+The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from
+TODO under D-045; it is a running-effort record, not a second permanent planning system.
+
+- One compact Updates screen, retaining the existing shortcut, separates Sandbox Manager,
+  Base Images and Environment OpenCode. Use progressive disclosure at 80x24. Share observations,
+  discovery, target validation and eligibility across CLI/TUI, not a universal update engine or
+  an Update All operation. Correct Agent Context with a generic, explicitly titled report.
+- Correctness first: retain local inventory after remote failures; fix daemon-wide base lock
+  scope and cleanup/creation races; replace creation-time rollback guessing with explicit copy
+  selection; bound diagnostic subprocesses without imposing short mutation deadlines; clear
+  obsolete advisories without overwriting active progress. Keep Docker identity and data safety.
+- Installed evidence, disposable discovery caches and operation state remain separate. Record
+  source, time and object identity; stopped environments show last verification or Unknown, not
+  their creation image's version as an installed fact. No automatic starts for discovery and no
+  temporary start/probe/stop workflow; offer explicit Start. No metadata/backup schema migration.
+- Network discovery defaults to manual. Optional dashboard background discovery attempts each
+  source at most once per 24 hours, failures included; coalesce requests, respect rate limits
+  and use quiet deduplicated notices. No persistent service or automatic installation. Manual
+  policy suppresses unsolicited notices, not explicit comparisons; Pinned may show newer versions
+  on explicit checks without changing the pin or permitting a forbidden update.
+- Resolve the latest compatible stable OpenCode release to an exact target before confirmation;
+  preserve supported-major restrictions and explicit alternative versions. Revalidate the same
+  target/state under the appropriate lock; do not silently substitute another version.
+- Base rebuilds retain candidate verification and rollback-preserving replacement. Distinguish
+  cached rebuild from full upstream/package refresh, without pruning the shared build cache.
+  Separate definition revision, embedded OpenCode and unknown upstream OS/package freshness.
+  Existing containers/layers do not migrate. Defer automatic upstream-digest notices until
+  reliable build-input provenance exists; do not add base-policy or replacement-history services.
+- Rollback selects a verified managed copy by immutable identity. Consolidate aliases; one
+  distinct copy may be selected automatically, several require explicit choice. Confirmation
+  bypass is not permission to guess. Preserve the replaced image and current-definition checks.
+- Base build and publication guards share a secure user-private namespace outside product
+  data/config overrides, keyed by canonical verified daemon endpoint and distribution. Include
+  cleanup and pin-check/container creation. Acquire installation usage, data coordinator,
+  environment IDs in stable order, base build, then base publication, only as needed. Never acquire
+  an earlier level while holding a later one; builds do not hold publication throughout.
+- Environment updates/rollback/recovery reuse existing stopped-container requirements,
+  checkpoints and journals. No implicit Stop or network change. Explain temporary update start,
+  final stopped state, full system-layer rollback and unchanged home/workspace data; binary
+  rollback is not a guarantee of application-data compatibility or reversal of data changes.
+- Implement manager self-update in this effort, after the earlier stages. Discover only published
+  full official GitHub releases; validate tags/version/source, never offer an implicit downgrade
+  or unpublished development. Automatic execution is only for a verified pipx installation from
+  the official repository at a versioned release tag. Other/editable/foreign/ambiguous installs
+  receive accurate manual guidance, not installation conversion or host setup.
+- Verify running package, interpreter, pipx record, executable and launcher ownership. Confirm an
+  exact target; refuse conflicting operations/sessions. Close the TUI and restore the terminal
+  before handing off to a self-contained helper independent of the replaceable environment and
+  invoking external pipx with argv, not shell evaluation. Coordinate supported manager instances
+  across data directories with installation-scoped exclusion and narrowly scoped fresh-process
+  verification. Do not assume external tools or older managers honor new locks.
+- pipx force is neither ownership proof nor a promise of preservation. Recheck identity before
+  replacement; verify expected version/source, actual launcher and basic CLI afterward, without
+  requiring Docker. Print recovery guidance before mutation and keep a small private recovery
+  record outside the installation. Distinguish old operational, target verification failed, and
+  unavailable installation/launcher. No automatic restart, elaborate rollback or interpreter
+  installation/switching. Previous-tag reinstall is recovery, not exact dependency restoration.
+- Stage order: correctness -> observations/discovery -> Updates UI/existing operations -> base
+  refresh -> manager discovery/self-update. Each coherent task requires regressions, appropriate
+  real evidence, documentation, a local commit and STOP. Do not claim earlier release PASS for
+  unexecuted changed paths. No version bump, release preparation, tag, push or publication.
+
+On implementation, this supersedes D-005/D-019's automatic newest-built rollback selection,
+D-019's suppression of explicit Manual comparisons and discovery limited to npm latest, and
+D-033's data-directory-local base coordination. It extends D-050's advisory presentation and
+D-042/D-044/D-048's pipx update UX without reviving a separate installer, taking over foreign
+launchers, changing distribution channels or weakening prerequisite checks. Unaffected decisions
+remain accepted. Detailed alternatives, dependencies and test gates are in the working record;
+implemented facts must be promoted to the current-state records before that record is retired.
