@@ -2,7 +2,9 @@
 
 ## Status and authority
 
-- **UP-00..UP-06 complete. Next: UP-07 + UP-08 together.** UP-00 persisted the plan; UP-01 fixes report
+- **UP-00..UP-06 and the one-time PERF checkpoint complete. Next: UP-07 + UP-08 together.**
+  PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
+  UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
   results; UP-03 implements shared base guards; UP-04 implements identity-bound explicit rollback
   selection; UP-05 bounds short diagnostics and owns client/probe cleanup; UP-06 replaces/clears
@@ -290,7 +292,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-06. D-057 consolidates closely related remaining
+All tasks below are pending except UP-00..UP-06 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -319,6 +321,7 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-04 | DONE: explicit base rollback selection | UP-03 | Alias consolidation, one-copy default, multi-copy explicit selection, immutable consent and definition verification; 49 mocked/host regressions and 4 packaged/retained real cases with CLI swap/layer preservation |
 | UP-05 | DONE: bounded diagnostic execution | UP-00 | Total network/short subprocess budgets, response limits and owned cleanup/cancellation; container-side bounds; long mutations unaffected; 51 new host/mocked/pilot cases and real Docker probe/base regressions, evidence below |
 | UP-06 | DONE: clear obsolete advisories | UP-00 | Category-owned warning/success/unknown replacement, status ownership and same-turn toast cleanup; 26 new mocked-check/image/readiness pilot cases at 80x24/100x30, four full compatibility suites; evidence below |
+| PERF | DONE: one-time test-performance investigation | Between UP-06 and UP-07 + UP-08, by owner request; not a new product dependency | Repeat baseline/after timings and collection/fixture/process profiling; same 1263 IDs/outcomes, 708 equivalent parser queries; two test-local improvements, risk-based local cadence, unchanged CI/release gates; evidence below |
 | UP-07 + UP-08 | Shared observations, compatible discovery and policy comparisons | UP-02, UP-05 | Structured source/time/identity, disposable local/remote cache, stopped history/Unknown, lifecycle invalidation and partial Docker results; bounded compatible stable npm resolution even when latest changes major, exact confirmed targets, Manual/Pinned explicit comparisons and shared CLI/TUI eligibility. Unit/host/lifecycle, cache corruption, source failure and policy regressions; scheduler/UI not required |
 | UP-10 + UP-09 | Compact Updates inventory, then optional background discovery | UP-01, UP-06, UP-07 + UP-08; **no UP-10 dependency on UP-09** | UP-10 independently delivers three local/cached-first subviews, manual Check, independent loading/errors, Details and keyboard/focus at 80x24/larger, with no network on opening and no premature manager execution. UP-09 adds default-off scheduling, attempt-based 24-hour persistence including failures/restarts, coalescing/rate limits and quiet deduplication, with no start/probe/update side effects. Separate UI/pilot/terminal and cache/preferences/scheduler gates; stop after verified UP-10 if the combined package is too large |
 | UP-11 | Environment actions and recovery | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers with exact consent and locked revalidation; pin/network/running-state refusals, stopped final state and recovery; real Docker/OpenCode and terminal tests. Recovery is an independent gate, not bundled with base or manager work |
@@ -1145,13 +1148,110 @@ a materially different architecture, record the blocker and ask the owner before
   --basetemp=/tmp/opencode/up06-docs-rerun`. Final whitespace checks clean. UP-06 complete;
   stop after local commit, then resume the grouped UP-07 + UP-08 package from this handoff.
 
+### PERF — 2026-10-30 — test performance investigation
+
+- Owner-requested one-time diagnostic/workflow task between UP-06 and UP-07/UP-08. Recovered
+  clean `work/updates` at `d7e587e`, instructions, test/CI configuration, fixtures, CONTRIBUTING,
+  BASELINE, release rules and recent evidence. UP work remains intact; UP-07/UP-08 did not start.
+  Read-only own-rootless inventory matched UP-06: zero containers/volumes, same four full tagged
+  image IDs. No real Docker mutation or new privileged/service/network permission was needed.
+- Report and durable recommended cadence are in
+  [BASELINE](../BASELINE.md#test-performance-and-local-verification); CONTRIBUTING links there.
+  Tests remain serial/foreground, function-isolated and fully collected; no CI/release gate change,
+  dependency installation, parallel runner, cross-test cache or shared mutable fixture introduced.
+- Primary environment: four-CPU Arch VM, kernel 7.2.11, Python 3.11.18, pytest 9.2.0,
+  Typer 0.27.3/Textual 8.2.8, Click 8.5.0/Rich 15.0.0. Reused verified venvs; `pip check` passed.
+  Other endpoints: Python 3.14.8 and lowest Typer 0.16.0/Textual 4.0.0. Ruff 0.17.3,
+  shellcheck-py 0.11.0.1, pyte 0.8.2; workflow tools actionlint 1.7.12/zizmor 1.31.1.
+- Ignored evidence/scripts: `.work/test-perf/measure.py` records external monotonic wall time,
+  child user/system CPU, maximum RSS, argv and exit status to JSON plus logs. `perf_probe.py`
+  records collection, test phases, fixture setup and inclusive process/sleep/fsync observations;
+  `cli_queries.py` records parser inputs/results; `analyze.py` aggregates XML. These are temporary
+  diagnostic instruments, not a new test framework or shipping dependency. Profiling elapsed
+  times are not mixed into the before/after sample. Artifacts stay under `.work/test-perf/`;
+  test basetemps are fresh `/tmp/opencode/perf-*` paths. No uploaded logs/credentials.
+
+  | Run labels | External wall / pytest time | Result |
+  |---|---|---|
+  | `baseline-a`, `baseline-b` | 108.08/107.18 s; 107.26/106.37 s | Each 1201 passed, 62 opt-in skips |
+  | `probe` (diagnostic full run) | 107.82/106.88 s | 1201 passed, 62 opt-in skips; setup 1.59/call 99.76/teardown 4.78 s |
+  | `collect-a`, `collect-b` | 0.50/0.29 s; 0.59/0.32 s | Each 1263 collected, no execution |
+  | `tui-probe` | 35.21/34.80 s | 50 passed; 39 settle calls, 12.7 s explicit delay, 14.86 s including pilot pauses |
+  | `cli-before-a/b` -> `cli-after-a/b` | 4.56/4.63 s -> 0.60/0.62 s wall | Each 8 passed |
+  | `http-before-a/b` -> `http-after-a/b` | 5.46/5.46 s -> 2.05/2.04 s wall | Each 40 passed |
+  | `after-a`, `after-b` | 99.36/98.48 s; 98.95/98.10 s | Each 1201 passed, 62 opt-in skips |
+  | `affected311low`, `affected314`, `affected314low` | 5.16/4.93 s; 4.97/4.68 s; 4.99/4.69 s | Each 80 passed, no skips; only known lowest-Typer deprecations |
+  | `docs-after-a/b` | 1.90/1.68 s; 1.84/1.63 s | Each 27 passed |
+
+  Reproducible default-suite command (repeat with a new label/basetemp; no opt-in real flags;
+  Bash's `time` reports external wall/CPU independently of pytest):
+
+  ```sh
+  time env PYTHONPATH="$PWD/src" .work/venv311/bin/python -m pytest -q --durations=40 \
+    --junitxml=.work/test-perf/baseline-a.xml --basetemp=/tmp/opencode/perf-base-a
+  ```
+
+  The local wrapper invocation was `.work/venv311/bin/python .work/test-perf/measure.py
+  baseline-a .work/venv311/bin/python -m pytest -q --durations=40
+  --junitxml=.work/test-perf/baseline-a.xml --basetemp=/tmp/opencode/perf-base-a`.
+  It explicitly disables real Docker/privileged/socket opt-ins in its child. `baseline-b` and
+  `after-a/b` use corresponding labels/basetemps; collection uses `--collect-only -q`.
+- Baseline source remained untouched until two full runs, fixture/process profiling, targeted
+  repeat timings and CLI query capture established the bottlenecks. CLI cProfile: 1328 helper
+  graph builds, 1400 total Typer graph builds including actual CLI invocation; after the patch
+  seven fresh per-test graphs, 79 total. Existing help invocations and negative option tests remain.
+  All **708 ordered parser query inputs/results are exactly equal**, before/after documentation
+  changes. Graphs are read-only within one function-scoped test, never reused across tests.
+- HTTP fixture: seven ordinary teardowns spent 0.45–0.50 s waiting for the default server shutdown
+  poll. Changed only fixture poll interval to 0.01 s and joined/closed owned resources; measured
+  0.004–0.007 s afterward. Request/error/oversize checks and all assertion/deadline/delay values
+  remain; timeout teardown stays 1.22 s. No HTTP probe replaced with a mock or faster response.
+- Compared JUnit XML: all **1263 ordered test IDs and pass/skip outcomes identical** across both
+  baselines, diagnostic full run and both after runs. Mean full external wall 107.67 -> 99.16 s,
+  8.51 s/7.9% observed improvement; changed modules explain about 7.4 s and the rest includes
+  ordinary variability. User+system CPU means 38.38 -> 33.12 s. Collection/ordinary isolation
+  setup/static tools are small, so shared fixtures/caching/parallelism are unjustified now.
+- Affected endpoint command: `PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q
+  tests/test_cli_structure.py tests/test_opencode_versions.py tests/test_quality.py
+  tests/test_language.py tests/test_user_docs.py --basetemp=<distinct short path>`. Those three
+  other combinations are focused evidence only, not new full regressions. Final primary full
+  runs include original safety, host-file/process/terminal, CLI/TUI and static/document coverage.
+- Ancillary measurements passed: local no-isolation build 0.68 s, strict twine 0.15 s, package
+  content 0.05 s, actionlint 0.02 s, offline zizmor 0.09 s; the latter small tools are single-run
+  indications, not repeated benchmarks. Python startup 0.007 s, `pip check` 0.21 s. No cold install,
+  hosted provisioning or agent/tool latency measurement; no invented attribution of that time to
+  test bodies. Ruff/shellcheck are already in the full suite. Avoid duplicate checks on identical
+  inputs; recheck changed documents, not all unchanged behavior just to update evidence prose.
+- Deferred proposals, not implementation permission: replace individually measured unnecessary
+  pilot waits with bounded condition/worker completion, retain negative timing windows and real
+  signal/race/archive behavior. The suite is already practical (~100 s); no global delay change,
+  xdist, session-mutable fixture or automatic broad test selection. UP-07/UP-08 remains high-risk
+  shared observation/policy/lifecycle work: full compatibility and affected real gates remain.
+- Local package/static checks only; no new real Docker/OpenCode, installed-manager/pipx,
+  model-provider, manual terminal or release evidence. Original release matrix and all completed
+  UP acceptance criteria stay intact. Stop after this one-time checkpoint; next UP-07 + UP-08.
+- Reviewed both test diffs and the report/cadence, retaining every original test/assertion and
+  function-scoped isolation. Final affected-plus-document repeat: **80 passed, no skips**,
+  Python 3.11/current, 5.03 s external/4.79 s pytest, `/tmp/opencode/perf-final-focused`.
+  Product sources, schema/version/assets, pyproject, CI, AGENTS and RELEASING are byte-unchanged
+  from UP-06. No failing test was suppressed; no production benchmark shortcut. Planned local
+  commit: `test: remove measured verification overhead and document cadence`.
+- After report/classification-only edits: **27 passed, no skips**, 1.84 s external/1.60 s pytest,
+  `tests/test_language.py tests/test_user_docs.py tests/test_cli_structure.py`, primary venv,
+  `/tmp/opencode/perf-final-docs`. This is focused document evidence, not a replay of the full
+  suite. Ending verified daemon inventory is unchanged: zero containers/volumes and the original
+  four full tagged-image IDs; no Docker resources created/changed/deleted, no cleanup needed.
+  Ignored benchmark logs/XML/profiles remain local for reproducibility. Whitespace checks clean.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
    ARCHITECTURE for implemented behavior, not proposed functionality. Check Git status, branch,
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
-   `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, then the UP-06 commit.
+   `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, UP-06 `d7e587e`,
+   then the one-time PERF checkpoint commit. Recover PERF's measured verification cadence from
+   BASELINE; it does not reduce the shared/high-risk or real gates for the next package.
    Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
    category-owned advisory clearing are implemented. Image assets, manager
    version and schemas still match the seed.

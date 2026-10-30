@@ -49,10 +49,17 @@ def registry(monkeypatch):
             self.wfile.write(state["body"])
 
     srv = HTTPServer(("127.0.0.1", 0), H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    # Only shutdown polling is shorter; response delays and client deadlines are unchanged.
+    thread = threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
+    thread.start()
     monkeypatch.setattr(v, "REGISTRY", f"http://127.0.0.1:{srv.server_port}/@opencode%2fcli/latest")
-    yield state
-    srv.shutdown()
+    try:
+        yield state
+    finally:
+        srv.shutdown()
+        thread.join(timeout=2)
+        srv.server_close()
+        assert not thread.is_alive(), "registry fixture did not stop its server thread"
 
 
 def test_latest_reads_registry(registry):

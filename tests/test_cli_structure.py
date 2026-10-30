@@ -2,6 +2,7 @@
 import re
 from pathlib import Path
 
+import pytest
 import typer
 from typer.core import TyperGroup
 from typer.testing import CliRunner
@@ -16,27 +17,29 @@ SRC = ROOT / "src" / "opencode_sandbox"
 GROUPS = {"changes", "backup", "container", "disk", "config", "opencode", "agent-context", "providers"}
 
 
-def root():
+@pytest.fixture
+def command_tree():
+    """One fresh graph per test; parser checks only read it, never share it across tests."""
     return typer.main.get_command(app)
 
 
-def resolves(words):
+def resolves(words, root):
     """True when `words` start with an existing command path: a command (arguments may follow)
     or a group followed by nothing or an option (it shows its help)."""
-    cmd = root()
+    cmd = root
     for word in words:
         if not isinstance(cmd, TyperGroup):
             return True
         if word.startswith("-"):
-            return cmd is not root()
+            return cmd is not root
         cmd = cmd.commands.get(word)
         if cmd is None:
             return False
-    return cmd is not root()
+    return cmd is not root
 
 
-def test_top_level_is_small_and_grouped():
-    commands = root().commands
+def test_top_level_is_small_and_grouped(command_tree):
+    commands = command_tree.commands
     groups = {n for n, x in commands.items() if isinstance(x, TyperGroup)}
     assert groups == GROUPS
     assert len(commands) <= 25, sorted(commands)
@@ -48,15 +51,15 @@ def test_top_level_is_small_and_grouped():
                   ["backup", "create"], ["backup", "list"], ["backup", "restore"], ["backup", "restore-rollback"],
                   ["container", "usage"], ["container", "snapshot"], ["container", "recreate"],
                   ["container", "recreate-recover"], ["disk", "usage"], ["disk", "cleanup"]):
-        assert resolves(words), words
+        assert resolves(words, command_tree), words
 
 
-def test_every_help_works_and_groups_show_their_commands():
+def test_every_help_works_and_groups_show_their_commands(command_tree):
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     for panel in ("Environments", "Sessions", "Settings, changes and data", "Maintenance"):
         assert panel in result.output
-    stack = [([], root())]
+    stack = [([], command_tree)]
     while stack:
         path, cmd = stack.pop()
         result = runner.invoke(app, [*path, "--help"])
@@ -80,16 +83,16 @@ def named_commands(text):
         yield match.group(0), words
 
 
-def test_every_command_hint_in_the_product_exists():
+def test_every_command_hint_in_the_product_exists(command_tree):
     """Hints in errors, readiness checks and dialogs must name commands that exist."""
     bad = [(path.name, text) for path in sorted(SRC.glob("*.py")) for text, words in named_commands(path.read_text())
-           if not resolves(words)]
+           if not resolves(words, command_tree)]
     assert bad == []
 
 
-def leaf(words):
+def leaf(words, root):
     """The command that `words` name (None if a word is unknown) and the words after it."""
-    cmd, rest = root(), list(words)
+    cmd, rest = root, list(words)
     while isinstance(cmd, TyperGroup) and rest and not rest[0].startswith("-"):
         cmd = cmd.commands.get(rest.pop(0))
         if cmd is None:
@@ -97,9 +100,9 @@ def leaf(words):
     return cmd, rest
 
 
-def unknown_options(words):
+def unknown_options(words, root):
     """Options in `words` that their command does not have (`--opt`, `[--opt X]`, `--opt=V`)."""
-    cmd, rest = leaf(words)
+    cmd, rest = leaf(words, root)
     if cmd is None or isinstance(cmd, TyperGroup):
         return []
     known = {o for p in cmd.params for o in (*p.opts, *p.secondary_opts)} | {"--help"}
@@ -115,7 +118,7 @@ def user_documents():
     return [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
 
 
-def test_every_command_in_the_user_documents_exists():
+def test_every_command_in_the_user_documents_exists(command_tree):
     """README.md and every guide in docs/: command paths and their options."""
     bad = []
     for path in user_documents():
@@ -124,26 +127,26 @@ def test_every_command_in_the_user_documents_exists():
         # Backticked forms without the program name: `backup create NAME`, `disk cleanup --yes` ...
         for code in re.findall(r"`([a-z][a-z-]*(?: [^`]*)?)`", text):
             words = code.split()
-            if words[0] not in root().commands or words[1:2] == ["..."]:
+            if words[0] not in command_tree.commands or words[1:2] == ["..."]:
                 continue
             if words[0] == "opencode" and words[1:2] in (["mcp"], ["upgrade"]):
                 continue  # OpenCode's own commands inside the container
             alternatives = words[1].split("|") if len(words) > 1 else [None]
             named += [(code, [words[0], *([a] if a else []), *words[2:]]) for a in alternatives]
         for full, words in named:
-            if not resolves(words):
+            if not resolves(words, command_tree):
                 bad.append((path.name, full))
-            elif unknown_options(words):
-                bad.append((path.name, full, unknown_options(words)))
+            elif unknown_options(words, command_tree):
+                bad.append((path.name, full, unknown_options(words, command_tree)))
     assert bad == []
 
 
-def test_the_document_check_finds_unknown_commands_and_options():
-    assert not resolves(["backup", "nonsense"]) and resolves(["backup", "create", "NAME"])
-    assert unknown_options(["backup", "create", "NAME", "--stop", "[--no-system]"]) == []
-    assert unknown_options(["backup", "create", "NAME", "--force"]) == ["--force"]
-    assert unknown_options(["exec", "NAME", "--", "ls", "--all"]) == []
-    assert unknown_options(["disk", "cleanup", "#", "--not-an-option"]) == []
+def test_the_document_check_finds_unknown_commands_and_options(command_tree):
+    assert not resolves(["backup", "nonsense"], command_tree) and resolves(["backup", "create", "NAME"], command_tree)
+    assert unknown_options(["backup", "create", "NAME", "--stop", "[--no-system]"], command_tree) == []
+    assert unknown_options(["backup", "create", "NAME", "--force"], command_tree) == ["--force"]
+    assert unknown_options(["exec", "NAME", "--", "ls", "--all"], command_tree) == []
+    assert unknown_options(["disk", "cleanup", "#", "--not-an-option"], command_tree) == []
 
 
 def test_create_defaults_and_shared_kind_rules(tmp_path, monkeypatch):
@@ -178,10 +181,10 @@ def test_create_defaults_and_shared_kind_rules(tmp_path, monkeypatch):
     assert c.create("ocs-qa-api", provisioning=ig.request([]))["kind"] == "scratch"
 
 
-def test_every_command_has_help_text():
+def test_every_command_has_help_text(command_tree):
     """`opencode status` and `opencode check` were listed without a description."""
     missing = []
-    stack = [([], root())]
+    stack = [([], command_tree)]
     while stack:
         path, cmd = stack.pop()
         if isinstance(cmd, TyperGroup):
@@ -191,10 +194,10 @@ def test_every_command_has_help_text():
     assert missing == []
 
 
-def test_every_option_has_help_text():
+def test_every_option_has_help_text(command_tree):
     """Options without help appeared as bare `--yes`, `--version`, `--destination` in --help."""
     missing = []
-    stack = [([], root())]
+    stack = [([], command_tree)]
     while stack:
         path, cmd = stack.pop()
         if isinstance(cmd, TyperGroup):

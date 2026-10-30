@@ -43,6 +43,13 @@ CI requirement. The 3.11 floor applies from 6.1.0; the 6.0.0 tag still requires 
 | Real identity and sessions | Tests marked `real_identity` and `real_session` run the daemon-identity verifier and session watchdogs as real local processes (against fake sockets and a fake `docker`) | part of `pytest -q` |
 | Real campaign | Real rootless Docker, both base images, real OpenCode, real terminals, fault injection (`tests/integration/`) | see below |
 
+For local iteration, start with the regression and affected modules, then run the complete suite
+at a completed code-package checkpoint. Shared/security/data-lifecycle changes need the broader
+compatibility and real layers; focused runs are not full regression. The measured costs and
+[risk-based cadence](docs/engineering/BASELINE.md#recommended-development-time-cadence) explain
+selection and reporting. Reuse verified unchanged venvs, not mutable fixtures; run host-process
+suites serially in the foreground. CI and release verification requirements are unchanged.
+
 The real campaign creates and deletes containers, volumes and images on your rootless daemon,
 kills and interrupts operations on purpose, and needs both base images, network access and
 `pyte`. **Run it only on a disposable machine, such as a VM set aside for testing**, never on a

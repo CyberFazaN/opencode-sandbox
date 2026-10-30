@@ -91,7 +91,128 @@ absolute `PYTHONPATH` so test subprocesses import the checkout. The retained-OS 
 test-only image namespace for new base images and the socket-activation opt-in are described
 in `RELEASING.md` ("Verify").
 
+## Test performance and local verification
+
+One-time investigation after UP-06, before UP-07/UP-08 (2026-10-30). No application, CI,
+dependency or release-gate changes. Commands/evidence:
+[working checkpoint](updates/ROADMAP.md#perf--2026-10-30--test-performance-investigation).
+
+### Measurements and findings
+
+Arch Linux VM, kernel 7.2.11, four available CPUs; existing editable venvs, no installation or
+environment rebuild. Primary timing: Python 3.11.18, pytest 9.2.0, Typer 0.27.3, Textual 8.2.8,
+Ruff 0.17.3, shellcheck 0.11.0, pyte 0.8.2. Serial foreground runs used fresh short basetemps,
+absolute PYTHONPATH and JUnit phase timings. External wall time includes startup/finalization,
+not agent reasoning or tool transport.
+
+| Measurement | Before | After test-only changes |
+|---|---|---|
+| Complete default suite, external wall, two runs | 108.08 / 107.26 s | 99.36 / 98.95 s |
+| Pytest session time, same runs | 107.18 / 106.37 s | 98.48 / 98.10 s |
+| Results, every full run | 1201 passed, 62 opt-in skips | Identical 1263 ordered test IDs/outcomes |
+| CLI-structure module, two standalone runs | 4.56 / 4.63 s | 0.60 / 0.62 s; same 8 tests |
+| OpenCode-version module, two standalone runs | 5.46 / 5.46 s | 2.05 / 2.04 s; same 40 tests |
+| Collection only | 0.50 / 0.59 s wall; pytest collection 0.29 / 0.32 s | Not a bottleneck |
+| Instrumented baseline phases | Setup 1.59 s, call 99.76 s, teardown 4.78 s | Diagnostic, not an optimized benchmark |
+
+The default "unit suite" mixes mocked Docker with real host files/Git, HTTP/UNIX sockets,
+processes, host-terminal fixtures and Textual pilots. The 62 opt-in skips prove no real-Docker
+behavior. Largest baseline modules, phase totals across two runs: `test_tui.py` 36.11–36.49 s,
+`test_readiness.py` 8.54–8.61 s, `test_version_inventory.py` 8.37–8.47 s,
+`test_opencode_versions.py` 5.27 s, `test_advisory_tui.py` 5.09–5.24 s and
+`test_cli_structure.py` 4.55–4.77 s. Slowest individual tests: document-command validation
+3.74–3.92 s, external-CLI dashboard refresh 3.15–3.27 s, create-form choices 2.79–2.90 s,
+dialog Escape 2.42–2.54 s and direct-workspace consent 2.09–2.13 s.
+
+Priorities, benefits and risks:
+
+1. **Implemented, low risk:** fresh command graph per CLI-structure test, passed to read-only
+   helpers: 1328 helper constructions become seven; all help invocations remain. All 708 ordered
+   command/option queries and results match before/after. No cross-test cache/shared mutable state.
+2. **Implemented, low risk:** function-scoped HTTP fixture shutdown polling 0.01 s instead of
+   0.5 s, plus explicit thread join/socket close. Seven teardowns fall from 0.45–0.50 s to
+   0.004–0.007 s. The real HTTP/error/body checks, 0.3 s client deadline and 1.5 s delayed response
+   are unchanged; the timeout case still takes 1.22 s in teardown. No real verification became a mock.
+3. **Workflow, greatest potential benefit:** avoid replaying identical full checks after each
+   subtask/prose edit; use the cadence below. UP-06's four full combinations consumed 420.82 s
+   of recorded pytest time, plus focused/document repeats. Different dependency combinations are
+   distinct evidence, not duplicates, but need not be four feedback loops per small edit.
+4. **Deferred:** the 50-test TUI module makes 39 `settle` calls: 12.7 s explicit delay, 14.86 s
+   including pilot pauses. Replace only individually proven unnecessary waits with bounded
+   worker/condition completion. Timers/unchanged-state intervals/negative observations must remain.
+   Prerequisite pilots also wait 20 iterations unconditionally (about two seconds explicit delay
+   across two cases). Needs repeated current/lowest-Textual and loaded-host evidence; no guaranteed
+   saving. No global sleep reduction, parallel runner or larger infrastructure rewrite now.
+
+Mean full wall time improved **107.67 -> 99.16 s (7.9%)**; changed modules explain about 7.4 s
+standalone saving, with normal variation in the remainder. A roughly 100-second mixed-layer
+suite for 1201 tests is already practical. Global isolation/safety fixture setup totals about
+0.11 s across 1201 tests; `tmp_path` setup 0.11 s; largest Git fixture setup total 0.57 s. Keep
+function isolation. The instrumented parent launched 2044 Git clients (about 2.35 s launch/blocking
+time); real Git/filesystem tests are not the main bottleneck. Retain the real 1 GiB archive-size
+safety fixture (about 1.1 s), durability checks, signal/lock deadlines and race repetitions.
+
+Prepared-tool costs are small: Ruff/shellcheck child execution about 0.02/0.03 s inside the suite;
+no-isolation sdist+wheel 0.68 s, strict twine 0.15 s, content check 0.05 s, workflow lints below
+0.10 s each (single-run indications). Repeated post-change language/link/CLI runs take 1.84–1.90 s
+wall for 27 tests. Existing-venv `pip check`: 0.21 s; Python startup: 0.007 s. Cold downloads/
+installations, hosted CI provisioning, real campaign runtime and agent/tool latency were not
+benchmarked; do not charge them to test execution. Async task/sleep durations overlap and must
+not be added as wall time. Diagnostic instrumentation is separate from baseline comparisons.
+
+### Recommended development-time cadence
+
+This applies the existing risk-appropriate verification contract, not a substitute for full
+regression. CI and [release verification](RELEASING.md#2-verify) stay unchanged.
+
+| Point / change | Verification and reporting |
+|---|---|
+| Fast feedback | Reproducer/new test, then its whole module and direct consumers. Name selected paths/IDs; never describe a focused or last-failed run as the complete suite |
+| Completed code package | At least one complete default suite on final code plus focused regressions; review changes since that run. Related subtask commits need not replay identical full runs mechanically |
+| Prose/evidence-only follow-up | Language/links/CLI checks; quality checks for changed code/scripts. Cite prior full code verification and label the new run focused; no unchanged UI/process or package replay solely for prose |
+| UI presentation / test-local helper | Affected pilots/helpers/CLI consumers at 80x24/larger and relevant current/lowest Textual/Typer endpoints; complete primary suite at code-package completion. Common workers/fixtures/action routing need broader verification |
+| Shared/high-risk code or infrastructure | Complete Python 3.11/3.14 × current/lowest suites at integration checkpoints, not just endpoint samples; adversarial/concurrency/fault/recovery tests and affected real scenarios separately |
+| Before release | Full final regression/compatibility matrix, package/installed-pipx checks and real campaign/P0/P1 evidence or accepted blockers under RELEASING/CAMPAIGN; no focused/mock/historical substitute |
+
+Broader gates must cover security/ownership/daemon identity and diagnostics, lock ordering/
+concurrency, host filesystem/Git safety, profiles/credentials, backup/archive/restore, cleanup,
+lifecycle/journals, rollback and recovery. Observation/version changes affecting identity, pins or
+update eligibility, including UP-07/UP-08, belong here. Run affected disposable real-Docker/
+OpenCode paths on both distributions, and pipx/terminal handoff/fault paths for installation
+changes, under existing permissions/manifests/cleanup rules. Full default-suite PASS is not real
+integration evidence. Preserve negative cases, real processes/files and both-distribution evidence.
+
+Representative test families (paths under `tests/`; not an exhaustive automatic selector):
+
+| Category | Existing coverage to retain together when affected |
+|---|---|
+| Identity, security, diagnostics | `test_runtime_identity.py`, `test_docker_readiness.py`, `test_diagnostics.py`, `test_hardening.py`, profile safety/mount tests; real sockets/processes are not live-daemon proof |
+| Concurrency, lifecycle, rollback/recovery | Base lock/coordination/rollback, lifecycle, config-plan, journals, recreate faults/consistency, transactions, recovery, OpenCode lifecycle and session-signal/hangup tests |
+| Filesystem/Git/data boundaries | Direct/unreadable/untrusted workspace, Git boundary/roundtrip/review, archive/home-archive paths, backup hardening/completeness, staged restore/resume/settings and cleanup tests |
+| CLI and UI consumers | CLI structure/robustness, TUI/text/advisory/diagnostic pilots, readiness, version inventory, Agent Context and affected management screens |
+| Static/package/contracts | Quality, language, user docs, package metadata, installation, release scripts and Python/CI structure tests; these do not replace runtime or installed-package checks |
+| Real opt-in integration | `integration/`: identity/prerequisites, both-distribution lifecycle/security/direct access, faults, OpenCode, base races/probes, TUI terminals, pipx, privileged and combination rows; permissions and manifests still apply |
+
+Reuse unchanged editable venvs after version/`pip check` verification, not container/fixture state.
+Record source checkpoint, commands, selected scope, dependencies, counts, skips, failures/reruns
+and unexecuted layers. Ruff/shellcheck/docs checks already passed in a full run need not be
+replayed on identical inputs; changed inputs must be checked again. Package/workflow checks
+remain required for affected inputs and final checkpoints. No automatic broad deselection,
+xdist or session-scoped mutable fixtures: global watchdog counts, signals and filesystem/kernel
+races require isolation. Review any future parallelism/caching proposal separately.
+
 ## Verification
+
+### One-time performance checkpoint after UP-06 — 2026-10-30
+
+- Two unchanged baselines, one diagnostic full run and two post-change full runs: **1201 passed,
+  62 opt-in skips each**, Python 3.11/current. Exact ordered IDs/outcomes matched.
+- Focused CLI/version/quality/language/document subset: **80 passed** in each other compatibility
+  combination (3.11/lowest, 3.14/current, 3.14/lowest); only known lowest-Typer deprecations.
+  These are not new full-suite results for those combinations.
+- Local build/strict twine/content/workflow checks passed. No application/CI/version/schema change,
+  dependency installation, new real Docker/OpenCode/pipx/manual evidence or release work. Original
+  safety checks, negative cases and release requirements remain intact.
 
 ### Unpublished UP-06 and roadmap consolidation — 2026-10-30
 

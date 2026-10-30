@@ -29,6 +29,11 @@ base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup
 Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
 their existing timing. Dashboard advisories now replace/clear by category without erasing active
 progress. Next: UP-07 + UP-08 together, shared observations, compatible discovery and comparisons.
+The one-time test-performance checkpoint between UP-06 and that package is complete: two
+test-local improvements preserve all test IDs/results and reduce measured full wall time by
+about 8%; findings and recommended verification cadence are in
+[BASELINE](docs/engineering/BASELINE.md#test-performance-and-local-verification). No application
+or CI/release gate changed; broader UP-07/UP-08 verification remains required.
 The manager version remains 6.1.0.
 Completion does not authorize a merge, version bump, release preparation, tag, push or publication.
 
