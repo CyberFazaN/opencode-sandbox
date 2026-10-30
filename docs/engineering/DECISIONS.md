@@ -626,8 +626,8 @@ Measured with pipx 1.18.7.
 - `OCS_TEST_MANAGER=<launcher>` runs the real campaign against an installed manager;
   `tests/integration/test_65_pipx.py` covers rows B09-B12 in a disposable clone with test tags
   (`OCS_TEST_PIPX_BUILD=1` adds the image build).
-- Not verified: installing from the GitHub repository itself, other pipx versions, the refusal by
-  an older pipx Python.
+- Verified from the GitHub repository itself at the release of 6.0.0. Not verified: other pipx
+  versions, the refusal by an older pipx Python.
 
 ## D-045 Public engineering records — accepted
 
