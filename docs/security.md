@@ -69,6 +69,20 @@ one waiting notice; Ctrl+C or dashboard quit cancels the preflight. The manager 
 services itself, but connecting can trigger a listener you already configured for activation.
 It never retries Docker mutations.
 
+## Base-image coordination
+
+Base-image guards live in `/tmp/opencode-sandbox-locks-<UID>/`, not in a selected data or
+configuration directory. Their keys use your UID, the canonical verified daemon endpoint and
+distribution; context aliases and daemon restarts do not split the guards. The location ignores
+HOME, TMPDIR and XDG overrides and has no alternate fallback. An unsafe/unusable namespace
+refuses the operation rather than silently choosing another lock location.
+
+The manager checks ownership and private modes (0700 directory, 0600 regular single-link files),
+refuses symlinks and changed path identities, and never repairs, replaces or removes lock files.
+Do not delete this directory while any manager instance might be running. A crashed process
+releases its locks automatically; its lock files are not stale locks to remove. Older managers,
+manual Docker commands and a hostile process of your own user are outside this advisory protocol.
+
 ## Host Git
 
 The repository inside a managed workspace is controlled by the agent. The `changes` commands

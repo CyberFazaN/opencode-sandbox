@@ -21,10 +21,11 @@ D-056 approves the Updates architecture and UX effort after the published 6.1.0 
 UP-00 persisted the plan; UP-01 implements explicitly titled generic reports and the Agent
 Context heading/capitalization and inspection-fallback correction. UP-02 preserves independent
 local/registry version results, isolates failed rows and reports partial failure in both CLI and
-TUI. The existing Versions interface, lookup provider, policies and mutation workflows otherwise
-remain unchanged; UP-03 is next. No image-definition, schema or manager-version change was made.
+TUI. UP-03 implements daemon-wide base build/publication guards, cleanup/creation coordination
+and locked image revalidation. The existing Versions interface, lookup provider and policies
+remain unchanged; UP-04 is next. No image-definition, schema or manager-version change was made.
 
-UP-01/UP-02 verification is below; commands, initial failures and handoff are in the roadmap.
+UP-01..UP-03 verification is below; commands, initial failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 
@@ -84,6 +85,19 @@ test-only image namespace for new base images and the socket-activation opt-in a
 in `RELEASING.md` ("Verify").
 
 ## Verification
+
+### Unpublished UP-03 — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Full unit/host/Textual-pilot/local-process suite, Python 3.11.18 and 3.14.8, current/lowest dependencies | **1075 passed, 60 opt-in skips in each of four serial runs**; current Typer 0.27.3/Textual 8.2.8, lowest 0.16.0/4.0.0; only the two known lowest-Typer/Click deprecations. Includes Ruff/shellcheck, documents, CLI structure and existing host terminal fixtures |
+| New host/mocked-Docker regressions | 60 cases: cross-data/config/HOME/TMPDIR/runtime/context process convergence, daemon/distribution separation, lock order, crash release, exec descriptor closure, unsafe ownership/modes/symlink/hardlink/FIFO/path replacement, participant guards, changed/failed image inspection, local references, colliding image tags and first-build safety |
+| Final test-only strengthening | Descriptor noninheritance now directly inspects the exec child's open file identities, not just reacquisition after unlock. Base-lock/static subset **35 passed** in each of the four combinations after that assertion change; no product change after the full suites |
+| Scoped real Docker/OpenCode version verification | `test_42_base_coordination.py -k local-fixture`: **2 passed, 24 logged checks, 2 packaged-definition cases deselected**, final run `up03-proof` (22.30 s). Separate data directories, real context aliases including a socket symlink, build/rollback/cleanup/creation races, pin check through creation, immutable swaps and writable-layer markers. Explicit network-free fixtures derived from retained Debian 12/revision 1 and Arch/revision 1 with OpenCode 2.2.0; tool/OS/binary verification still runs, not new-package installation or current-definition freshness evidence |
+| Fresh packaged-definition variant | **BLOCKED, not passed**: initial attempt had 2 failures (104.30 s), Debian at Docker Hub DNS resolution for `node:24-trixie`, Arch at mirror DNS resolution during pacman. Both failed before publication and cleaned up. No networking/security changes or silent skips. Rerun the `packaged` variant when DNS works; command in the roadmap |
+| Package | Python 3.11 sdist/wheel built locally with unchanged version 6.1.0; strict twine and `check_dist.py` passed, new `base_locks.py` byte-identical in the wheel. Not uploaded/installed globally; no fresh pipx or installed-manager race run |
+| Resources | Each real run has a manifest and guarded product cleanup; final run has zero objects with its data/test labels, unchanged original tagged images, socket aliases removed. Shared private lock files remain intentionally (never unlinked); build cache was not pruned |
+| Not re-established | Full real campaign, fresh Debian 13/Arch package builds, privileged daemon restart/socket-activation rows, real model provider, or new real-terminal/manual UI observation. Earlier release evidence remains historical; no release-readiness inference |
 
 ### Unpublished UP-02 — 2026-10-30
 

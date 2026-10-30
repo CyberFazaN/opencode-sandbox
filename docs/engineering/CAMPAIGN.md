@@ -29,6 +29,14 @@ report evidence is unit/host/pilot only (BASELINE and the Updates working roadma
 PASS entries below are historical, not new verification of these changes; report-specific
 real-terminal and live-source checks remain to be re-established in UP-18.
 
+UP-03 adds host-process locking/revalidation regressions and scoped real build/swap/rollback/
+cleanup/creation races (`test_42_base_coordination.py`) across data directories and canonical
+context aliases. Retained-image fixtures pass on Debian 12 and Arch with real OpenCode version
+and tool verification, not model-provider or current-definition freshness evidence. Fresh
+packaged-definition races on Debian 13/Arch are BLOCKED by DNS failures to Docker Hub/Arch
+mirrors; both attempts failed before publication and cleaned up. Full campaign/pty evidence is
+not renewed by these scoped tests; commands and remaining gates are in the Updates roadmap.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

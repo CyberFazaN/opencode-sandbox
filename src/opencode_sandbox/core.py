@@ -226,6 +226,9 @@ def init_dirs():
 @contextmanager
 def lock(key, timeout=30.0):
     """Cross-process advisory lock with bounded waiting; all mutations use it."""
+    from . import base_locks
+    if base_locks.held():
+        raise SandboxError("Lock order violation: data/environment locks must precede base guards")
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", key):
         raise SandboxError("Invalid lock key")
     init_dirs()
@@ -821,8 +824,35 @@ def base_tag_lock(m):
     Derived and custom images are not affected."""
     if m.get("image") or m.get("distro") is None:
         yield; return
-    with lock(f"base-tag-{m['distro']}"):
+    with base_lock(m["distro"], "publication"):
         yield
+
+def base_lock(distro, phase, *, timeout=30.0):
+    from . import base_locks
+    return base_locks.lock(distro, phase, timeout=timeout)
+
+def inspect_base_image(distro, ref, *, missing=False):
+    """Identity/ownership evidence, re-read under base guards before mutation.
+
+    Only a known missing-image response permits a first build; failed/invalid inspection must
+    not authorize replacement. Old definition revisions are allowed, foreign named images not.
+    """
+    p = docker("image", "inspect", ref, capture=True, check=False)
+    if p.returncode:
+        if missing and "no such image:" in (p.stderr or "").lower(): return None
+        raise SandboxError(f"Cannot inspect base image {ref}; no image was authorized for replacement/removal")
+    try:
+        (info,) = json.loads(p.stdout)
+        labels = info["Config"]["Labels"]
+        image_id = info["Id"]
+        if not isinstance(image_id, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
+            raise ValueError("invalid image identity")
+        if distros.image_definition(distro.id, labels) is None or labels.get(DATA_LABEL) \
+                or labels.get("org.opencode-sandbox.id"):
+            raise SandboxError(f"Refusing unmanaged/foreign base image {ref}; its name is not ownership proof")
+    except (ValueError, KeyError, TypeError) as exc:
+        raise SandboxError(f"Invalid base image inspection for {ref}") from exc
+    return info
 
 def missing_image(m, image, command):
     """The refusal when an image a journal or the next container needs was removed outside the

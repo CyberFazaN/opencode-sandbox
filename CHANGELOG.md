@@ -16,6 +16,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   discovery fails, and keeps registry results when local inventory fails. Per-environment errors
   do not hide other rows. The CLI reports partial failures on stderr with exit status 2;
   stopped containers are never started for discovery.
+- Base builds, publication, rollback and cleanup now coordinate across data directories and
+  context aliases for the same verified daemon. Pinned container creation holds publication
+  through its version check and creation. Image identity/ownership is rechecked before changes;
+  cleanup leaves busy candidates and rollback copies alone.
 
 ## 6.1.0 — 2026-10-30
 

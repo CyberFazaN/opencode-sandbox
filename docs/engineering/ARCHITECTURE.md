@@ -8,9 +8,9 @@ state and verification: `BASELINE.md`. User-facing behaviour is in `README.md` a
 
 Approved staged architecture: D-056 and the [Updates working roadmap](updates/ROADMAP.md).
 UP-01 implements generic reports and the Agent Context presentation correction; UP-02 preserves
-independent local/registry version results. The Updates interface and other corrections remain
-pending. The current implementation still has data-directory-scoped base locks and no disposable
-version observations/discovery cache.
+independent local/registry version results. UP-03 adds daemon-wide base coordination and locked
+image revalidation. The Updates interface, disposable version observations/discovery cache and
+other staged corrections remain pending.
 
 ## Boundaries
 
@@ -30,6 +30,7 @@ version observations/discovery cache.
 |---|---|---|
 | `core.py` | Paths, locks, metadata (schema 2), labels, Docker access, create/start/stop/session/exec, snapshot, recreate and recovery journals, export, delete, image build, `error_text` | D-001..D-004, D-016, D-026, D-027, D-030, D-031, D-033, D-034 |
 | `runtime_identity.py` | Bounded acquisition and authenticated rootless response-sender proof; shared by CLI/TUI and standalone stdlib diagnostic | D-003, D-048, D-052 |
+| `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
 | `agent_context.py` | Renders, verifies and refreshes the injected guidance | D-008, D-018 |
@@ -127,6 +128,28 @@ last; a recreation stops the container before `docker commit` and removes the ol
 with the remaining ways out (`core.missing_image`, D-033). Crash points were tested with SIGKILL
 at every Docker step (CAMPAIGN D05, E02, G03).
 
+## Base-image coordination (D-056)
+
+Base coordination (D-056) is separate from `core.lock`'s per-data-directory environment locks.
+`base_locks` always uses `/tmp/opencode-sandbox-locks-<UID>/` (no HOME/TMPDIR/XDG fallback), with
+SHA-256 keys over UID, the canonical pinned verified daemon endpoint and distribution. The
+validated temporary parent (root-owned/sticky if writable by others), private own-user directory and regular single-link lock
+files are checked with no-follow descriptor-relative access; pathname/inode identity is checked
+again after acquisition. Unsafe paths fail closed without chmod/unlink/recreation. File
+descriptors are non-inheritable; process death releases the advisory flock, not the file.
+
+Acquire only needed data coordinator -> environment IDs in stable order -> base build -> base
+publication. The base guard tracks its execution context and refuses reverse/recursive base
+acquisition; `core.lock` refuses data/environment acquisition inside a base guard. Installation
+usage will precede these levels in UP-16; it is not implemented yet. Build/rollback hold build
+through candidate/copy verification and their own cleanup, taking publication only for guarded
+inspection, identity rechecks and tag changes. Creation holds environment then publication from
+pin check through Docker creation. All base cleanup takes build then publication nonblocking,
+rechecks identity/ownership/references, and releases each item's guards before the next item.
+Old managers/manual Docker do not participate, and daemon-shared copies can still be removed
+before another data directory's future rollback. Locks do not protect against a hostile same-user
+process or make unknown labels into ownership proof.
+
 ## Settings changes (D-010)
 
 `config plan`/`config apply` and the dashboard Settings screen use `config_plan.py`: each change
@@ -161,8 +184,11 @@ comparisons remain unchanged; only running containers are queried for their bina
 OpenCode V2 (`@opencode/cli` 2.x, no other major) is installed in the base images; every
 container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`. Updates are journalled with a `docker commit`
 checkpoint and roll back on failure; `update-base` keeps a verified rollback copy of the replaced
-base image. The pin check and the creation of a container from a registry base image hold the lock
-`base-tag-<distro>`, which `update-base`/`rollback-base` take while they move the tag (D-033). The managed `run` starts
+base image. Build/swap/rollback, cleanup and pin-check/container creation use the shared base
+guards described above (D-056 supersedes D-033's data-directory-local base locks). Only a known
+missing-image response permits a first build; full image identity/managed distribution ownership
+is checked before replacement and rechecked at publication, and colliding candidate/copy tags
+are refused. Rollback-copy choice still uses Docker creation time until UP-04. The managed `run` starts
 `opencode --standalone` through `core.LAUNCHER` with the provider profile's variables; a watchdog
 hangs the session up when the manager dies. Interactive client creation defers callable exit
 signals until the client reference and watchdog PID are owned, then restores/delivers the
@@ -200,8 +226,11 @@ original reference (D-026, D-032).
 
 `check NAME` and `doctor` are read-only; reachability (internet, host LAN address, host
 loopback) is measured from the running container, not assumed. `disk usage` and `disk cleanup`
-consider only objects labelled with this data directory, never base images or the build cache;
-cleanup previews before `--yes`, and an object already gone at its turn counts as removed.
+consider objects labelled with this data directory plus shared managed base candidates/copies and
+identifiable untagged replaced bases. Current bases and the build cache are never removed.
+Cleanup previews before `--yes`; base removals recheck identity, labels and local references
+under shared guards. Unverifiable base distribution/ownership is kept, even under a familiar
+name. The existing per-environment removal semantics remain unchanged.
 
 Managed base-definition checks (D-050) compare `Config.Labels` with the registry revision and
 distribution identity. `doctor` and the dashboard's existing startup worker share the results,

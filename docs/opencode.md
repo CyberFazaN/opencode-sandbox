@@ -109,6 +109,14 @@ errors are reported without hiding other environments. Available rows go to stdo
 stderr; any report error gives exit status 2. Without `--check`, the command never queries npm.
 Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
 
+**Concurrent base operations.** Builds and rollback share daemon/distribution guards across
+data directories and context aliases. A long build does not block creation from the current
+base; publication waits for a pin check and container creation to finish. Rebuild and rollback
+recheck image identity and managed distribution labels before replacement, refuse unexpected
+changes or colliding candidate/copy tags, and never treat a failed inspection as a missing image.
+These advisory guards do not coordinate older managers or manual Docker commands. They do not
+change existing containers, their writable layers, policies or user configuration.
+
 **Policies.** `notify` (the default) reports available updates with `versions --check`;
 `manual` reports nothing; `pinned` refuses updates to other versions, refuses to create a
 container from a base image built with another version, and reports a version changed outside

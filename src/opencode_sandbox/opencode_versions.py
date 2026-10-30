@@ -176,6 +176,13 @@ def _content(image):
                     image, capture=True).stdout.strip()
 
 
+def _unused_base_tag(distro, tag):
+    """Under publication: never overwrite a colliding candidate or rollback-copy tag."""
+    if c.inspect_base_image(distro, tag, missing=True) is not None:
+        raise c.SandboxError(f"Base image tag already exists: {tag}; refusing to overwrite it")
+    return tag
+
+
 def update_base(version, distro=None, *, keep_previous=True):
     """Build and verify a candidate base image for a distribution, then replace the tag.
 
@@ -186,28 +193,34 @@ def update_base(version, distro=None, *, keep_previous=True):
     # Resolve "latest" first: the literal build arg "latest" hits Docker's layer
     # cache, so the npm install step was never re-run and nothing was updated.
     version = supported(latest() if version == "latest" else version)
-    with c.lock(f"base-image-{d.id}"):
+    with c.base_lock(d.id, "build"):
         c.require_docker_space("a base image build")
         candidate = distros.candidate_tag(d, __import__("secrets").token_hex(6))
+        with c.base_lock(d.id, "publication"):
+            original = c.inspect_base_image(d, d.image, missing=True)
+            _unused_base_tag(d, candidate)
         try:
             c.build_image(d, version, candidate)
-            old = c.docker("image", "inspect", "--format", "{{.Id}}", d.image, capture=True, check=False)
-            if old.returncode == 0 and _content(d.image) == _content(candidate):
-                # Identical rebuild: a rollback tag would only add clutter.
-                return {"version": version, "previous_image": None, "image": d.image, "unchanged": True}
             previous = None
-            with c.lock(f"base-tag-{d.id}"):  # not while a pinned environment is checked and created
-                if old.returncode == 0 and keep_previous:
-                    previous = distros.previous_tag(d, __import__("secrets").token_hex(6))
-                    c.docker("tag", old.stdout.strip(), previous)
-                c.docker("tag", candidate, d.image)
-            if old.returncode == 0 and not keep_previous:
-                # Otherwise every rebuild leaves the replaced GB-sized image untagged. Docker refuses
-                # while a container still uses it or another tag names it; then it stays.
-                c.docker("image", "rm", old.stdout.strip(), capture=True, check=False)
+            with c.base_lock(d.id, "publication"):  # not held throughout a long build
+                old = c.inspect_base_image(d, d.image, missing=True)
+                if (old or {}).get("Id") != (original or {}).get("Id"):
+                    raise c.SandboxError("Base image changed during the build; refusing replacement; retry after review")
+                built = c.inspect_base_image(d, candidate)
+                if old and _content(old["Id"]) == _content(built["Id"]):
+                    return {"version": version, "previous_image": None, "image": d.image, "unchanged": True}
+                if old and keep_previous:
+                    previous = _unused_base_tag(d, distros.previous_tag(d, __import__("secrets").token_hex(6)))
+                    c.docker("tag", old["Id"], previous)
+                c.docker("tag", built["Id"], d.image)
+                if old and not keep_previous:
+                    # Docker refuses deletion while a container or another tag still uses it.
+                    c.docker("image", "rm", old["Id"], capture=True, check=False)
             return {"version": version, "previous_image": previous, "image": d.image}
         finally:
-            c.docker("image", "rm", candidate, capture=True, check=False)
+            with c.base_lock(d.id, "publication"):
+                if c.inspect_base_image(d, candidate, missing=True):
+                    c.docker("image", "rm", candidate, capture=True, check=False)
 
 
 # The shared install script of the image builds also performs in-container updates.
@@ -407,7 +420,7 @@ def rollback_base(distro=None):
     the replaced image becomes a rollback copy itself, so the swap can be repeated."""
     c.ensure_runtime()
     d = distros.get(distros.DEFAULT if distro is None else distro)
-    with c.lock(f"base-image-{d.id}"):
+    with c.base_lock(d.id, "build"):
         pattern = re.compile(re.escape(distros.previous_tag(d, "")) + r"[0-9a-f]{12}")
         tags = [t for t in c.docker("image", "ls", "--format", "{{.Repository}}:{{.Tag}}", distros.REPOSITORY,
                                     capture=True).stdout.split() if pattern.fullmatch(t)]
@@ -415,16 +428,22 @@ def rollback_base(distro=None):
             raise c.SandboxError(f"No rollback copy of {d.image} ({distros.previous_tag(d, '<hex>')})")
         created = {t: c.docker("image", "inspect", "--format", "{{.Created}}", t, capture=True).stdout.strip() for t in tags}
         previous = max(tags, key=lambda t: created[t])
+        with c.base_lock(d.id, "publication"):
+            selected = c.inspect_base_image(d, previous)
+            original = c.inspect_base_image(d, d.image, missing=True)
         label = c.docker("image", "inspect", "--format", _VERSION_FORMAT, previous,
                          capture=True).stdout.strip()
         version = supported(label) if label and label != "<no value>" else image_version(previous)
         c.verify_image(d, previous, version)
-        with c.lock(f"base-tag-{d.id}"):  # see update_base
-            old = c.docker("image", "inspect", "--format", "{{.Id}}", d.image, capture=True, check=False)
+        with c.base_lock(d.id, "publication"):
+            copy = c.inspect_base_image(d, previous)
+            old = c.inspect_base_image(d, d.image, missing=True)
+            if copy["Id"] != selected["Id"] or (old or {}).get("Id") != (original or {}).get("Id"):
+                raise c.SandboxError("Base image or rollback copy changed during verification; refusing replacement")
             kept = None
-            if old.returncode == 0:
-                kept = distros.previous_tag(d, __import__("secrets").token_hex(6))
-                c.docker("tag", old.stdout.strip(), kept)
-            c.docker("tag", previous, d.image)
-        c.docker("image", "rm", previous, capture=True)  # only the tag: d.image names the same image
+            if old:
+                kept = _unused_base_tag(d, distros.previous_tag(d, __import__("secrets").token_hex(6)))
+                c.docker("tag", old["Id"], kept)
+            c.docker("tag", copy["Id"], d.image)
+            c.docker("image", "rm", previous, capture=True)  # only the tag: d.image names the same image
         return {"image": d.image, "version": version, "previous_image": kept}

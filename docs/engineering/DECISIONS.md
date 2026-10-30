@@ -918,7 +918,8 @@ Owner approval after the 6.1.0 release: improve discovery, version evidence, not
 execution and recovery without replacing working lifecycle mechanisms. **Implementation is
 staged.** UP-00 persisted the plan only; UP-01 implements the generic explicitly titled report
 and Agent Context heading/fallback correction; UP-02 preserves independent inventory/discovery
-results and reports partial failures. All other tasks remain pending. Current behavior remains
+results; UP-03 implements shared base guards, lock order and guarded revalidation (fixed private
+`/tmp` namespace, no override-dependent fallback). All other tasks remain pending. Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from
 TODO under D-045; it is a running-effort record, not a second permanent planning system.

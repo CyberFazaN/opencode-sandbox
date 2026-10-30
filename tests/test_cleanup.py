@@ -29,6 +29,8 @@ def lab(owner=None, *, managed=True, data=True, **extra):
     out = {}
     if managed:
         out.update({cl.MANAGED: "true", cl.VERSION: "6.0.0"})
+    if not data and not owner and managed:
+        out.update(c.distros.get(c.distros.DEFAULT).image_labels())
     if data:
         out[c.DATA_LABEL] = c.data_id() if data is True else data
     if owner:
@@ -90,10 +92,11 @@ class Daemon:
             rows = [f"{i}\t{t}" for i, x in self.images.items() for t in (sorted(x["tags"]) or ["<none>:<none>"])]
             return ok("\n".join(rows))
         if a[:2] == ("image", "inspect"):
-            found = [self.images[x] for x in a[2:] if x in self.images]
+            found = [self.images[i] for x in a[2:] if (i := self.tag_of(x)) is not None]
             if "--format" in a:
                 return ok("") if found or a[-1] in {t for x in self.images.values() for t in x["tags"]} else fail("No such image")
-            return ok(json.dumps([{k: v for k, v in x.items() if k in ("Id", "Config")} for x in found]))
+            return ok(json.dumps([{**{k: v for k, v in x.items() if k in ("Id", "Config")},
+                                   "RepoTags": sorted(x["tags"])} for x in found]))
         if a[0] == "rm":
             x = self.containers.get(a[1])
             if x is None:
@@ -328,8 +331,11 @@ def test_another_data_directory_is_never_an_orphan_source(world, tmp_path, monke
 
 def test_candidate_needs_the_base_build_lock(world):
     key = "image:opencode-sandbox:debian-candidate-0123456789ab"
-    with c.lock("base-image-debian"):
-        assert cl.apply([key])[0][1].startswith("busy")
+    with c.base_lock("debian", "build"):
+        item = next(i for i in cl.inventory().eligible() if i.key == key)
+        # A separate caller, not recursive acquisition in this execution context.
+        import contextvars
+        assert contextvars.Context().run(cl._remove, item).startswith("busy")
     assert cl.apply([key])[0][1] is None
 
 

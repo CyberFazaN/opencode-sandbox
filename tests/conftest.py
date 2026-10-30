@@ -1,6 +1,7 @@
 import pytest
 import typer.rich_utils
 
+from opencode_sandbox import base_locks
 from opencode_sandbox import core as c
 from opencode_sandbox import runtime_identity as rid
 
@@ -12,6 +13,8 @@ def _isolated_manager_paths(tmp_path, monkeypatch):
     """No test may touch the real user's data/config directories."""
     monkeypatch.setattr(c, "BASE", tmp_path / "ocs-data")
     monkeypatch.setattr(c, "CONFIG", tmp_path / "ocs-config")
+    # Unit tests exercise real host locks, but never the user's shared namespace.
+    monkeypatch.setattr(base_locks, "_TMP", tmp_path)
 
 
 @pytest.fixture(autouse=True)

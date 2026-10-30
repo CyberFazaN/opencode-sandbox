@@ -118,15 +118,20 @@ candidate left by an interrupted build, and unfinished `.backup-*` directories.
 `--superseded` adds update checkpoints and runtime images that existing environments no longer
 use, base image rollback copies and replaced untagged base images.
 
-- Every object is checked again just before its removal, under the lock of its owner; busy
-  objects and objects that changed meanwhile are reported as `Skipped:`, and only `Not removed:`
-  makes the command fail. A removal is never forced; an interrupted cleanup can simply run again.
+- Every object is checked again just before removal under its relevant guards. Base candidates,
+  rollback copies and identifiable untagged replaced bases take the shared build and publication
+  guards without waiting. Busy objects are left alone with a reason (`Not removed:`, nonzero
+  exit); entries no longer eligible are `Skipped:`. Revalidation checks base identity, labels and
+  current references. Unverifiable base ownership/distribution is not removal permission.
+  A removal is never forced; an interrupted cleanup can simply run again.
 - Never removed: environments (use `delete`), snapshots of existing environments, base images,
   direct workspaces, exports, backups, anything of another data directory.
 - Exception: base images, their rollback copies and replaced untagged base images are shared by
   every data directory on the daemon, so `--superseded` in one data directory can remove a
-  rollback copy that another one would use for `opencode rollback-base` (Docker refuses only while
-  a container uses it).
+  rollback copy that another one would use in a future `opencode rollback-base`. Shared guards
+  protect participating active builds, rollback and creation, not another directory's future
+  intentions or uncoordinated older managers/manual Docker. Docker also refuses an image removal
+  while a container uses it.
 
 ## The Docker build cache
 
