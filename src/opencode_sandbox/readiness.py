@@ -654,7 +654,10 @@ def opencode_check(m, state, data):
     item = {"state": "running", "policy": v.policy(m), **v.environment_version(m)}
     line = v.environment_line(item)
     env = (data.get("Config") or {}).get("Env") or []
-    if item["version"] is None:
+    if item.get("recovery") or (item.get("verification") != "verified" and not item.get("error")) \
+            or item.get("verification") == "history-unverified":
+        return Check("opencode", title, NOT_CHECKED, line)
+    if item["version"] is None or item.get("error"):
         if m.get("distro") is None:
             return Check("opencode", title, FAILED, "`opencode --version` failed in the container (custom image without a working OpenCode)",
                          "Use an image with OpenCode 2.x, or a registry distribution")

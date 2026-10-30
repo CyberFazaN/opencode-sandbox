@@ -24,6 +24,7 @@ class FakeDocker:
         self.calls, self.exists, self.running = [], True, False
         self.version, self.install, self.base_label = version, install, base_label
         self.images = {"opencode-sandbox:debian"}
+        self.cid, self.iid = "a" * 64, "sha256:" + "b" * 64
         monkeypatch.setattr(c, "ensure_runtime", lambda distro=None: None)
         monkeypatch.setattr(c, "ensure_volume", lambda m: None)
         monkeypatch.setattr(c, "assert_volume_owned", lambda m: None)
@@ -37,6 +38,8 @@ class FakeDocker:
 
     def __call__(self, *args, capture=False, check=True):
         self.calls.append(args)
+        if args[:2] == ("container", "inspect") and "{{.Id}}" in args[3]:
+            return self.ok(self.cid + "|" + self.iid + "|" + args[-1].removeprefix("ocs-"))
         if args[:1] == ("exec",) and args[2:4] == ("timeout", "--signal=KILL"):
             args = (*args[:2], *args[5:])
         op = args[0]
@@ -134,7 +137,9 @@ def test_versions_report_a_broken_installation(monkeypatch):
     fake = FakeDocker(monkeypatch)
     fake.running = True
     m = env()
-    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="postinstall not run"))
+    real = fake.__call__
+    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="postinstall not run")
+                        if a[0] == "exec" else real(*a, **k))
     (item,) = [i for i in v.versions() if i["id"] == m["id"]]
     assert item["version"] is None and "`opencode --version` failed in the container" in v.environment_line(item)
 
@@ -266,10 +271,10 @@ def test_environment_lines():
     assert v.environment_line({**run, "policy": notify, "version": "2.1.4"}, "2.2.0") == "2.1.4; update available: 2.1.4 -> 2.2.0"
     assert v.environment_line({**run, "policy": notify, "version": "2.2.0"}, "2.2.0") == "2.2.0; current"
     assert v.environment_line({**run, "policy": notify, "version": "2.1.4"}) == "2.1.4; notify"
-    assert v.environment_line({**run, "policy": manual, "version": "2.1.4"}, "2.2.0") == "2.1.4; manual"
-    assert v.environment_line({**run, "policy": pin, "version": "2.1.4"}, "2.2.0") == "2.1.4; pinned"
+    assert v.environment_line({**run, "policy": manual, "version": "2.1.4"}, "2.2.0") == "2.1.4; manual; update available: 2.1.4 -> 2.2.0"
+    assert v.environment_line({**run, "policy": pin, "version": "2.1.4"}, "2.2.0") == "2.1.4; pinned; update available: 2.1.4 -> 2.2.0"
     assert "but runs 2.2.0 (changed outside the manager)" in v.environment_line({**run, "policy": pin, "version": "2.2.0"})
-    assert v.environment_line({"state": "stopped", "policy": notify, "version": None}) == "notify; not checked (stopped)"
+    assert v.environment_line({"state": "stopped", "policy": notify, "version": None}) == "notify; not checked (stopped); Unknown"
     assert v.environment_line({"state": "error: x", "policy": None, "version": None}) == "error: x"
 
 

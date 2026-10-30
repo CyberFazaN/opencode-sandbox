@@ -28,9 +28,11 @@ def inventory(monkeypatch):
         return states[m["id"]]
 
     def docker(*args, **kwargs):
+        if args[:2] == ("container", "inspect"):
+            return SimpleNamespace(returncode=0, stdout="a" * 64 + "|sha256:" + "b" * 64 + "|" + args[-1].removeprefix("ocs-"), stderr="")
         if args[:2] == ("image", "inspect"):  # dashboard's independent startup advisory
             return SimpleNamespace(returncode=1, stdout="", stderr="No such image")
-        assert args == ("exec", c.cname(running), "timeout", "--signal=KILL", "5s", "opencode", "--version"), args
+        assert args == ("exec", "a" * 64, "timeout", "--signal=KILL", "5s", "opencode", "--version"), args
         events.append(args)
         return SimpleNamespace(returncode=0, stdout="opencode v2.1.4\n", stderr="")
 
@@ -192,13 +194,13 @@ def test_bad_rows_do_not_hide_other_environments(monkeypatch, inventory, fronten
 
 
 @pytest.mark.parametrize("mode", ["notify", "manual", "pinned"])
-def test_shared_inventory_preserves_existing_policy_comparisons(inventory, mode):
+def test_shared_inventory_compares_every_policy_without_changing_it(inventory, mode):
     inventory.discovery["error"] = None
     running = next(m for m in c.all_envs() if m["name"] == "ocs-test-up02-running")
     v.set_policy(running, mode, "2.1.4" if mode == "pinned" else None)
     lines, errors = v.versions_report(check=True)
     assert errors == [] and lines[0] == "npm registry: 2.2.0"
-    expected = "update available: 2.1.4 -> 2.2.0" if mode == "notify" else mode
+    expected = ("" if mode == "notify" else mode + "; ") + "update available: 2.1.4 -> 2.2.0"
     assert f"{running['name']}: 2.1.4; {expected}" in lines
     assert c.resolve(running["id"])["opencode_policy"] == mode
 

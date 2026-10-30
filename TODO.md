@@ -16,24 +16,28 @@ Priority: correctness/reliability fixes -> shared observations/discovery -> comp
 and existing operations -> explicit base refresh -> verified pipx manager self-update.
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
-UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen (eight now remain
-after UP-06). Base refresh does not depend on environment recovery; manager discovery does not
+UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen (seven now remain
+after UP-07 + UP-08). Base refresh does not depend on environment recovery; manager discovery does not
 depend on base refresh. Tightly
 related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
 package or safety boundary, not mechanically after each ID. Environment recovery, manager
 handoff, replacement and failure recovery retain independent verification gates. The working
 roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
 
-Current checkpoint: UP-00..UP-06 complete. Explicit reports, honest partial inventory, shared
+Current checkpoint: UP-00..UP-08 complete. Explicit reports, honest partial inventory, shared
 base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.
 Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
 their existing timing. Dashboard advisories now replace/clear by category without erasing active
-progress. Next: UP-07 + UP-08 together, shared observations, compatible discovery and comparisons.
+progress. Identity-bound disposable version evidence now retains stopped history/Unknown;
+bounded compatible stable discovery, Manual/Pinned explicit comparisons and exact confirmed
+targets preserve policy/lifecycle restrictions. Four complete compatibility suites and scoped
+real Debian/Arch update/rollback/recovery/restore/probe checks pass (BASELINE).
+Next: UP-10 + UP-09, manual/cached Updates UI first and optional scheduling afterward.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by
 about 8%; findings and recommended verification cadence are in
 [BASELINE](docs/engineering/BASELINE.md#test-performance-and-local-verification). No application
-or CI/release gate changed; broader UP-07/UP-08 verification remains required.
+or CI/release gate changed; its cadence and all broader verification requirements remain in force.
 The manager version remains 6.1.0.
 Completion does not authorize a merge, version bump, release preparation, tag, push or publication.
 

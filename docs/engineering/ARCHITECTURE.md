@@ -11,8 +11,9 @@ UP-01 implements generic reports and the Agent Context presentation correction; 
 independent local/registry version results. UP-03 adds daemon-wide base coordination and locked
 image revalidation; UP-04 adds explicit identity-bound rollback-copy selection; UP-05 bounds
 diagnostic execution and owns client/probe cleanup. UP-06 replaces/clears category-owned dashboard
-advisories while preserving operation status. The Updates
-interface, disposable version observations/discovery cache and other staged corrections remain pending.
+advisories while preserving operation status. UP-07/UP-08 add disposable identity-bound version
+evidence, compatible stable discovery and explicit policy comparisons. The Updates interface,
+optional scheduling, refresh modes and manager updater remain pending.
 
 ## Boundaries
 
@@ -36,6 +37,7 @@ interface, disposable version observations/discovery cache and other staged corr
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
+| `update_cache.py` | Bounded private disposable evidence/attempt files, atomic per-key replacement; no metadata/journal authority, scheduling or mutation locks | D-056 |
 | `agent_context.py` | Renders, verifies and refreshes the injected guidance | D-008, D-018 |
 | `integrations.py` | Initial MCP integrations (Context7 by default), provisioned once | D-009 |
 | `config_plan.py` | One planner/executor for CPU, memory, PIDs, network, ports, provider profile | D-010 |
@@ -110,7 +112,7 @@ the existing callable-signal deferral guard, never a child-inherited signal mask
 signal changes. Cleanup waits are bounded and failures are reported, not claimed as reaped.
 
 The npm lookup executes the standalone stdlib `http_probe.py` under an isolated interpreter,
-with an eight-second total parent budget and a 64 KiB response limit, including slow DNS/body
+with an eight-second total parent budget and an 8 MiB abbreviated-metadata response limit, including slow DNS/body
 reads. Cancellation terminates/reaps that owned child; no persistent downloader/thread or host npm.
 Existing daemon-identity acquisition and resource-support mechanisms retain their own budgets.
 
@@ -148,7 +150,7 @@ Updates screen is introduced by this correction.
 
 - Data directory `OPENCODE_SANDBOX_HOME` (default `~/.local/share/opencode-sandbox`):
   `environments/<id>/` (`metadata.json`, managed `workspace/`, `agent-context/`,
-  `readiness.json`), `exports/`, `changes/`, `backups/`, `locks/`. Configuration
+  `readiness.json`), `exports/`, `changes/`, `backups/`, `locks/`, disposable `update-cache/`. Configuration
   `OPENCODE_SANDBOX_CONFIG` (default `~/.config/opencode-sandbox`): `profiles/*.json` (0600,
   never shell-sourced; legacy `.env` refused), `ui.json`.
 - Names: container `ocs-<id>`, home volume `ocs-home-<id>` (`/root`), staging volumes
@@ -226,8 +228,42 @@ results intact. Per-environment and formatting errors keep their subject and une
 type instead of discarding other rows. CLI `opencode versions` prints available rows to stdout,
 errors to stderr and exits 2 on a partial/failed report; the dashboard displays them together
 with its failure notice. Without `--check`, the CLI never queries npm. This is a read-only report,
-not a new update executor, observation cache or concurrent discovery service. Existing policy
-comparisons remain unchanged; only running containers are queried for their binary version.
+not a new update executor or concurrent discovery service. Only running containers are queried
+for their binary version; stopped ones retain qualified last verification or Unknown.
+
+UP-07/UP-08 evidence is structured value/source/time/identity, separate from authoritative
+metadata and operation state. Runtime probes target full container IDs, after existing ownership
+checks plus an identity/ownership inspection, and recheck identity/lifecycle after probing.
+Identity includes environment, data directory, verified endpoint, container and creation-image
+IDs plus a fingerprint of creation/derived-image/update history. Stop/status/policy changes retain
+dated evidence; replacement, restore (new environment ID), rollback, update history and pending
+journals invalidate or qualify it without metadata hooks or schema additions. Inaccessible Docker
+may expose history only as unverified against the current container; failed fresh checks never
+make readiness pass. Update success/no-install verification is recorded from the actual probe,
+after journal completion, with its original observation time. Labels are build provenance only.
+
+Image evidence binds the verified endpoint and immutable image ID. Local-only image observation
+reads labels/cache without helpers; explicit image verification uses an immutable, bounded helper.
+Retagging selects another object's cache; rollback to the identical image may reuse dated real
+evidence. No creation-image label becomes an environment's installed fact.
+
+`update-cache/` uses hashed per-source/object filenames, format 1 (disposable file format, not an
+environment/backup schema), 128 KiB per-file limits, private owner/mode checks and no-follow,
+descriptor-relative reads/replacement. Invalid/future-time/unsafe/missing/unwritable cache entries
+are misses, not permission to repair paths or fail an otherwise successful operation. Success and
+latest attempt stay separate. No cache lock is held while taking mutation locks; per-key last
+completion wins, and in-flight/scheduler coordination remains UP-09. A stale cache can lose an
+observation but cannot authorize a mutation, clear a journal or prove current runtime state.
+
+npm discovery reads one bounded abbreviated packument, semantically selects the greatest stable
+supported-major version, and persists only that selected result and attempt, not the response.
+Prereleases are excluded by default; strict compatible explicit alternatives remain possible.
+Fresh failures preserve dated prior discovery, surface explicit errors and never fall back to
+cached `latest` installation. Retry-After for HTTP 429/503 is persisted and respected. Manual and
+Pinned allow explicit comparisons, while unsolicited comparison filtering and locked execution
+eligibility remain separate. CLI environment/base confirmations receive exact resolved targets;
+environment plans bind immutable identity and revalidate under the existing environment lock.
+No target is replaced by a newer lookup after consent; pins/network/pending journals still refuse.
 
 OpenCode V2 (`@opencode/cli` 2.x, no other major) is installed in the base images; every
 container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`. Updates are journalled with a `docker commit`

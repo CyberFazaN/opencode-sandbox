@@ -34,10 +34,10 @@ def _result(p, timeout):
     return p
 
 
-def exec(m, *argv, timeout=None):
+def exec(m, *argv, timeout=None, container_id=None):
     timeout = EXEC_TIMEOUT if timeout is None else timeout
     with c.diagnostic_timeout(timeout + CLIENT_GRACE):
-        p = c.docker("exec", c.cname(m), *_command(argv, timeout), capture=True, check=False)
+        p = c.docker("exec", container_id or c.cname(m), *_command(argv, timeout), capture=True, check=False)
     return _result(p, timeout)
 
 

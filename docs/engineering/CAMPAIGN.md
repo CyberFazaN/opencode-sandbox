@@ -55,6 +55,17 @@ No new real-Docker/OpenCode, advisory-specific real-terminal or manual observati
 earlier scoped real PASS entries are not renewed by this UI-only change. D-057 consolidates
 remaining work packages/dependencies, not the independent recovery/safety verification gates.
 
+UP-07/UP-08 add 125 default-suite cases for identity-bound version history, disposable cache
+safety, compatible stable resolution, exact targets and explicit policy comparisons; all four
+full compatibility suites pass. Scoped real `test_43_diagnostics.py` +
+`test_44_version_evidence.py`: **4 tests/72 checks passed**, `up0708-final`, on retained Debian
+12/revision 1 and Arch/revision 1. Includes real binary update/rollback, same-version verification,
+stopped no-start checks, SIGKILL recovery, recreation/file-only restore invalidation, preserved
+configuration/data and bounded probe cleanup. No fresh base build, full campaign, model-provider,
+installed-manager/pipx or report-specific real-terminal/manual evidence is renewed by this scope.
+The initial real-test fixture-marker failure was corrected and rerun, not skipped. Release gates
+and historical PASS qualifications below are unchanged.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

@@ -187,7 +187,7 @@ def test_rollback_rechecks_copy_and_base_after_verification(monkeypatch):
     def docker(*args, **kwargs):
         if args[:2] == ("image", "ls"):
             return SimpleNamespace(returncode=0, stdout=ref, stderr="")
-        if "--format" in args:
+        if "--format" in args and args[3] != "{{.Id}}|{{json .Config.Labels}}":
             return SimpleNamespace(returncode=0, stdout="2.1.4", stderr="")
         result = real(*args, **kwargs)
         if state["verified"] and args == ("image", "inspect", ref):

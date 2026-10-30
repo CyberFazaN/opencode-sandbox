@@ -44,8 +44,8 @@ def _root(version: bool = typer.Option(False, "--version", callback=_print_versi
     """Manage isolated OpenCode workspaces on rootless Docker."""
 
 @opencode_app.command("versions")
-def opencode_versions(check: bool=typer.Option(False,"--check",help="Also query the npm registry: environments with the notify policy report available updates")):
-    """OpenCode version and policy of every environment (running containers only; stopped ones are not started).
+def opencode_versions(check: bool=typer.Option(False,"--check",help="Query npm for the latest supported stable release; compare every policy without changing pins")):
+    """OpenCode version/policy: probe running containers; retain dated stopped evidence, never start them.
 
     Available rows survive failed checks; errors go to stderr and exit status is 2.
     """
@@ -57,7 +57,7 @@ def opencode_versions(check: bool=typer.Option(False,"--check",help="Also query 
 
 @opencode_app.command("status")
 def opencode_status(name: str):
-    """OpenCode version running in one environment (a stopped container is not started)."""
+    """Actual/last-verified version and evidence for one environment; never starts a stopped container."""
     from . import opencode_versions as v
     typer.echo(v.environment_version(c.resolve(name)))
 
@@ -65,7 +65,7 @@ DISTRO_HELP="Distribution from the registry: "+", ".join(distros.REGISTRY)
 
 @opencode_app.command("check")
 def opencode_check(distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP)):
-    """Compare a base image's OpenCode version with the newest release on the npm registry."""
+    """Compare a base image's OpenCode version with npm's latest supported stable release."""
     from . import opencode_versions as v
     image=distros.get(distro).image
     current=v.image_version(image)
@@ -87,25 +87,27 @@ def opencode_policy_set(name: str, mode: str, version: str | None = typer.Option
     typer.echo(v.set_policy(c.resolve(name), mode, version))
 
 @opencode_app.command("update-base")
-def opencode_update_base(version: str=typer.Option("latest","--version",help="OpenCode 2.x version, or latest"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
+def opencode_update_base(version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
                          distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP)):
     """Rebuild a base image with another OpenCode version; keeps a rollback copy of the old one."""
     from . import opencode_versions as v
     image=distros.get(distro).image
+    version=v.resolve_target(version)
     if not yes and not _confirm(f"Build, verify and replace base image {image} with OpenCode {version}?", docker=True):
         raise typer.Abort()
     typer.echo(v.update_base(version, distro))
 
 @opencode_app.command("update")
-def opencode_update(name: str, version: str=typer.Option("latest","--version",help="OpenCode 2.x version, or latest"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation")):
+def opencode_update(name: str, version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation")):
     """Update OpenCode in a stopped environment; on failure its system layer is rolled back to a checkpoint."""
     from . import opencode_versions as v
     m=c.resolve(name)
+    plan=v.prepare_environment_update(m,version)
     typer.echo("Note: a checkpoint (docker commit) of the container's system layer is taken first; a failed update "
                "is rolled back to it, 'opencode rollback' undoes a successful one. /root and /workspace are not touched.")
-    if not yes and not _confirm(f"Temporarily start stopped environment {name}, update OpenCode to {version}, then stop it?", docker=True):
+    if not yes and not _confirm(f"Temporarily start stopped environment {name}, update OpenCode to {plan.target}, then stop it?", docker=True):
         raise typer.Abort()
-    result=v.update_environment(m,version)
+    result=v.update_environment(m,plan.target,plan=plan)
     if result.get("unchanged"): typer.echo(f"OpenCode {result['version']} is already installed; nothing changed")
     else: typer.echo(f"Updated OpenCode {result['previous_version'] or 'unknown (opencode --version failed)'} -> {result['version']}; "
                      f"rollback point {result['checkpoint']}")

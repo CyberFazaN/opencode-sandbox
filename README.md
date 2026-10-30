@@ -51,7 +51,8 @@ Consider something else if:
   through one change plan.
 - **Backups and recovery**: verified cold backups, restores into new environments, snapshots,
   and journalled operations with explicit recovery commands.
-- **OpenCode versions** managed per base image and environment: update policies, updates with
+- **OpenCode versions** managed per base image and environment: dated stopped-version evidence,
+  latest supported stable discovery, update policies, updates with
   automatic rollback on failure; OpenCode's self-update is off. Local version inventory remains
   available when registry discovery fails.
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,

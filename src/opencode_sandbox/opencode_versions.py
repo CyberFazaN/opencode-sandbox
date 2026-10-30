@@ -4,21 +4,29 @@ Never starts stopped environments merely to inspect their versions.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from . import core as c
 from . import distros, probes
+from . import update_cache as cache
 
 # `opencode --version` prints "opencode v2.1.4"; npm metadata and pins use "2.1.4".
-VERSION = re.compile(r"^(?:opencode\s+)?v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$")
+_NUMBER = r"(?:0|[1-9][0-9]*)"
+_PRE = r"(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)"
+_SEMVER = rf"{_NUMBER}\.{_NUMBER}\.{_NUMBER}(?:-{_PRE}(?:\.{_PRE})*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+VERSION = re.compile(rf"^(?:opencode\s+)?v?({_SEMVER})$")
 POLICIES = {"notify", "manual", "pinned"}
 PACKAGE = "@opencode/cli"  # OpenCode V2 only (D-007)
 MAJOR = 2  # the contract: OpenCode 2.x only; another major needs a new manager release
-REGISTRY = "https://registry.npmjs.org/@opencode%2fcli/latest"
+REGISTRY = "https://registry.npmjs.org/@opencode%2fcli"
+METADATA_LIMIT = 8 * 1024 * 1024  # abbreviated packument measured ~2 MiB; finite room for growth
 
 
 def normalize(raw):
@@ -26,14 +34,16 @@ def normalize(raw):
         raise c.SandboxError("Version must be a string")
     value = raw.strip().splitlines()[-1].strip() if raw.strip() else ""
     match = VERSION.fullmatch(value)
-    if not match:
+    if not match or len(value) > 220:
         raise c.SandboxError(f"Unrecognized OpenCode version: {value[:120]!r}")
     return match.group(1)
 
 
 def supported(version):
     """Normalize a version the manager may install or pin: OpenCode 2.x."""
-    version = normalize(version)
+    # Runtime probes may print a warning/prefix; install targets and pins must be exact data.
+    if not isinstance(version, str) or len(version) > 200 or not re.fullmatch(_SEMVER, version):
+        raise c.SandboxError("Expected an exact semantic version, such as 2.2.0 (no command/output prefixes)")
     if int(version.split(".")[0]) != MAJOR:
         raise c.SandboxError(f"OpenCode {version} is not supported; this manager installs OpenCode {MAJOR}.x only "
                              f"(npm package {PACKAGE}). Choose a {MAJOR}.x version with --version")
@@ -61,19 +71,94 @@ def describe(installed, newest):
     if order < 0:
         return f"update available: {installed} -> {newest}"
     if order > 0:
-        return f"newer than npm latest ({installed} > {newest})"
+        return f"newer than latest supported stable ({installed} > {newest})"
     return "current"
 
 
-def latest(timeout=8):
-    """One total bounded npm request, including DNS/TLS/body reads; no host npm or Node."""
+def _registry_key():
+    return f"npm:{REGISTRY}:supported-major={MAJOR}"
+
+
+def discovery():
+    """Local-only discovery snapshot; success and the latest attempt are independent."""
+    data = cache.read(_registry_key())
+    success = cache.observation(data, "npm-metadata", {"url": REGISTRY, "major": MAJOR})
+    if success:
+        try:
+            supported(success["value"])
+            if "-" in success["value"].partition("+")[0]: success = None
+        except c.SandboxError: success = None
+    attempt = cache.attempt(data)
+    stale = success is None or time.time() - success["at"] >= 86400 or bool(attempt and not attempt["ok"])
+    return {"success": success, "attempt": attempt, "stale": stale}
+
+
+def _compatible(metadata):
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("versions"), dict):
+        raise c.SandboxError("Invalid npm metadata: expected a versions object")
+    candidates = []
+    for version, record in metadata["versions"].items():
+        if not isinstance(record, dict) or record.get("version") != version:
+            continue
+        try: value = supported(version)
+        except c.SandboxError: continue
+        if "-" not in value.partition("+")[0]: candidates.append(value)
+    if not candidates:
+        raise c.SandboxError(f"No supported stable OpenCode {MAJOR}.x release in npm metadata; choose an explicit --version")
+    return max(candidates, key=lambda value: (_key(value), value))
+
+
+def _retry_until(value):
     try:
-        p = c.call([sys.executable, "-I", "-B", str(Path(__file__).with_name("http_probe.py")), REGISTRY, str(timeout)],
-                   capture=True, check=False, timeout=timeout, max_output=65536)
-        if p.returncode: raise c.SandboxError(p.stderr.strip() or "registry request failed")
-        return normalize(json.loads(p.stdout)["version"])
-    except (c.SandboxError, OSError, ValueError, KeyError, TypeError) as exc:
+        if not isinstance(value, str): return None
+        delay = int(value) if value.isdigit() else parsedate_to_datetime(value).timestamp() - time.time()
+        until = time.time() + max(delay, 0)
+        return until if until <= 253402300799 else None  # latest representable UTC date, not an early retry
+    except (ValueError, TypeError, OverflowError): return None
+
+
+def latest(timeout=8):
+    """Fresh latest supported stable release, not npm's potentially incompatible latest tag.
+
+    One bounded metadata request, including DNS/TLS/body, without host npm/Node. Persist only a
+    small selected result, never the packument. A cached success cannot authorize installation
+    after an explicit failure. Rate-limit attempts are retained for later manual/background users.
+    """
+    data = discovery()
+    attempt = data["attempt"]
+    retry = (attempt or {}).get("retry_until")
+    if type(retry) in (int, float) and time.time() < retry <= 253402300799:
+        raise c.SandboxError(f"Cannot check OpenCode npm registry: rate limited; retry after {cache.when(retry)}")
+    attempt = {"at": time.time(), "ok": False}
+    cache.write(_registry_key(), {"success": data["success"], "attempt": {**attempt, "error": "check did not complete"}})
+    try:
+        p = c.call([sys.executable, "-I", "-B", str(Path(__file__).with_name("http_probe.py")), REGISTRY, str(timeout), str(METADATA_LIMIT)],
+                   capture=True, check=False, timeout=timeout, max_output=METADATA_LIMIT + 1024)
+        if p.returncode:
+            try: error = json.loads(p.stderr)
+            except ValueError: error = {}
+            if isinstance(error, dict) and error.get("status"):
+                if error["status"] in (429, 503): attempt["retry_until"] = _retry_until(error.get("retry_after", ""))
+                raise c.SandboxError(f"HTTP {error['status']}" + (f"; retry after {cache.when(attempt['retry_until'])}" if attempt.get("retry_until") else ""))
+            raise c.SandboxError(p.stderr.strip() or "registry request failed")
+        value = _compatible(json.loads(p.stdout))
+    except (c.SandboxError, OSError, ValueError, KeyError, TypeError, RecursionError) as exc:
+        attempt["error"] = c.error_text(exc)[:1000]
+        cache.write(_registry_key(), {"success": data["success"], "attempt": attempt})
         raise c.SandboxError(f"Cannot check OpenCode npm registry: {exc}") from exc
+    cache.write(_registry_key(), {"success": cache.evidence(value, "npm-metadata", {"url": REGISTRY, "major": MAJOR}),
+                                  "attempt": {**attempt, "ok": True}})
+    return value
+
+
+def resolve_target(version, m=None):
+    """Resolve once before consent; executors receive/revalidate this exact target, never latest."""
+    if m is not None and version == "latest" and policy(m)["mode"] == "pinned":
+        raise c.SandboxError(f"Environment pinned to OpenCode {policy(m)['version']}; change policy first")
+    target = supported(latest() if version == "latest" else version)
+    if m is not None and policy(m)["mode"] == "pinned" and target != policy(m)["version"]:
+        raise c.SandboxError(f"Environment pinned to OpenCode {policy(m)['version']}; change policy first")
+    return target
 
 
 def policy(m):
@@ -108,21 +193,125 @@ def set_policy(m, mode, version=None):
 
 
 def image_version(image):
-    p = probes.image(image, "opencode", "--version", timeout=probes.EXEC_TIMEOUT)
-    return normalize(p.stdout)
+    result = image_observation(image, check=True)
+    if result.get("error"): raise c.SandboxError(result["error"])
+    return result["observation"]["value"]
+
+
+def image_observation(image, *, check=False):
+    """Labels are build provenance only; only explicit Check runs a bounded immutable helper."""
+    p = c.docker("image", "inspect", "--format", "{{.Id}}|{{json .Config.Labels}}", image, capture=True)
+    try:
+        image_id, raw = p.stdout.strip().split("|", 1)
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id): raise ValueError("invalid image ID")
+        labels = json.loads(raw) or {}
+        if not isinstance(labels, dict): raise TypeError("invalid labels")
+    except (ValueError, TypeError) as exc:
+        raise c.SandboxError("Invalid image version inspection") from exc
+    identity = {"image": image_id, "endpoint": c.docker_endpoint()}
+    key = "image:" + identity["endpoint"] + ":" + image_id
+    data = cache.read(key)
+    old = cache.observation(data, "image-exec", identity)
+    if old:
+        try:
+            if normalize(old["value"]) != old["value"]: old = None
+        except c.SandboxError: old = None
+    result = {"image": image_id, "build_version": labels.get(VERSION_LABEL), "observation": old,
+              "attempt": cache.attempt(data), "verification": "last-verified" if old else "unknown"}
+    if not check: return result
+    attempt = {"at": time.time(), "ok": False}
+    try:
+        value = normalize(probes.image(image_id, "opencode", "--version", timeout=probes.EXEC_TIMEOUT).stdout)
+    except c.SandboxError as exc:
+        attempt["error"] = c.error_text(exc)[:1000]
+        cache.write(key, {"success": old, "attempt": attempt})
+        return {**result, "error": attempt["error"], "attempt": attempt}
+    observation = cache.evidence(value, "image-exec", identity)
+    attempt["ok"] = True
+    cache.write(key, {"success": observation, "attempt": attempt})
+    return {**result, "observation": observation, "attempt": attempt, "verification": "verified"}
 
 
 def environment_version(m):
+    """Actual or last-verified evidence; inaccessible Docker only permits qualified history."""
+    m = c.resolve(m["id"])
+    try:
+        return _environment_version(m)
+    except c.SandboxError as exc:
+        data = cache.read(_environment_key(m))
+        old = cache.observation(data, "container-exec")
+        attempt = {"at": time.time(), "ok": False, "error": c.error_text(exc)[:1000]}
+        cache.write(_environment_key(m), {"success": old, "attempt": attempt})
+        if not old or old["identity"].get("lifecycle") != _lifecycle(m) \
+                or old["identity"].get("environment") != m["id"] or old["identity"].get("data") != c.data_id() or m.get("operation"):
+            raise
+        try:
+            if normalize(old["value"]) != old["value"]: raise c.SandboxError("Invalid cached version")
+        except c.SandboxError: raise exc from None
+        return {"state": "unknown", "version": old["value"], "observation": old, "verification": "history-unverified",
+                "error": c.error_text(exc), "attempt": attempt}
+
+
+def _environment_version(m):
+    # Re-read metadata: historical completed-update fields do not verify the current binary.
+    m = c.resolve(m["id"])
     state = c.inspect_container(m)
     if state is None:
-        return {"state": "not-created", "version": None}
+        return {"state": "not-created", "version": None, "observation": None}
+    identity = _environment_identity(m)
+    data = cache.read(_environment_key(m))
+    old = cache.observation(data, "container-exec", identity)
+    if old:
+        try:
+            if normalize(old["value"]) != old["value"]: old = None
+        except c.SandboxError: old = None
+    attempt = cache.attempt(data)
+    if attempt and attempt.get("identity") != identity: attempt = None
+    result = {"state": "running" if state.get("Running") else "stopped", "version": old["value"] if old else None,
+              "observation": old, "verification": "last-verified" if old else "unknown", "attempt": attempt}
+    if m.get("operation"):
+        return {**result, "version": None, "observation": None, "verification": "unknown",
+                "recovery": str(c.pending_operation(m))}
     if not state.get("Running"):
-        return {"state": "stopped", "version": None}
-    p = probes.exec(m, "opencode", "--version")
+        return result
+    attempt = {"at": time.time(), "ok": False, "identity": identity}
+    cache.write(_environment_key(m), {"success": old, "attempt": {**attempt, "error": "probe did not complete"}})
     try:
-        return {"state": "running", "version": normalize(p.stdout) if p.returncode == 0 else None}
-    except c.SandboxError:
-        return {"state": "running", "version": None}
+        value = _exec_version(m, container_id=identity["container"])
+        current = c.resolve(m["id"])
+        if current.get("operation") or _environment_identity(current) != identity:
+            old = None
+            result.update(version=None, observation=None, verification="unknown")
+            raise c.SandboxError("Environment/container changed during the version check; no fresh result verified")
+    except c.SandboxError as exc:
+        attempt["error"] = c.error_text(exc)[:1000]
+        cache.write(_environment_key(m), {"success": old, "attempt": attempt})
+        return {**result, "error": attempt["error"], "attempt": attempt}
+    observation = cache.evidence(value, "container-exec", identity)
+    attempt["ok"] = True
+    cache.write(_environment_key(m), {"success": observation, "attempt": attempt})
+    return {**result, "version": value, "observation": observation, "verification": "verified", "attempt": attempt}
+
+
+def _environment_key(m):
+    return "environment:" + m["id"]
+
+
+def _lifecycle(m):
+    # Stop/start/status/policy changes retain dated evidence. Replacement/update/restore do not.
+    fields = {key: m.get(key) for key in ("id", "created", "image", "custom_image", "opencode_update")}
+    return hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()
+
+
+def _environment_identity(m):
+    fmt = '{{.Id}}|{{.Image}}|{{index .Config.Labels "org.opencode-sandbox.id"}}'
+    p = c.docker("container", "inspect", "--format", fmt, c.cname(m), capture=True)
+    parts = p.stdout.strip().split("|")
+    if len(parts) != 3 or not re.fullmatch(r"[0-9a-f]{64}", parts[0]) or not re.fullmatch(r"sha256:[0-9a-f]{64}", parts[1]):
+        raise c.SandboxError("Invalid immutable container/image identity in version inspection")
+    if parts[2] != m["id"]: raise c.SandboxError("Container name collision / ownership mismatch in version inspection")
+    return {"environment": m["id"], "container": parts[0], "image": parts[1],
+            "endpoint": c.docker_endpoint(), "data": c.data_id(), "lifecycle": _lifecycle(m)}
 
 
 def versions():
@@ -154,11 +343,17 @@ def versions_report(*, check=False):
             newest = latest()
         except Exception as exc:  # noqa: BLE001 — report boundary; retain local inventory on failure
             errors.append(f"npm registry check failed: {c.error_text(exc)}")
-    lines = [f"npm registry: {newest}"] if newest is not None else []
+    cached = discovery()
+    if newest is None and cached["success"]:
+        newest = cached["success"]["value"]
+        lines = [f"npm registry (cached; last checked {cache.when(cached['success']['at'])}): {newest}"]
+    else:
+        lines = [f"npm registry: {newest}"] if newest is not None else []
     for item in items:
         try:
             line = f"{item['name']}: {environment_line(item, newest)}"
             (errors if item["policy"] is None else lines).append(line)
+            if item.get("error"): errors.append(f"{item['name']}: version check failed: {item['error']}")
         except Exception as exc:  # noqa: BLE001 — one failed row must not discard the other rows
             errors.append(f"{item['name']}: check failed ({c.error_text(exc)})")
     return lines, errors
@@ -187,7 +382,7 @@ def update_base(version, distro=None, *, keep_previous=True):
     d = distros.get(distros.DEFAULT if distro is None else distro)
     # Resolve "latest" first: the literal build arg "latest" hits Docker's layer
     # cache, so the npm install step was never re-run and nothing was updated.
-    version = supported(latest() if version == "latest" else version)
+    version = resolve_target(version)
     with c.base_lock(d.id, "build"):
         c.require_docker_space("a base image build")
         candidate = distros.candidate_tag(d, __import__("secrets").token_hex(6))
@@ -249,29 +444,82 @@ def check_pin(m):
             f"or change the policy: opencode-sandbox opencode policy-set {m['name']} notify")
 
 
+def comparison(item, newest=None, *, unsolicited=False):
+    """Availability is information, not execution eligibility; pins and Manual still compare."""
+    p, version = item.get("policy"), item.get("version")
+    if not p or not version or not newest or (unsolicited and p["mode"] != "notify"): return None
+    return describe(version, newest)
+
+
 def environment_line(item, newest=None):
-    """How `versions`/the dashboard report one environment. Only the notify policy reports updates
-    (`newest` from the registry); pinned reports a version changed outside the manager."""
+    """Shared explicit CLI/TUI comparison. Dated evidence never becomes a fresh verification."""
     p, version = item.get("policy"), item.get("version")
     if p is None:
         return item["state"]
+    if item.get("recovery"):
+        return f"{p['mode']}; Unknown; {item['recovery']}"
     if version is None:
         if item["state"] == "running":
             return f"{p['mode']}; `opencode --version` failed in the container (broken or missing; repair: stop, then opencode update NAME)"
-        return f"{p['mode']}; {'not checked (stopped)' if item['state'] == 'stopped' else item['state']}"
+        return f"{p['mode']}; {'not checked (stopped); Unknown' if item['state'] == 'stopped' else item['state']}"
+    suffix = ""
+    if item.get("verification") in ("last-verified", "history-unverified") and item.get("observation"):
+        suffix = f"; last verified {cache.when(item['observation']['at'])} ({item['state']}; not a fresh check)"
+        if item["verification"] == "history-unverified": suffix += "; current container identity unverified"
+    if item.get("error"): suffix += f"; latest probe failed: {item['error']}"
     if p["mode"] == "pinned":
         if normalize(version) != p["version"]:
-            return f"{version}; pinned {p['version']}, but runs {version} (changed outside the manager)"
-        return f"{version}; pinned"
-    if p["mode"] == "manual" or newest is None:
-        return f"{version}; {p['mode']}"
-    return f"{version}; {describe(version, newest)}"
+            status = f"pinned {p['version']}, but {'last verified' if suffix else 'runs'} {version} (changed outside the manager)"
+        else: status = "pinned"
+    else: status = p["mode"]
+    available = comparison(item, newest) if item.get("verification") != "history-unverified" else None
+    if available:
+        status = available if p["mode"] == "notify" else f"{status}; {available}"
+    return f"{version}; {status}{suffix}"
 
 
-def _exec_version(m):
-    p = probes.exec(m, "opencode", "--version")
+def _exec_version(m, *, container_id=None):
+    p = probes.exec(m, "opencode", "--version", container_id=container_id)
     if p.returncode: raise c.SandboxError(f"OpenCode version probe failed (exit {p.returncode})")
     return normalize(p.stdout)
+
+
+def update_blocker(m, state, target):
+    """Pure shared eligibility, also re-evaluated under the execution lock; no network/start."""
+    supported(target)
+    if m.get("operation"): return str(c.pending_operation(m))
+    p = policy(m)
+    if p["mode"] == "pinned" and target != p["version"]:
+        return f"Environment pinned to OpenCode {p['version']}; change policy first"
+    if c.runtime_settings(m)["network"] == "none":
+        return ("OpenCode update downloads from npm but this environment has network=none; "
+                "update the base image instead, or temporarily change the network with config apply NAME --network bridge")
+    if state is None or state.get("Running"):
+        return "OpenCode update requires an existing stopped container"
+    return None
+
+
+@dataclass(frozen=True)
+class EnvironmentUpdatePlan:
+    target: str
+    identity: tuple[tuple[str, str], ...]
+
+
+def prepare_environment_update(m, version):
+    target = resolve_target(version, m)
+    c.ensure_runtime(False)
+    m = c.resolve(m["id"])
+    state = c.inspect_container(m)
+    reason = update_blocker(m, state, target)
+    if reason: raise c.SandboxError(reason)
+    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())))
+
+
+def _remember_update(m, value, identity, at):
+    """Actual runtime verification just completed; journal closure changes its lifecycle binding."""
+    observation = cache.evidence(value, "container-exec", {**identity, "lifecycle": _lifecycle(m)})
+    observation["at"] = at
+    cache.write(_environment_key(m), {"success": observation, "attempt": {"at": at, "ok": True, "identity": observation["identity"]}})
 
 
 def _restore_checkpoint(m, result):
@@ -296,7 +544,7 @@ def _restore_checkpoint(m, result):
     c._finish_reconfigure(m)
 
 
-def update_environment(m, version):
+def update_environment(m, version, *, plan=None):
     """Update OpenCode in a stopped container with the image build's install script (D-019).
 
     Journal `opencode-update` with a docker-commit checkpoint of the container's system layer,
@@ -305,26 +553,25 @@ def update_environment(m, version):
     layer; the /root volume and /workspace are not part of it and not touched). After a success
     the checkpoint stays the environment's rollback point (`rollback_environment`).
     """
-    if version == "latest" and policy(m)["mode"] == "pinned":
-        raise c.SandboxError(f"Environment pinned to OpenCode {policy(m)['version']}; change policy first")
-    target = supported(latest() if version == "latest" else version)
+    target = supported(version) if plan is not None else resolve_target(version, m)
+    if plan is not None and target != plan.target:
+        raise c.SandboxError("Update target differs from the confirmed target; review again")
     c.ensure_runtime(False)
     with c.lock(m["id"]):
         m = c.resolve(m["id"])
         if m.get("operation"):
             raise c.pending_operation(m)
-        p = policy(m)
-        if p["mode"] == "pinned" and target != p["version"]:
-            raise c.SandboxError(f"Environment pinned to OpenCode {p['version']}; change policy first")
-        if c.runtime_settings(m)["network"] == "none":
-            # npm retried for >10 minutes and was left running if interrupted.
-            raise c.SandboxError("OpenCode update downloads from npm but this environment has network=none; "
-                                 "update the base image instead, or temporarily change the network with config apply NAME --network bridge")
+        # Policy/network refusals precede Docker inspection, as in the original executor.
+        reason = update_blocker(m, {"Running": False}, target)
+        if reason: raise c.SandboxError(reason)
         state = c.inspect_container(m)
-        if state is None or state.get("Running"):
-            raise c.SandboxError("OpenCode update requires an existing stopped container")
+        reason = update_blocker(m, state, target)
+        if reason: raise c.SandboxError(reason)
+        if plan is not None and tuple(sorted(_environment_identity(m).items())) != plan.identity:
+            raise c.SandboxError("Environment/container changed since confirmation; review again")
         c.recheck_mount(m)  # the update starts it
         c.require_docker_space("an OpenCode update (checkpoint + npm install)")
+        identity = _environment_identity(m)
         checkpoint = "ocs-checkpoint:" + m["id"] + "-" + __import__("secrets").token_hex(4)
         c.docker("commit", c.cname(m), checkpoint, capture=True)
         before = m.get("opencode_update")
@@ -334,7 +581,8 @@ def update_environment(m, version):
         try:
             c.docker("start", c.cname(m), capture=True)
             try:
-                record["from"] = _exec_version(m)
+                record["from"] = _exec_version(m, container_id=identity["container"])
+                verified_at = time.time()
             except c.SandboxError:
                 # A broken installation (e.g. a user's `opencode upgrade` on Arch): the
                 # install script below is the repair. Its checkpoint holds the broken state.
@@ -342,7 +590,8 @@ def update_environment(m, version):
             c.save(m)
             if record["from"] != target:
                 c.docker("exec", c.cname(m), *INSTALL, target, capture=True)
-                installed = _exec_version(m)
+                installed = _exec_version(m, container_id=identity["container"])
+                verified_at = time.time()
                 if installed != target:
                     raise c.SandboxError(f"installed {installed}, expected {target}")
             c.docker("stop", c.cname(m), capture=True)
@@ -361,10 +610,12 @@ def update_environment(m, version):
             if before is None:
                 m.pop("opencode_update")
             c.mark(m, "stopped", operation=None, last_error=None)
+            _remember_update(m, target, identity, verified_at)
             c.docker("image", "rm", checkpoint, capture=True, check=False)
             return {"version": target, "previous_version": target, "unchanged": True}
         record.update(state="done", at=c.now(), result=f"updated {record['from'] or 'unknown (broken)'} -> {target}")
         c.mark(m, "stopped", operation=None, last_error=None)
+        _remember_update(m, target, identity, verified_at)
         return {"version": target, "previous_version": record["from"], "checkpoint": checkpoint}
 
 

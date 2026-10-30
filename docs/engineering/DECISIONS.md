@@ -926,7 +926,9 @@ results; UP-03 implements shared base guards, lock order and guarded revalidatio
 rollback selection and immutable consent; UP-05 adds bounded host/network diagnostics, finite
 container probes, owned helper/client cleanup and cancellation-safe read-only publication;
 UP-06 implements category-owned advisory replacement/clearing and progress-safe status ownership.
-All other tasks remain pending. Current behavior remains
+UP-07/UP-08 implement identity-bound disposable evidence/attempt caches, compatible stable
+resolution, explicit Manual/Pinned comparisons and exact target confirmation/revalidation.
+All later tasks remain pending. Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from
 TODO under D-045; it is a running-effort record, not a second permanent planning system.

@@ -29,13 +29,13 @@ def test_semver_compare(a, b, expected):
 def test_describe_never_offers_a_downgrade():
     assert v.describe("2.1.4", "2.1.4") == "current"
     assert v.describe("2.9.0", "2.10.0").startswith("update available")
-    assert v.describe("2.10.0", "2.9.0").startswith("newer than npm latest")
+    assert v.describe("2.10.0", "2.9.0").startswith("newer than latest supported stable")
 
 
 @pytest.fixture
 def registry(monkeypatch):
     """Real HTTP over loopback; each test sets the response."""
-    state = {"status": 200, "body": b"{}", "delay": 0}
+    state = {"status": 200, "body": b"{}", "delay": 0, "headers": {}, "requests": []}
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -43,8 +43,10 @@ def registry(monkeypatch):
 
         def do_GET(self):
             import time
+            state["requests"].append((self.path, self.headers.get("Accept")))
             time.sleep(state["delay"])
             self.send_response(state["status"])
+            for key, value in state["headers"].items(): self.send_header(key, value)
             self.end_headers()
             self.wfile.write(state["body"])
 
@@ -52,7 +54,7 @@ def registry(monkeypatch):
     # Only shutdown polling is shorter; response delays and client deadlines are unchanged.
     thread = threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
-    monkeypatch.setattr(v, "REGISTRY", f"http://127.0.0.1:{srv.server_port}/@opencode%2fcli/latest")
+    monkeypatch.setattr(v, "REGISTRY", f"http://127.0.0.1:{srv.server_port}/@opencode%2fcli")
     try:
         yield state
     finally:
@@ -63,7 +65,7 @@ def registry(monkeypatch):
 
 
 def test_latest_reads_registry(registry):
-    registry["body"] = json.dumps({"version": "2.1.4"}).encode()
+    registry["body"] = json.dumps({"versions": {"2.1.4": {"version": "2.1.4"}}}).encode()
     assert v.latest() == "2.1.4"
 
 
@@ -114,7 +116,7 @@ def fake_docker(calls, installed="2.1.4", same=False, os_release='ID=debian\nVER
                 return SimpleNamespace(returncode=1, stdout="[]", stderr="No such image: " + a[-1])
             new = ("-candidate-" in a[-1] or a[-1] == NEW) and not same
             if "--format" in a:
-                out = "layers:new" if new else "layers:old"
+                out = ((NEW if new else OLD) + "|{}") if a[3] == "{{.Id}}|{{json .Config.Labels}}" else ("layers:new" if new else "layers:old")
             else:
                 d = c.distros.get("arch" if "arch" in a[-1] else c.distros.DEFAULT)
                 out = json.dumps([{"Id": NEW if new else OLD, "Config": {"Labels": {
@@ -276,7 +278,9 @@ def test_npm_install_is_bounded(monkeypatch):
     versions = iter(["2.1.2\n", "2.1.3\n"])
     def docker(*a, **k):
         calls.append(a)
-        if a[:2] == ("exec", c.cname(m)) and a[-2:] == ("opencode", "--version"):
+        if a[:2] == ("container", "inspect"):
+            return SimpleNamespace(returncode=0, stdout="a" * 64 + "|sha256:" + "b" * 64 + "|" + m["id"], stderr="")
+        if a[0] == "exec" and a[-2:] == ("opencode", "--version"):
             return SimpleNamespace(returncode=0, stdout=next(versions), stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
@@ -308,7 +312,7 @@ def test_v2_version_output_is_normalized(raw, expected):
 
 @pytest.mark.parametrize("bad", ["1.19.4", "0.0.0-dev-84", "opencode v1.19.3"])
 def test_v1_and_dev_versions_are_not_installable(bad):
-    with pytest.raises(c.SandboxError, match="not supported; this manager installs OpenCode 2.x only"):
+    with pytest.raises(c.SandboxError, match="not supported; this manager installs OpenCode 2.x only|exact semantic version"):
         v.supported(bad)
     with pytest.raises(c.SandboxError):
         v.policy({"opencode_policy": "pinned", "opencode_pin": bad})

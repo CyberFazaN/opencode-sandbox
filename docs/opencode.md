@@ -77,8 +77,10 @@ answered from the guidance in the first prompt.
 
 ## Versions
 
-Only OpenCode 2.x (npm package `@opencode/cli`) is installed or pinned; a newer major version is
-reported, never installed. OpenCode in a sandbox is installed and updated only by the manager:
+Only OpenCode 2.x (npm package `@opencode/cli`) is installed or pinned. `latest` selects the
+highest supported stable version even if npm's latest tag moves to another major; prereleases
+are excluded by default. An exact compatible alternative, including a prerelease, can be selected
+with `--version`. Unsupported majors are never installed. OpenCode in a sandbox is installed and updated only by the manager:
 every container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`, so OpenCode's own update check and
 self-update (also `update: auto` in your OpenCode configuration) are off. An `opencode upgrade`
 inside a container left world-writable files, about 940 MB of platform packages and a 470 MB
@@ -93,8 +95,8 @@ that environment's OS and system layer.
 | Command | Does |
 |---|---|
 | `opencode check [--distro ID]` | Compares a base image's version with the npm registry (over HTTPS, no host npm, no background checks) |
-| `opencode versions [--check]` | Each environment's running version and policy (stopped containers are not started); with `--check`, environments with the notify policy report available updates |
-| `opencode status NAME` | The version one environment runs |
+| `opencode versions [--check]` | Running versions or dated last verification/Unknown for stopped containers; `--check` compares every policy with npm's latest supported stable release |
+| `opencode status NAME` | One environment's actual/last-verified version, source, time and immutable object identity |
 | `opencode policy NAME`, `opencode policy-set NAME notify\|manual\|pinned [--version X]` | The update policy |
 | `opencode update NAME [--version X] --yes` | Update a stopped environment |
 | `opencode rollback NAME --yes` | Undo its last update |
@@ -110,9 +112,26 @@ errors are reported without hiding other environments. Available rows go to stdo
 stderr; any report error gives exit status 2. Without `--check`, the command never queries npm.
 Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
 
+**Evidence and cache.** Successful runtime checks record the version, source, time, environment,
+daemon, immutable container and creation-image IDs in disposable files under the data directory's
+`update-cache/`, separate from metadata and recovery journals. Stopped containers show **last
+verified** with its time, or **Unknown**; creation labels and old update records do not verify the
+present binary. Replacement, restore, rollback and update journals invalidate or qualify earlier
+observations. A failed probe retains older evidence with its original time, never a fresh success.
+If Docker cannot be inspected, history is explicitly unverified against the current container.
+For a fresh stopped-container check, start it explicitly, then check; it remains running.
+
+npm success and the latest attempt are stored separately. Without `--check`, an existing cached
+comparison is visibly dated and no network request is made. Explicit discovery failures still
+exit 2, even if cached information survives. Invalid, unsafe, missing or unwritable caches do not
+block normal operations and are not installation authority. An explicit `latest` update requires
+a successful fresh lookup; it cannot silently use a cached target after failure. HTTP rate limits
+with Retry-After are retained and respected by later explicit requests. No daily scheduling or
+automatic updates are enabled by this cache.
+
 **Bounded checks.** Short Docker inventory/inspect calls have an eight-second per-call deadline
 and a 1 MiB combined output limit. The npm check has one eight-second total budget, including DNS,
-TLS and response reading (64 KiB maximum), without host npm/Node. A running-container version
+TLS and abbreviated package-metadata reading (8 MiB maximum), without host npm/Node. A running-container version
 probe has a five-second container-side limit; the host client gets three extra seconds for Docker
 transport/completion. Image definition/tool verification has a separate 30-second probe limit.
 Timeout or unavailable tooling is not a verified version, a missing image, or an up-to-date result.
@@ -135,13 +154,17 @@ changes or colliding candidate/copy tags, and never treat a failed inspection as
 These advisory guards do not coordinate older managers or manual Docker commands. They do not
 change existing containers, their writable layers, policies or user configuration.
 
-**Policies.** `notify` (the default) reports available updates with `versions --check`;
-`manual` reports nothing; `pinned` refuses updates to other versions, refuses to create a
+**Policies.** Explicit version comparisons show newer compatible versions for all policies.
+`manual` suppresses unsolicited notices, not requested information. `pinned` also suppresses
+general newer-version notices, but retains pin-mismatch reporting; availability does not change
+the pin or authorize an update. It refuses updates to other versions, refuses to create a
 container from a base image built with another version, and reports a version changed outside
 the manager.
 
 **Environment updates.** `opencode update` works on a **stopped** environment with network. It
-resolves `latest` first and refuses versions below 2.0.0. It commits a checkpoint
+resolves an exact latest-supported-stable target **before confirmation**, then revalidates that
+same target, container identity, policy, network and pending operation under the environment lock.
+It never substitutes a newer release after consent. It commits a checkpoint
 `ocs-checkpoint:<id>-*` of the container's system layer, journals the update, and on any
 failure replaces the container with one created from the checkpoint (the system layer exactly
 as before; `/root` and `/workspace` are not touched). It also repairs a broken installation.

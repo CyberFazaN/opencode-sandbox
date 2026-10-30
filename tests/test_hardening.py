@@ -5,6 +5,7 @@ image removed outside the manager and the Agent Context refresh after provisioni
 import json
 import os
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 from test_arch_image import aur
@@ -64,6 +65,9 @@ def test_report_names_an_unsupported_latest_major():
 
 def test_version_probe_runs_without_new_privileges(monkeypatch):
     fake = Docker(monkeypatch, {("run",): (0, "opencode v2.2.0\n")})
+    real = c.docker
+    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=0, stdout="sha256:" + "a" * 64 + "|{}", stderr="")
+                        if a[:2] == ("image", "inspect") else real(*a, **k))
     assert v.image_version("opencode-sandbox:debian") == "2.2.0"
     run = next(a for a in fake.calls if a[0] == "run")
     assert "no-new-privileges:true" in run

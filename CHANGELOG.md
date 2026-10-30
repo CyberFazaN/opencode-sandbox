@@ -31,6 +31,14 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 - Dashboard refresh replaces or clears only its own daemon, resource-support and base-image
   advisories, including successful checks. Unknown results replace obsolete warnings without
   claiming success, and advisory/readiness cleanup preserves active operation progress and results.
+- Stopped environments retain dated, identity-bound OpenCode verification or show Unknown;
+  build labels and completed-update metadata are not treated as current runtime evidence.
+  Disposable caches preserve successful evidence separately from failed attempts, without
+  changing environment/backup schemas or starting containers for discovery.
+- OpenCode discovery selects the latest supported stable 2.x release even if npm latest moves
+  to another major. Explicit Manual/Pinned comparisons no longer hide newer versions; pin and
+  lifecycle restrictions remain. Updates resolve exact targets before confirmation and revalidate
+  them instead of silently selecting a later release.
 
 ## 6.1.0 — 2026-10-30
 

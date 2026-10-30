@@ -61,6 +61,8 @@ class FakeDocker:
             if not self.exists:
                 return fail("Error: No such container: " + a[-1])
             fmt = a[3]
+            if fmt.startswith("{{.Id}}|"):
+                return ok("a" * 64 + "|sha256:" + "b" * 64 + "|" + self.owner)
             if fmt == "{{json .State}}":
                 return ok(json.dumps({"Running": self.running, "Dead": self.dead, "Status": "running" if self.running else "exited"}))
             if "org.opencode-sandbox.id" in fmt:

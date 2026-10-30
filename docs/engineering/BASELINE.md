@@ -27,10 +27,14 @@ selection and immutable consent/revalidation. UP-05 bounds short host/network di
 container probes, owns client/helper cleanup and prevents late canceled read-only UI results.
 UP-06 replaces/clears category-owned daemon/resource/image advisories and readiness notices,
 with explicit status ownership preserving active operations and cleanup-safe completion results.
-The Versions interface, discovery policy and independent mutation lifecycles remain unchanged;
-UP-07 + UP-08 is next. No image-definition, schema or manager-version change was made.
+UP-07 + UP-08 add structured identity-bound runtime/image observations and disposable source
+caches, compatible stable npm discovery, explicit comparisons for Manual/Pinned, and exact target
+confirmation/revalidation. Stopped environments retain dated evidence or Unknown; failed checks
+never become readiness success. The interface is still the Versions report; next is UP-10 + UP-09
+(manual/cached Updates UI first, optional scheduling second). No image-definition, metadata/backup
+schema or manager-version change was made.
 
-UP-01..UP-06 verification is below; commands, initial failures and handoff are in the roadmap.
+UP-01..UP-08 verification is below; commands, initial failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -202,6 +206,24 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-07 + UP-08 — 2026-10-30
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/Textual-pilot/local-process suites | **1326 passed, 64 opt-in skips in each of four serial foreground runs**: Python 3.11.18/3.14.8, Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0; pytest 9.2.0, pip checks clean. Only known lowest-Typer/Click deprecations. Includes Ruff/shellcheck, language/links/CLI and existing host terminal coverage |
+| New mocked/host/HTTP/pilot coverage | 125 additional default-suite cases: strict semver/compatible selection despite another latest major, prereleases/explicit alternatives, source errors/size/deadline, cache privacy/corruption/non-finite/future times/expiry, Retry-After including long delays, canceled-attempt retention, immutable identity/lifecycle invalidation, stopped/unknown/unverified history, pin/network/journal refusals, exact-target consent/revalidation, readiness not passing stale evidence and explicit Manual/Pinned reports at 80x24/100x30 |
+| Scoped real Docker/OpenCode | **4 tests/72 checks passed**, no skips/deselections, `up0708-final`, 150.84 s: retained Debian 12/revision 1 and Arch/revision 1, OpenCode 2.2.0 -> explicit 2.1.4 -> checkpoint rollback; same-version/no-install, stopped dated evidence with byte-unchanged metadata/StartedAt, pin/network-none refusals, SIGKILL/update-recover, recreation and file-only restore invalidation, system/home/workspace/user-config preservation; bounded probes, canceled-client/helper cleanup and missing-timeout refusal/restoration still pass |
+| Public npm read | Bounded packaged HTTP child selected supported stable **2.2.4** from live abbreviated metadata (measured response 2,061,815 bytes); isolated cache stored source/time/attempt. No model/provider call, host npm or host OpenCode. Major-rollover and outage/rate-limit behavior use controlled real-loopback HTTP/mocks, not a claim of a public-service outage |
+| Failures/review | Four original regressions failed before patch. Intermediate runs exposed mock identity assumptions, readiness consumers, import/style errors and a missing real-test marker; corrected/rerun, never suppressed. Final review hardened non-finite cache data and removed premature Retry-After clipping; all four final complete suites include these corrections. First real attempt: 2 passed/2 harness failures; corrected run 4 passed/68 checks, then final restore-extended 4 passed/72 checks |
+| Package/resources/boundaries | Local 6.1.0 sdist/wheel, strict metadata/content and byte-identical changed-module checks; no upload/global install. Three real runs manifested resources and finished with guarded product cleanup/leak checks. Final own-rootless inventory: zero containers/volumes, unchanged four original full tagged-image IDs; no run helpers remain. No new full real campaign, fresh base build, privileged/socket/service change, paid provider, installed-pipx, report-specific real terminal or manual observation evidence; no release-readiness claim |
+
+After the full suites, three future-time parameter IDs were given stable names (no values,
+assertions or product changes), and engineering evidence was finalized. The entire new-test
+plus quality/language/links/CLI subset then passed **165 tests in each of four combinations**.
+Those are focused repeats, not additional full-suite runs. The final wheel matches all six
+changed/new product modules; the actual full-suite outcomes agree across combinations after
+normalizing only those three former import-time timestamp IDs.
 
 ### One-time performance checkpoint after UP-06 — 2026-10-30
 
