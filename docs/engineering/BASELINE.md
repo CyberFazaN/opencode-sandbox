@@ -47,9 +47,10 @@ default-off daily GitHub metadata work. UP-16's first verified checkpoint adds e
 installation usage/internal exclusion and a stdlib-only console bootstrap. Its second verified
 checkpoint adds internal dated external-tool/runtime/settings assessment. Its third freezes an
 independent stdlib helper and proves a non-mutating process-exit/exclusion fixture, including
-worker shutdown and operation with the installed application absent. Manager Update stays
-disabled; UP-16 is partial, with narrow fresh-verifier access and restored-terminal handoff still
-pending before UP-17 replacement/recovery.
+worker shutdown and operation with the installed application absent. Its fourth adds a dedicated
+fixed read-only fresh runtime query under helper exclusion, using an unlocked witness and live
+peer fdinfo rather than inheriting a lease. Manager Update stays disabled; UP-16 is partial, with
+restored-terminal handoff pending before UP-17 replacement/recovery.
 No image-definition, metadata/backup schema or manager-version change was made.
 
 UP-01..UP-15 and the partial UP-16 checkpoints' verification is below; commands, failures and
@@ -225,6 +226,71 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-16 fourth verifier-access checkpoint — 2026-10-31
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1822 passed, 84 opt-in skips each**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Four clean pip checks; serial foreground, 245.63/239.45/243.72/239.39 s. All **1906 ordered IDs/outcomes identical**; only two known lowest-Typer deprecations |
+| New default regressions | **59 cases**: 54 real host/process verifier cases, four procfs-observation helper cases and one required-module package gate. Unlocked O_RDONLY/CLOEXEC witness, matching private inode and live owner's exact kernel FLOCK proof; shared/unheld/POSIX/wrong-owner/prefix/replaced-inode refusal, fork/exec hygiene, reverse order, no ordinary entry-point bypass even with a deliberately inherited real guard or fake environment flags. Fixed dedicated entry, nonce/message-credential/FD-shape refusal, unexpected descriptor closure, no credential/data-directory work, close-before-query and changed-record preservation. Actual runtime query, failure/timeout/interruption and early descendant retention proof; minimal no-pip CPython fixtures are not pipx provenance evidence |
+| Affected real Docker/OpenCode/pipx/terminal | **29 tests/762 checks passed**, no skips/deselections, `up16d-final`, 996.24 s. All prior 29 rows/assertions retained. Actual default/custom-space pipx installs freeze the helper from installed source and observe version/prefix/module through the dedicated fresh process under exclusion. Normal launcher still refuses. A real early target-site hook spawns a manifested descendant; kill/reap helper/direct verifier, prove exclusion free while the descendant still lives, then terminate/reap it. Original installation/record/executable remains unchanged and operational; no automatic restart |
+| Boundary | **UP-16 remains partial**. No normal CLI exemption, public verifier command, CLI/TUI/startup consumer, restored-terminal handoff or installation path. Only observed runtime facts, not expected source/commit/launcher/basic-CLI health, replacement success or recovery. Manager Update stays disabled. Usable Linux pidfds, live peer proc fdinfo and parent-death protection required for this internal fixture; no unsafe fallback or new ordinary-startup requirement |
+
+The fixed external bootstrap sets parent-death protection before target Python site initialization,
+then execs only the target venv's existing Python/dedicated module. It inherits an **independent,
+unlocked read-only witness**, never the helper's exclusive description. Both bootstrap and client
+check the live peer's exact exclusive fdinfo/inode; private pidfd/nonce and kernel message
+credentials bind owner and actual responder. Client closes witness before reading version/prefix/
+module; no CLI/core/Docker/config/discovery import or generic command/callback. Owner retains
+exclusion through successful fresh exit/result and reserved-group cleanup/reap. Query budget is
+eight seconds/4096-byte messages, further limited by remaining fixture time, not installation or
+build timing. Raw streams/environment/nonce are not persisted. Fixed-source code is trusted local
+tooling, not a sandbox, public authenticity attestation or guarantee to stop escaped site-hook work.
+
+Failure trail: missing-capability reproducer **1 failed**, 0.02 s. Initial selected **2 failed/141
+passed**, 17.28 s (replaced inode also correctly refused on context exit; two test imports). Lowest
+selected **179 passed**, 17.83 s; extended **224 passed**, 20.29 s; early real **2 passed/134 checks**,
+53.53 s. Review then exposed a flaw in the first uncommitted locked-descriptor design: an early site
+descendant could retain exclusion after helper death. Real-process reproducer **1 failed/44
+unrelated cases deselected**, 0.30 s. **Kept it unchanged**, replaced descriptor export with an
+unlocked witness/live peer proof and kernel responder credentials. Post-fix **161 passed**, 17.75 s;
+actual pipx proof **2 passed/138 checks**, 50.22 s. Final Python 3.14 focused **237 passed**, 24.04 s.
+
+First complete attempt: **1818/84 skips** on both 3.11 variants and 3.14/current (246.50/241.36/
+244.62 s); 3.14/lowest **1 failed/1817 passed/84 skips**, 239.63 s. Existing diagnostic helper read
+procfs while an owned task disappeared and raised ESRCH/ProcessLookupError, not ENOENT. Deterministic
+reproducer **1 failed/3 passed/49 unrelated cases deselected**, .06 s. Handle only those two
+disappearance errors; explicitly retain PermissionError failure and live-process negative checks.
+All real termination/reaping assertions, signal/deadline/output bounds remain unchanged. Lowest
+3.14 affected **223 passed**, 22.97 s, then **all four complete suites and all 29 real rows rerun**
+above. Original `final-*` failure evidence remains separate from corrected `verified-*`; no failure
+waived, assertion relaxed or focused selection promoted as complete verification.
+
+Evidence/hashes/XML under `.work/up16d/`; real manifests/commands/checks under `.work/logs/up16d-*`.
+Four changed/new product modules, unchanged bundled path probe, checker and final test-helper/
+fixture sources frozen before final gates (`final-source-sha256.json`). The stricter test teardown
+asserts no leaked witness set rather than clearing it. CLI/launcher/TUI/core, daemon identity,
+discovery/cache, lifecycle/journals/recovery, manager version/schemas, assets, dependency bounds
+and CI/release workflows unchanged. All real attempts isolated and guarded-cleaned; final own-
+rootless inventory has no containers/volumes/test tags and exactly the original four full image
+IDs. All deliberately spawned helpers/verifiers/descendants explicitly reaped; no user install,
+launcher, Python, credentials, services or default context changed. Private fixture Git tags/
+transport are not public release authentication. Persistent protocol inodes, evidence and build
+cache preserved. No complete campaign, optional installed-asset build, broad legacy TUI,
+privileged/socket/service, human observation, restored-terminal handoff/replacement/recovery or
+release-readiness claim. No bump, merge, push, upload, project tag, remote change or publication.
+
+Final no-isolation sdist/wheel, strict twine/content validation and five product-file byte equality
+against frozen complete/real source and wheel pass; no private instructions/evidence in sdist.
+Final document/CLI/quality subset **43 passed**, 3.20 s, not another complete run. No remaining
+manager/helper/verifier/probe/guard/watchdog Python process found. Guarded cleanup removed only
+**21 exact manifested completed pytest roots** after own-UID/inode/process/socket/mount checks;
+`/tmp/opencode` empty with **1047461 free inodes**. Real helper/results, failed/pass XML/logs,
+source hashes/artifacts, prior evidence and build cache retained. Added fixed-namespace protocol
+inodes are intentional persistent state. Prose-only follow-up scratch is separately manifested/
+guarded; no product/checker/test-helper change after final complete/real gates.
+Prose-only language/link/CLI follow-up: **27 passed**, 1.84 s (`prose.xml`), not another complete
+regression. Final documentation-bearing package retained separately.
 
 ### Unpublished UP-16 third artifact/lifetime checkpoint — 2026-10-31
 

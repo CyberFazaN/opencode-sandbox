@@ -1,8 +1,8 @@
-"""Staged stdlib-only, NON-MUTATING process-exit fixture; no installer or verifier dispatch.
+"""Staged stdlib-only, NON-MUTATING process-exit fixture; no installer/normal CLI dispatch.
 
-Executed only as the frozen zipapp's __main__ under external Python -I -B -S. Its two local
-imports are bundled source copies, not imports from the replaceable package. No shell, pipx,
-subprocess, Docker, network, generic command or normal-manager bypass is implemented here.
+Executed only as the frozen zipapp's __main__ under external Python -I -B -S. Local imports are
+bundled source copies, not imports from the replaceable package. Only the optional fixed fresh
+read-only verifier is launched; no shell, pipx, Docker, network or normal-manager bypass.
 """
 import hashlib
 import json
@@ -84,7 +84,9 @@ def main():
         if f'Pid:\t{origin}' not in fields: raise Refused('Helper origin pidfd does not match control peer')
         started = time.monotonic()
         request = json.loads(_receive(control, started + 8.0))
-        if not isinstance(request, dict) or set(request) != {'protocol', 'prefix', 'sha256', 'budget'} \
+        required = {'protocol', 'prefix', 'sha256', 'budget'}
+        if not isinstance(request, dict) or set(request) not in (required, required | {'verify'}) \
+                or ('verify' in request and request['verify'] is not True) \
                 or type(request['protocol']) is not int or request['protocol'] != 1 or isinstance(request['budget'], bool) \
                 or not isinstance(request['budget'], (float, int)) \
                 or not 0 < request['budget'] <= BUDGET:
@@ -122,8 +124,16 @@ def main():
         if outcome == 'quiescent':
             try:
                 with locks.exclusive(target):
-                    _result(directory, {'protocol': 1, 'fixture': True, 'outcome': outcome,
-                                        'origin': origin, 'helper': os.getpid(), 'sha256': digest})
+                    result = {'protocol': 1, 'fixture': True, 'outcome': outcome,
+                              'origin': origin, 'helper': os.getpid(), 'sha256': digest}
+                    if request.get('verify'):
+                        try:
+                            from manager_verifier import run
+                            result['verifier'] = {'ok': True, 'observed': run(locks, target, deadline=deadline)}
+                        except (OSError, ValueError, TypeError, KeyError, RuntimeError, ImportError):
+                            result['outcome'] = 'verification-failed'
+                            result['verifier'] = {'ok': False, 'reason': 'Fresh runtime verification unavailable; no installation was changed'}
+                    _result(directory, result)
                 return
             except locks.Error: outcome = 'busy'
         _result(directory, {'protocol': 1, 'fixture': True, 'outcome': outcome,

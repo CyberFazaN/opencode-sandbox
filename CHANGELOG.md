@@ -48,6 +48,12 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   manager installation. Its independent process waits for actual origin termination, including
   worker shutdown, before trying non-waiting installation exclusion. It does not install anything,
   grant verifier access or implement restored-terminal handoff; Manager Update stays disabled.
+- Optional internal fresh-verifier access uses a dedicated fixed read-only runtime query under
+  helper-owned exclusion. An unlocked read-only witness is checked against the live helper's
+  kernel lock record and closed before querying; no exclusive descriptor is inherited, even by
+  early Python startup descendants. Parent-death protection stops an interrupted direct verifier.
+  Ordinary CLI startup has no bypass. This is not source/launcher authentication, replacement
+  success or restored-terminal handoff; Manager Update remains disabled.
 
 ### Fixed
 

@@ -937,7 +937,8 @@ refresh with identity-bound consent and retained copies. UP-14/UP-15 add indepen
 manager discovery/classification. UP-16's first checkpoint implements early process-lifetime
 installation usage/internal exclusion; its second checkpoint adds internal dated external-tool
 runtime/settings assessment. Its third freezes a stdlib helper and verifies a non-mutating
-process-exit fixture. Verifier access, restored-terminal handoff and replacement remain pending.
+process-exit fixture. The fourth adds a dedicated fixed read-only fresh runtime query under helper
+exclusion, not an ordinary CLI exemption. Restored-terminal handoff and replacement remain pending.
 The grouped package is split at its approved verified UI checkpoint (D-057). Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from

@@ -189,6 +189,23 @@ preserved. **Not verifier access or restored-terminal handoff**: no CLI/TUI/star
 mutation path; Manager Update stays disabled. Existing ordinary terminal checks are not promoted
 as helper-handoff proof. Full commands/failure trail/limits: BASELINE and the Updates working record.
 
+UP-16 fourth verifier-access checkpoint (still partial): **59 new default cases**, four complete
+suites (**1822 passed/84 opt-in skips each**, identical **1906** ordered outcomes) and **29 affected
+real tests/762 checks**, `up16d-final`, 996.24 s. All earlier assertions/rows retained. Actual
+default/custom-space installs run one fixed fresh read-only runtime query under helper exclusion;
+ordinary startup remains refused. A manifested early site descendant stays alive after helper/
+verifier death while exclusion is demonstrably free, then is explicitly terminated/reaped. No
+exclusive descriptor crosses exec: only an independent unlocked read-only witness, validated
+against the live owner's exact kernel lock record, then closed before query. Existing source/
+record/launcher bytes unchanged and operational, all original images unchanged, no containers/
+volumes/test tags/owned process leaks. Prior locked-descriptor design failed the unchanged
+descendant reproducer and was replaced; a procfs observation race failed the fourth initial suite,
+was corrected with strict disappearance/permission/live-PID regressions, then all four complete
+suites and all 29 real rows reran. Evidence/failure trails in BASELINE/working record. **Not expected
+source/launcher/basic-CLI/replacement verification or restored-terminal handoff**; no CLI/TUI/
+startup consumer or install path. Manager Update remains disabled, UP-16 partial. Persistent
+inodes/evidence/build cache preserved; no complete campaign/manual/privileged/release claim.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

@@ -76,6 +76,7 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
              'opencode_sandbox/launcher.py': 'x', 'opencode_sandbox/installation_locks.py': 'x',
              'opencode_sandbox/manager_tools.py': 'x', 'opencode_sandbox/manager_tool_probe.py': 'x',
              'opencode_sandbox/manager_handoff.py': 'x', 'opencode_sandbox/manager_helper.py': 'x',
+             'opencode_sandbox/manager_verifier.py': 'x',
              f"{info}/licenses/LICENSE": "MIT",
              **{f"opencode_sandbox/assets/images/{a}": "x" for a in check_dist.assets()}}
     with zipfile.ZipFile(dist / f"opencode_sandbox-{v}-py3-none-any.whl", "w") as wheel:
@@ -87,6 +88,7 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
                  'src/opencode_sandbox/launcher.py', 'src/opencode_sandbox/installation_locks.py',
                  'src/opencode_sandbox/manager_tools.py', 'src/opencode_sandbox/manager_tool_probe.py',
                  'src/opencode_sandbox/manager_handoff.py', 'src/opencode_sandbox/manager_helper.py',
+                 'src/opencode_sandbox/manager_verifier.py',
                  *(f"src/opencode_sandbox/assets/images/{a}" for a in check_dist.assets()), *extra):
         if name not in drop:
             (tree / name).parent.mkdir(parents=True, exist_ok=True)
@@ -122,7 +124,7 @@ def test_a_missing_image_asset_or_licence_is_reported(tmp_path):
 
 
 @pytest.mark.parametrize('module', ['launcher.py', 'installation_locks.py', 'manager_tools.py', 'manager_tool_probe.py',
-                                  'manager_handoff.py', 'manager_helper.py'])
+                                  'manager_handoff.py', 'manager_helper.py', 'manager_verifier.py'])
 def test_missing_bootstrap_modules_fail_both_package_gates(tmp_path, module):
     dist = distributions(tmp_path, drop={'opencode_sandbox/' + module, 'src/opencode_sandbox/' + module})
     problems = check_dist.check(dist)

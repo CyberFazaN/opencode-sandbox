@@ -37,8 +37,23 @@ def dead(pid):
     try:
         from pathlib import Path
         return Path(f"/proc/{pid}/stat").read_text().split(")", 1)[1].split()[0] == "Z"
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
+        # procfs can lose the task between open and read: ENOENT and ESRCH both mean gone.
         return True
+
+
+@pytest.mark.parametrize('error', [FileNotFoundError, ProcessLookupError, PermissionError])
+def test_process_death_observation_distinguishes_disappearance_from_inaccessible_procfs(monkeypatch, error):
+    from pathlib import Path
+    def vanished(*args, **kwargs): raise error('owned procfs observation fixture')
+    monkeypatch.setattr(Path, 'read_text', vanished)
+    if error is PermissionError:
+        with pytest.raises(PermissionError): dead(os.getpid())
+    else: assert dead(os.getpid())
+
+
+def test_running_process_is_not_a_dead_descendant():
+    assert not dead(os.getpid())
 
 
 @pytest.mark.parametrize("failure", ["timeout", "cancel", "overflow", "interrupt"])

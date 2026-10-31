@@ -162,6 +162,83 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
                     except (ProcessLookupError, ChildProcessError): pass
         ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real helper: fixture left installed records/executable unchanged')
         ck(run().returncode == 0, 'Manager real helper: restored original installation remains operational; no automatic restart')
+        # Dedicated fixed runtime access under the ACTUAL helper's exclusive guard. No normal
+        # entry point gets a bypass, and these facts do not verify a replacement/source/launcher.
+        verifying_code = origin_code.replace('h.start_fixture(artifact,budget=20)', 'h.start_fixture(artifact,budget=20,verify=True)')
+        for killed in (False, True):
+            site = next(prefix.glob('lib/python*/site-packages'))
+            hook_module, hook_path = site / 'ocs_test_verifier_death.py', site / 'ocs_test_verifier_death.pth'
+            marker = base / 'verifier-startup-ready.json'
+            partial = marker.with_suffix('.partial')
+            if killed:
+                assert not hook_module.exists() and not hook_path.exists() and not marker.exists()
+                camp.note(f'owned startup-death fixture {hook_module}, {hook_path}, {marker}, {partial}; only target verifier -m startup pauses; exact hook files removed in finally')
+                hook_module.write_text('import json,os,subprocess,sys,time\nfrom pathlib import Path\n'
+                    'if sys.argv[0]=="-m" and len(sys.argv)==4:\n'
+                    f' child=subprocess.Popen([{sys._base_executable!r},"-I","-B","-S","-c","import time; time.sleep(30)"],close_fds=False)\n'
+                    f' Path({str(partial)!r}).write_text(json.dumps({{"pid":os.getpid(),"descendant":child.pid}}))\n'
+                    f' os.replace({str(partial)!r},{str(marker)!r})\n'
+                    ' while True: time.sleep(.01)\n')
+                hook_path.write_text('import ocs_test_verifier_death\n')
+            helper = verifier = descendant = None
+            try:
+                with subreaper():
+                    origin = subprocess.Popen([str(prefix / 'bin/python'), '-B', '-c', verifying_code, json.dumps(value), str(staging)],
+                                              env=helper_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    camp.note(f'owned fresh-verifier fixture origin pid={origin.pid}; killed-helper={killed}; always reaped, no replacement')
+                    try:
+                        assert select.select([origin.stdout], [], [], 15)[0], 'Verifier origin did not report readiness'
+                        line = origin.stdout.readline()
+                        assert line, origin.stderr.read()
+                        fixture = json.loads(line); helper = fixture['helper']; directory = Path(fixture['directory'])
+                        camp.note(f'owned verifying helper pid={helper}, artifact/result evidence {directory}; retained, exact children adopted/reaped')
+                        origin.communicate(timeout=10)
+                        assert ck(origin.returncode == 0, 'Manager real verifier: actual originating installed process exits before fresh query')
+                        if killed:
+                            end = time.monotonic() + 8
+                            while not marker.exists() and time.monotonic() < end: time.sleep(.01)
+                            assert marker.exists(), 'Owned startup verifier did not reach rendezvous'
+                            startup = json.loads(marker.read_text())
+                            verifier, descendant = startup['pid'], startup['descendant']
+                            camp.note(f'owned early-startup verifier pid={verifier}; parent-death signal must kill it with its helper, supervisor reaps exact PID')
+                            camp.note(f'owned early-startup descendant pid={descendant}; deliberately inherits unlocked witness and remains alive for exclusion-release proof, then exact PID killed/reaped')
+                            ck(exclusion(camp, prefix, busy=True), 'Manager real verifier: helper retains exclusion during target site startup')
+                            refused = camp._run([str(launcher), '--version'], env=env, check=False)
+                            ck(refused.returncode == 2 and 'installation busy' in refused.stderr.lower(),
+                               'Manager real verifier: ordinary installed launcher still refuses while dedicated verifier starts')
+                            os.kill(helper, signal.SIGKILL)
+                            status = wait_helper(helper); helper = None
+                            ck(status == -signal.SIGKILL, 'Manager real verifier: interrupted independent helper explicitly reaped')
+                            status = wait_helper(verifier); verifier = None
+                            ck(status == -signal.SIGKILL, 'Manager real verifier: parent-death protection kills/reaps startup verifier before installed module entry')
+                            ck(not (directory / 'result.json').exists(), 'Manager real verifier: killed helper cannot publish a late success result')
+                            ck(Path(f'/proc/{descendant}').exists() and exclusion(camp, prefix, busy=False),
+                               'Manager real verifier: live early site descendant cannot retain exclusion through its inherited read-only witness')
+                            os.kill(descendant, signal.SIGKILL)
+                            status = wait_helper(descendant); descendant = None
+                            ck(status == -signal.SIGKILL, 'Manager real verifier: exact manifested startup descendant terminated/reaped after witness proof')
+                        else:
+                            status = wait_helper(helper); helper = None
+                            ck(status == 0, 'Manager real verifier: independent helper finishes/reaps its fresh child without deadlock')
+                            fresh = result_at(directory)
+                            observed = fresh.get('verifier', {}).get('observed', {})
+                            ck(fresh['outcome'] == 'quiescent' and fresh['verifier']['ok'] is True
+                               and observed == {'version': version, 'prefix': str(prefix),
+                                                'module': str(site / 'opencode_sandbox/__init__.py')},
+                               'Manager real verifier: fixed fresh process observes actual installed version/prefix/module under exclusive coordination')
+                        ck(exclusion(camp, prefix, busy=False), 'Manager real verifier: no inherited capability keeps exclusion alive after helper exit')
+                    finally:
+                        if origin.poll() is None: origin.kill()
+                        origin.communicate(timeout=5)
+                        for owned in (helper, verifier, descendant):
+                            if owned is not None:
+                                try: os.kill(owned, signal.SIGKILL); os.waitpid(owned, 0)
+                                except (ProcessLookupError, ChildProcessError): pass
+            finally:
+                if killed:
+                    hook_path.unlink(); hook_module.unlink()
+        ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real verifier: successful/interrupted fresh access leaves installation records/executable unchanged')
+        ck(json.loads(run().stdout)['installation']['verified'], 'Manager real verifier: original installed launcher still operational; no automatic restart/replacement')
         # This external guard runs from the test venv, not from the guarded application. It
         # exercises the real fixed namespace/prefix key without patching the installed package.
         hold = subprocess.Popen([sys.executable, '-B', '-c',

@@ -74,8 +74,11 @@ UP-16's third checkpoint stages a private frozen stdlib helper outside the insta
 exercises only a non-mutating process-exit fixture. A pidfd, not main return or socket EOF, proves
 origin termination before a non-waiting exclusive attempt. Existing process-lifetime leases stay
 intact. This is not verifier access, terminal handoff or installation authority.
-Next: finish UP-16's narrow fresh-verifier access
-and real terminal handoff. No early release or generic bypass exists; Manager Update stays
+UP-16's fourth checkpoint adds dedicated fixed read-only fresh runtime access under the helper's
+exclusive guard, with an unlocked read-only witness, kernel owner-fd proof, close-before-query and
+startup parent-death protection. No exclusive descriptor is exported. Normal CLI startup remains excluded; runtime facts are not source/launcher
+authentication or replacement success. The helper still has no CLI/TUI consumer or install path.
+Next: finish UP-16's real restored-terminal handoff. No early release or generic bypass exists; Manager Update stays
 disabled. Keep UP-17 replacement/recovery separate. No version bump, release preparation,
 merge, push or publication.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two

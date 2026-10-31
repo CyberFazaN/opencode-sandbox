@@ -18,8 +18,9 @@ environment actions and recovery to existing handlers. UP-12/UP-13 bind base act
 cached/full-refresh builds; UP-14/UP-15 add read-only manager discovery/classification.
 UP-16's first safety checkpoint adds early process-lifetime usage/exclusive coordination. Its
 second checkpoint adds independent external-tool/runtime prerequisite facts. Its third stages
-an independent stdlib helper with a non-mutating process-exit fixture. Narrow verifier access,
-restored-terminal handoff and UP-17 replacement remain pending; Manager Update is disabled.
+an independent stdlib helper with a non-mutating process-exit fixture. Its fourth adds a dedicated
+fixed read-only fresh runtime query under helper exclusion. Restored-terminal handoff and UP-17
+replacement remain pending; Manager Update is disabled.
 
 ## Boundaries
 
@@ -40,9 +41,10 @@ restored-terminal handoff and UP-17 replacement remain pending; Manager Update i
 | `core.py` | Paths, locks, metadata (schema 2), labels, Docker access, create/start/stop/session/exec, snapshot, recreate and recovery journals, export, delete, image build, `error_text` | D-001..D-004, D-016, D-026, D-027, D-030, D-031, D-033, D-034 |
 | `runtime_identity.py` | Bounded acquisition and authenticated rootless response-sender proof; shared by CLI/TUI and standalone stdlib diagnostic | D-003, D-048, D-052 |
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
-| `launcher.py`, `installation_locks.py` | Stdlib-only console bootstrap and canonical-prefix shared process-lifetime lease/internal non-waiting exclusion; no updater, verifier bypass or early-release API | D-056, D-057 |
+| `launcher.py`, `installation_locks.py` | Stdlib-only console bootstrap/canonical-prefix process-lifetime usage/internal exclusion; unlocked read-only witness for dedicated fixed verifier, never a lease export, ordinary-startup exemption or early-release API | D-056, D-057 |
 | `manager_tools.py`, `manager_tool_probe.py` | Explicit internal dated external-tool prerequisite assessment and self-contained isolated diagnostic source; only known existing pipx version/runtime/settings checks, no helper/handoff/executor or automatic consumer | D-056, D-057 |
-| `manager_handoff.py`, `manager_helper.py` | Internal private frozen stdlib artifact and bounded non-mutating pidfd process-exit/exclusion fixture; no verifier, terminal-handoff or installation dispatch, no startup/CLI/TUI consumer | D-056, D-057 |
+| `manager_handoff.py`, `manager_helper.py` | Internal private frozen stdlib artifact/bounded non-mutating pidfd fixture with optional dedicated fresh runtime query; no terminal-handoff or installation dispatch, no startup/CLI/TUI consumer | D-056, D-057 |
+| `manager_verifier.py` | Frozen external fixed-query launcher/parent-death bootstrap and dedicated installed read-only client; kernel descriptor/channel/pidfd checks, no normal CLI dispatch or source/launcher/installation-success grant | D-056, D-057 |
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
@@ -96,9 +98,11 @@ refuses exclusive access with a static error/exit 2, before dispatch. A process-
 usage acquisition idempotent across callers/threads. The shared guard remains referenced until
 process exit, **not** main/dashboard return: non-daemon/thread-pool shutdown cannot leave a live
 worker operating after release. No production early-release API is provided at this checkpoint.
-All directory/lock descriptors are CLOEXEC; fork-only children close their copies without
+All directory/lock descriptors default to CLOEXEC; fork-only children close their copies without
 LOCK_UN, so they neither unlock the parent nor keep its lock after it exits. Entry in a forked
-child must acquire a new lease. Process death releases the guard; persistent inodes remain.
+child must acquire a new lease. The dedicated verifier receives only an unlocked read-only
+witness, never a lease or exclusive descriptor. Process death releases the
+guard; persistent inodes remain.
 
 Installation access is acquired before data coordinator/environment/base guards. A small
 context-local data-lock observation in core complements the existing base-held observation;
@@ -110,7 +114,7 @@ or proof that orphaned work stopped. Provenance classification recognizes both s
 bootstrap console templates, without claiming that an older installed program implements locks.
 
 This independently verified startup checkpoint is only part of UP-16. No manager replacement
-consumer, narrow fresh-verifier capability, restored-terminal handoff, recovery record or automatic
+consumer, restored-terminal handoff, recovery record or automatic
 restart exists. Those are separate pending gates; exclusive access alone never authorizes mutation.
 Manager Update remains disabled. Any future mutating handoff must preserve the actual process-exit
 boundary rather than close this lease while Textual workers could still be alive; no generic
@@ -164,14 +168,15 @@ Results are timestamped in-memory prerequisite facts, independent of release cac
 state. Probe output/import/metadata errors are not echoed, because they can contain secrets;
 unsupported cases receive static manual guidance. Cancellation propagates rather than publishing
 a late result. Successful assessment is still **execution unavailable**. Independent helper
-materialization/process-exit coordination is described below. Narrow fresh-verifier capability
-and restored-terminal handoff remain pending UP-16 gates, followed separately by UP-17 consent,
+materialization/process-exit coordination and narrow runtime-verifier access are described below.
+Restored-terminal handoff remains pending UP-16, followed separately by UP-17 consent,
 source authentication/revalidation, replacement and success/failure recovery.
 
 ### Frozen helper/process-exit fixture (UP-16 third checkpoint)
 
 `manager_handoff.prepare()` freshly reassesses the existing external tools, then freezes source
-copies of `manager_helper.py` (zipapp entry), `installation_locks.py` and `manager_tool_probe.py`
+copies of `manager_helper.py` (zipapp entry), `installation_locks.py`, `manager_tool_probe.py` and
+`manager_verifier.py`
 under a unique own-UID/mode-0700 directory in an explicitly supplied, controlled parent outside
 the target. The zipapp and small inventory are private single-link mode-0600 files. Creation is
 exclusive, content deterministic and SHA-256-bound; neither discovery cache nor recovery state
@@ -199,7 +204,8 @@ fixture arming are separate. Before arming, lost origin/control means abandoned;
 socket EOF alone never proves exit. Actual origin termination is required, including non-daemon/
 thread-pool shutdown after main returns. Only then does the helper try the unchanged exclusive
 guard once. Another live shared/exclusive holder yields busy; no retry or shared-to-exclusive
-conversion. It writes only one bounded private fixture result, releases its own guard and exits.
+conversion. It can optionally run the dedicated fixed read-only verifier below, writes one bounded
+private fixture result, releases its own guard and exits.
 Even SIGKILL after fixture arming can produce only this non-mutating result, not consent or a
 terminal-restoration claim. The fixture has a maximum **30-second lifetime** and an eight-second
 initial request/readiness bound; neither becomes a future installation deadline.
@@ -209,11 +215,63 @@ its remaining finite lifetime. Explicit artifact discard refuses a live child or
 files, ownership, inode, bytes or records. After origin exit the private artifact/result are retained
 for the caller/supervisor's evidence, never scavenged by generic cleanup. Test-only subreapers adopt
 and reap the exact orphaned fixture child without relying on PID 1 or signalling a reaped PID.
-No automatic dashboard restart, verifier capability, ordinary CLI bypass or install command exists.
-The CLI, launcher, TUI and startup lock implementation are unchanged. Active-session/mutation
+No automatic dashboard restart, ordinary CLI bypass or install command exists. The normal CLI,
+launcher and TUI are unchanged. Active-session/mutation
 refusal and restored-terminal ownership transfer still require their own UI/real-terminal gate;
 this fixture must not be promoted into permission to mutate. UP-16 remains partial and Manager
 Update stays disabled until the independent UP-16/UP-17 gates pass.
+
+### Dedicated fresh runtime verifier (UP-16 fourth checkpoint)
+
+Only the non-mutating helper fixture's explicit verification choice invokes this query, after
+actual origin exit and acquisition of the existing exclusive guard. `installation_locks._verification()`
+requires that process's matching exclusive guard and correct lock order; shared usage cannot issue
+it. It opens an **independent unlocked O_RDONLY witness** for the same private persistent inode,
+alongside the number of the owner's actual exclusive descriptor. The exclusive description never
+crosses exec. Witnesses default to CLOEXEC and are tracked for fork-only close-without-LOCK_UN.
+No usage lease is released, upgraded or exempted; `acquire_usage()` and both ordinary
+entry points ignore verifier capabilities and still refuse under exclusion, including help/version.
+
+`manager_verifier.py` is bundled with the helper and installed for its dedicated fixed client.
+The single-threaded external owner launches a frozen stdlib-only `-I -B -S` bootstrap with only
+control, unlocked witness and owner-pidfd descriptors. It authenticates peer UID/PID/parent/liveness,
+canonical prefix and live peer's kernel lock record, sets Linux PR_SET_PDEATHSIG/SIGKILL, rechecks the parent
+race, then execs only that prefix's existing Python and the dedicated client with `-I -B`.
+This avoids preexec_fn and any relaxation of at-fork descriptor-dropping rules, keeping process
+setup out of threaded application code. Parent-death protection exists **before
+target site initialization**, not just after the installed verifier imports; a killed helper
+therefore stops the direct verifier even in an early site hook. A startup descendant retaining
+the read-only witness cannot retain exclusion: it has no flock. Arbitrary site hooks remain
+trusted local code, not sandboxed/authenticated or a promise to stop their escaped work. Tests
+explicitly supervise/clean their deliberately spawned descendants.
+
+The installed dedicated entry accepts only its three descriptors, never commands or user-selected
+callbacks. It checks isolation/no-bytecode flags, peer UID/PID/parent/pidfd and one fresh nonce-bound
+request. Kernel message credentials also bind replies to the actual fresh PID, not an inherited
+channel's startup descendant. The witness must name the private persistent inode for its own
+canonical prefix; the **live peer's fdinfo**, not the witness's, must identify the owner's named
+descriptor as a full-file exclusive flock for that inode. A guessed busy inode, wrong owner-fd,
+shared/POSIX/foreign-owner lock,
+changed path, wrong prefix, arbitrary environment flag or descriptor passed to a normal entry point
+cannot satisfy this protocol. The client **closes the unlocked witness before querying
+the package**, then reports only observed version, canonical prefix and package module location.
+There is no CLI/core/Docker/configuration/discovery import or normal app dispatch. Owner liveness
+is checked again before the bounded response; no global verified/bypass state is installed.
+
+The external owner validates shape/nonce/fields, retains the guard, waits for successful fresh
+process exit, and only then accepts these **runtime facts**, not replacement success. It reserves
+the process-group leader with WNOWAIT until group termination/reap to prevent PID-reuse signalling.
+The fixed read-only query has an eight-second/4096-byte message bound, further limited by the
+remaining fixture budget; neither changes build/install/session deadlines. Raw child streams and
+environment are not published. Failure yields static unavailable facts, not success, cache/journal
+authority, source authentication or a health claim. No persistent process or automatic restart.
+
+This gate requires usable Linux pidfds, proc flock fdinfo and parent-death protection with no unsafe
+fallback. Ordinary manager startup does not gain a new prerequisite. Expected release/source/commit,
+actual exposed launcher, basic CLI health and post-replacement result/recovery verification remain
+UP-17 gates. Restored-terminal transfer and active-session/mutation refusal still need independent
+UP-16 UI/real-pty proof; the fixture's arming/runtime result is not that evidence. Manager Update
+remains disabled and no public verifier or helper command is added.
 
 ## Docker access and identity (D-003, D-004, D-052)
 

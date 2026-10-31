@@ -19,11 +19,13 @@ def _isolated_manager_paths(tmp_path, monkeypatch):
     # main() is process-lifetime in production. In-process entry-point tests must not retain a
     # lease to a completed test's private inode; never release a real user's lease here.
     assert installation_locks._LEASE is None
+    assert not installation_locks._WITNESSES
     yield
     with installation_locks._MUTEX:
         if installation_locks._LEASE is not None:
             installation_locks._LEASE.close()
             installation_locks._LEASE = None
+    assert not installation_locks._WITNESSES
 
 
 @pytest.fixture(autouse=True)

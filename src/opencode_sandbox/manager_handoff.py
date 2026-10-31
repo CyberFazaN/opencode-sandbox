@@ -1,6 +1,6 @@
 """Internal helper materialization/process-exit fixture, not manager-update authorization.
 
-No CLI/TUI/startup consumer, verifier bypass, terminal handoff or installation execution. The
+No CLI/TUI/startup consumer, normal-CLI bypass, terminal handoff or installation execution. The
 fixture is deliberately separate from consent/recovery; supported external-tool evidence grants
 neither. Artifacts/results are private and outside the target, not disposable discovery caches.
 """
@@ -50,7 +50,7 @@ def _bundle():
     content = io.BytesIO()
     with zipfile.ZipFile(content, 'w', compression=zipfile.ZIP_STORED) as archive:
         for source, name in [('manager_helper.py', '__main__.py'), ('installation_locks.py', 'installation_locks.py'),
-                             ('manager_tool_probe.py', 'manager_tool_probe.py')]:
+                             ('manager_tool_probe.py', 'manager_tool_probe.py'), ('manager_verifier.py', 'manager_verifier.py')]:
             fd = os.open(Path(__file__).with_name(source), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
             with os.fdopen(fd, 'rb') as stream:
                 info = os.fstat(stream.fileno())
@@ -75,6 +75,7 @@ class Artifact:
     owner: int = field(default_factory=os.getpid)
     process: object = field(default=None, repr=False)
     used: bool = False
+    verify: bool = False
 
     def check(self):
         if self.owner != os.getpid(): raise c.SandboxError('External helper artifact belongs to another process')
@@ -99,11 +100,28 @@ class Artifact:
             raise c.SandboxError('External helper inventory changed; preserved')
         if FILES[2] in names:
             value = _record(self.directory / FILES[2])
-            if self.process is None or not isinstance(value, dict) or set(value) != {'protocol', 'fixture', 'sha256', 'origin', 'helper', 'outcome'} \
+            base = {'protocol', 'fixture', 'sha256', 'origin', 'helper', 'outcome'}
+            if self.process is None or not isinstance(value, dict) or set(value) not in (base, base | {'verifier'}) \
                     or value['protocol'] != 1 or value['fixture'] is not True or value['sha256'] != self.sha256 \
                     or value['origin'] != self.owner or value['helper'] != self.process.pid \
-                    or value['outcome'] not in ('quiescent', 'busy', 'cancelled', 'abandoned', 'expired'):
+                    or value['outcome'] not in ('quiescent', 'busy', 'cancelled', 'abandoned', 'expired', 'verification-failed'):
                 raise c.SandboxError('External helper result is unfamiliar; preserved')
+            if 'verifier' in value and (not self.verify or not isinstance(value['verifier'], dict)
+                                        or type(value['verifier'].get('ok')) is not bool):
+                raise c.SandboxError('External helper verifier result is unfamiliar; preserved')
+            if 'verifier' in value:
+                verifier = value['verifier']
+                expected = {'ok', 'observed'} if verifier['ok'] else {'ok', 'reason'}
+                if set(verifier) != expected or value['outcome'] != ('quiescent' if verifier['ok'] else 'verification-failed'):
+                    raise c.SandboxError('External helper verifier result is unfamiliar; preserved')
+                if verifier['ok']:
+                    observed = verifier['observed']
+                    if not isinstance(observed, dict) or set(observed) != {'prefix', 'module', 'version'} \
+                            or observed['prefix'] != self.prefix or not isinstance(observed['module'], str) \
+                            or not Path(observed['module']).resolve().is_relative_to(self.prefix) or not isinstance(observed['version'], str):
+                        raise c.SandboxError('External helper runtime facts are unfamiliar; preserved')
+                elif verifier['reason'] != 'Fresh runtime verification unavailable; no installation was changed':
+                    raise c.SandboxError('External helper verifier result is unfamiliar; preserved')
         for name in names: (self.directory / name).unlink()
         self.directory.rmdir()
 
@@ -159,12 +177,13 @@ class Fixture:
         finally: self.control.close()
 
 
-def start_fixture(artifact, *, budget=30.0):
+def start_fixture(artifact, *, budget=30.0, verify=False):
     """One finite non-mutating fixture, with pidfd proof of this process's actual exit.
 
     Explicit close/cancel remains the origin's responsibility while alive. After an armed origin
     exits, the independent helper owns its remaining bounded lifetime and retains private result/
-    artifact evidence. It never inherits installation leases or executes replacement/verifiers.
+    artifact evidence. It never inherits usage leases or executes replacement. Optional fresh
+    verification is one fixed read-only query, never normal CLI dispatch or a target/source grant.
     """
     artifact.check()
     # This is an originating-manager fixture, not an external shortcut around usage leasing.
@@ -175,6 +194,7 @@ def start_fixture(artifact, *, budget=30.0):
     if artifact.used: raise c.SandboxError('External helper artifact is single-use')
     if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not 0 < budget <= 30:
         raise c.SandboxError('External helper fixture budget must be finite and at most 30 seconds')
+    if type(verify) is not bool: raise c.SandboxError('External helper verification choice must be boolean')
     if tuple(tools._controlled(artifact.python, Path(artifact.prefix))[1]) != artifact.python_identity:
         raise c.SandboxError('External helper interpreter changed since preparation')
     control, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET | socket.SOCK_CLOEXEC)
@@ -190,11 +210,13 @@ def start_fixture(artifact, *, budget=30.0):
                                        pass_fds=(child.fileno(), pidfd, directory), close_fds=True, start_new_session=True,
                                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                        cwd=artifact.directory, env={'HOME': str(Path.home()), 'PATH': os.defpath, 'LANG': 'C.UTF-8'})
-            artifact.process, artifact.used = process, True
+            artifact.process, artifact.used, artifact.verify = process, True, verify
             fixture = Fixture(artifact, control, process)
         child.close()
         control.settimeout(8)
-        control.sendall(json.dumps({'protocol': 1, 'prefix': artifact.prefix, 'sha256': artifact.sha256, 'budget': budget}).encode())
+        request = {'protocol': 1, 'prefix': artifact.prefix, 'sha256': artifact.sha256, 'budget': budget}
+        if verify: request['verify'] = True
+        control.sendall(json.dumps(request).encode())
         if control.recv(4096) != b'ready': raise c.SandboxError('External helper fixture readiness refused')
         return fixture
     except BaseException:
