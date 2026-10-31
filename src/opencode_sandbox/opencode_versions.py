@@ -218,7 +218,7 @@ def policy(m):
     return {"mode": p, "version": pin if p == "pinned" else None}
 
 
-def set_policy(m, mode, version=None):
+def _policy_target(mode, version):
     if mode not in POLICIES:
         raise c.SandboxError("Policy must be notify, manual or pinned")
     if mode == "pinned":
@@ -227,10 +227,36 @@ def set_policy(m, mode, version=None):
         version = supported(version)
     elif version is not None:
         raise c.SandboxError("--version only applies to pinned policy")
+    return version
+
+
+def _consent_metadata(m):
+    return hashlib.sha256(json.dumps(m, sort_keys=True).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class EnvironmentPolicyPlan:
+    mode: str
+    version: str | None
+    metadata: str
+    data: str
+
+
+def prepare_environment_policy(m, mode, version=None):
+    version = _policy_target(mode, version)
+    m = c.resolve(m["id"])
+    if m.get("operation"): raise c.pending_operation(m)
+    return EnvironmentPolicyPlan(mode, version, _consent_metadata(m), c.data_id())
+
+
+def set_policy(m, mode, version=None, *, plan=None):
+    version = _policy_target(mode, version)
     with c.lock(m["id"]):
         m = c.resolve(m["id"])
         if m.get("operation"):
             raise c.pending_operation(m)
+        if plan is not None and prepare_environment_policy(m, mode, version) != plan:
+            raise c.SandboxError("Environment/policy changed since confirmation; review again")
         m["opencode_policy"] = mode
         m["opencode_pin"] = version if mode == "pinned" else None
         c.save(m)
@@ -563,6 +589,30 @@ def update_blocker(m, state, target):
 class EnvironmentUpdatePlan:
     target: str
     identity: tuple[tuple[str, str], ...]
+    metadata: str
+
+
+@dataclass(frozen=True)
+class EnvironmentStartPlan:
+    metadata: str
+    endpoint: str
+    data: str
+    identity: tuple[tuple[str, str], ...] | None
+
+
+def prepare_environment_start(m):
+    c.ensure_runtime(False)
+    m = c.resolve(m["id"])
+    if m.get("operation"): raise c.pending_operation(m)
+    state = c.inspect_container(m)
+    if state and state.get("Running"): raise c.SandboxError("Environment is already running; use Check for fresh evidence")
+    return EnvironmentStartPlan(_consent_metadata(m), c.docker_endpoint(), c.data_id(),
+                                tuple(sorted(_environment_identity(m).items())) if state is not None else None)
+
+
+def recheck_environment_start(m, plan):
+    if prepare_environment_start(m) != plan:
+        raise c.SandboxError("Environment/container changed since confirmation; review again")
 
 
 def prepare_environment_update(m, version):
@@ -572,7 +622,8 @@ def prepare_environment_update(m, version):
     state = c.inspect_container(m)
     reason = update_blocker(m, state, target)
     if reason: raise c.SandboxError(reason)
-    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())))
+    c.assert_volume_owned(m)
+    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())), _consent_metadata(m))
 
 
 def _remember_update(m, value, identity, at):
@@ -582,12 +633,21 @@ def _remember_update(m, value, identity, at):
     cache.write(_environment_key(m), {"success": observation, "attempt": {"at": at, "ok": True, "identity": observation["identity"]}})
 
 
-def _restore_checkpoint(m, result):
+def _restore_checkpoint(m, result, *, checkpoint=None):
+    try:
+        _restore_checkpoint_steps(m, result, checkpoint=checkpoint)
+    except Exception as exc:
+        # Keep the current journal (including runtime-recreate after removal began) and reason.
+        c.mark(m, "error", last_error="Checkpoint recovery: " + c.error_text(exc))
+        raise
+
+
+def _restore_checkpoint_steps(m, result, *, checkpoint=None):
     """Replace the container by one created (at the next start) from the update's checkpoint: the
     system layer exactly as before the update; /root volume and /workspace are not touched. Uses the
     runtime-recreate journal, so a crash here is finished by `config recover`. Caller holds the lock."""
     record = m["opencode_update"]
-    checkpoint = record["checkpoint"]
+    checkpoint = checkpoint or record["checkpoint"]
     if c.docker("image", "inspect", checkpoint, capture=True, check=False).returncode:
         raise c.missing_image(m, checkpoint, "opencode-sandbox opencode update-recover {name}")
     state = c.inspect_container(m)
@@ -627,8 +687,10 @@ def update_environment(m, version, *, plan=None):
         state = c.inspect_container(m)
         reason = update_blocker(m, state, target)
         if reason: raise c.SandboxError(reason)
-        if plan is not None and tuple(sorted(_environment_identity(m).items())) != plan.identity:
+        if plan is not None and (tuple(sorted(_environment_identity(m).items())) != plan.identity
+                                 or _consent_metadata(m) != plan.metadata):
             raise c.SandboxError("Environment/container changed since confirmation; review again")
+        c.assert_volume_owned(m)
         c.recheck_mount(m)  # the update starts it
         c.require_docker_space("an OpenCode update (checkpoint + npm install)")
         identity = _environment_identity(m)
@@ -661,7 +723,7 @@ def update_environment(m, version, *, plan=None):
                 _restore_checkpoint(m, f"update to {target} failed ({failure[:300]}); rolled back to the checkpoint")
             except Exception as restore_exc:  # noqa: BLE001 — reported together with the update failure
                 raise c.SandboxError(f"OpenCode update failed: {failure}; rollback failed: {c.error_text(restore_exc)}. "
-                                     f"Run: opencode-sandbox opencode update-recover {m['name']}") from exc
+                                     + str(c.pending_operation(m))) from exc
             raise c.SandboxError(f"OpenCode update failed: {failure}. Rolled back: the container is recreated from "
                                  f"checkpoint {checkpoint} at the next start (system layer as before the update; "
                                  "/root and /workspace untouched).") from exc
@@ -679,7 +741,71 @@ def update_environment(m, version, *, plan=None):
         return {"version": target, "previous_version": record["from"], "checkpoint": checkpoint}
 
 
-def update_recover(m):
+@dataclass(frozen=True)
+class EnvironmentCheckpointPlan:
+    action: str
+    metadata: str
+    endpoint: str
+    data: str
+    identity: tuple[tuple[str, str], ...] | None
+    running: bool
+    checkpoint: str
+    checkpoint_id: str
+    current_image_id: str | None
+    previous_version: str | None
+    target: str | None
+
+
+def _image_id(ref, m=None):
+    result = c.docker("image", "inspect", "--format", "{{.Id}}", ref, capture=True, check=False)
+    if result.returncode:
+        if m is not None and "no such image" in (result.stderr or "").lower():
+            raise c.missing_image(m, ref, "opencode-sandbox opencode update-recover {name}" if m.get("operation") == UPDATE_OP
+                                  else "opencode-sandbox opencode rollback {name}")
+        raise c.SandboxError(f"Cannot inspect checkpoint/image {ref}; nothing authorized")
+    out = result.stdout.strip()
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", out):
+        raise c.SandboxError("Invalid immutable checkpoint/image identity; nothing authorized")
+    return out
+
+
+def _checkpoint_action_plan(m, action):
+    record = m.get("opencode_update") or {}
+    if action == "recover":
+        if m.get("operation") != UPDATE_OP: raise c.SandboxError("No interrupted OpenCode update; use the journal's recovery command")
+    elif action == "rollback":
+        if m.get("operation"): raise c.pending_operation(m)
+        if record.get("state") != "done": raise c.SandboxError("No completed OpenCode update to roll back")
+        p = policy(m)
+        if p["mode"] == "pinned" and record.get("from") != p["version"]:
+            raise c.SandboxError(f"Environment pinned to OpenCode {p['version']}; change policy first")
+    else:
+        raise c.SandboxError("Unknown checkpoint action")
+    checkpoint = record.get("checkpoint")
+    if not checkpoint: raise c.SandboxError("The update journal has no checkpoint; manual recovery required")
+    state = c.inspect_container(m)
+    if action == "rollback" and state is not None and state.get("Running"):
+        raise c.SandboxError("Stop the environment before rolling back OpenCode")
+    c.assert_volume_owned(m)
+    return EnvironmentCheckpointPlan(action, _consent_metadata(m), c.docker_endpoint(), c.data_id(),
+                                     tuple(sorted(_environment_identity(m).items())) if state is not None else None,
+                                     bool(state and state.get("Running")), checkpoint, _image_id(checkpoint, m),
+                                     _image_id(m["image"], m) if state is None and m.get("image") else None,
+                                     record.get("to"), record.get("from"))
+
+
+def prepare_checkpoint_action(m, action):
+    """Read-only immutable consent for this component's existing rollback/recovery handlers."""
+    c.ensure_runtime(False)
+    return _checkpoint_action_plan(c.resolve(m["id"]), action)
+
+
+def _recheck_checkpoint_plan(m, action, plan):
+    if plan.action != action or _checkpoint_action_plan(m, action) != plan:
+        raise c.SandboxError("Environment/checkpoint changed since confirmation; review again")
+
+
+def update_recover(m, *, plan=None):
     """Finish an interrupted update by rolling back to its checkpoint (never by guessing whether
     npm completed). Run `update` again afterwards if wanted."""
     c.ensure_runtime(False)
@@ -689,11 +815,13 @@ def update_recover(m):
             raise c.SandboxError("No interrupted OpenCode update")
         if not (m.get("opencode_update") or {}).get("checkpoint"):
             raise c.SandboxError("The update journal has no checkpoint; manual recovery required")
-        _restore_checkpoint(m, "interrupted; rolled back to the checkpoint by update-recover")
+        if plan is not None: _recheck_checkpoint_plan(m, "recover", plan)
+        _restore_checkpoint(m, "interrupted; rolled back to the checkpoint by update-recover",
+                            checkpoint=plan.checkpoint_id if plan else None)
         return {"image": m["image"], "rolled_back": True}
 
 
-def rollback_environment(m):
+def rollback_environment(m, *, plan=None):
     """Undo the last successful update: the container is recreated from its checkpoint. The current
     system layer (also later changes) is kept as an ocs-snapshot first: committed from the container,
     or, when a runtime change already removed the container, the environment's derived image tagged."""
@@ -702,6 +830,7 @@ def rollback_environment(m):
         m = c.resolve(m["id"])
         if m.get("operation"):
             raise c.pending_operation(m)
+        if plan is not None: _recheck_checkpoint_plan(m, "rollback", plan)
         record = m.get("opencode_update") or {}
         if record.get("state") != "done" or not record.get("checkpoint"):
             raise c.SandboxError("No completed OpenCode update to roll back")
@@ -719,7 +848,8 @@ def rollback_environment(m):
         elif m.get("image"):
             snapshot = c.snapshot_tag(m)
             c.docker("tag", m["image"], snapshot)
-        _restore_checkpoint(m, f"rolled back {record['to']} -> {record['from'] or 'unknown (broken)'}" + (f"; previous system layer kept as {snapshot}" if snapshot else ""))
+        _restore_checkpoint(m, f"rolled back {record['to']} -> {record['from'] or 'unknown (broken)'}" + (f"; previous system layer kept as {snapshot}" if snapshot else ""),
+                            checkpoint=plan.checkpoint_id if plan else None)
         return {"version": record["from"], "rolled_back_from": record["to"], "snapshot": snapshot, "image": m["image"]}
 
 

@@ -280,6 +280,8 @@ def test_npm_install_is_bounded(monkeypatch):
         calls.append(a)
         if a[:2] == ("container", "inspect"):
             return SimpleNamespace(returncode=0, stdout="a" * 64 + "|sha256:" + "b" * 64 + "|" + m["id"], stderr="")
+        if a[:2] == ("volume", "inspect"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps([{"Labels": {"org.opencode-sandbox.id": m["id"]}}]), stderr="")
         if a[0] == "exec" and a[-2:] == ("opencode", "--version"):
             return SimpleNamespace(returncode=0, stdout=next(versions), stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")

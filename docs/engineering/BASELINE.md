@@ -36,10 +36,14 @@ OpenCode binary or image helper. UP-09 completes the split package with optional
 dashboard-only daily npm discovery, persisted attempt claims, cross-caller/process source
 coalescing and a quiet policy-filtered cached-availability indicator. No automatic runtime/image
 probe, start, install or service; explicit checks still work with scheduling off/unavailable and
-respect Retry-After. Next is UP-11 environment actions/recovery. Mutation bindings and manager discovery/classification/execution stay
-pending. No image-definition, metadata/backup schema or manager-version change was made.
+respect Retry-After. UP-11 binds explicit environment Start/Update/Policy/Rollback/Recover with
+immutable consent, locked revalidation and the existing handlers/journals. Recovery Center can
+also review interrupted OpenCode updates; failed restoration persists its actual successor journal
+and error. Approved mutations are app-owned and not canceled by Close/Cancel check. Next is
+UP-12 + UP-13 base actions/refresh; manager discovery/classification/execution stays pending.
+No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-10 verification is below; commands, failures and handoff are in the roadmap.
+UP-01..UP-11 verification is below; commands, failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -211,6 +215,46 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-11 — 2026-10-31
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1471 passed, 78 opt-in skips in each of four serial foreground runs**: Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Clean pip checks, only the two known lowest-Typer deprecations; 194.60/189.41/191.32/187.48 s. All **1549 ordered IDs/outcomes identical** |
+| New/retained regressions | **64 new default-suite cases** (38 backend, 25 pilots, one quality-module parameter), six new opt-in terminal rows. Exact checkpoint/container/daemon/data/policy/metadata consent races, live eligibility/ownership refusals, locked start/policy/configuration-recovery preconditions, missing-checkpoint salvage, persistent successor-journal errors, full-layer preservation, explicit Start remains running, cancellation/Close/normal-Quit semantics, late-plan rejection, policy/pin consent, current metadata before Details, current/lowest UI, production toast ownership and scrollable Recovery errors with unclipped controls. Existing assertions retained; UP-10's three unavailable-action expectations now assert review without mutation/confirmation instead. Existing volume/config fakes extended to answer new preflights, not to bypass checks |
+| Scoped real Docker/OpenCode/terminal | **18 tests/400 logged checks passed**, no skips/deselections, `up11-verified`, 489.49 s. Both retained distributions: existing bounded diagnostics, binary/lifecycle/restore evidence, manual Updates and daily discovery terminals; new 80x24/120x40 explicit Start, pin/refused target/Manual consent, actual 2.2.0 -> 2.1.4 update/final stopped state, whole-layer rollback and a retained snapshot that really contains later system changes/the updated binary. Independent recovery rows cover actual SIGKILL, missing checkpoint refusal without mutation, failed owned removal, persisted `runtime-recreate`/reason, existing config recovery, direct Recovery Center update-recover success, restored actual binary/configuration/data and terminal restoration |
+| Failure trail | Initial absent checkpoint-plan reproducer failed. First broader full run **3 failed/1455 passed/72 skips**: two old fakes lacked volume inspection and Recovery controls clipped at 80x24. Focused **184 passed** after correction. Initial terminal sequence batched editing keys and did not supply its intended exact target; harness now separates controls and stops immediately on missing consent. Real runs also exposed advisory overlays on forms/Details and delayed inventory supplying an old journal to Details; fixed in product, not hidden by test changes. Retained intermediate failures/proofs are detailed in the roadmap. Lowest focused run **1 failed/141 passed** caught subscreen/late table events reaching the hidden dashboard during teardown; narrowed event ownership, added regression, **143 passed** on rerun before final full matrix |
+| Boundaries | Environment actions/recovery only; no universal engine/Update All, automatic start/install, temporary start/probe/stop, network/policy auto-change, new schema or base/manager executor. Full image IDs are valid existing image-reference strings; original checkpoint names remain retained in update records. No new full campaign/legacy broad TUI workflow, fresh base build, installed-manager/pipx, privileged/socket/service, paid-provider or manual-observation evidence. CI/release gates unchanged; not a release-readiness claim |
+
+Before work, the owner requested old temporary-test cleanup. Inspected/manifested **159 completed
+pytest roots** from earlier Updates/performance cycles: own UID, only fixture trees, no live
+process references, active UNIX sockets or nested mounts. Removed only those exact roots without
+following symlinks: **929919 inodes** and about **1.48 GiB allocated space** freed. `/tmp` inode
+use fell from 89% to 35 used/1048541 free. All other `/tmp` entries, persistent Sandbox locks,
+retained `.work` logs/XML/artifacts, user data and Docker objects stayed untouched. Ignored
+manifest/result: `.work/up11/tmp-cleanup-*.json`; no recurring system cleanup was installed.
+
+Final evidence lives under `.work/up11/` and `.work/logs/up11-*`. All real attempts used isolated
+roots/manifests and guarded product cleanup, including failed runs. Ending verified own-rootless
+inventory: no containers/volumes/helpers and unchanged four original full tagged-image IDs.
+Seven changed/new product modules are hash-frozen after the final matrix/real gate. Image assets,
+versions/schemas, identity proof, base guards, diagnostic/HTTP/probe executors, scheduler/cache/
+preferences, worker adapter, dependencies, AGENTS and CI/release gates are unchanged from the
+UP-09 checkpoint.
+
+Final review after an initial four-way **1469 passed/78 skips** matrix and **18 passed/400 checks**
+real gate found older Recovery paths relying on now-collapsed toasts. Their messages now persist
+in a bounded read-only scrollable result pane, including long errors and unsupported-journal next
+steps; controls stay visible. Added two pilot cases and reran the final complete/real gates above.
+First rerun **1 failed/1470 passed/78 skips**: an existing text test searched only Static widgets;
+extended it to include the new TextArea, preserving the terminal-guidance assertion and adding
+read-only verification. A final documentation subset initially **1 failed/41 passed** because of
+a commit ID in a public record; removed that reference without changing the contract test.
+Final sdist/wheel, strict twine/content validation and byte equality for all seven product modules
+pass, without installation/upload. Final document/CLI/quality subset **42 passed**, 3.08 s,
+not another complete suite; final-code hashes `.work/up11/final-source-sha256.json`. After evidence
+preservation, removed only this cycle's **32 exact manifested completed pytest roots**; `/tmp`
+again has **1048541 free inodes**. No old evidence or persistent protocol locks were discarded.
 
 ### Unpublished UP-09 — 2026-10-31
 

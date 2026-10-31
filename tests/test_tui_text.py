@@ -34,7 +34,9 @@ def test_recovery_center_names_the_terminal_for_other_operations():
         app.push_screen(RecoveryScreen())
         await settle(pilot)
         texts = " ".join(str(s.render()) for s in app.screen.query("Static"))
+        texts += " ".join(s.text for s in app.screen.query("TextArea"))
         assert "in a terminal" in texts
+        assert app.screen.query_one("#recovery-result").read_only
     run(t, (120, 40))
 
 

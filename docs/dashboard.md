@@ -128,12 +128,54 @@ in Updates Details. Explicit checks can still use the bounded network path witho
 cross-process coalescing/throttling cannot be guaranteed without that storage. Clearing the
 disposable cache resets discovery history/throttles, not installed software or recovery journals.
 
-**Manager release discovery/installation classification and mutation buttons are not implemented here yet.**
-The disabled Update button explains that limit; Details points to existing CLI operations.
-Environment Start/Settings/Recovery remain available through the existing dashboard paths as
-applicable. No Update All, automatic installation, temporary start/probe/stop or background
-service is added. For a fresh stopped-environment version, explicitly Start from the dashboard,
-then return to Updates and Check; the environment remains running.
+### Environment actions
+
+In **Environment OpenCode** (`3`), use **Start** (`s`), **Update** (`u`), **Policy** (`p`),
+**Rollback** (`r`) or **Recover** (`e`). These buttons request a review, not permission inferred
+from cached versions, availability or readiness. Target selection and live eligibility checks
+run off the UI thread. The scrollable confirmation shows the exact operation and identities;
+Cancel is focused first. Changed metadata, policy, container or checkpoint requires a new review.
+
+- **Start** is explicit, may create a container, and **leaves it running**. Use Check afterward
+  for fresh binary verification. It does not temporarily start/probe/stop. Normal pin, direct
+  workspace, profile, ownership and pending-operation checks remain in force.
+- **Update** accepts an exact compatible 2.x target or resolves the latest supported stable
+  release to an exact version **before consent**. It requires an existing stopped, owned,
+  network-enabled container. It never stops a running environment or changes network/policy for
+  you. A full system-layer checkpoint is committed first; the container starts temporarily for
+  npm installation and binary verification, then finishes stopped. Failure restores the checkpoint;
+  success keeps it for explicit rollback. An already-installed exact version is verified without
+  reinstalling. Pins still restrict the target; there is no silent target substitution.
+- **Policy** changes Notify/Manual/Pinned and an exact pin only after separate confirmation.
+  It installs nothing and does not bypass update, rollback or first-creation restrictions.
+- **Rollback** restores the **entire checkpointed system layer**, not just the OpenCode binary.
+  The present layer, including later system changes, is preserved as a snapshot first. It requires
+  a stopped container (or a retained derived image) and compatible pin. No running replacement
+  is started; explicitly Start afterward.
+- **Recover** reviews an interrupted OpenCode update and invokes the existing checkpoint
+  recovery handler. It never guesses whether npm finished. It may stop/remove the owned incomplete
+  container, discarding unfinished update-layer changes; explicit Start is required afterward.
+  Other journals route to the existing **Recovery Center**, preselecting the environment. Its
+  **Recover selected** button handles OpenCode or configuration recovery as appropriate; other
+  operation types retain their specific CLI next steps. The read-only scrollable result pane
+  retains full recovery errors and guidance without pushing the controls off-screen.
+
+Home, workspace and user OpenCode configuration are preserved, **not rolled back**. Binary rollback
+cannot undo application-data changes or guarantee backward compatibility. Missing checkpoints and
+failed recovery retain the journal/reason and name safe next steps. If recovery has progressed to
+container recreation, the next action is `opencode-sandbox config recover NAME`, not another
+OpenCode update-recover. Details rereads authoritative local journal metadata, even while Docker
+inventory is still refreshing, and leads with operation results/recovery guidance.
+
+**Cancel check** cancels read-only checks and operation-plan preparation, not an approved mutation.
+Closing Updates also does not cancel an approved operation: it is owned by the dashboard, which
+refuses conflicting operations and normal Quit until it finishes. If the manager is killed, use
+the saved journal and indicated recovery command. Notifications remain owned by the dashboard but
+do not cover operation forms or Updates Details at 80x24.
+
+**Manager release discovery/installation classification and Base Images mutation buttons are not
+implemented here yet.** Their disabled Update buttons explain the limit; Details retains existing
+CLI guidance. No Update All, automatic installation or background service is added.
 
 ## State
 

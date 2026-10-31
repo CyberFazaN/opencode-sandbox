@@ -202,7 +202,11 @@ def test_interrupted_update_is_journalled_and_recoverable(monkeypatch, env):
 def test_recover_completes_an_interrupted_recreation(monkeypatch, env):
     FakeContainer(monkeypatch, "missing")
     seen = []
-    monkeypatch.setattr(c, "recover_runtime_reconfigure", lambda m: seen.append(m["id"]) or {"image": "x", "recovered": True})
+    def recover(m, *, precondition=None):
+        assert precondition is None  # ordinary CLI recovery has no new consent precondition
+        seen.append(m["id"])
+        return {"image": "x", "recovered": True}
+    monkeypatch.setattr(c, "recover_runtime_reconfigure", recover)
     c.mark(env, "reconfiguring", operation="runtime-recreate")
     assert cp.recover(env)["next"] == f"start it with: opencode-sandbox start {env['name']}" and seen == [env["id"]]
 

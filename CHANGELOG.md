@@ -12,13 +12,17 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   Environment OpenCode, local/cached-first without network requests or version probes on opening.
   Explicit Check has independent registry/object results and cancellable owned read-only work;
   Details discloses full evidence, errors, recovery and existing CLI guidance. Manager checks
-  and mutation actions remain unavailable at this checkpoint.
+  and base mutation actions remain unavailable at this checkpoint.
 - Optional daily npm metadata discovery in dashboard Preferences, off by default: durable
   attempt claims throttle failures/restarts/interruption, shared source requests coalesce across
   CLI/Updates/background callers, and Retry-After applies to explicit checks too. One quiet
   policy-filtered cached-availability indicator replaces repeated notices; no automatic runtime
   probe, start, install or persistent service. Scheduling fails closed without safe writable
   storage; bounded explicit discovery remains available.
+- Explicit Environment OpenCode Start/Update/Policy/Rollback/Recover in Updates, with compact
+  controls, scrollable exact consent, locked revalidation and existing checkpoint/journal handlers.
+  Recovery Center can also review interrupted OpenCode updates. Approved operations survive
+  closing Updates; read-only cancellation is not mutation rollback.
 
 ### Fixed
 
@@ -56,6 +60,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 - Updates controls stay visible at 80x24 even when dashboard advisory notices exist; their
   ownership is preserved and full messages remain available in Details. Recovery journals remain
   visible even when their container is absent.
+- Checkpoint restoration failures persist their actual journal and error reason, including the
+  configuration-recovery successor after removal begins. Updates Details rereads authoritative
+  journal metadata instead of waiting for Docker inventory, and operation forms/Details keep
+  advisory overlays from covering consent controls.
 
 ## 6.1.0 — 2026-10-30
 

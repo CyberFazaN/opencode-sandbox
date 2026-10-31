@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-10 and PERF complete. Next: UP-11 (environment actions and recovery).**
+- **UP-00..UP-11 and PERF complete. Next: UP-12 + UP-13 (base actions and explicit refresh).**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -13,6 +13,8 @@
   UP-10 delivers the manual/cached compact Updates UI; the approved package is split after
   this verified checkpoint because of its UI/real-terminal scope. UP-09 now completes optional
   default-off daily npm discovery, durable attempt claims, shared requests and quiet indicators.
+  UP-11 adds explicit environment actions/immutable consent and verified checkpoint recovery;
+  base and manager packages remain separate.
   D-057 consolidates the remaining
   packages and removes artificial dependencies, without weakening verification gates. The initially
   DNS-blocked packaged-definition gate now passes, alongside retained
@@ -298,7 +300,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-10 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
+All tasks below are pending except UP-00..UP-11 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -311,12 +313,12 @@ UI with optional background scheduling (UP-10 + UP-09), environment actions/reco
 base actions/refresh (UP-12 + UP-13), manager discovery/classification (UP-14 + UP-15), manager
 handoff (UP-16), replacement/recovery (UP-17), then evidence consolidation (UP-18). This is
 **nine remaining cycles at consolidation approval instead of thirteen** (UP-10 now split from
-UP-09; six later packages remain after completing it), not
+UP-09; five later packages remain after completing UP-11), not
 a quota or permission to combine
 unrelated risks. Read-only manager discovery can be developed independently of base refresh;
 manager execution remains later and must not delay the earlier component workflows. UP-18 is
-not release preparation. UP-00..UP-10 are DONE; later tasks are PENDING. Next is UP-11 with its
-independent environment recovery gate. UP-03's initially DNS-blocked
+not release preparation. UP-00..UP-11 are DONE; later tasks are PENDING. Next is UP-12 + UP-13;
+UP-11's independent environment recovery gate is verified. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
 | ID | Stage / task | Prerequisites | Acceptance and minimum focused verification |
@@ -332,7 +334,7 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-07 + UP-08 | DONE: shared observations, compatible discovery and policy comparisons | UP-02, UP-05 | Structured source/time/identity, private disposable local/remote cache, stopped history/Unknown, lifecycle qualification and partial Docker results; bounded stable supported-major selection, exact confirmed targets, Manual/Pinned explicit comparisons and shared eligibility. 125 new default-suite cases, four complete compatibility suites, scoped real Debian/Arch update/rollback/recovery/restore/probe checks; evidence below. Scheduler/Updates UI remain pending |
 | UP-10 | DONE: compact manual/cached Updates inventory; approved split checkpoint | UP-01, UP-06, UP-07 + UP-08; **no UP-09 dependency** | Three local/cached-first views, independent manual checks/errors/progress, Details and keyboard/focus/Cancel at 80x24/larger; no network/probe on opening or premature manager execution. 39 new default-suite cases, four complete compatibility suites and real terminal/Docker/OpenCode evidence below. Component mutations stay pending |
 | UP-09 | DONE: optional background discovery | UP-07 + UP-08; delivered UP-10/preferences for presentation | Default-off dashboard-only npm discovery, durable attempt-based 24-hour claims including failure/restart/interruption, cross-caller/process source coalescing, numeric/date/long Retry-After and quiet policy-filtered indicators. No start/probe/install; manual UI stays usable when off/unavailable. 42 new default-suite cases, four full compatibility suites and 12 affected real tests/200 checks; evidence below |
-| UP-11 | Environment actions and recovery | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers with exact consent and locked revalidation; pin/network/running-state refusals, stopped final state and recovery; real Docker/OpenCode and terminal tests. Recovery is an independent gate, not bundled with base or manager work |
+| UP-11 | DONE: environment actions and independent recovery gate | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers, immutable exact consent/locked revalidation, live refusals, app-owned non-cancelable mutations, persistent journal/recovery routing. Four full suites (1471 passed/78 skips each), 18 affected real tests/400 checks including actual update/full-layer rollback and independent missing/failed/successful recovery on both distributions. Evidence below; no base/manager bundling |
 | UP-12 + UP-13 | Base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Inventory, Build/Rebuild/Check/Rollback, rollback-preserving replacement and exact target/state/mode consent; explicit cached versus Refresh & Rebuild in CLI/TUI, pull/no-cache without prune. Verify both distributions under isolated tags, failed-candidate safety, CLI/TUI parity, pinned creation and unchanged retained containers/layers; cached and full-refresh results are separate evidence |
 | UP-14 + UP-15 | Manager release discovery and verified installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Bounded official published-full-release discovery, strict tags/semver/no implicit downgrade, local inventory retained on GitHub failure; actual official-tag pipx identity including custom paths/interpreter/source/launcher, safe manual guidance otherwise. Separate provider and real isolated pipx/foreign/shadowed-launcher tests. Optional daily-source hookup only if UP-09 exists; neither discovery nor classification requires it or exposes execution |
 | UP-16 | Installation exclusion and terminal handoff | UP-14 + UP-15, UP-05 | Supported instances coordinate across data directories; safe self-contained helper/interpreter/external pipx, clean TUI exit before mutation, startup exclusion and narrow verification path; process and pty tests |
@@ -1594,6 +1596,186 @@ a materially different architecture, record the blocker and ask the owner before
   HTTP/probe executors, worker adapter, image assets, schemas, dependencies, AGENTS, CI and
   RELEASING are byte-unchanged from `8aa7df5`.
 
+### UP-11 — 2026-10-31 — environment actions and independent recovery
+
+- Resumed clean `work/updates` at `1aca6ca`; recovered repository/local instructions, roadmap,
+  TODO, BASELINE, ARCHITECTURE and D-056/D-057. Verified own-rootless daemon: zero containers/
+  volumes, original four tagged-image IDs. Only this package and the owner's explicit pre-work
+  cleanup request; no base/manager package, release or unrelated performance work.
+- Owner-requested temporary cleanup came first. `/tmp` had 118622 free inodes (89% used).
+  Inspected **159** old Updates/performance pytest roots, their own-UID fixture-only contents,
+  process descriptor/cwd references, active UNIX sockets and nested mounts. Recorded exact root
+  paths/device/inode identities and counts in `.work/up11/tmp-cleanup-manifest.json`; rechecked
+  before safe non-symlink-following removal. Freed **929919 inodes** and 1587982336 allocated
+  bytes (~1.48 GiB); ended at **35 used/1048541 free**. All other `/tmp` files, the persistent
+  `/tmp/opencode-sandbox-locks-1000` protocol namespace, prior `.work` logs/XML/packages and
+  Docker/user data remained untouched. No system-wide cleanup rule, service or sudo. Ignored
+  result/script: `tmp-cleanup-result.json`, `cleanup_tmp.py`; later tests use manifested fresh
+  `up11-*` short roots and retain logs separately, not another inode-exhaustion workaround.
+- Investigated existing policy/status/update plans, update/install/probe/stop, checkpoint rollback,
+  `_restore_checkpoint`, update-recover/config-recover and dashboard confirmation/worker ownership.
+  Minimal new checkpoint-plan test **1 failed** before implementation: no immutable rollback/
+  recovery consent plan existed. Existing component handlers/journals were retained, not replaced.
+- Environment Updates now exposes Start (`s`), Update (`u`), Policy (`p`), Rollback (`r`), Recover
+  (`e`) plus existing Check/Details. One extra compact environment-only row, separate target/policy
+  forms and a scrollable Cancel-first exact-consent modal fit 80x24/larger. Review buttons request
+  read-only preparation; no eligibility grant comes from inventory strings, availability, cached
+  versions, readiness or labels. Late/canceled plans cannot publish consent after Close or over
+  another screen. Selection/metadata are captured by identity, never re-read from the cursor at
+  execution; changes during plan preparation refuse misdescribed consent.
+- Existing update plans now include a metadata fingerprint and owned-volume preflight/recheck.
+  Latest supported stable is resolved before consent; the exact target is passed unchanged to
+  `update_environment`. Existing stopped/network/pin/ownership/direct-workspace restrictions,
+  complete checkpoint, installation/real binary verification, failure rollback and final stopped
+  state remain. No implicit Stop, network/policy change, temporary start/probe/stop, automatic
+  installation, generic executor, Update All or schema migration. Start uses a read-only identity/
+  metadata plan and optional precondition under `core.start`'s original lock; it remains running
+  and fresh Check is separate. Policy/pin has its own explicit metadata/data-bound consent and
+  locked revalidation; it never installs or lifts execution/first-creation restrictions.
+- Immutable checkpoint plans bind action, metadata, endpoint/data identity, actual container ID/
+  image/running state, checkpoint full image ID and any retained derived-image ID. Optional
+  plan arguments to the existing rollback/recover handlers revalidate inside the environment
+  lock before snapshots, stops or removal. Restoration uses that exact full ID, not a subsequently
+  substituted tag; it occupies existing `image`/`last_snapshot` string fields while the named
+  checkpoint remains referenced in `opencode_update` for retention/cleanup. Missing ID references
+  retain the existing data-salvage guidance. Successful rollback preserves the entire present
+  system layer first, including later changes. Home/workspace/configuration are not rolled back;
+  binary rollback cannot undo application-data changes or guarantee backward compatibility.
+- Defect found in recovery: failed restoration did not persist its reason and the combined-update
+  failure always named update-recover even after the journal had advanced to runtime-recreate.
+  Restoration now records `last_error` without clearing the actual journal, and failure guidance
+  names its actual recovery route. Updates completion/Details and later inventory publication
+  reread authoritative local journal metadata without waiting for Docker inventory or relying on
+  cache authority; lifecycle/journal changes qualify version evidence immediately. Details leads
+  with operation results and current recovery guidance. Missing checkpoints refuse with safe data
+  export/restore guidance, never guessing that npm completed or erasing intent.
+- Recover handles interrupted OpenCode updates directly in Updates or Recovery Center; successor/
+  other journals route to the existing Recovery Center with the environment preselected. Its
+  existing configuration recovery gets an optional metadata/data precondition under its original
+  lock; no parallel recovery algorithm. Approved environment and routed config recovery workers
+  belong to the app, not the screen, reserve the operation slot and are not exclusive/replaced.
+  Normal Quit/conflicting operations refuse while they run; Close/Cancel check only cancels owned
+  read-only checks/planning. Once approved, cooperative UI cancellation is not propagated into a
+  partial mutation; bounded diagnostics remain bounded, installs/commits keep existing timing.
+  Process death still relies on durable journals. No fake success/automatic retry/rollback engine.
+- Real/pilot review found notification racks covering operation forms/Updates Details, and delayed
+  inventory allowing a stale journal in Details. Collapsed racks only on the affected forms/
+  Recovery Center/class-marked Updates Details; notification objects/advisory ownership remain
+  intact and full text stays available. Metadata refresh above fixes the stale routing. Lowest
+  Textual also exposed late/subscreen table events reaching the hidden/unmounted dashboard;
+  restricted dashboard events to its mounted own table and stopped Updates event bubbling.
+
+  | Final complete layer | Result |
+  |---|---|
+  | Python 3.11/current | **1471 passed, 78 opt-in skips**, 194.60 s |
+  | Python 3.11/lowest | **1471 passed, 78 opt-in skips**, 189.41 s; two known Typer deprecations |
+  | Python 3.14/current | **1471 passed, 78 opt-in skips**, 191.32 s |
+  | Python 3.14/lowest | **1471 passed, 78 opt-in skips**, 187.48 s; two known Typer deprecations |
+  | Affected real Docker/OpenCode/terminal | **18 passed/400 logged checks**, no skips/deselections, `up11-verified`, 489.49 s |
+
+  Full commands: `env PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q --tb=short
+  --junitxml=.work/up11/<prefix>-<label>.xml --basetemp=/tmp/opencode/up11-<base><label>`;
+  labels/venvs `311/venv311`, `311low/venv311low`, `314/venv314`, `314low/venv314low`.
+  Prefix/base `verified-retry` for 311 and `verified` for the other three combinations.
+  Python 3.11.18/3.14.8, current Typer 0.27.3/Textual 8.2.8, lowest 0.16.0/4.0.0, pytest 9.2.0;
+  four clean pip checks, serial foreground, inode-capacity preflight. All **1549 ordered test IDs/
+  outcomes identical**. No inode failure this package. **64 new default cases**: 38 backend,
+  25 pilot and one quality-module parameter; six new opt-in terminal cases explain 78 skips.
+  All old assertions remain: three UP-10 unavailable-action cases now exercise read-only review/
+  cancellation without mutation, appropriate to delivered actions; volume/configuration fakes
+  provide new preflight responses without bypassing ownership or disk assertions.
+- Regression layers: real private files/locks and existing fake Docker backend; exact consent
+  revalidation for changed checkpoint IDs, container/image/state, metadata/pins/journals, endpoint,
+  data directory and volume ownership, before any mutation; existing handlers execute under the
+  original lock and restore the confirmed ID. Explicit Start, live stopped/network/pin/absent
+  refusals, policy/pin consent, missing checkpoint salvage, persistent failed restoration/successor
+  routing, configuration preconditions and missing immutable image guidance. Pilots at 80x24/
+  120x40 prove full consent/control bounds, focused Cancel, keyboard target entry, unchanged target
+  despite later discovery, selection changes, canceled late planning, app-owned mutation after
+  Close/Cancel, normal Quit/conflict refusal, production toasts intact/no overlay and event isolation.
+- Intermediate unit failure trail retained: first selected run **4 failed/65 passed** (old unavailable
+  expectations/new checkpoint fake missing `.Id` response), first new pilot set **7 failed/111
+  passed** (tests observed queued Button/Screen events before mounting/completion; fixed condition
+  synchronization, no product assertion weakened). First full run **3 failed/1455 passed/72 skips**,
+  186.38 s (two fakes lacked volume responses, Recovery row clipped); corrected and **184 passed**,
+  88.78 s. Later reviewed **90 passed**, 55.22 s. Lowest affected **1 failed/141 passed**, 57.36 s,
+  exposed the event-ownership defect above; narrow fix/new regression, **143 passed**, 56.86 s,
+  before the final four complete suites. XMLs remain in `.work/up11/`, not last-failed deselection.
+- Real command: `env PYTHONPATH="$PWD/src" OCS_TEST_DOCKER=1 OCS_TEST_RUN=up11-verified
+  .work/venv311/bin/python -m pytest -q -rA --tb=short tests/integration/test_43_diagnostics.py
+  tests/integration/test_44_version_evidence.py tests/integration/test_51_updates.py
+  tests/integration/test_52_discovery.py tests/integration/test_53_environment_updates.py
+  --junitxml=.work/up11/real-verified.xml --basetemp=/tmp/opencode/up11-real-verified`.
+  Earlier 12 real rows retain diagnostics/probe cancellation, actual binary/lifecycle/restore
+  checks and manual/daily discovery terminals without implicit starts. New four action terminals
+  exercise both retained distributions at 80x24/120x40: explicit Start stays running, exact pin/
+  refused incompatible target/Manual unpin require consent, exact 2.2.0 -> 2.1.4 installs keep the
+  container and finish stopped, Cancel never installs, whole-layer rollback restores 2.2.0 in a
+  new container and preserves user configuration/home/workspace. Later system changes are absent
+  from the restored checkpoint but present with the updated binary in the retained snapshot,
+  proven by actual named/labeled no-network/no-mount one-shot containers, manifested before use.
+- Independent recovery gate is real, not inferred from successful update tests. New two distro
+  rows SIGKILL the actual manager before npm installation; missing checkpoint tag refuses without
+  changing running container/journal (a run-owned temporary alias preserves/restores that image).
+  A shell shim fails only removal of the named run-owned container; all other Docker operations
+  are real. Failure persists runtime-recreate plus reason and stops safely; Details names config
+  recover, existing Recovery Center finishes after the fault is removed, and actual binary/data/
+  configuration are checked. A second interruption/new dashboard at 120x40 independently invokes
+  direct OpenCode recovery through Recovery Center, succeeds/closes its journal and restores the
+  actual original binary. Every normal terminal quit in both success/failure workflows restores
+  terminal state. No paid/model-provider call, base replacement or fake mutation/verification.
+- Real failure/proof trail (all manifests/logs retained and guarded cleanup executed):
+  `up11-terminal-first`: **1 failed body/1 teardown error**, 7 passed/4 failed checks, 368.52 s.
+  A burst of terminal editing controls/text left a blank target; the refusal was correct, but
+  later harness keys reached the dashboard and opened the container's OpenCode UI. No prompt/
+  credential was submitted; this is not model-provider or manual-observation evidence. Harness
+  now separates controls and stops immediately if exact consent is absent. `up11-keyboard-repro`:
+  **1 failed body/1 teardown error**, 6 passed/1 failed check, 37.52 s, retained snapshots.
+  `up11-terminal-proof`: **1 passed/26 checks**, 53.93 s. Recovery iterations: `up11-recovery-first`
+  **1 body passed/1 teardown error**, 17 passed/2 failed checks, 47.24 s; `up11-recovery-proof`
+  **1 body passed/1 teardown error**, 18 passed/1 failed check, 39.76 s; `up11-recovery-verified`
+  **1 body passed/1 teardown error**, 26 passed/2 failed checks, 52.91 s. These exposed Details
+  overlays/stale journal publication and a wrapped-text matcher; fixed product publication/
+  presentation and matching, without removing checks. `up11-recovery-finalproof`: **1 passed/28
+  checks**, 26.10 s. Initial **18 passed/400 checks**, `up11-final`, 463.93 s, reran all affected real rows on both
+  distributions, including expanded policy/snapshot/direct-recovery assertions.
+- Final review after that first four-way **1469 passed/78 skips** matrix (193.10/187.56/191.71/
+  185.54 s) and initial real gate found older Recovery paths reporting only through now-collapsed
+  toasts. Added bounded read-only scrollable Recovery results, persistent repair/unsupported-journal
+  errors and two pilots proving full long messages, unchanged journals and unclipped controls.
+  Focused **78 passed**, 27.31 s. First complete rerun **1 failed/1470 passed/78 skips**, 195.23 s:
+  an existing text assertion searched only Static widgets, not the new TextArea. Extended text
+  collection while retaining the terminal-guidance assertion and adding read-only verification.
+  The final four complete suites and **18 passed/400 checks**, `up11-verified`, 489.49 s, above
+  include this correction. Earlier XMLs/logs stay retained; nothing is waived. A documentation
+  subset also caught a commit ID in public BASELINE (**1 failed/41 passed**); removed that prose
+  reference, never changed the public-record gate; corrected subset **42 passed**, 3.13 s.
+- All nine real attempts used isolated `.work/<run>/data`/config, manifests/logs under
+  `.work/logs/up11-*`, named resources and guarded product cleanup. Ending actual own-rootless
+  inventory has zero containers/volumes/helpers and the same four original full image IDs:
+  Debian `d5905c3f5026...`, Arch `418889644792...`, Arch input `3cbf69d2d595...`, custom Ubuntu
+  `68ee22004a91...` (full IDs in run evidence). Only run-owned snapshots/checkpoints/aliases/
+  runtime objects were removed; file-only backups/cache/logs/scripts remain ignored. Original
+  inputs are retained Debian 12/revision 1 and Arch/revision 1; no new current-definition base
+  build/freshness claim. User/engineering records updated. Seven product hashes are frozen in
+  `.work/up11/final-source-sha256.json`; no product change after final full/real verification.
+  Versions, schemas, image assets, runtime identity, base guards, diagnostic/HTTP/probe executors,
+  scheduler/cache/preferences, worker adapter, dependencies, AGENTS, CI/RELEASING unchanged.
+  No complete campaign, legacy broad test_50 workflow, fresh base, installed-pipx/manager,
+  privileged/socket/service, paid-provider or manual-observation evidence is established here.
+  No version bump, merge, push, tag, release, upload or publication. Package/checkpoint locally,
+  then STOP at UP-11; next is UP-12 + UP-13, not another recovery/manager task.
+- Final checkpoint gates: local sdist/wheel build, strict twine and packaged-content validation
+  pass; all seven changed/new product modules match final-code hashes and wheel bytes.
+  Final document/CLI/quality subset **42 passed**, 3.08 s, not another full suite. Artifacts/logs:
+  `.work/up11/package-final/`, `package-final-build.log`; final hashes `final-source-sha256.json`.
+  After preserving XML/logs, rechecked/removed only **32 exact manifested current-cycle completed
+  pytest roots** with no live process/socket/mount references. `/tmp/opencode` is empty again;
+  **1048541 free inodes**, all other `/tmp` entries and persistent locks intact. Cleanup evidence
+  `.work/up11/cycle-cleanup-*.json`; no Docker operation or old evidence deletion. Prose-only
+  follow-up checks are separate from the final complete suites. Review intended diff, commit
+  locally on `work/updates`, leave a clean tree and STOP; nothing merged/pushed/released.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
@@ -1601,33 +1783,36 @@ a materially different architecture, record the blocker and ask the owner before
    log and scoped Docker state; preserve unfamiliar changes and reconcile them before editing.
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
    `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, UP-06 `d7e587e`,
-   PERF `6b53f46`, UP-07/UP-08 `cacffea`, UP-10 `8aa7df5`, then the UP-09 package commit. Recover PERF's measured verification cadence from
+   PERF `6b53f46`, UP-07/UP-08 `cacffea`, UP-10 `8aa7df5`, UP-09 `1aca6ca`, then the UP-11 package commit. Recover PERF's measured verification cadence from
    BASELINE; it does not reduce the shared/high-risk or real gates for the next package.
     Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
      category-owned advisory clearing, identity-bound evidence/discovery, exact targets and
-     manual/cached Updates UI and default-off daily npm discovery are implemented. Image assets, manager
+      compact Updates UI, default-off daily npm discovery and explicit environment actions/recovery
+   are implemented. Image assets, manager
    version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Select **UP-11**, environment actions and recovery, with its own acceptance gate. Inspect the
-   existing `opencode_versions.py` status/policy/eligibility/plans/update/rollback/recovery and
-   dashboard Start/worker/confirmation paths before binding them to the Environment Updates view.
-   Reuse existing handlers and immutable exact-target plans; do not create a universal executor,
-   infer mutation eligibility from cache/indicator/readiness strings, or substitute later targets.
-   Check never starts a stopped container. Start is explicit and leaves it running; no temporary
-   start/probe/stop. Explain update's stopped/network/pin/ownership requirements, temporary update
-   start, full system-layer checkpoint/rollback and final stopped state; home/workspace/configuration
-   stay preserved, not guaranteed application-data compatibility. Policy/pin changes need explicit
-   consent and never bypass execution restrictions. Pending journals retain persistent reasons,
-   refuse conflicting actions and route to the existing recovery command; recovery success/failure
-   must have independent real Docker/OpenCode evidence, not a unit-only inferred pass. Retain
-   80x24/larger progressive disclosure, keyboard/focus/Cancel, exact confirmation/locked revalidation
-   and no cancellation of a mutation as if it were a read-only Check. Preserve UP-05 bounds/owned
-   cleanup, UP-06 status ownership, UP-07/08 identity/history, UP-09 default-off scheduling/source
-   coalescing, pins, base guards and schemas. Never hold a discovery-cache guard while acquiring
-   mutation locks. Base actions/refresh and manager discovery/classification/handoff/replacement
-   remain their separate later packages. No unrelated performance or host/service work.
+3. Select **UP-12 + UP-13**, base actions and explicit cached/full-refresh rebuild. Inspect
+   existing `update_base`, `rollback_base`, candidate verification/publication, distro build scripts,
+   current immutable rollback plans and shared base guards before binding Base Images actions.
+   Keep cached rebuild distinct from Refresh & Rebuild: full refresh explicitly pulls upstream and
+   bypasses build cache without pruning it. Confirm exact target/distribution/state/mode before
+   mutation; keep CLI/TUI parity, no implicit refresh from Check/rebuild and no moving-latest
+   substitution. Preserve candidate verification, original/current-ID rechecks under publication,
+   rollback copies and alias-consolidated explicit immutable selection; `--yes` must not guess
+   among several copies. Existing containers/writable layers and environment pins/configuration
+   do not migrate. Use isolated new base tags through the existing test namespace hook; original
+   four images remain read-only inputs unless the owner separately authorizes replacement.
+   Demonstrate cached versus refreshed builds independently on both distributions, failed-candidate
+   safety, concurrent publication/cleanup/pinned-creation behavior, retained containers/layers,
+   80x24/larger exact mode consent and terminal/worker ownership. No universal executor, Update All,
+   upstream-digest freshness claims, automatic installs/refresh, service or schema change. Preserve
+   UP-05 bounds, UP-06 progress/status ownership, source coordination with no discovery guard over
+   mutation locks, identity evidence and independently verified UP-11 journals/recovery. Manager
+   discovery/classification/handoff/replacement remains separate (UP-14..UP-17). No unrelated
+   performance or host/service work. Finish full compatibility/affected real gates before claiming
+   the package; not a release-readiness recommendation.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.

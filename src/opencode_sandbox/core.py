@@ -503,7 +503,7 @@ def reconfigure_runtime(m, settings, profile=None):
     # Do not auto-start: preserves the user's stopped state.
     return {"image":tag,"recreated":True}
 
-def recover_runtime_reconfigure(m):
+def recover_runtime_reconfigure(m, *, precondition=None):
     """Complete a durable runtime-recreate intent, never removing an unowned container.
 
     The committed image and requested settings were saved before container removal.
@@ -512,6 +512,7 @@ def recover_runtime_reconfigure(m):
     ensure_runtime(False)
     with lock(m["id"]):
         m=resolve(m["id"])
+        if precondition is not None: precondition(m)
         if m.get("operation") != "runtime-recreate":
             raise SandboxError("No interrupted runtime reconfiguration")
         if not m.get("image") or m.get("image") != m.get("last_snapshot"):
@@ -903,10 +904,11 @@ def recheck_mount(m):
     if workspaces.is_direct(m):
         workspaces.recheck(m)
 
-def start(m, *, _resume_recreate=False):
+def start(m, *, _resume_recreate=False, precondition=None):
     ensure_runtime(None if m.get("image") else env_distro(m))
     with lock(m["id"]):
         m=resolve(m["id"])
+        if precondition is not None: precondition(m)
         if m.get("operation")=="delete" or m.get("status")=="deleting":
             raise SandboxError("Environment deletion pending; retry delete --yes")
         if m.get("operation") in ("runtime-recreate","config-update","restore","opencode-update") \
@@ -925,7 +927,7 @@ def start(m, *, _resume_recreate=False):
                 image=env_image(m)
                 pull=image==m.get("custom_image")  # a custom image is pulled like docker run would (D-026)
                 if not pull and docker("image","inspect",image,capture=True,check=False).returncode:
-                    if image.split(":",1)[0] in MANAGER_IMAGE_KINDS:
+                    if image.split(":",1)[0] in MANAGER_IMAGE_KINDS or image.startswith("sha256:"):
                         raise missing_image(m, image, "opencode-sandbox container recreate-recover {name}" if _resume_recreate
                                             else "opencode-sandbox start {name}")
                     raise SandboxError(f"Base image {image} is missing; build it: opencode-sandbox build --distro {m.get('distro')}")

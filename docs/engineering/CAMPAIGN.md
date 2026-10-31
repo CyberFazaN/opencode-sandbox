@@ -97,6 +97,22 @@ Final review narrowed coalescing so cached-only lock contention cannot replace e
 discovery, then reran the matrix/real gate. A rerun hit tmpfs inode exhaustion (379 setup errors);
 only manifested current-run pytest roots were removed, logs retained, complete suites rerun clean.
 
+UP-11's environment actions and independent recovery gate pass: **64 new default-suite cases**,
+four complete compatibility suites (**1471 passed/78 opt-in skips each**) and **18 affected real
+tests/400 checks**, `up11-verified`, 489.49 s (`test_43`, `test_44`, `test_51`, `test_52`, new
+`test_53_environment_updates.py`). New terminal rows use both retained distributions at 80x24/
+120x40 for explicit Start, policy/pin consent and refusal, actual target installation/stopped
+completion, entire-system-layer rollback and actual later-layer snapshot preservation. Separate
+recovery rows exercise real SIGKILL, missing checkpoints, failed removal, persisted successor
+journal/error, existing config recovery and direct Recovery Center success; restored binary,
+configuration/data and normal terminal restoration are checked. Initial terminal failures and
+the lowest-dependency event-ownership failure were fixed/rerun, not waived (BASELINE/roadmap).
+Final review also routes older Recovery errors into a bounded scrollable pane, not collapsed
+toasts; new regressions and the complete/real gates above include that correction.
+All real attempts use guarded cleanup and retain manifests/evidence; no containers/volumes/helpers
+remain and four original tagged-image IDs are unchanged. This is not full-campaign, fresh-image,
+installed-pipx, paid-provider, privileged/service, manual-observation or release-readiness evidence.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

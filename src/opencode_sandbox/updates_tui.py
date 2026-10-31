@@ -1,4 +1,4 @@
-"""Compact manual/cached Updates views, with screen-owned cancellable read-only workers."""
+"""Compact Updates views: owned read-only checks, explicit environment consent and existing handlers."""
 import json
 import time
 
@@ -36,10 +36,15 @@ class UpdatesScreen(Screen):
     #updates-reason {height: 2; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis;}
     #updates-buttons {height: auto;}
     #updates-buttons Button {min-width: 10; width: 1fr;}
+    #updates-environment-buttons {height: auto;}
+    #updates-environment-buttons Button {min-width: 10; width: 1fr;}
     """
     BINDINGS = [Binding("escape", "close", "Close"), Binding("c", "check", "Check"),
                 Binding("d", "details", "Details"), Binding("1", "view('manager')", "Manager"),
-                Binding("2", "view('bases')", "Bases"), Binding("3", "view('environments')", "Environments")]
+                Binding("2", "view('bases')", "Bases"), Binding("3", "view('environments')", "Environments"),
+                Binding("u", "environment('update')", "Update"), Binding("s", "environment('start')", "Start"),
+                Binding("p", "environment('policy')", "Policy"), Binding("r", "environment('rollback')", "Rollback"),
+                Binding("e", "environment('recover')", "Recover")]
     AUTO_FOCUS = "#updates-table"
 
     def __init__(self, *, environment_id=None):
@@ -55,6 +60,9 @@ class UpdatesScreen(Screen):
         self._generation = {}
         self._active = {}
         self._owned = []
+        self._preparing = None
+        self._prepare_token = None
+        self.operation_result = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="updates-panel"):
@@ -71,6 +79,9 @@ class UpdatesScreen(Screen):
                 yield Button("Cancel check", id="updates-cancel", compact=True, disabled=True)
                 yield Button("Update", id="updates-update", compact=True, disabled=True)
                 yield Button("Close", id="updates-close", compact=True)
+            with Horizontal(id="updates-environment-buttons"):
+                for label, action in (("Start", "start"), ("Policy", "policy"), ("Rollback", "rollback"), ("Recover", "recover")):
+                    yield Button(label, id="updates-" + action, compact=True)
             yield Static("1/2/3: views   ↑/↓: select   c: Check   d/Enter: Details   Esc: Close", id="updates-keys", markup=False)
 
     def on_mount(self):
@@ -149,6 +160,7 @@ class UpdatesScreen(Screen):
         if not item.get("error"): previous.pop("error", None)
         if "state" in item and not item.get("recovery"): previous.pop("recovery", None)
         self.items[section][key].update(item)
+        if section == "environments": self._adopt_current_metadata(key)
         if checked:
             self._active.pop((section, key), None)
             self.items[section][key].pop("checking", None)
@@ -164,7 +176,7 @@ class UpdatesScreen(Screen):
         return None
 
     def on_tabs_tab_activated(self, event: Tabs.TabActivated):
-        if self._alive: self.action_view(event.tab.id)
+        if self._alive and self.app.screen is self: self.action_view(event.tab.id)
 
     def on_resize(self):
         if self._alive: self._render_view()
@@ -238,7 +250,7 @@ class UpdatesScreen(Screen):
                              + (f"; last verified {cache.when(observation['at'])}" if observation else "; version Unknown"))
                 if item.get("recovery"): lines.append(item["recovery"])
                 elif item.get("verification") == "history-unverified": lines.append("Current container identity unverified; see Details.")
-                elif item.get("state") == "stopped": lines.append("For fresh evidence, explicitly Start from the dashboard; it stays running.")
+                elif item.get("state") == "stopped": lines.append("For fresh evidence: explicit Start, then Check. It stays running.")
                 elif item.get("state") == "not-created": lines.append("No runtime binary verified; creation-image labels are not installed evidence.")
             else:
                 observation = item.get("observation")
@@ -254,19 +266,33 @@ class UpdatesScreen(Screen):
         reason = check_reason or ""
         reason += "\n" + {"manager": "Update unavailable: verified manager handoff is not implemented yet.",
                            "bases": "Build/Rollback unavailable here yet; CLI guidance in Details. Existing environments do not change.",
-                           "environments": "Start/Update/Policy/Rollback/Recover unavailable here yet; use existing dashboard/CLI (Details)."}[self.view]
+                            "environments": "Actions review live eligibility before consent; Check never starts a container."}[self.view]
+        if self.operation_result: reason = "Operation result — Details for full text\n" + plain(self.operation_result)
+        if self._preparing: reason = "Preparing read-only operation plan… Cancel check cancels preparation, not an approved mutation."
+        if self.app._operation_pending: reason = "An operation is running. Close/Cancel check does not cancel it; wait for its result."
         self.query_one("#updates-reason", Static).update(reason.strip())
         button = self.query_one("#updates-check", Button)
         button.disabled = self.view == "manager"
         button.tooltip = check_reason or "Query npm and check the selected object's OpenCode version"
-        self.query_one("#updates-cancel", Button).disabled = not self._active
-        self.query_one("#updates-update", Button).tooltip = reason.strip()
+        self.query_one("#updates-cancel", Button).disabled = not (self._active or self._preparing)
+        controls = self.query_one("#updates-environment-buttons")
+        controls.display = self.view == "environments"
+        self.query_one("#updates-keys", Static).update(
+            "c Check d Details | s Start u Update p Policy r Rollback e Recover | Esc Close"
+            if self.view == "environments" else "1/2/3: views   ↑/↓: select   c: Check   d/Enter: Details   Esc: Close")
+        blocked = self.view != "environments" or item is None or bool(self._preparing) or self.app._operation_pending
+        for action in ("update", "start", "policy", "rollback", "recover"):
+            button = self.query_one("#updates-" + action, Button)
+            button.disabled = blocked or bool(item and item.get("metadata", {}).get("operation") and action != "recover")
+            button.tooltip = reason.strip() if button.disabled else f"Review {action} for the selected environment; no mutation before confirmation"
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted):
+        event.stop()
         if self._alive: self._render_selected()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected):
-        self.action_details()
+        event.stop()
+        if self.app.screen is self: self.action_details()
 
     def action_check(self):
         if self.view == "manager": return
@@ -313,6 +339,9 @@ class UpdatesScreen(Screen):
         self._render_selected()
 
     def action_cancel_checks(self):
+        if self._preparing:
+            self._preparing.cancel()
+            self._preparing = self._prepare_token = None
         if ("npm",) in self._active: self._discovery_notice = "npm check canceled; previous discovery retained."
         for request, worker in self._active.items():
             worker.cancel()
@@ -324,11 +353,106 @@ class UpdatesScreen(Screen):
         self._active.clear()
         self._render_view()
 
+    def action_environment(self, action):
+        from .environment_updates_tui import PolicyScreen, TargetScreen
+        if self.view != "environments" or self.app._operation_pending or self._preparing: return
+        key = self.selected_key()
+        if key is None: return
+        try:
+            m = c.resolve(key)
+            if m.get("operation") and action != "recover": raise c.pending_operation(m)
+            if action == "recover" and m.get("operation") != v.UPDATE_OP:
+                from .management_tui import RecoveryScreen
+                self.app.push_screen(RecoveryScreen(environment_id=key))
+            elif action == "update":
+                self.app.push_screen(TargetScreen(m), lambda value: self._prepare_action(key, action, value) if value is not None else None)
+            elif action == "policy":
+                self.app.push_screen(PolicyScreen(m), lambda value: self._prepare_action(key, action, value) if value is not None else None)
+            else:
+                self._prepare_action(key, action)
+        except Exception as exc:
+            self.operation_result = c.error_text(exc)
+            self._render_selected()
+
+    def _prepare_action(self, key, action, value=None):
+        if not self._alive or self.app._operation_pending or self._preparing: return
+        self._prepare_token = token = object()
+        self._preparing = self._prepare_action_worker(key, action, value, token)
+        self._track(self._preparing)
+        self._render_selected()
+
+    @work(thread=True, group="updates-prepare")
+    def _prepare_action_worker(self, key, action, value, token):
+        from .environment_updates_tui import consent
+        try:
+            m = c.resolve(key)
+            if action == "update": plan = v.prepare_environment_update(m, value)
+            elif action == "policy": plan = v.prepare_environment_policy(m, *value)
+            elif action == "start": plan = v.prepare_environment_start(m)
+            else: plan = v.prepare_checkpoint_action(m, action)
+            m = c.resolve(key)
+            if v._consent_metadata(m) != plan.metadata:
+                raise c.SandboxError("Environment changed while preparing consent; review again")
+            publish(self.app, self._action_prepared, token, m, action, plan, consent(m, action, plan), None)
+        except Exception as exc:
+            publish(self.app, self._action_prepared, token, None, action, None, None, c.error_text(exc))
+
+    def _action_prepared(self, token, m, action, plan, message, error):
+        from .environment_updates_tui import EnvironmentConsentScreen
+        if not self._alive or self._prepare_token is not token: return
+        self._preparing = self._prepare_token = None
+        if self.app.screen is not self:
+            self.operation_result = "Operation review ended while another screen was open; request the action again."
+            self._render_selected()
+            return
+        if error:
+            self.operation_result = error
+            self._render_selected()
+            return
+        self._render_selected()
+        self.app.push_screen(EnvironmentConsentScreen(message),
+                             lambda yes: self._approved_action(m, action, plan) if yes else None)
+
+    def _approved_action(self, m, action, plan):
+        if not self._alive or self.app._operation_pending: return
+        self.action_cancel_checks()
+        self._next("environments", m["id"])  # old inventory cannot publish across the mutation
+        self.operation_result = None
+        self.app.run_environment_update_action(m, action, plan, self._environment_action_finished)
+        self._render_selected()
+
+    def _environment_action_finished(self, key, result, failed):
+        if not self._alive: return
+        self.operation_result = result
+        self._adopt_current_metadata(key)
+        token = self._next("environments", key)
+        self._track(self._inventory_worker("environments", [(key, token)]))
+        self._render_selected()
+
+    def _adopt_current_metadata(self, key):
+        item = self.items["environments"].get(key)
+        if item is None: return
+        try:
+            m = c.resolve(key)
+            # Journals/recovery routing are local authoritative metadata, not delayed inventory.
+            changed = v._lifecycle(m) != v._lifecycle(item.get("metadata", {})) or m.get("operation") != item.get("metadata", {}).get("operation")
+            item.update(metadata=m, name=m["name"], policy=v.policy(m))
+            if changed or m.get("operation"): item.update(v.environment_history(m))
+            if not m.get("operation"): item.pop("recovery", None)
+        except Exception as exc:
+            item["error"] = c.error_text(exc)
+
     def action_details(self):
         from .tui import ReportScreen
         key = self.selected_key()
+        if self.view == "environments": self._adopt_current_metadata(key)
         item = self.items[self.view].get(key)
-        lines = [VIEWS[self.view], self.discovery_text(), ""]
+        lines = [VIEWS[self.view]]
+        if self.operation_result: lines += ["Last operation result:", self.operation_result, ""]
+        if item and self.view == "environments" and item.get("metadata", {}).get("operation"):
+            m = item["metadata"]
+            lines += [str(c.pending_operation(m)), f"Last operation error: {m.get('last_error') or 'none'}", ""]
+        lines += [self.discovery_text(), ""]
         if self.view != "manager": lines += ["Discovery evidence:", json.dumps(self.remote, indent=2), ""]
         lines += ["Optional dashboard discovery: " + ("enabled (npm only)" if self.app._discovery_enabled else "off"),
                   "Automatic attempts are daily, failures included. Explicit Check may refresh sooner; Retry-After still applies.",
@@ -366,7 +490,9 @@ class UpdatesScreen(Screen):
                         ("start", "opencode status", "opencode update", "opencode policy", "opencode rollback", "opencode update-recover")],
                       "Start explicitly leaves it running. Update requires an existing stopped, network-enabled container.",
                       "Pins, ownership and pending journals still govern all operations; availability is not consent."]
-        self.app.push_screen(ReportScreen(c.printable("\n".join(lines)), title=f"Updates — {VIEWS[self.view]} — Details"))
+        report = ReportScreen(c.printable("\n".join(lines)), title=f"Updates — {VIEWS[self.view]} — Details")
+        report.add_class("updates-details")
+        self.app.push_screen(report)
 
     def action_close(self):
         self._stop_workers()
@@ -374,6 +500,7 @@ class UpdatesScreen(Screen):
 
     def _stop_workers(self):
         self._alive = False
+        self._prepare_token = None
         for worker in self._owned: worker.cancel()
 
     def on_unmount(self):
@@ -382,7 +509,9 @@ class UpdatesScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed):
         event.stop()
         {"updates-check": self.action_check, "updates-details": self.action_details,
-         "updates-cancel": self.action_cancel_checks, "updates-close": self.action_close}.get(event.button.id, lambda: None)()
+         "updates-cancel": self.action_cancel_checks, "updates-close": self.action_close,
+         **{"updates-" + action: lambda action=action: self.action_environment(action)
+            for action in ("update", "start", "policy", "rollback", "recover")}}.get(event.button.id, lambda: None)()
 
 
 def plain_lines(text):

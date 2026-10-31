@@ -243,8 +243,10 @@ def test_selection_survives_view_changes_and_resize_without_hidden_dashboard_act
 
 
 @pytest.mark.parametrize("state", ["stopped", "not-created", "running"])
-def test_check_and_details_do_not_enable_mutations_or_infer_installed_labels(sources, monkeypatch, state):
+def test_check_and_details_never_authorize_mutations_or_infer_installed_labels(sources, monkeypatch, state):
     m, calls = sources
+    mutations = []
+    monkeypatch.setattr(v, "update_environment", lambda *a, **k: mutations.append(a))
     def environment(*a, **k): return {"state": state, "version": None, "observation": None, "verification": "unknown"}
     monkeypatch.setattr(v, "environment_version", environment)
     async def test(app, pilot):
@@ -252,12 +254,18 @@ def test_check_and_details_do_not_enable_mutations_or_infer_installed_labels(sou
         screen = app.screen
         await until(pilot, lambda: not screen._active)
         assert screen.items["environments"][m["id"]]["version"] is None
-        assert screen.query_one("#updates-update", Button).disabled
-        assert "unavailable here yet" in str(screen.query_one("#updates-reason").render())
+        # UP-11 enables a read-only review request, not installation based on this cached row.
+        assert not screen.query_one("#updates-update", Button).disabled
+        assert "review live eligibility before consent" in str(screen.query_one("#updates-reason").render())
+        assert mutations == []
         await pilot.press("d")
         assert "No stopped container is started by Check" in app.screen.report
         assert "Pins, ownership and pending journals" in app.screen.report
         assert calls.count(("npm",)) == 1
+        await pilot.press("escape", "u")
+        assert app.screen.__class__.__name__ == "TargetScreen" and mutations == []
+        await pilot.press("escape")
+        assert mutations == [] and c.resolve(m["id"]).get("operation") is None
     run(test, (80, 24))
 
 

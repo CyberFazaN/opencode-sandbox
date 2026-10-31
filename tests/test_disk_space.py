@@ -1,4 +1,5 @@
 """Commit/build/npm on a nearly full disk failed midway with ENOSPC."""
+import json
 from collections import namedtuple
 from types import SimpleNamespace
 
@@ -17,6 +18,8 @@ def low_disk(monkeypatch, tmp_path):
         calls.append(a)
         if a[:2] == ("info", "--format"):
             return SimpleNamespace(returncode=0, stdout=str(tmp_path) + "\n", stderr="")
+        if a[:2] == ("volume", "inspect"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps([{"Labels": {"org.opencode-sandbox.id": a[-1].removeprefix("ocs-home-")}}]), stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
     monkeypatch.setattr(c, "docker", docker)

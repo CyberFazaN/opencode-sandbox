@@ -504,11 +504,12 @@ class Dashboard(App):
             self.notify("Some checks failed", severity="error")
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        self.update_details()
+        if self.is_running and event.data_table.id == "envs" and event.data_table.is_mounted:
+            self.update_details()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         # Enter (or a click on the highlighted row); the table consumes Enter itself.
-        if event.data_table.id == "envs":
+        if self.is_running and event.data_table.id == "envs" and event.data_table.is_mounted:
             self.action_open_selected()
 
     def action_focus_search(self) -> None:
@@ -698,6 +699,57 @@ class Dashboard(App):
         self._set_busy(message)
         self.notify(message, severity="error" if error else "information", timeout=10)
         self.action_refresh()
+
+    def action_quit(self) -> None:
+        if getattr(self, "_updates_mutation_active", False):
+            self.notify("An approved environment operation is running; wait before quitting. Killing the manager may require journal recovery.", severity="warning")
+            return
+        self.exit()
+
+    def run_environment_update_action(self, m, action, plan, callback):
+        """App-owned work survives closing Updates. Never replace/cancel an approved mutation."""
+        if self._operation_pending:
+            self.notify("Another operation is running", severity="warning")
+            return
+        self._operation_pending = self._updates_mutation_active = True
+        self._set_busy(f"{action.capitalize()} {m['name']}…")
+        self._environment_update_worker(m, action, plan, callback)
+
+    @work(thread=True, group="environment-operation")
+    def _environment_update_worker(self, m, action, plan, callback):
+        import json
+
+        from . import opencode_versions as v
+        feedback = c._RUNTIME_FEEDBACK.get() or {}
+        # Once approved, cancellation is not a rollback. Keep bounded diagnostics but do not
+        # propagate a UI worker cancellation into a partially applied lifecycle transaction.
+        with c.runtime_feedback(progress=feedback.get("progress"), cancelled=None):
+            try:
+                if action == "start":
+                    c.start(m, precondition=lambda current: v.recheck_environment_start(current, plan))
+                    result = "Started; remains running. Use Check for fresh version verification."
+                elif action == "update":
+                    outcome = v.update_environment(m, plan.target, plan=plan)
+                    result = "OpenCode update complete; stopped. " + json.dumps(outcome)
+                elif action == "policy":
+                    result = "OpenCode policy saved. " + json.dumps(v.set_policy(m, plan.mode, plan.version, plan=plan))
+                elif action == "rollback":
+                    result = "OpenCode rollback complete; explicit Start required. " + json.dumps(v.rollback_environment(m, plan=plan))
+                elif action == "recover":
+                    result = "OpenCode recovery complete; explicit Start required. " + json.dumps(v.update_recover(m, plan=plan))
+                else: raise ValueError(action)
+                failed = False
+            except Exception as exc:
+                result, failed = c.error_text(exc), True
+        if self.is_running:
+            try: self.call_from_thread(self._environment_update_finished, m["id"], result, failed, callback)
+            except RuntimeError:
+                if self.is_running: raise
+
+    def _environment_update_finished(self, key, result, failed, callback):
+        self._updates_mutation_active = False
+        self._finished(result, failed)
+        callback(key, result, failed)
 
     @work(thread=True, exclusive=True, group="environment-operation")
     def _run_operation(self, action: str, environment: dict) -> None:
@@ -1020,7 +1072,7 @@ class DiskScreen(ModalScreen[bool | None]):
 
 class ReportScreen(ModalScreen[None]):
     """Read-only plain-text report; every caller must name its subject explicitly."""
-    CSS = "ReportScreen {align: center middle;} #report-panel {width: 90%; height: 85%; border: round $accent; padding: 0 1; background: $surface;} #report-text {height: 1fr;}"
+    CSS = "ReportScreen {align: center middle;} ReportScreen.updates-details ToastRack {height: 0; max-height: 0; overflow: hidden;} #report-panel {width: 90%; height: 85%; border: round $accent; padding: 0 1; background: $surface;} #report-text {height: 1fr;}"
     BINDINGS = [Binding("escape", "close", "Close")]
 
     def action_close(self) -> None:

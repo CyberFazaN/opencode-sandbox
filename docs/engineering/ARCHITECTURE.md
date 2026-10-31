@@ -13,7 +13,8 @@ image revalidation; UP-04 adds explicit identity-bound rollback-copy selection; 
 diagnostic execution and owns client/probe cleanup. UP-06 replaces/clears category-owned dashboard
 advisories while preserving operation status. UP-07/UP-08 add disposable identity-bound version
 evidence, compatible stable discovery and explicit policy comparisons. UP-10 adds the manual/
-cached compact Updates interface; UP-09 adds default-off dashboard discovery. Mutation bindings, refresh modes and
+cached compact Updates interface; UP-09 adds default-off dashboard discovery; UP-11 binds explicit
+environment actions and recovery to existing handlers. Base refresh modes and
 manager discovery/classification/updater remain pending.
 
 ## Boundaries
@@ -40,7 +41,7 @@ manager discovery/classification/updater remain pending.
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
 | `update_cache.py` | Bounded private disposable evidence/attempt files, optional durable replacement and secure source-scoped exclusion; no metadata/journal authority or mutation locks | D-056 |
 | `update_discovery.py` | Dashboard-only optional daily npm attempt and Docker-free policy-filtered cached availability; no manager provider or component executor | D-056 |
-| `updates.py`, `updates_tui.py` | Read-only base inventory and compact local/cached-first Updates views; explicit independent object/npm checks, selected Details and owned cancellation; no scheduler or mutation engine | D-056, D-057 |
+| `updates.py`, `updates_tui.py`, `environment_updates_tui.py` | Read-only base inventory, compact local/cached-first Updates views, independent checks and owned cancellation; environment target/policy forms and immutable consent invoke existing component handlers, not a universal mutation engine | D-056, D-057 |
 | `agent_context.py` | Renders, verifies and refreshes the injected guidance | D-008, D-018 |
 | `integrations.py` | Initial MCP integrations (Context7 by default), provisioned once | D-009 |
 | `config_plan.py` | One planner/executor for CPU, memory, PIDs, network, ports, provider profile | D-010 |
@@ -137,11 +138,11 @@ gets its own uncancelled inspection after an interrupted probe. Full reports can
 per-call budgets; Updates publishes local/selected evidence and independent discovery without
 waiting for every source to finish.
 
-UP-10's `UpdatesScreen` is a separate read-only screen retaining `v`, with one compact table
+`UpdatesScreen` retains UP-10's `v` and one compact table
 shared by Manager/Bases/Environment subviews, stable selection, plain selected summaries and
 generic scrollable Details. Manager installed version is local; installation/release eligibility
-is not guessed. Pending mutation/release capabilities are visibly unavailable, with existing CLI
-guidance, not fake working buttons. No confirmation/executor/journal was added in this package.
+is not guessed. Base mutations and manager release capabilities remain visibly unavailable,
+with existing CLI guidance. UP-11 binds only the Environment OpenCode actions below.
 
 Opening renders metadata and Docker-free `environment_history` first (explicitly identity-
 unverified), then independent bounded local base/environment inspection workers. The new
@@ -162,6 +163,47 @@ without retimestamping it.
 Dashboard notifications/advisories remain intact, but Updates collapses its toast rack to zero
 height and discloses a count/full messages in Details so notices cannot cover 80x24 controls.
 Leaving the screen preserves dashboard notification/status ownership.
+
+UP-11 adds one environment-only compact action row and target/policy forms. Review requests are
+not eligibility grants from inventory strings, observations, cached discovery or readiness. A
+screen-owned cancellable read-only worker resolves exact targets and prepares immutable consent
+before a scrollable, Cancel-first modal. It verifies that displayed metadata still matches the
+prepared plan; late/canceled plans cannot push consent after Close or over another screen.
+The existing update plan additionally fingerprints current metadata and checks volume ownership.
+Start uses an optional `core.start` precondition under its existing environment lock; ordinary
+CLI Start is unchanged. Policy plans bind the exact mode/pin, data-directory identity and current
+metadata; `set_policy` revalidates under its existing lock. No policy change installs anything.
+
+Checkpoint plans bind action, metadata, endpoint/data identity, actual container identity/running
+state, immutable checkpoint ID and any retained derived-image ID before consent. Optional plan
+arguments to `rollback_environment`/`update_recover` compare the same evidence under their existing
+lock before snapshots, stops or removal. The existing restore handler receives the confirmed full
+image ID; the normal `image`/`last_snapshot` string fields can hold that Docker reference, while the
+original named checkpoint stays in the update record for retention/cleanup. No new metadata schema,
+parallel journal, component executor or cache authority. Missing immutable derived images retain
+the existing data-salvage guidance. Present system-layer preservation, pin restrictions, direct
+workspace checks, binary verification and final stopped state remain existing lifecycle behavior.
+
+Restoration failures now persist `last_error` without clearing the current journal. If removal
+has begun, that journal is `runtime-recreate`; failure messages and UI routing name `config recover`
+instead of blindly repeating `update-recover`. Updates metadata adoption/Details reread authoritative
+local records independently of delayed Docker inventory, qualify version evidence after lifecycle/
+journal changes, and lead with operation results/recovery reasons. Recovery Center preselects a
+routed environment and uses the same confirmed OpenCode recovery handler. Its existing configuration
+recovery accepts a metadata/data precondition rechecked inside the original lock, not a new recovery
+algorithm. Other journal types keep their existing command guidance.
+Recovery Center's bounded read-only TextArea retains full results/errors and unsupported-journal
+guidance even with toasts collapsed; long messages cannot expand past the 80x24 controls.
+
+Approved environment operations are app-owned, non-exclusive/replacement workers, distinct from
+screen-owned checks/planning. The dashboard reserves its existing operation slot before launch,
+refuses conflicting actions and normal Quit, and suppresses cooperative UI cancellation inside the
+approved mutation without removing bounded diagnostic budgets. Close/Cancel check cannot cancel
+that work; completion publishes a result only while the app is running, then refreshes local
+metadata/inventory. Killing the process still requires the existing durable journals. Configuration
+recovery routed from these views has the same app ownership. No short timeout is added to install,
+commit or other mutations. Toast racks are collapsed only on these forms, Recovery Center and
+class-marked Updates Details; notification objects remain intact and disclosed through Details.
 
 UP-09's `daily_discovery` boolean preference defaults false, including old/invalid preference
 values. Only a running dashboard schedules npm discovery: at startup, after saving Preferences,

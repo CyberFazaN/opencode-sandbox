@@ -58,6 +58,8 @@ Consider something else if:
 - **Updates inventory** in the dashboard (`v`): compact component views, local/cached-first,
   explicit version checks and full evidence in Details. Opening it does not trigger discovery.
   Optional daily npm discovery is off by default and runs only while the dashboard is open.
+  Environment Start/Update/Policy/Rollback/Recover reuse existing handlers with exact confirmation;
+  read-only Cancel never cancels an approved mutation.
   [Current capabilities and limits](docs/dashboard.md#updates).
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
   operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.
