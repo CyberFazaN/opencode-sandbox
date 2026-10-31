@@ -32,11 +32,14 @@ caches, compatible stable npm discovery, explicit comparisons for Manual/Pinned,
 confirmation/revalidation. Stopped environments retain dated evidence or Unknown; failed checks
 never become readiness success. UP-10 replaces the Versions report with manual/cached-first
 Updates views, independent explicit checks and full Details; opening runs no network discovery,
-OpenCode binary or image helper. The approved package is split at this verified UI checkpoint;
-UP-09 scheduling is next. Mutation bindings and manager discovery/classification/execution stay
+OpenCode binary or image helper. UP-09 completes the split package with optional default-off
+dashboard-only daily npm discovery, persisted attempt claims, cross-caller/process source
+coalescing and a quiet policy-filtered cached-availability indicator. No automatic runtime/image
+probe, start, install or service; explicit checks still work with scheduling off/unavailable and
+respect Retry-After. Next is UP-11 environment actions/recovery. Mutation bindings and manager discovery/classification/execution stay
 pending. No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-08 and UP-10 verification is below; commands, failures and handoff are in the roadmap.
+UP-01..UP-10 verification is below; commands, failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -208,6 +211,36 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-09 — 2026-10-31
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1407 passed, 72 opt-in skips in each of four serial foreground runs**: Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Clean pip checks; only the two known lowest-Typer deprecations. Times 166.42/160.50/164.65/159.91 s; all **1479 ordered IDs/outcomes identical** |
+| New regressions | **42 new default-suite cases**, no removed/weakened prior assertions: real private files/locks and loopback HTTP; attempt persisted before request, successful/failed/interrupted restart, actual process death before HTTP, thread/process overlap and shared failures, bounded/canceled waits, cached-only contention still requires a fresh explicit request, canceled HTTP child reaped, forward/backward clock changes, numeric/date/long Retry-After, unsafe/unwritable/fsync-failed storage, explicit fallback, exact-target guard release, old/invalid preferences, 80x24/larger Save/Cancel/enable/disable, Notify/Manual/Pinned/Unknown/recovery filtering, quiet deduplication/status ownership, open-screen cache adoption and no unsolicited short-CLI network work |
+| Real Docker/OpenCode/terminal | **12 tests/200 logged checks passed**, no skips/deselections, `up09-verified`, 178.60 s. Retained both-distribution diagnostics and actual binary/lifecycle recovery rows plus existing Updates terminals; new daily-discovery terminal workflow at 80x24/120x40 exercises real keyboard Preferences, loopback HTTP, new dashboard processes after success/failure, cached comparisons and opt-out. Docker argv recording proves no runtime/image probes or mutations in these discovery rows; actual stopped state/start time/metadata unchanged, all normal quits restore terminals |
+| Failure trail | Two initial automatic-daily tests failed before implementation. Focused iterations exposed import/lint errors and an aliased cached-snapshot regression (fixed, not weakened); reviewed subset **158 passed**, 48.39 s. Lowest focused run **1 failed/156 passed**: new test variable/prose used an existing forbidden internal-reference word; renamed without touching the gate. First new real terminal run: **1 teardown error, 3 failed/13 passed checks** because unescaped `(1)` was a regex group in the harness matcher. Corrected literal matching; four-case proof **4 passed/64 checks**, then the final 12-case affected real gate above |
+| Boundaries | Metadata-only optional npm scheduler, not GitHub or component mutation UI. Safe durable source storage required for automatic requests; manual bounded fallback cannot promise cross-process throttle without it. Cache clearing/corruption can reset disposable history, never installs/journals. Same retained Debian 12/revision 1 and Arch/revision 1 inputs; no fresh base build, full campaign/legacy broad TUI workflow, installed-manager/pipx, paid/provider, privileged/socket/service or manual-observation evidence. CI/release gates unchanged; not a release-readiness claim |
+
+Evidence/commands and next-package handoff are in the working roadmap; logs/XML are ignored
+under `.work/up09/`, real manifests/logs under `.work/logs/up09-*`. All real attempts, failed or
+successful, used isolated product roots and guarded product cleanup. Ending verified own-rootless
+inventory: zero containers/volumes/run helpers and unchanged four original full tagged-image IDs.
+No changes to manager version, metadata/backup schemas, image assets, core lifecycle/identity/
+base guards, bounded diagnostic/probe implementations, worker adapter, dependencies or release gates.
+
+Final review after an initial four-way **1406 passed/72 skipped** matrix and 12-case real gate
+caught a freshness edge: waiting behind a cached-only background consideration must not let
+explicit Check reuse old success. Narrowly corrected coalescing; new regression, **56 passed**
+focused review, and the final complete/real results above. During rerun, `/tmp` tmpfs inode
+exhaustion produced **1 failed/1027 passed/72 skipped/379 setup errors** in lowest 3.11; preserved
+log/XML, manifested/removed only this conversation's UP-09 pytest roots, then reran all remaining
+complete suites cleanly. Final-code 3.11/current had already passed and matches all final outcomes.
+No source/test assertions/gates changed to resolve infrastructure exhaustion; older runs, user
+data and Docker objects were not deleted. Product source is unchanged after final verification.
+Local sdist/wheel, strict twine/content checks and source/wheel equality for all seven changed/new
+product modules pass; no install/upload. Final document/CLI/quality subset **41 passed**, 3.01 s,
+not another complete suite. Seven source hashes are retained in `.work/up09/verified-source-sha256.json`.
 
 ### Unpublished UP-10 — 2026-10-30
 

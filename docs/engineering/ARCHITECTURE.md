@@ -13,7 +13,7 @@ image revalidation; UP-04 adds explicit identity-bound rollback-copy selection; 
 diagnostic execution and owns client/probe cleanup. UP-06 replaces/clears category-owned dashboard
 advisories while preserving operation status. UP-07/UP-08 add disposable identity-bound version
 evidence, compatible stable discovery and explicit policy comparisons. UP-10 adds the manual/
-cached compact Updates interface; optional scheduling, mutation bindings, refresh modes and
+cached compact Updates interface; UP-09 adds default-off dashboard discovery. Mutation bindings, refresh modes and
 manager discovery/classification/updater remain pending.
 
 ## Boundaries
@@ -38,7 +38,8 @@ manager discovery/classification/updater remain pending.
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
-| `update_cache.py` | Bounded private disposable evidence/attempt files, atomic per-key replacement; no metadata/journal authority, scheduling or mutation locks | D-056 |
+| `update_cache.py` | Bounded private disposable evidence/attempt files, optional durable replacement and secure source-scoped exclusion; no metadata/journal authority or mutation locks | D-056 |
+| `update_discovery.py` | Dashboard-only optional daily npm attempt and Docker-free policy-filtered cached availability; no manager provider or component executor | D-056 |
 | `updates.py`, `updates_tui.py` | Read-only base inventory and compact local/cached-first Updates views; explicit independent object/npm checks, selected Details and owned cancellation; no scheduler or mutation engine | D-056, D-057 |
 | `agent_context.py` | Renders, verifies and refreshes the injected guidance | D-008, D-018 |
 | `integrations.py` | Initial MCP integrations (Context7 by default), provisioned once | D-009 |
@@ -154,12 +155,47 @@ recovery remains qualified even without a container.
 
 Each screen owns its worker references and per-item generation tokens. A newer Check invalidates
 older local inventory publication; Cancel/Close cancels only owned read-only work and refuses
-queued/late results without treating cancellation as mutation rollback. Per-screen in-flight npm
-checks coalesce across both OpenCode views, but this is not UP-09's persistent/cross-caller
-coordinator. No timer queries a source; a UI-only notice-count timer never calls Docker/network.
+queued/late results without treating cancellation as mutation rollback. Per-screen UI waiters
+coalesce across both OpenCode views; UP-09 also coordinates the shared source below. Its local
+cache/notice timer never calls Docker/network and adopts completed background/other-caller evidence
+without retimestamping it.
 Dashboard notifications/advisories remain intact, but Updates collapses its toast rack to zero
 height and discloses a count/full messages in Details so notices cannot cover 80x24 controls.
 Leaving the screen preserves dashboard notification/status ownership.
+
+UP-09's `daily_discovery` boolean preference defaults false, including old/invalid preference
+values. Only a running dashboard schedules npm discovery: at startup, after saving Preferences,
+and on a 60-second consideration timer. Explicit CLI/Updates/latest-target resolution uses the
+same source coordinator but does not gain unsolicited network work. No GitHub provider exists
+yet; UP-14 must add its own truthful source contract/hookup, not infer a manager check from npm.
+
+`opencode_versions.latest(automatic=True)` checks the most recent attempt, not just successful
+evidence. Under a source-keyed private `flock` in that data directory's `update-cache/`, persist/
+fsync an attempt ID/time and incomplete result before HTTP. The guard covers only metadata
+request/cache publication, never Docker, mutation locks, journals, consent or installation.
+It is released before target execution. Fresh threads/processes that overlap wait cancellably
+(10-second bounded source wait) and reuse the completed attempt, failures included; only the
+owner uses the existing eight-second HTTP request budget. Success and attempts stay independent.
+Lock files are no-follow, private own-UID single-link regular files, descriptor-relative with
+post-acquisition namespace/inode checks, never unlinked/repaired. Source keys include npm URL
+and supported major; the data-directory boundary is intentional, not a daemon-wide/global cache.
+
+An automatic attempt consumes 24 hours from its persisted start, whether successful, failed or
+interrupted. Backward clock changes retain future throttle claims without treating future success
+as fresh evidence. Explicit refresh can run early but honors persisted numeric/date Retry-After,
+including long pauses. Cancellation of a waiter cannot cancel an owner; owner interruption leaves
+an incomplete claim and no new success. Unsafe/unwritable coordination or failed durable claims
+disable automatic HTTP. Manual discovery keeps the original bounded uncached fallback; without
+usable storage cross-process exclusion/rate persistence is unavailable. Cache clearing/corruption
+can reset disposable throttles, never authorize a mutation or clear a journal. Other observation
+writes remain ordinary disposable replacements; durable fsync is only requested for discovery.
+
+The dashboard uses one stable `Updates (N)` label, no availability toasts or operation-status
+writes. Its Docker-free count uses only qualified dated environment history against npm evidence,
+Notify policy, and no pending journal; Manual/Pinned/Unknown do not yield unsolicited newer-version
+counts. Explicit comparisons are unchanged. Tooltip/Details qualify stale/cached source evidence;
+Details also shows scheduling failures. Disabling cancels owned automatic workers and suppresses
+the indicator, not the manual screen. No probes, temporary starts, installs, service or schema change.
 
 Dashboard startup/explicit Refresh publishes complete base-image check results, including success.
 Daemon, resource-support and image advisories own their notification objects and share an explicit
@@ -279,8 +315,9 @@ evidence. No creation-image label becomes an environment's installed fact.
 environment/backup schema), 128 KiB per-file limits, private owner/mode checks and no-follow,
 descriptor-relative reads/replacement. Invalid/future-time/unsafe/missing/unwritable cache entries
 are misses, not permission to repair paths or fail an otherwise successful operation. Success and
-latest attempt stay separate. No cache lock is held while taking mutation locks; per-key last
-completion wins, and in-flight/scheduler coordination remains UP-09. A stale cache can lose an
+latest attempt stay separate. No cache lock is held while taking mutation locks. Observations
+are per-key last-completion-wins; UP-09 coordinates discovery requests/attempt claims separately.
+A stale cache can lose an
 observation but cannot authorize a mutation, clear a journal or prove current runtime state.
 
 npm discovery reads one bounded abbreviated packument, semantically selects the greatest stable

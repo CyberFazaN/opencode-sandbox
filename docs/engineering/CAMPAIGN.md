@@ -66,8 +66,8 @@ installed-manager/pipx or report-specific real-terminal/manual evidence is renew
 The initial real-test fixture-marker failure was corrected and rerun, not skipped. Release gates
 and historical PASS qualifications below are unchanged.
 
-UP-10's independently useful manual/cached UI is now verified; optional UP-09 scheduling is
-still pending (approved split checkpoint). Four full compatibility suites: **1365 passed,
+UP-10's independently useful manual/cached UI was verified before optional UP-09 scheduling
+(approved split checkpoint). Four full compatibility suites: **1365 passed,
 68 opt-in skips each**; 39 new default-suite cases plus retained/migrated report assertions.
 Scoped real `test_43_diagnostics.py test_44_version_evidence.py test_51_updates.py`:
 **8 tests/136 checks passed**, `up10-verified`, 193.19 s. New terminal rows exercise both retained
@@ -79,6 +79,23 @@ labeled and manifested. Existing image IDs remain; guarded cleanup leaves no con
 No full `test_50_tui.py` rerun, full campaign, fresh definitions/build, installed-manager/pipx,
 provider, privileged/socket/service or manual-observation evidence is implied. Release gates
 and historical PASS qualifications remain unchanged.
+
+UP-09 completes optional daily npm discovery with **42 new default-suite cases**, four complete
+compatibility suites (**1407 passed/72 opt-in skips each**) and **12 affected real tests/200 checks**,
+`up09-verified`, 178.60 s: `test_43_diagnostics.py`, `test_44_version_evidence.py`, `test_51_updates.py`,
+`test_52_discovery.py`. New keyboard-only daily-discovery rows on both retained distributions at
+80x24/120x40 cover default off, persisted opt-in/out, one quiet policy-filtered cached indicator,
+fresh processes after success/failure, explicit early checks, no implicit runtime/image probes
+or mutation (actual Docker argv recorded), unchanged stopped state/startup time/metadata and
+restored terminals. Initial new terminal run had three failed checks from a harness regex error;
+corrected, not waived. Unit/host/pilot rows additionally prove actual interruption before HTTP,
+thread/process overlap, Retry-After/clock/storage failure and cancellation/reaping. All real
+attempts cleaned behind the product guard; no containers/volumes/helpers leaked and four original
+image IDs stayed unchanged. Earlier scope qualifications and full-release gates remain unchanged;
+there is no GitHub discovery, new full campaign, fresh build or installed-manager evidence here.
+Final review narrowed coalescing so cached-only lock contention cannot replace explicit fresh
+discovery, then reran the matrix/real gate. A rerun hit tmpfs inode exhaustion (379 setup errors);
+only manifested current-run pytest roots were removed, logs retained, complete suites rerun clean.
 
 ## Legend
 

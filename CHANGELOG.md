@@ -11,8 +11,14 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 - Compact Updates views (`v`) replace the dashboard's Versions report: Manager, Base Images and
   Environment OpenCode, local/cached-first without network requests or version probes on opening.
   Explicit Check has independent registry/object results and cancellable owned read-only work;
-  Details discloses full evidence, errors, recovery and existing CLI guidance. Manager checks,
-  mutation actions and optional daily discovery remain unavailable at this checkpoint.
+  Details discloses full evidence, errors, recovery and existing CLI guidance. Manager checks
+  and mutation actions remain unavailable at this checkpoint.
+- Optional daily npm metadata discovery in dashboard Preferences, off by default: durable
+  attempt claims throttle failures/restarts/interruption, shared source requests coalesce across
+  CLI/Updates/background callers, and Retry-After applies to explicit checks too. One quiet
+  policy-filtered cached-availability indicator replaces repeated notices; no automatic runtime
+  probe, start, install or persistent service. Scheduling fails closed without safe writable
+  storage; bounded explicit discovery remains available.
 
 ### Fixed
 

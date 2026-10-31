@@ -1,11 +1,12 @@
 """Disposable bounded update evidence, never authoritative metadata or recovery state.
 
-Per-key atomic replacement, no mutation locks or cross-source transactions. A corrupt/unsafe/
-unwritable cache is a miss, not permission to repair paths or block normal operations. Scheduling
-and in-flight request coordination belong to their callers, not this file store.
+Per-key atomic replacement and optional private source exclusion, no mutation locks or cross-
+source transactions. A corrupt/unsafe/unwritable cache is a miss, not permission to repair paths
+or block normal operations. Scheduling decisions belong to callers, not this file store.
 """
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import math
@@ -13,7 +14,7 @@ import os
 import secrets
 import stat
 import time
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 
 from . import core as c
@@ -76,10 +77,10 @@ def read(key):
         return {}
 
 
-def write(key, data):
+def write(key, data, *, durable=False):
     try: raw = json.dumps({**data, "format": 1, "key": key}, allow_nan=False).encode()
-    except (ValueError, TypeError, RecursionError): return
-    if len(raw) > LIMIT: return
+    except (ValueError, TypeError, RecursionError): return False
+    if len(raw) > LIMIT: return False
     try:
         c.BASE.mkdir(mode=0o700, parents=True, exist_ok=True)
         with _directory(create=True) as directory:
@@ -87,19 +88,75 @@ def write(key, data):
                 existing = os.stat(_name(key), dir_fd=directory, follow_symlinks=False)
                 if not stat.S_ISREG(existing.st_mode) or existing.st_uid != os.getuid() \
                         or existing.st_nlink != 1 or existing.st_mode & 0o077:
-                    return
+                    return False
             except FileNotFoundError: pass
             name = ".write-" + secrets.token_hex(12)
             fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
                          0o600, dir_fd=directory)
             try:
-                with os.fdopen(fd, "wb") as stream: stream.write(raw)
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(raw)
+                    if durable:
+                        stream.flush()
+                        os.fsync(stream.fileno())
                 os.replace(name, _name(key), src_dir_fd=directory, dst_dir_fd=directory)
+                if durable: os.fsync(directory)
             finally:
                 try: os.unlink(name, dir_fd=directory)
                 except FileNotFoundError: pass
     except OSError:
-        return  # disposable evidence, not the result of an install/verification
+        return False  # disposable evidence, not the result of an install/verification
+    return True
+
+
+class Unavailable(OSError):
+    """No safe persistent source coordination; automatic requests must fail closed."""
+
+
+@contextmanager
+def source_lock(key, *, timeout=10):
+    """Only metadata requests belong inside this guard, never Docker or mutation locks.
+
+    Persistent lock inodes are never removed/repaired. Each thread/process opens its own file
+    description; no-follow/ownership/link/mode and namespace identity checks prevent split locks.
+    """
+    from . import runtime_identity as rid
+    with ExitStack() as stack:
+        try:
+            c.BASE.mkdir(mode=0o700, parents=True, exist_ok=True)
+            directory = stack.enter_context(_directory(create=True))
+            name = _name(key) + ".lock"
+            fd = os.open(name, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                         0o600, dir_fd=directory)
+            stack.callback(os.close, fd)
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1 \
+                    or stat.S_IMODE(info.st_mode) != 0o600:
+                raise OSError("unsafe source lock")
+        except OSError as exc:
+            raise Unavailable("Discovery scheduling storage unavailable") from exc
+        deadline, waited = time.monotonic() + timeout, False
+        while True:
+            cancelled = (c._RUNTIME_FEEDBACK.get() or {}).get("cancelled")
+            if cancelled and cancelled(): raise rid.Cancelled()
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                waited = True
+                if time.monotonic() >= deadline: raise c.SandboxError("Discovery source busy; try Check later") from None
+                time.sleep(.02)
+            except OSError as exc:
+                raise Unavailable("Discovery source exclusion unavailable") from exc
+        try:
+            with _directory() as current:
+                opened, named = os.fstat(directory), os.fstat(current)
+                if (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino): raise OSError("source directory changed")
+            named = os.stat(name, dir_fd=directory, follow_symlinks=False)
+            if (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino): raise OSError("source lock changed")
+        except OSError as exc:
+            raise Unavailable("Discovery scheduling storage changed") from exc
+        yield waited
 
 
 def evidence(value, source, identity):

@@ -48,6 +48,7 @@ class UpdatesScreen(Screen):
         self.items = {key: {} for key in VIEWS}
         self.selection = {"environments": environment_id}
         self.remote = v.discovery()
+        self._cached_remote = dict(self.remote)
         self.inventory_error = None
         self._discovery_notice = None
         self._alive = False
@@ -93,7 +94,17 @@ class UpdatesScreen(Screen):
         for section in ("bases", "environments"):
             entries = [(key, self._next(section, key)) for key in self.items[section]]
             self._track(self._inventory_worker(section, entries))
-        self.set_interval(1, self._render_notices)
+        self.set_interval(1, self._refresh_discovery)
+
+    def _refresh_discovery(self):
+        self._render_notices()
+        current = v.discovery()
+        if current != self._cached_remote and ("npm",) not in self._active:
+            self._cached_remote = current
+            self.remote = current
+            self._discovery_notice = None
+            self._render_selected()
+        self.query_one("#updates-discovery", Static).update(plain_lines(self.discovery_text()))
 
     def _notices(self):
         notes = list(self.app._notifications)
@@ -191,7 +202,12 @@ class UpdatesScreen(Screen):
         text = (f"npm: {success['value']} — cached; checked {cache.when(success['at'])}"
                 + ("; stale" if stale else "")) if success else "npm: never checked; availability unknown"
         if ("npm",) in self._active: return text + "\nChecking npm… local evidence remains available."
+        worker = self.app._discovery_worker_ref
+        if self.app._discovery_enabled and worker is not None and not worker.is_finished:
+            return text + "\nDashboard checking npm… local evidence remains available."
         if self._discovery_notice: return text + "\n" + self._discovery_notice
+        if attempt and not attempt["ok"] and attempt.get("error") == "check did not complete":
+            return text + "\nLast npm attempt did not complete; explicit Check can retry."
         if attempt and not attempt["ok"]: return text + "\nCheck failed: " + attempt["error"]
         return text + "\nCheck queries npm and verifies only the selected object; never starts an environment."
 
@@ -254,7 +270,7 @@ class UpdatesScreen(Screen):
 
     def action_check(self):
         if self.view == "manager": return
-        # One in-flight npm request per screen, shared by both OpenCode views.
+        # One UI waiter per screen; the provider also coalesces other screens/CLI/background.
         if ("npm",) not in self._active:
             self._active[("npm",)] = self._registry_worker()
             self._track(self._active[("npm",)])
@@ -277,15 +293,21 @@ class UpdatesScreen(Screen):
     def _registry_worker(self):
         try:
             value = v.latest()
-            result = {"success": cache.evidence(value, "npm-metadata", {"url": v.REGISTRY, "major": v.MAJOR}),
-                      "attempt": {"at": time.time(), "ok": True}, "stale": False}
+            result = v.discovery()
+            if not result["success"] or result["success"]["value"] != value or not (result["attempt"] or {}).get("ok"):
+                # Explicit discovery still works without writable cache storage.
+                result = {"success": cache.evidence(value, "npm-metadata", {"url": v.REGISTRY, "major": v.MAJOR}),
+                          "attempt": {"at": time.time(), "ok": True}, "stale": False}
         except Exception as exc:
-            result = {"attempt": {"at": time.time(), "ok": False, "error": c.error_text(exc)}, "stale": True}
+            attempt = v.discovery()["attempt"]
+            if not attempt or attempt["ok"]: attempt = {"at": time.time(), "ok": False}
+            result = {"attempt": {**attempt, "error": c.error_text(exc)}, "stale": True}
         publish(self.app, self._registry_received, result)
 
     def _registry_received(self, result):
         if not self._alive: return
         self._active.pop(("npm",), None)
+        self._cached_remote = v.discovery()
         self._discovery_notice = None
         self.remote.update(result)
         self._render_selected()
@@ -308,6 +330,11 @@ class UpdatesScreen(Screen):
         item = self.items[self.view].get(key)
         lines = [VIEWS[self.view], self.discovery_text(), ""]
         if self.view != "manager": lines += ["Discovery evidence:", json.dumps(self.remote, indent=2), ""]
+        lines += ["Optional dashboard discovery: " + ("enabled (npm only)" if self.app._discovery_enabled else "off"),
+                  "Automatic attempts are daily, failures included. Explicit Check may refresh sooner; Retry-After still applies.",
+                  "Automatic discovery never starts containers or runs binary/image probes."]
+        if self.app._discovery_status:
+            lines += ["Last dashboard scheduling result:", json.dumps(self.app._discovery_status, indent=2)]
         notes = self._notices()
         if notes:
             lines += ["Dashboard notices (retained; compact here so controls remain visible):",

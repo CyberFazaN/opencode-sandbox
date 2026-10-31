@@ -211,6 +211,9 @@ class Dashboard(App):
         self._runtime_notification = None
         self._advisories = {}
         self._status_owner = None
+        self._discovery_worker_ref = None
+        self._discovery_status = None
+        self._discovery_enabled = False
         self.query_one("#envs", DataTable).add_columns("Name", "Kind", "State", "Profile", "Source", "ID")
         self.action_refresh()
         # CLI changes made while the dashboard is open (H08); only metadata file stats are read.
@@ -228,6 +231,49 @@ class Dashboard(App):
         except Exception as exc:
             self.notify(c.error_text(exc), severity="error")
         self._prerequisites_worker()
+        self.set_interval(60, self.refresh_discovery_preferences)
+        self.refresh_discovery_preferences()
+
+    def refresh_discovery_preferences(self):
+        from . import preferences
+        try: enabled = preferences.read()["daily_discovery"]
+        except (c.SandboxError, OSError, ValueError): enabled = False
+        self._discovery_enabled = enabled
+        if not enabled:
+            if self._discovery_worker_ref: self._discovery_worker_ref.cancel()
+        elif self._discovery_worker_ref is None or self._discovery_worker_ref.is_finished:
+            self._discovery_worker_ref = self._daily_discovery_worker()
+        self._refresh_update_indicator()
+
+    @work(thread=True, group="daily-discovery")
+    def _daily_discovery_worker(self):
+        from . import update_discovery
+        try: result = update_discovery.check()
+        except Exception as exc: result = {"scheduling_error": c.error_text(exc)}
+        publish(self, self._daily_discovery_received, result)
+
+    def _daily_discovery_received(self, result):
+        if not self._discovery_enabled: return
+        self._discovery_status = result
+        self._refresh_update_indicator()
+
+    def _refresh_update_indicator(self):
+        from . import opencode_versions as v
+        from . import update_cache as cache
+        from . import update_discovery
+        count = 0
+        if self._discovery_enabled:
+            try: count = update_discovery.available()
+            except (c.SandboxError, OSError, ValueError): pass  # optional cached indicator, not operation status
+        button = self.query_one("#ocversions", Button)
+        button.label = f"Updates ({count})" if count else "Updates"
+        if count:
+            remote = v.discovery()
+            success = remote["success"]
+            button.tooltip = (f"{count} notify-policy environment(s): newer npm version than dated last verification. "
+                              + (f"npm checked {cache.when(success['at'])}; " if success else "")
+                              + ("stale cached discovery; " if remote["stale"] else "") + "Details in Updates")
+        else: button.tooltip = "Local/cached Updates; Check explicitly refreshes npm"
 
     @work(thread=True, exclusive=True, group="prerequisites")
     def _prerequisites_worker(self) -> None:
@@ -374,6 +420,7 @@ class Dashboard(App):
             with contextlib.suppress(RowDoesNotExist):  # the selected environment is gone or filtered out
                 table.move_cursor(row=table.get_row_index(previous))
         self.update_details()
+        self._refresh_update_indicator()
 
     def action_refresh_readiness(self) -> None:
         """Explicit Refresh retries prerequisites; metadata auto-refresh stays Docker-free."""

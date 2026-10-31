@@ -17,14 +17,14 @@ and existing operations -> explicit base refresh -> verified pipx manager self-u
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
 UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen. UP-10 is now a
-verified split checkpoint; UP-09 and six later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
+verified split checkpoint; UP-09 is complete too, and six later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
 depend on base refresh. Tightly
 related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
 package or safety boundary, not mechanically after each ID. Environment recovery, manager
 handoff, replacement and failure recovery retain independent verification gates. The working
 roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
 
-Current checkpoint: UP-00..UP-08 and UP-10 complete. Explicit reports, honest partial inventory, shared
+Current checkpoint: UP-00..UP-10 complete. Explicit reports, honest partial inventory, shared
 base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.
 Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
 their existing timing. Dashboard advisories now replace/clear by category without erasing active
@@ -37,7 +37,12 @@ independent Check/Details and owned cancellation at 80x24/larger. Opening does n
 network or execute version probes; stopped checks never start containers. Manager discovery
 and mutation bindings remain visibly unavailable, with existing CLI guidance. The approved
 UP-10/UP-09 package is split after the verified UI because of its scope and real-terminal fixes.
-Next: UP-09 optional default-off discovery scheduling; the manual UI does not depend on it.
+UP-09 adds default-off dashboard-only daily npm discovery, persisted attempt claims across
+failures/restarts/interruption, cross-caller/process source coalescing and a quiet policy-filtered
+cached-availability indicator. Explicit refresh remains available; Retry-After still applies.
+No automatic starts, runtime/image probes, installations or service. Four complete compatibility
+suites and affected real lifecycle/terminal checks pass. Next: UP-11 environment actions and
+recovery, with its own exact-consent/lifecycle/recovery gate; base and manager packages stay separate.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by
 about 8%; findings and recommended verification cadence are in

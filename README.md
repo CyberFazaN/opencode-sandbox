@@ -56,7 +56,8 @@ Consider something else if:
   automatic rollback on failure; OpenCode's self-update is off. Local version inventory remains
   available when registry discovery fails.
 - **Updates inventory** in the dashboard (`v`): compact component views, local/cached-first,
-  explicit version checks and full evidence in Details. Opening it makes no network request.
+  explicit version checks and full evidence in Details. Opening it does not trigger discovery.
+  Optional daily npm discovery is off by default and runs only while the dashboard is open.
   [Current capabilities and limits](docs/dashboard.md#updates).
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
   operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.

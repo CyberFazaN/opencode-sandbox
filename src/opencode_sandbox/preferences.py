@@ -5,7 +5,7 @@ import tempfile
 
 from . import core as c
 
-DEFAULTS = {"confirm_stop": True, "show_quick": True, "refresh_on_return": True}
+DEFAULTS = {"confirm_stop": True, "show_quick": True, "refresh_on_return": True, "daily_discovery": False}
 
 def read():
     path = c.CONFIG / "ui.json"

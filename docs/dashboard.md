@@ -79,7 +79,7 @@ buttons; **Cancel check** cancels this screen's read-only checks, not an install
 dashboard operation. Close cancels owned checks and rejects late results. Selection survives
 view changes, and returning from Details restores focus to the inventory.
 
-Opening Updates does **not** contact npm/GitHub, execute OpenCode, start an environment or run
+Opening Updates does **not** trigger npm/GitHub discovery, execute OpenCode, start an environment or run
 an image helper. Installed manager/local metadata and cached evidence appear first; bounded
 Docker inspections arrive independently. Saved environment status is not treated as actual
 container state. Before identity can be inspected, history is explicitly unverified; stopped
@@ -99,8 +99,36 @@ assessed, and changing a base never migrates existing environments. Dashboard no
 owned by the dashboard but are shown as a compact notice count and full text in Updates Details,
 instead of toasts covering the small-terminal controls.
 
-This checkpoint delivers manual inventory/checks. **Manager release discovery/installation
-classification, mutation buttons and optional daily discovery are not implemented here yet.**
+**Optional daily discovery** is off by default. In Preferences (`g`), enable **Daily metadata
+discovery (dashboard only)** to check npm while the dashboard runs. The dashboard considers
+discovery at startup, after saving Preferences and about once a minute, but attempts each source
+at most once per 24 hours, including failures and interrupted requests. It persists a claim
+before contacting the source; restarting does not reset that attempt. No background service is
+installed, and short CLI commands do not start unsolicited discovery. GitHub/manager discovery
+is not available yet; enabling this setting does not imply a manager check.
+
+Explicit Check may refresh sooner, but overlapping dashboard/Updates/CLI requests for the same
+source and data directory share the attempt's result or failure. Both explicit and automatic
+checks respect numeric/date Retry-After, even pauses longer than 24 hours. Canceling a waiting
+screen does not cancel another caller's request. An interrupted request retains an incomplete
+attempt rather than inventing success; explicit Check can retry when rate limits permit.
+
+With discovery enabled, a single **Updates (N)** button indicator counts Notify-policy
+environments whose dated last verification is older than the discovered release. It does not
+probe Docker to calculate that count. Unknown versions, Manual/Pinned policies and pending
+recovery do not generate general newer-version indicators. Explicit comparisons remain available
+for all policies. The indicator is not a fresh runtime verification or install permission; its
+tooltip/Details qualify cached discovery, including stale success after failure. It never creates
+per-environment or repeated availability toasts, and never overwrites operation status.
+
+Automatic discovery never starts containers or runs runtime/image probes. Disabling the preference
+cancels owned automatic work and hides unsolicited availability; manual Updates remains usable.
+If private scheduling storage is unsafe/unwritable, automatic checks fail closed and explain why
+in Updates Details. Explicit checks can still use the bounded network path without persistence;
+cross-process coalescing/throttling cannot be guaranteed without that storage. Clearing the
+disposable cache resets discovery history/throttles, not installed software or recovery journals.
+
+**Manager release discovery/installation classification and mutation buttons are not implemented here yet.**
 The disabled Update button explains that limit; Details points to existing CLI operations.
 Environment Start/Settings/Recovery remain available through the existing dashboard paths as
 applicable. No Update All, automatic installation, temporary start/probe/stop or background

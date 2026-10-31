@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
+import secrets
 import sys
 import time
 from dataclasses import dataclass
@@ -117,7 +119,48 @@ def _retry_until(value):
     except (ValueError, TypeError, OverflowError): return None
 
 
-def latest(timeout=8):
+def _attempt_state():
+    """Scheduling also honors future claims after a clock rollback; they are not fresh evidence."""
+    item = cache.read(_registry_key()).get("attempt")
+    if not isinstance(item, dict) or type(item.get("at")) not in (int, float) \
+            or not math.isfinite(item["at"]) or not 0 < item["at"] <= 253402300799 \
+            or type(item.get("ok")) is not bool or (not item["ok"] and not isinstance(item.get("error"), str)):
+        return None
+    return item
+
+
+def _attempt_result(attempt):
+    success = discovery()["success"]
+    if attempt and attempt["ok"] and success: return success["value"]
+    raise c.SandboxError("Cannot check OpenCode npm registry: " + (attempt or {}).get("error", "check did not complete"))
+
+
+def latest(timeout=8, *, automatic=False):
+    """Explicit refresh or opt-in daily metadata discovery, shared across callers/processes.
+
+    Claim before HTTP, including cancellation/interruption; explicit calls may refresh sooner,
+    but join an overlapping attempt and obey Retry-After. Never hold this guard over mutation.
+    Automatic requests require durable storage; unavailable caches do not disable explicit use.
+    """
+    previous = _attempt_state()
+    try:
+        with cache.source_lock(_registry_key()) as waited:
+            attempt = _attempt_state()
+            # A cached-only daily consideration also takes the guard; contention alone is not
+            # permission for an explicit Check/target resolution to reuse old successful evidence.
+            interrupted = waited and attempt and not attempt["ok"] and attempt.get("error") == "check did not complete"
+            if interrupted or (attempt and attempt != previous): return _attempt_result(attempt)
+            retry = (attempt or {}).get("retry_until")
+            if type(retry) in (int, float) and time.time() < retry <= 253402300799:
+                raise c.SandboxError(f"Cannot check OpenCode npm registry: rate limited; retry after {cache.when(retry)}")
+            if automatic and attempt and time.time() < attempt["at"] + 86400: return _attempt_result(attempt)
+            return _latest_request(timeout, automatic=automatic)
+    except cache.Unavailable:
+        if automatic: raise c.SandboxError("Automatic discovery unavailable: cannot safely persist attempt claims") from None
+        return _latest_request(timeout)
+
+
+def _latest_request(timeout, *, automatic=False):
     """Fresh latest supported stable release, not npm's potentially incompatible latest tag.
 
     One bounded metadata request, including DNS/TLS/body, without host npm/Node. Persist only a
@@ -129,8 +172,10 @@ def latest(timeout=8):
     retry = (attempt or {}).get("retry_until")
     if type(retry) in (int, float) and time.time() < retry <= 253402300799:
         raise c.SandboxError(f"Cannot check OpenCode npm registry: rate limited; retry after {cache.when(retry)}")
-    attempt = {"at": time.time(), "ok": False}
-    cache.write(_registry_key(), {"success": data["success"], "attempt": {**attempt, "error": "check did not complete"}})
+    attempt = {"at": time.time(), "ok": False, "id": secrets.token_hex(16)}
+    persisted = cache.write(_registry_key(), {"success": data["success"], "attempt": {**attempt, "error": "check did not complete"}}, durable=True)
+    if automatic and not persisted:
+        raise c.SandboxError("Automatic discovery unavailable: cannot persist attempt claim")
     try:
         p = c.call([sys.executable, "-I", "-B", str(Path(__file__).with_name("http_probe.py")), REGISTRY, str(timeout), str(METADATA_LIMIT)],
                    capture=True, check=False, timeout=timeout, max_output=METADATA_LIMIT + 1024)
@@ -144,10 +189,10 @@ def latest(timeout=8):
         value = _compatible(json.loads(p.stdout))
     except (c.SandboxError, OSError, ValueError, KeyError, TypeError, RecursionError) as exc:
         attempt["error"] = c.error_text(exc)[:1000]
-        cache.write(_registry_key(), {"success": data["success"], "attempt": attempt})
+        cache.write(_registry_key(), {"success": data["success"], "attempt": attempt}, durable=True)
         raise c.SandboxError(f"Cannot check OpenCode npm registry: {exc}") from exc
     cache.write(_registry_key(), {"success": cache.evidence(value, "npm-metadata", {"url": REGISTRY, "major": MAJOR}),
-                                  "attempt": {**attempt, "ok": True}})
+                                   "attempt": {**attempt, "ok": True}}, durable=True)
     return value
 
 
