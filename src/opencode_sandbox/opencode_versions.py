@@ -459,7 +459,75 @@ def _unused_base_tag(distro, tag):
     return tag
 
 
-def update_base(version, distro=None, *, keep_previous=True):
+@dataclass(frozen=True)
+class BaseBuildPlan:
+    distro: str
+    endpoint: str
+    image: str
+    target: str
+    refresh: bool
+    keep_previous: bool
+    current_id: str | None
+    current_definition: distros.ImageDefinition | None
+    current_version: str | None
+    definition: distros.Distro
+    assets: str
+
+
+def _build_assets():
+    digest = hashlib.sha256()
+    for path in sorted(p for p in distros.IMAGES.rglob('*') if p.is_file()):
+        digest.update(str(path.relative_to(distros.IMAGES)).encode() + b'\0' + path.read_bytes() + b'\0')
+    return digest.hexdigest()
+
+
+def _base_build_plan(d, target, refresh, keep_previous, current):
+    labels = current['Config']['Labels'] if current else {}
+    return BaseBuildPlan(d.id, c.docker_endpoint(), d.image, target, refresh, keep_previous,
+                         (current or {}).get('Id'), distros.image_definition(d.id, labels),
+                         labels.get(VERSION_LABEL), d, _build_assets())
+
+
+def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=True):
+    """Resolve before consent; inspect only, never build/probe or infer authority from a cache."""
+    d = distros.get(distros.DEFAULT if distro is None else distro)
+    target = resolve_target(version)  # release discovery guard is released before base guards
+    c.ensure_runtime()
+    with c.base_lock(d.id, 'publication'):
+        current = c.inspect_base_image(d, d.image, missing=True)
+        return _base_build_plan(d, target, refresh, keep_previous, current)
+
+
+def _recheck_base_build(d, version, refresh, keep_previous, plan):
+    current = c.inspect_base_image(d, d.image, missing=True)
+    if distros.get(d.id) != d or _base_build_plan(d, version, refresh, keep_previous, current) != plan:
+        raise c.SandboxError('Base image, definition, daemon or build mode changed since confirmation; review again')
+    return current
+
+
+def describe_base_build(plan):
+    d = plan.definition
+    old = plan.current_definition
+    return c.printable('\n'.join([
+        f"{'Rebuild' if plan.current_id else 'Build'} base image {plan.image}",
+        f"Daemon: {plan.endpoint}", f"Current image: {plan.current_id or 'missing (first build)'}",
+        (f"Current definition: {old.distro + ' ' + old.version + ', revision ' + str(old.revision) if old else 'none'}; "
+         f"OpenCode {plan.current_version or 'Unknown'} (build label, not a fresh binary check)"),
+        f"Selected definition: {d.name} {d.version}, revision {d.revision}",
+        f"Exact OpenCode target: {plan.target}",
+        ('Mode: Refresh & Rebuild — pull current upstream inputs and bypass build cache (--pull --no-cache).'
+         if plan.refresh else 'Mode: Cached rebuild — reuse eligible layers; no forced pull/cache bypass.'),
+        'Network/download/time costs apply; upstream package repositories can change. Shared build cache is never pruned.',
+        'A separate candidate must pass OS/tool/OpenCode verification before guarded publication.',
+        ('The replaced image is kept as a rollback copy.' if plan.keep_previous else
+         'NO rollback copy is kept by this command; use opencode update-base for rollback-preserving replacement.'),
+        'Existing containers and writable layers are unchanged; no environment migration or integration reapplication.',
+        'Future base-based creation and file-only restores use the new base. Not-yet-created pins remain enforced.',
+        'Upstream OS/package freshness is not assessed or security-certified; full refresh is not reproducibility.',
+    ]))
+
+
+def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan=None):
     """Build and verify a candidate base image for a distribution, then replace the tag.
 
     With keep_previous the replaced image stays available as `<repo>:<distro>-previous-<hex>`.
@@ -468,21 +536,32 @@ def update_base(version, distro=None, *, keep_previous=True):
     d = distros.get(distros.DEFAULT if distro is None else distro)
     # Resolve "latest" first: the literal build arg "latest" hits Docker's layer
     # cache, so the npm install step was never re-run and nothing was updated.
-    version = resolve_target(version)
+    version = supported(version) if plan is not None else resolve_target(version)
     with c.base_lock(d.id, "build"):
+        from . import build_output
+        build_output.phase('Checking confirmed base and preparing candidate')
         c.require_docker_space("a base image build")
         candidate = distros.candidate_tag(d, __import__("secrets").token_hex(6))
         with c.base_lock(d.id, "publication"):
-            original = c.inspect_base_image(d, d.image, missing=True)
+            original = (_recheck_base_build(d, version, refresh, keep_previous, plan) if plan is not None
+                        else c.inspect_base_image(d, d.image, missing=True))
             _unused_base_tag(d, candidate)
+        candidate_id = None
         try:
-            c.build_image(d, version, candidate)
+            build_output.phase('Refresh & Rebuild: pulling upstream and bypassing build cache' if refresh else 'Cached rebuild: reusing eligible layers')
+            candidate_id = c.build_image(d, version, candidate, verify=False, **({'refresh': True} if refresh else {}))
+            build_output.phase('Verifying candidate OS, tools and exact OpenCode binary')
+            c.verify_image(d, candidate_id, version)
             previous = None
+            build_output.phase('Revalidating and publishing verified candidate')
             with c.base_lock(d.id, "publication"):  # not held throughout a long build
-                old = c.inspect_base_image(d, d.image, missing=True)
+                old = (_recheck_base_build(d, version, refresh, keep_previous, plan) if plan is not None
+                       else c.inspect_base_image(d, d.image, missing=True))
                 if (old or {}).get("Id") != (original or {}).get("Id"):
                     raise c.SandboxError("Base image changed during the build; refusing replacement; retry after review")
                 built = c.inspect_base_image(d, candidate)
+                if built['Id'] != candidate_id:
+                    raise c.SandboxError('Candidate image changed after verification; refusing publication')
                 if old and _content(old["Id"]) == _content(built["Id"]):
                     return {"version": version, "previous_image": None, "image": d.image, "unchanged": True}
                 if old and keep_previous:
@@ -495,8 +574,12 @@ def update_base(version, distro=None, *, keep_previous=True):
             return {"version": version, "previous_image": previous, "image": d.image}
         finally:
             with c.runtime_feedback(progress=None, cancelled=None), c.base_lock(d.id, "publication"):
-                if c.inspect_base_image(d, candidate, missing=True):
-                    c.docker("image", "rm", candidate, capture=True, check=False)
+                leftover = c.inspect_base_image(d, candidate, missing=True)
+                if leftover and leftover['Id'] != candidate_id:
+                    raise c.SandboxError(f'Candidate cleanup identity unconfirmed for {candidate}; left untouched. '
+                                         'Inspect actual base/copies and use disk cleanup only after review')
+                if leftover:
+                    c.docker("image", "rm", candidate, capture=True)
 
 
 # The shared install script of the image builds also performs in-container updates.

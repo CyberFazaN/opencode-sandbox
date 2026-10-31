@@ -39,11 +39,13 @@ probe, start, install or service; explicit checks still work with scheduling off
 respect Retry-After. UP-11 binds explicit environment Start/Update/Policy/Rollback/Recover with
 immutable consent, locked revalidation and the existing handlers/journals. Recovery Center can
 also review interrupted OpenCode updates; failed restoration persists its actual successor journal
-and error. Approved mutations are app-owned and not canceled by Close/Cancel check. Next is
-UP-12 + UP-13 base actions/refresh; manager discovery/classification/execution stays pending.
+and error. Approved mutations are app-owned and not canceled by Close/Cancel check. UP-12/UP-13
+add Base Images build/rollback, identity/target/definition/mode consent, cached versus explicit
+pull/no-cache refresh, retained copies and bounded app-owned build feedback. Next is UP-14 + UP-15,
+read-only manager release discovery/installation classification; manager execution stays pending.
 No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-11 verification is below; commands, failures and handoff are in the roadmap.
+UP-01..UP-13 verification is below; commands, failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -215,6 +217,48 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-12 + UP-13 — 2026-10-31
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1525 passed, 80 opt-in skips in each of four serial foreground runs**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Clean pip checks; only two known lowest-Typer deprecations. 213.93/206.99/209.79/206.44 s; all **1605 ordered IDs/outcomes identical** |
+| New/retained regressions | **54 new default cases**: 38 base backend/CLI, 12 pilots, three actual host-output clients and one module quality parameter; two new opt-in both-distribution cases. Pre/post-build changed image/absence/ownership, endpoint/namespace, target/mode/retention, definition/assets, no moving-latest substitution, immutable candidate verification/retagged cleanup refusal, same-content no-op and failed-candidate safety. Exact CLI/TUI consent, no-copy CLI disclosure, explicit multi-copy selection, cancellation/Close/Quit and late-plan ownership, bounded output/retained notifications, and active operation priority over a saved result. Old assertions retained; two old mocks extended for actual preflight/immutable candidate return |
+| Scoped real Docker/OpenCode/terminal | **24 tests/581 logged checks passed**, no skips/deselections, `up1213-reviewed`, 928.47 s. `test_42` packaged and retained fixtures on both distributions proves cross-directory/context races involving build, rollback, cleanup, publication and pinned creation. Existing diagnostics/lifecycle/restore/discovery/environment-recovery terminals rerun. New `test_54` separately proves repeated cached reuse/verified unchanged and full-refresh pull/no-cache package-layer execution, immutable publication and retained copies, real candidate verification followed by injected refusal, pinned future creation and unchanged running containers/metadata/layers. Base mode consent/cancel, output Details, Close/Quit ownership, exact single/multi-copy rollback and terminal restoration at 80x24/120x40 |
+| Boundaries | New full-refresh evidence uses packaged Debian 13/revision 2 and Arch/revision 1 assets under isolated namespaces; only copied upstream FROM hostnames use an explicit official Docker Hub registry alias to avoid moving the retained original upstream tag. OS/tools/binary checks are unchanged, and downloaded aliases are removed. Real environment evidence still uses retained Debian 12/revision 1 and Arch/revision 1. No full campaign/legacy broad TUI workflow, installed-manager/pipx, paid-provider, privileged/socket/service or manual-observation evidence; no release-readiness claim. Image assets/revisions, versions/schemas, identity/base-lock/probe executors and CI/release gates unchanged |
+
+Failure trail/evidence: the initial missing-plan reproducer failed. First selected run **1 lint
+failure/163 passed**; new focused **3 failed/230 passed** caught an early output publication gap,
+a deprecated Select blank sentinel differing across supported versions and a queued-button test
+race. Fixed the stream's first output publication and explicit selection validation, synchronized the test;
+**63 passed**, then lowest affected **186 passed**. First full suite **1 failed/1518 passed/78
+skips**: an old CLI mock omitted the new inspection/plan arguments; extended it while retaining
+the exact-target assertion. Documentation initially **1 failed/42 passed** on an overlong example;
+wrapped it without changing the gate. First real Debian run failed in the harness: its short
+exit-wait helper deliberately kills a still-running process; replaced with non-destructive
+`waitid(WNOWAIT)`, then **2 distro tests/86 checks passed**. Initial complete matrix **1524 passed/
+80 skips each** and real **23 passed/1 failed**: a real Arch content-equivalent cached rebuild
+correctly left the initial image current, not a rollback copy. Corrected only the test's explicit
+alternate-copy choice, preserving exact-ID and swap assertions; real **24 passed/581 checks**.
+Final UI review reproduced a prior base result hiding another active operation (**1 failed**);
+active work now takes priority, lowest UI/ownership subset **97 passed**, then final complete/real
+gates above rerun on the final seven-module source hashes. No failed test was waived or deselected.
+
+Logs/XML/manifests: `.work/up1213/`, `.work/logs/up1213-*`; final complete XMLs `reviewed-*.xml`,
+real `real-reviewed.xml`, hashes `reviewed-source-sha256.json`. Each real attempt uses isolated
+product roots, run-owned names/labels/manifests, guarded product cleanup and leak checks. Ending
+verified own-rootless inventory: no containers/volumes/helpers and exactly four original tagged
+images with unchanged full IDs. Shared build cache remains intact, not pruned. No manager-version,
+metadata/backup schema, distribution revision or production image-asset change; no upload/install,
+merge, push, tag or release. Next is read-only manager discovery/classification, not execution.
+
+Final sdist/wheel, strict twine/content validation and byte equality for all seven changed/new
+product modules pass. Final document/CLI/quality subset **43 passed**, 3.23 s, not another complete
+suite. Its earlier **1 failed/42 passed** caught public-record prose resembling a retired internal
+path; reworded the prose without changing the gate. After retaining logs/XML/package artifacts,
+removed only **25 exact manifested completed pytest roots** with no live process/socket/mount
+references. `/tmp/opencode` is empty again with **1048541 free inodes**; persistent protocol locks
+and all prior evidence are untouched. Cleanup result is ignored under `.work/up1213/`.
 
 ### Unpublished UP-11 — 2026-10-31
 

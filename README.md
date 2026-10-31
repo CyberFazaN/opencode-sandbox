@@ -60,6 +60,8 @@ Consider something else if:
   Optional daily npm discovery is off by default and runs only while the dashboard is open.
   Environment Start/Update/Policy/Rollback/Recover reuse existing handlers with exact confirmation;
   read-only Cancel never cancels an approved mutation.
+  Base Build/Rebuild and Rollback preserve copies; cached builds and explicit Refresh & Rebuild
+  stay separate, without migrating existing environments or pruning Docker's build cache.
   [Current capabilities and limits](docs/dashboard.md#updates).
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
   operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.

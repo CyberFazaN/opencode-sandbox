@@ -14,8 +14,8 @@ diagnostic execution and owns client/probe cleanup. UP-06 replaces/clears catego
 advisories while preserving operation status. UP-07/UP-08 add disposable identity-bound version
 evidence, compatible stable discovery and explicit policy comparisons. UP-10 adds the manual/
 cached compact Updates interface; UP-09 adds default-off dashboard discovery; UP-11 binds explicit
-environment actions and recovery to existing handlers. Base refresh modes and
-manager discovery/classification/updater remain pending.
+environment actions and recovery to existing handlers. UP-12/UP-13 bind base actions and explicit
+cached/full-refresh builds; manager discovery/classification/updater remains pending.
 
 ## Boundaries
 
@@ -36,6 +36,7 @@ manager discovery/classification/updater remain pending.
 | `core.py` | Paths, locks, metadata (schema 2), labels, Docker access, create/start/stop/session/exec, snapshot, recreate and recovery journals, export, delete, image build, `error_text` | D-001..D-004, D-016, D-026, D-027, D-030, D-031, D-033, D-034 |
 | `runtime_identity.py` | Bounded acquisition and authenticated rootless response-sender proof; shared by CLI/TUI and standalone stdlib diagnostic | D-003, D-048, D-052 |
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
+| `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
@@ -141,8 +142,8 @@ waiting for every source to finish.
 `UpdatesScreen` retains UP-10's `v` and one compact table
 shared by Manager/Bases/Environment subviews, stable selection, plain selected summaries and
 generic scrollable Details. Manager installed version is local; installation/release eligibility
-is not guessed. Base mutations and manager release capabilities remain visibly unavailable,
-with existing CLI guidance. UP-11 binds only the Environment OpenCode actions below.
+is not guessed. Manager release capabilities remain visibly unavailable, with existing CLI
+guidance. UP-11 binds Environment OpenCode actions; UP-12/UP-13 bind Base Images below.
 
 Opening renders metadata and Docker-free `environment_history` first (explicitly identity-
 unverified), then independent bounded local base/environment inspection workers. The new
@@ -204,6 +205,45 @@ metadata/inventory. Killing the process still requires the existing durable jour
 recovery routed from these views has the same app ownership. No short timeout is added to install,
 commit or other mutations. Toast racks are collapsed only on these forms, Recovery Center and
 class-marked Updates Details; notification objects remain intact and disclosed through Details.
+
+UP-12/UP-13 reuse `update_base` and `rollback_base`, not another update executor. `BaseBuildPlan`
+is read-only: resolve exact target outside base guards, then inspect proven managed current image
+(or confirmed absence) under publication. Consent binds canonical endpoint, image namespace/ID,
+current provenance/build-version label, the immutable distro record, build-asset content digest,
+target, refresh mode and retention choice. `update_base(plan=...)` accepts that exact target,
+rechecks the plan under build/publication before build and before publication, and retains the
+existing daemon-wide build/short-publication lock ordering. Unknown/foreign ownership refuses;
+old/newer definitions are disclosed rather than treated as permission from availability strings.
+
+Cached remains the default. Only explicit `refresh=True` supplies Docker `--pull --no-cache`;
+neither path prunes cache or migrates environments. `core.build_image` returns the built immutable
+ID. Its public default still verifies; `update_base` requests build-only, records the returned ID
+and invokes the same current-definition OS/tool/binary verifier on that ID outside publication.
+Publication checks that the candidate tag still names the verified ID. Cleanup checks that same
+known ID, refuses an unconfirmed/retagged candidate, and reports removal errors instead of hiding
+them. Content-equivalent candidates still verify and report unchanged without swapping/copying.
+Rollback uses the existing alias-consolidated inventory/immutable plans and original handlers;
+multiple images require explicit copy selection. No new schema, journal or base-policy/history
+service. Failure/process death requires inspection of actual images/copies/candidates, not a
+cache-based recovery guess. Existing containers/layers/home/workspace/configuration/integrations
+stay unchanged; future creation/file-only restores and not-yet-created pin checks use the base.
+
+CLI `opencode update-base` and `build` share plan/description and explicit `--refresh`. The former
+confirms and retains a copy, including `--yes` noninteractive use; the latter preserves its existing
+noninteractive no-copy capability and discloses it before mutation. The TUI always retains a copy.
+Its target/mode, explicit multi-copy selection and Cancel-first scrollable consent are separate
+base forms, fit 80x24/larger and retain advisory ownership without toast overlays. Screen-owned
+read-only planning/cancellation is separate from app-owned approved base workers using the same
+operation slot/Quit refusal as environment actions; closing/reopening Updates retains phases,
+bounded build-output tail and result. No percentage or mutation Cancel is invented.
+
+`build_output.listen` is a scoped ContextVar used only by the base worker. Only `docker build`
+opts into its merged stdout/stderr client path in `core.call`; other CLI/mutation/diagnostic paths
+are unchanged. It drains continuously into a 32 KiB byte tail with explicit truncation, throttles
+UI publication (first output, phases and completion always published), closes/reaps the direct
+client, and never imposes a build/output deadline. Output is plain and bounded in app memory,
+not written over Textual. Short verification/inspection budgets remain unchanged. This does not
+promise daemon-build termination if a client/manager dies or coordinate manual Docker/old managers.
 
 UP-09's `daily_discovery` boolean preference defaults false, including old/invalid preference
 values. Only a running dashboard schedules npm discovery: at startup, after saving Preferences,

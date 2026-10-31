@@ -173,9 +173,49 @@ refuses conflicting operations and normal Quit until it finishes. If the manager
 the saved journal and indicated recovery command. Notifications remain owned by the dashboard but
 do not cover operation forms or Updates Details at 80x24.
 
-**Manager release discovery/installation classification and Base Images mutation buttons are not
-implemented here yet.** Their disabled Update buttons explain the limit; Details retains existing
-CLI guidance. No Update All, automatic installation or background service is added.
+### Base image actions
+
+In **Base Images** (`2`), **Build/Rebuild** (`b` or `u`) opens the target/mode form; **Rollback**
+(`r`) reviews managed rollback copies. Check remains a read-only binary/registry check, never a
+build, pull or package-freshness assessment. Opening the view still inspects only local metadata.
+
+Build defaults to the latest supported stable OpenCode target, resolved to an exact version before
+consent; an explicit compatible alternative is allowed. Choose **Cached rebuild** to reuse eligible
+layers, or **Refresh & Rebuild** to pull current upstream inputs and bypass build cache. Refresh is
+explicit, costs additional network/time/disk and never prunes the shared cache. Neither mode is
+an OS/package security certification or reproducibility claim. The scrollable Cancel-first consent
+names the distribution, definition, exact target, current image (or missing first build) and mode.
+Unknown/unmanaged provenance is not permission to overwrite an image; the live handler refuses it.
+Old/newer definitions remain distinct and visible, not inferred to be current from their tag.
+
+The existing candidate handler verifies the immutable candidate's OS/tools/OpenCode, then rechecks
+the consented current image and build definition/mode under shared guards before publishing. The
+dashboard always preserves the replaced image as a rollback copy; an identical verified result is
+reported unchanged without making a redundant copy. Changed/unconfirmed candidate identities are
+left untouched with review guidance, not published or deleted based on a familiar name.
+
+Rollback consolidates aliases of the same immutable image. A single distinct copy can go straight
+to consent; multiple copies require an explicit selection in the copy form, **not** a default
+newest image. Full IDs, aliases, definition and embedded-version labels are scrollable. The copy
+must pass the current manager's OS/tool/OpenCode checks, and both it and the current base are
+revalidated before swap. The replaced current image is kept so you can swap back. Old definition
+copies remain listed but may fail verification; there is no implicit base OS downgrade.
+
+Approved work belongs to the dashboard, not this screen. Close/Cancel check cannot cancel a build
+or rollback, conflicting operations and normal Quit refuse while it runs, and reopening Updates
+retains the phase/result. Details includes a bounded tail of build output; output never writes
+directly over Textual. No invented percentage or short build timeout. After process death, inspect
+the actual base/copies and any named candidate; there is no new base recovery journal.
+
+Existing containers/writable layers, their pins, home/workspace/configuration and integrations do
+not migrate. Future base-based creation and file-only restores use the changed base, with
+not-yet-created pins still enforced. The CLI retains both rollback-preserving
+`opencode update-base` and deliberately no-copy `build`, each with explicit `--refresh`; see
+[base modes and limits](opencode.md#versions).
+
+**Manager release discovery/installation classification and update remain unimplemented.** The
+manager's disabled Update explains that limit. No Update All, automatic installation or background
+service is added.
 
 ## State
 

@@ -24,7 +24,7 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import diagnostics, distros, runtime_identity
+from . import build_output, diagnostics, distros, runtime_identity
 
 APP = "opencode-sandbox"
 BASE = Path(os.getenv("OPENCODE_SANDBOX_HOME", Path.home()/".local/share"/APP)).expanduser()
@@ -96,9 +96,11 @@ def run_program(argv, *, check=False, **kwargs):
     except FileNotFoundError as exc:
         raise missing_program(os.path.basename(str(argv[0]))) from exc
 
-def call(argv, *, capture=False, check=True, cwd=None, env=None, timeout=None, max_output=diagnostics.MAX_OUTPUT):
+def call(argv, *, capture=False, check=True, cwd=None, env=None, timeout=None, max_output=diagnostics.MAX_OUTPUT, build_stream=False):
     try:
-        if timeout is None:
+        if build_stream:
+            p = build_output.run([str(x) for x in argv], env=env, launch_guard=_session_launch_signals)
+        elif timeout is None:
             p = subprocess.run([str(x) for x in argv], cwd=cwd, env=env, text=True, capture_output=capture, check=False)
         else:
             feedback = _RUNTIME_FEEDBACK.get() or {}
@@ -191,8 +193,9 @@ def docker(*args, capture=False, check=True):
                 or args[:1] in (("ps",), ("info",)) or (args[:1] == ("stats",) and "--no-stream" in args)
     timeout = _DIAGNOSTIC_TIMEOUT.get()
     if timeout is None and read_only: timeout = diagnostics.TIMEOUT
-    return call(["docker", "-H", docker_endpoint(), *args], capture=capture, check=check,
-                env=runtime_identity.docker_env(), timeout=timeout)
+    stream = args[:1] == ("build",) and build_output.current() is not None
+    return call(["docker", "-H", docker_endpoint(), *args], capture=capture or stream, check=check,
+                env=runtime_identity.docker_env(), timeout=timeout, **({"build_stream": True} if stream else {}))
 
 def docker_info():
     """Fresh read-only daemon evidence on the pinned endpoint; bounded/cancellable, no replay.
@@ -1547,15 +1550,21 @@ def promote(m,kind,name=None):
         m["kind"]=kind
         save(m)
 
-def build_image(distro, version, tag):
+def build_image(distro, version, tag, *, refresh=False, verify=True):
     """Build a registry image with OpenCode `version` (concrete) as `tag`, then verify it."""
     from . import opencode_versions as v
     meta={**distro.image_labels(), distros.LABEL+"opencode-package": v.PACKAGE,
           distros.LABEL+"opencode-version": version}
-    docker("build","--build-arg",f"OPENCODE_VERSION={version}",*labels(scoped=False),
+    docker("build",*(("--pull","--no-cache") if refresh else ()),
+           "--build-arg",f"OPENCODE_VERSION={version}",*labels(scoped=False),
            *(arg for key,value in meta.items() for arg in ("--label",f"{key}={value}")),
            "-t",tag,"-f",str(distro.dockerfile),str(distros.IMAGES))
-    verify_image(distro, tag, version)
+    with base_lock(distro.id, "publication"):
+        image_id = inspect_base_image(distro, tag)["Id"]
+    if verify:
+        build_output.phase("Verifying candidate OS, tools and exact OpenCode binary")
+        verify_image(distro, image_id, version)
+    return image_id
 
 def _image_facts(distro):
     """Shell script printing os-release entries, missing tools, failed smoke commands, then
@@ -1589,10 +1598,10 @@ def verify_image(distro, tag, version):
     installed=v.normalize(p.stdout)
     if installed!=version: raise SandboxError(f"Built OpenCode {installed}, expected {version}")
 
-def build(distro=None, version=None):
+def build(distro=None, version=None, *, refresh=False, plan=None):
     """Build (or rebuild) a distribution's base image; no rollback copy (see update-base)."""
     from . import opencode_versions as v
-    return v.update_base(version or "latest", distro, keep_previous=False)
+    return v.update_base(version or "latest", distro, keep_previous=False, refresh=refresh, plan=plan)
 
 TRANSIENT_STATES = frozenset({"creating", "starting", "stopping", "recreating", "deleting", "error"})
 

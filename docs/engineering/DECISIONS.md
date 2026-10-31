@@ -932,7 +932,8 @@ UP-10 implements the independently useful manual/cached Updates screen with expl
 and Details; UP-09 adds optional default-off daily npm discovery with durable attempt claims,
 cross-caller source coalescing and a quiet policy-filtered indicator. UP-11 binds explicit
 environment Start/Update/Policy/Rollback/Recover with exact consent, locked revalidation and the
-existing recovery handlers. Later base/manager tasks remain pending.
+existing recovery handlers. UP-12/UP-13 bind Base Images build/rollback and explicit cached/full
+refresh with identity-bound consent and retained copies. Manager tasks remain pending.
 The grouped package is split at its approved verified UI checkpoint (D-057). Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from

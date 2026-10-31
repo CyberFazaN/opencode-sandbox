@@ -61,11 +61,18 @@ def test_cli_confirms_exact_target_and_never_replaces_it_with_later_latest(monke
 
 
 def test_cli_base_confirmation_receives_an_exact_target(monkeypatch):
+    from test_opencode_versions import fake_docker
+
     from opencode_sandbox import cli
     seen = []
+    monkeypatch.setattr(c, 'ensure_runtime', lambda *a: None)
+    monkeypatch.setattr(c, 'docker', fake_docker([]))
     monkeypatch.setattr(v, "latest", lambda: "2.2.0")
     monkeypatch.setattr(cli, "_confirm", lambda text, **kwargs: seen.append(text) or True)
-    monkeypatch.setattr(v, "update_base", lambda version, distro: seen.append((version, distro)))
+    def update(version, distro, *, refresh, plan):
+        assert not refresh and plan.target == version and plan.keep_previous
+        seen.append((version, distro))
+    monkeypatch.setattr(v, "update_base", update)
     result = CliRunner().invoke(app, ["opencode", "update-base"])
     assert result.exit_code == 0 and "2.2.0" in seen[0] and "latest" not in seen[0]
     assert seen[1] == ("2.2.0", "debian")

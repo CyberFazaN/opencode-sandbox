@@ -68,10 +68,11 @@ if mode == 'local-fixture':
 if action in ('build', 'held-build'):
     if action == 'held-build':
         real_build = c.build_image
-        def build(*args):
-            real_build(*args)
+        def build(*args, **kwargs):
+            image_id = real_build(*args, **kwargs)
             print('READY build', flush=True)
             input()
+            return image_id
         c.build_image = build
     print('RESULT ' + json.dumps(v.update_base('2.2.0',distro)), flush=True)
 elif action in ('try-update', 'try-rollback'):

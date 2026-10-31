@@ -101,7 +101,7 @@ that environment's OS and system layer.
 | `opencode update NAME [--version X] --yes` | Update a stopped environment |
 | `opencode rollback NAME --yes` | Undo its last update |
 | `opencode update-recover NAME` | Finish an interrupted update (rolls back) |
-| `opencode update-base [--version X] [--distro ID]` | Rebuild a base image, keep a rollback copy |
+| `opencode update-base [--version X] [--distro ID] [--refresh]` | Build/rebuild a base image, keep a rollback copy; default cached, explicit pull/no-cache with refresh |
 | `opencode rollback-base [--distro ID] --list` | List distinct managed rollback images, full IDs and tag aliases (read-only) |
 | `opencode rollback-base [--distro ID] [--copy TAG_OR_FULL_IMAGE_ID] [--yes]` | Verify and swap the selected copy; default only when there is one distinct image |
 
@@ -193,8 +193,35 @@ selected rollback aliases are removed, and the replaced base is retained under a
 tag. If the selected image is already current, verification reports unchanged without moving
 or removing tags. A failed/unverifiable inventory is an error, not permission to replace images.
 
-`build` rebuilds without a rollback copy. Base images affect future base-based container creation
-and file-only restores, not existing containers or writable layers; pins remain enforced.
-Rebuilds reuse Docker's cached operating-system
-layers and refresh only OpenCode; update operating-system packages inside an environment with
-its package manager.
+Build consent names the existing immutable image (or missing first build), distribution/definition,
+exact OpenCode target and mode. These are rechecked under the existing shared guards before a
+build and publication; a changed base requires a new review, never silent target substitution.
+The candidate's immutable ID passes OS/tool/binary verification before publication. Failed
+verification leaves the current base intact; cleanup removes only the known candidate. If its
+identity or cleanup cannot be confirmed, inspect the named leftover and actual base/copies before
+retrying `disk cleanup`. This is not a durable base-build journal or an automatic recovery engine.
+
+Choose the mode explicitly:
+
+- **Cached rebuild** (default): reuse eligible Docker layers with the selected definition and
+  exact OpenCode version. It may reuse OS/package layers; definition or cache changes may rerun
+  them. It does **not** guarantee fresh packages or an offline build.
+- **Refresh & Rebuild** (`--refresh`): request current upstream inputs and bypass the build cache
+  (`--pull --no-cache`). This downloads/rebuilds package layers, can take substantially longer
+  and use more disk, and **never prunes the shared build cache**. Repositories and upstream tags
+  can change during a build; this is not reproducibility, a security certification or a separate
+  upstream-freshness assessment.
+
+```sh
+opencode-sandbox opencode update-base --distro debian --version 2.1.4 --yes
+opencode-sandbox opencode update-base --distro arch --version 2.1.4 \
+  --refresh --yes
+```
+
+The dashboard [Base Images view](dashboard.md#base-image-actions) offers both modes and always
+keeps a rollback copy on replacement. The existing `build` command deliberately keeps **no**
+rollback copy, discloses that distinction, and also accepts `--refresh` (its target option remains
+`--opencode-version`). Base changes affect future base-based container creation and file-only
+restores, not existing containers, writable layers, home/workspace/configuration or integrations.
+Not-yet-created pinned environments must still match the new base. To upgrade packages in an
+existing environment, use that environment's package manager instead.

@@ -221,7 +221,12 @@ def test_base_tag_swap_holds_the_base_tag_lock(monkeypatch):
         return real(distro, phase, timeout=timeout)
     monkeypatch.setattr(c, "base_lock", lock)
     built = set()
-    monkeypatch.setattr(c, "build_image", lambda d, version, tag: built.add(tag))
+    def build(d, version, tag, *, verify):
+        assert verify is False  # update_base verifies the returned immutable candidate separately
+        built.add(tag)
+        return 'sha256:' + 'b' * 64
+    monkeypatch.setattr(c, "build_image", build)
+    monkeypatch.setattr(c, "verify_image", lambda d, ref, version: None)
     monkeypatch.setattr(c, "require_docker_space", lambda what: None)
     def answer(args):
         if ("candidate" in args[-1] and args[-1] not in built) or "previous" in args[-1]:

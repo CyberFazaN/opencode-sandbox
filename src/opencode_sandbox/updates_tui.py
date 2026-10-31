@@ -38,13 +38,14 @@ class UpdatesScreen(Screen):
     #updates-buttons Button {min-width: 10; width: 1fr;}
     #updates-environment-buttons {height: auto;}
     #updates-environment-buttons Button {min-width: 10; width: 1fr;}
+    #updates-base-buttons {height: auto;} #updates-base-buttons Button {min-width: 10;}
     """
     BINDINGS = [Binding("escape", "close", "Close"), Binding("c", "check", "Check"),
                 Binding("d", "details", "Details"), Binding("1", "view('manager')", "Manager"),
                 Binding("2", "view('bases')", "Bases"), Binding("3", "view('environments')", "Environments"),
                 Binding("u", "environment('update')", "Update"), Binding("s", "environment('start')", "Start"),
                 Binding("p", "environment('policy')", "Policy"), Binding("r", "environment('rollback')", "Rollback"),
-                Binding("e", "environment('recover')", "Recover")]
+                Binding("e", "environment('recover')", "Recover"), Binding("b", "base('build')", "Build/Rebuild")]
     AUTO_FOCUS = "#updates-table"
 
     def __init__(self, *, environment_id=None):
@@ -82,6 +83,8 @@ class UpdatesScreen(Screen):
             with Horizontal(id="updates-environment-buttons"):
                 for label, action in (("Start", "start"), ("Policy", "policy"), ("Rollback", "rollback"), ("Recover", "recover")):
                     yield Button(label, id="updates-" + action, compact=True)
+            with Horizontal(id="updates-base-buttons"):
+                yield Button('Rollback', id='updates-base-rollback', compact=True)
             yield Static("1/2/3: views   ↑/↓: select   c: Check   d/Enter: Details   Esc: Close", id="updates-keys", markup=False)
 
     def on_mount(self):
@@ -116,6 +119,7 @@ class UpdatesScreen(Screen):
             self._discovery_notice = None
             self._render_selected()
         self.query_one("#updates-discovery", Static).update(plain_lines(self.discovery_text()))
+        if self.view == 'bases': self._render_selected()
 
     def _notices(self):
         notes = list(self.app._notifications)
@@ -265,11 +269,16 @@ class UpdatesScreen(Screen):
         self.query_one("#updates-selected", Static).update(plain_lines(text))
         reason = check_reason or ""
         reason += "\n" + {"manager": "Update unavailable: verified manager handoff is not implemented yet.",
-                           "bases": "Build/Rollback unavailable here yet; CLI guidance in Details. Existing environments do not change.",
+                            "bases": "Build/Rebuild selects cached or full refresh; existing environments do not change.",
                             "environments": "Actions review live eligibility before consent; Check never starts a container."}[self.view]
         if self.operation_result: reason = "Operation result — Details for full text\n" + plain(self.operation_result)
         if self._preparing: reason = "Preparing read-only operation plan… Cancel check cancels preparation, not an approved mutation."
-        if self.app._operation_pending: reason = "An operation is running. Close/Cancel check does not cancel it; wait for its result."
+        base_operation = getattr(self.app, '_base_operation', None)
+        if self.view == 'bases' and base_operation and base_operation['distro'] == key:
+            reason = (base_operation.get('result') or base_operation['phase']) + '\nBuild output / full result: Details. Close never cancels approved work.'
+        if self.app._operation_pending:
+            active_base = self.view == 'bases' and base_operation and base_operation['distro'] == key and not base_operation.get('result')
+            reason = (base_operation['phase'] if active_base else 'An operation is running.') + '\nClose/Cancel check does not cancel it; wait for its result (Details).'
         self.query_one("#updates-reason", Static).update(reason.strip())
         button = self.query_one("#updates-check", Button)
         button.disabled = self.view == "manager"
@@ -277,14 +286,22 @@ class UpdatesScreen(Screen):
         self.query_one("#updates-cancel", Button).disabled = not (self._active or self._preparing)
         controls = self.query_one("#updates-environment-buttons")
         controls.display = self.view == "environments"
+        self.query_one('#updates-base-buttons').display = self.view == 'bases'
         self.query_one("#updates-keys", Static).update(
             "c Check d Details | s Start u Update p Policy r Rollback e Recover | Esc Close"
-            if self.view == "environments" else "1/2/3: views   ↑/↓: select   c: Check   d/Enter: Details   Esc: Close")
+            if self.view == "environments" else 'c Check d Details | b/u Build/Rebuild r Rollback | Esc Close'
+            if self.view == 'bases' else "1/2/3: views   ↑/↓: select   c: Check   d/Enter: Details   Esc: Close")
         blocked = self.view != "environments" or item is None or bool(self._preparing) or self.app._operation_pending
         for action in ("update", "start", "policy", "rollback", "recover"):
             button = self.query_one("#updates-" + action, Button)
             button.disabled = blocked or bool(item and item.get("metadata", {}).get("operation") and action != "recover")
             button.tooltip = reason.strip() if button.disabled else f"Review {action} for the selected environment; no mutation before confirmation"
+        update = self.query_one('#updates-update', Button)
+        update.label = ('Build' if item and item.get('state') == 'not built' else 'Rebuild') if self.view == 'bases' else 'Update'
+        if self.view == 'bases':
+            update.disabled = item is None or bool(self._preparing) or self.app._operation_pending
+            update.tooltip = 'Review live base identity, exact target and cached/full-refresh mode before building'
+        self.query_one('#updates-base-rollback', Button).disabled = self.view != 'bases' or bool(self._preparing) or self.app._operation_pending
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted):
         event.stop()
@@ -354,6 +371,8 @@ class UpdatesScreen(Screen):
         self._render_view()
 
     def action_environment(self, action):
+        if self.view == 'bases' and action in ('update', 'rollback'):
+            self.action_base('build' if action == 'update' else 'rollback'); return
         from .environment_updates_tui import PolicyScreen, TargetScreen
         if self.view != "environments" or self.app._operation_pending or self._preparing: return
         key = self.selected_key()
@@ -373,6 +392,71 @@ class UpdatesScreen(Screen):
         except Exception as exc:
             self.operation_result = c.error_text(exc)
             self._render_selected()
+
+    def action_base(self, action):
+        from .base_updates_tui import BaseTargetScreen
+        if self.view != 'bases' or self.app._operation_pending or self._preparing: return
+        key = self.selected_key()
+        if key is None: return
+        if action == 'build':
+            self.app.push_screen(BaseTargetScreen(distros.get(key)),
+                                 lambda value: self._prepare_base(key, action, value) if value is not None else None)
+        else: self._prepare_base(key, action)
+
+    def _prepare_base(self, key, action, value=None):
+        if not self._alive or self.app._operation_pending or self._preparing: return
+        self._prepare_token = token = object()
+        self._preparing = self._prepare_base_worker(key, action, value, token)
+        self._track(self._preparing)
+        self._render_selected()
+
+    @work(thread=True, group='updates-prepare')
+    def _prepare_base_worker(self, key, action, value, token):
+        try:
+            if action == 'build': plan = v.prepare_base_build(value[0], key, refresh=value[1])
+            else: plan = v.base_rollback_inventory(key)
+            publish(self.app, self._base_prepared, token, key, action, plan, None)
+        except Exception as exc:
+            publish(self.app, self._base_prepared, token, key, action, None, c.error_text(exc))
+
+    def _base_prepared(self, token, key, action, plan, error):
+        from .base_updates_tui import BaseRollbackScreen
+        if not self._alive or self._prepare_token is not token: return
+        self._preparing = self._prepare_token = None
+        if self.app.screen is not self: return
+        if error:
+            self.operation_result = error
+            self._render_selected(); return
+        if action == 'rollback':
+            if len(plan.copies) > 1:
+                self.app.push_screen(BaseRollbackScreen(plan),
+                                     lambda choice: self._confirm_base(key, action, v.select_base_rollback(plan, choice)) if choice is not None else None)
+                return
+            try: plan = v.select_base_rollback(plan)
+            except c.SandboxError as exc:
+                self.operation_result = str(exc)
+                self._render_selected(); return
+        self._confirm_base(key, action, plan)
+
+    def _confirm_base(self, key, action, plan):
+        from .base_updates_tui import BaseConsentScreen, rollback_consent
+        if not self._alive or self.app._operation_pending: return
+        text = v.describe_base_build(plan) if action == 'build' else rollback_consent(plan)
+        self.app.push_screen(BaseConsentScreen(text), lambda yes: self._approved_base(key, action, plan) if yes else None)
+
+    def _approved_base(self, key, action, plan):
+        if not self._alive or self.app._operation_pending: return
+        self.action_cancel_checks()
+        self._next('bases', key)
+        self.operation_result = None
+        self.app.run_base_update_action(key, action, plan, self._base_finished)
+        self._render_selected()
+
+    def _base_finished(self, key, result, failed):
+        if not self._alive: return
+        self.operation_result = result
+        self._track(self._inventory_worker('bases', [(key, self._next('bases', key))]))
+        self._render_selected()
 
     def _prepare_action(self, key, action, value=None):
         if not self._alive or self.app._operation_pending or self._preparing: return
@@ -449,6 +533,11 @@ class UpdatesScreen(Screen):
         item = self.items[self.view].get(key)
         lines = [VIEWS[self.view]]
         if self.operation_result: lines += ["Last operation result:", self.operation_result, ""]
+        base_operation = getattr(self.app, '_base_operation', None)
+        if self.view == 'bases' and base_operation and base_operation['distro'] == key:
+            lines += ['Base operation (app-owned; Cancel check/Close do not cancel it):',
+                      base_operation['phase'], base_operation.get('result') or '',
+                      'Bounded build output tail:', base_operation.get('output') or '(no build output)', '']
         if item and self.view == "environments" and item.get("metadata", {}).get("operation"):
             m = item["metadata"]
             lines += [str(c.pending_operation(m)), f"Last operation error: {m.get('last_error') or 'none'}", ""]
@@ -511,7 +600,8 @@ class UpdatesScreen(Screen):
         {"updates-check": self.action_check, "updates-details": self.action_details,
          "updates-cancel": self.action_cancel_checks, "updates-close": self.action_close,
          **{"updates-" + action: lambda action=action: self.action_environment(action)
-            for action in ("update", "start", "policy", "rollback", "recover")}}.get(event.button.id, lambda: None)()
+            for action in ("update", "start", "policy", "rollback", "recover")},
+         'updates-base-rollback': lambda: self.action_base('rollback')}.get(event.button.id, lambda: None)()
 
 
 def plain_lines(text):

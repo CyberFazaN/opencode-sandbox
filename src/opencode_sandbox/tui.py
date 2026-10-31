@@ -702,7 +702,7 @@ class Dashboard(App):
 
     def action_quit(self) -> None:
         if getattr(self, "_updates_mutation_active", False):
-            self.notify("An approved environment operation is running; wait before quitting. Killing the manager may require journal recovery.", severity="warning")
+            self.notify("An approved operation is running; wait before quitting. Killing the manager may leave unfinished work; review its result, candidates or journal.", severity="warning")
             return
         self.exit()
 
@@ -747,6 +747,51 @@ class Dashboard(App):
                 if self.is_running: raise
 
     def _environment_update_finished(self, key, result, failed, callback):
+        self._updates_mutation_active = False
+        self._finished(result, failed)
+        callback(key, result, failed)
+
+    def run_base_update_action(self, key, action, plan, callback):
+        """Base-only worker binding; no screen ownership or universal update executor."""
+        if self._operation_pending: return
+        self._operation_pending = self._updates_mutation_active = True
+        self._base_operation = {'distro': key, 'phase': 'Preparing base operation', 'output': '', 'result': None}
+        self._set_busy(f'{action.capitalize()} base {key}…')
+        self._base_update_worker(key, action, plan, callback)
+
+    @work(thread=True, group='base-operation')
+    def _base_update_worker(self, key, action, plan, callback):
+        import json
+
+        from . import build_output
+        from . import opencode_versions as v
+        def progress(phase, output):
+            if self.is_running:
+                try: self.call_from_thread(self._base_progress, phase, output)
+                except RuntimeError:
+                    if self.is_running: raise
+        with c.runtime_feedback(progress=None, cancelled=None), build_output.listen(progress):
+            try:
+                if action == 'build':
+                    outcome = v.update_base(plan.target, key, refresh=plan.refresh, plan=plan)
+                    result = ('Base verified unchanged; ' if outcome.get('unchanged') else 'Base build verified and published; ') + json.dumps(outcome)
+                else:
+                    outcome = v.rollback_base(key, plan=plan)
+                    result = ('Base rollback verified unchanged; ' if outcome.get('unchanged') else 'Base rollback verified and published; ') + json.dumps(outcome)
+                failed = False
+            except Exception as exc:
+                result, failed = c.error_text(exc), True
+        if self.is_running:
+            try: self.call_from_thread(self._base_finished, key, result, failed, callback)
+            except RuntimeError:
+                if self.is_running: raise
+
+    def _base_progress(self, phase, output):
+        self._base_operation.update(phase=c.printable(phase), output=c.printable(output))
+        self._set_busy('Base: ' + c.printable(phase))
+
+    def _base_finished(self, key, result, failed, callback):
+        self._base_operation.update(result=result, phase='Failed; inspect actual base/copies before retry' if failed else 'Complete')
         self._updates_mutation_active = False
         self._finished(result, failed)
         callback(key, result, failed)

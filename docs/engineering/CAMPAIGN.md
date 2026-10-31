@@ -113,6 +113,22 @@ All real attempts use guarded cleanup and retain manifests/evidence; no containe
 remain and four original tagged-image IDs are unchanged. This is not full-campaign, fresh-image,
 installed-pipx, paid-provider, privileged/service, manual-observation or release-readiness evidence.
 
+UP-12/UP-13 base actions/refresh: **54 new default cases**, four complete suites (**1525 passed,
+80 opt-in skips each**), and the affected real gate **24 tests/581 checks passed**,
+`up1213-reviewed`, 928.47 s. Includes packaged/retained base race rows (`test_42`), all existing
+affected diagnostics/version/Updates/discovery/environment-recovery rows (`test_43`, `test_44`,
+`test_51`..`test_53`), and new both-distribution cached/full-refresh/base-terminal rows (`test_54`).
+Cached and pull/no-cache package-layer builds have separate real evidence. Explicit official
+Docker Hub upstream aliases in copied FROM lines keep retained upstream tags read-only; no
+definition/tool/binary assertion is weakened. Real failure injection runs after actual candidate
+verification; current base, copies, pins, retained containers/layers and cleanup are checked.
+Single/multi-copy rollback, both mode confirmations and app-owned terminal progress/Close/Quit
+behavior pass at 80x24/120x40. Initial harness/expectation errors and final UI priority correction
+were recorded and rerun, not waived (BASELINE/working roadmap). Ending daemon has zero containers/
+volumes/helpers, unchanged original four image IDs, and no test tags/aliases; build cache stays
+intact. No complete campaign, installed-pipx/manager, paid-provider, privileged/service or manual
+observation is renewed; release gates/historical release evidence remain unchanged.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

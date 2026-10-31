@@ -12,7 +12,7 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   Environment OpenCode, local/cached-first without network requests or version probes on opening.
   Explicit Check has independent registry/object results and cancellable owned read-only work;
   Details discloses full evidence, errors, recovery and existing CLI guidance. Manager checks
-  and base mutation actions remain unavailable at this checkpoint.
+  remain unavailable at this checkpoint.
 - Optional daily npm metadata discovery in dashboard Preferences, off by default: durable
   attempt claims throttle failures/restarts/interruption, shared source requests coalesce across
   CLI/Updates/background callers, and Retry-After applies to explicit checks too. One quiet
@@ -23,6 +23,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   controls, scrollable exact consent, locked revalidation and existing checkpoint/journal handlers.
   Recovery Center can also review interrupted OpenCode updates. Approved operations survive
   closing Updates; read-only cancellation is not mutation rollback.
+- Base Images Build/Rebuild and Rollback in Updates, with exact image/target/mode consent and
+  rollback-preserving publication. Choose cached rebuild or explicit Refresh & Rebuild;
+  `build --refresh` and `opencode update-base --refresh` pull upstream and bypass build cache
+  without pruning it. App-owned builds expose bounded output in Details and survive Close.
 
 ### Fixed
 
@@ -38,6 +42,9 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   context aliases for the same verified daemon. Pinned container creation holds publication
   through its version check and creation. Image identity/ownership is rechecked before changes;
   cleanup leaves busy candidates and rollback copies alone.
+- Base build consent binds the existing image, exact OpenCode target, definition and refresh
+  mode, rechecked before building and publication. Candidate verification uses its immutable ID;
+  a retagged candidate is neither published nor silently cleaned as the operation's own image.
 - Base rollback no longer guesses replacement order from Docker creation dates. It consolidates
   aliases, defaults only for one distinct copy, and requires `--copy` for several, even with
   `--yes`; `--list` shows full identities and aliases. Confirmation and execution bind to the
