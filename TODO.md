@@ -57,8 +57,17 @@ classification. Opening stays network-free, manager Update stays disabled, and u
 editable/foreign/shadowed/ambiguous installations receive manual guidance. Four complete suites
 (1611 passed/82 skips each) and 26 affected real tests/637 checks pass, including isolated real
 pipx/source/options/launcher and manager terminals; local provenance is not public commit authentication.
-Next: UP-16, installation exclusion and independent helper/terminal handoff, without conflating
-that gate with UP-17 replacement/recovery. No version bump, release preparation, merge, push or publication.
+UP-16's first verified safety checkpoint adds a stdlib-only early console bootstrap and canonical-
+prefix process-lifetime shared usage/internal exclusive guards, across data/config overrides.
+Supported live dashboards, workers, CLI sessions and commands block exclusive access; startup
+refuses it before dispatch. Private persistent lock inodes, lock order and fork/exec descriptor
+ownership have real-process regressions. Four complete suites (1655 passed/84 skips each) and
+29 affected real tests/702 checks pass, including actual installed pipx lifecycle/launchers and
+live session/mutation exclusion. This is a split checkpoint, **not completion of UP-16**.
+Next: finish UP-16's independent helper/external-tool validation, narrow fresh-verifier access
+and real terminal handoff. No early release or generic bypass exists; Manager Update stays
+disabled. Keep UP-17 replacement/recovery separate. No version bump, release preparation,
+merge, push or publication.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by
 about 8%; findings and recommended verification cadence are in

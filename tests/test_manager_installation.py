@@ -132,3 +132,11 @@ def test_recognized_custom_resource_paths_and_same_default_python_are_retained(i
     result = i.classify()
     assert result['verified'], result
     assert result['evidence']['locations'] == {name.lower(): str(tmp_path / name.lower()) for name in ('MAN_DIR', 'COMPLETION_DIR', 'SHARED_LIBS')}
+
+
+def test_new_bootstrap_console_template_remains_recognizable(installation):
+    _, _, _, _, launcher = installation
+    script = launcher.resolve()
+    script.write_text(script.read_text().replace('from opencode_sandbox.cli import main',
+                                               'from opencode_sandbox.launcher import main'))
+    assert i.classify()['verified']

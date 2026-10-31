@@ -144,6 +144,20 @@ failures were retained, fixed and rerun (BASELINE/roadmap). No complete campaign
 privileged/socket/service claim. Final daemon inventory has no containers/volumes/helpers and
 unchanged original four image IDs; build cache and persistent locks remain intact.
 
+UP-16 first safety checkpoint (partial task): **44 new default cases**, four complete suites
+(**1655 passed/84 opt-in skips each**, identical 1739 ordered outcomes), and **29 affected real
+tests/702 checks passed**, `up16a-final`, 1047.39 s. The previous 26 affected rows rerun with actual
+default/custom-space bootstrap launchers and live installed-dashboard shared/exclusive assertions.
+Full isolated `test_65` pipx install/upgrade/downgrade/uninstall/data-retention/foreign-launcher
+checks now test a private current-package snapshot; no published/source tag is changed. New
+`test_67` proves both distributions' real attached shells and long Docker exec hold usage leases;
+the base terminal rows also refuse exclusive access during approved mutations. Failed initial
+fixture/tag/marker attempts are retained in BASELINE/roadmap, fixed and rerun without waived
+assertions. No containers/volumes/test tags remain; original four image IDs, shared build cache
+and persistent protocol inodes are preserved. No independent helper/verifier/terminal-handoff,
+manager replacement/recovery, complete campaign, privileged/service or manual-observation claim.
+Manager Update remains disabled; **UP-16 is not complete**.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from campaign import DISTROS, ROOT
+from test_66_manager_inventory import exclusion
 
 pytest.importorskip('pyte')
 from pty_term import DOWN, ENTER, ESC, TAB, Term
@@ -188,6 +189,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
                 ck('Cached rebuild' in term.text(), 'Base terminal: cached mode is independent and explicit')
                 term.send(TAB + ENTER, .3)
                 assert ck(camp.wait_for(lambda hold=hold: Path(str(hold) + '.ready').exists(), timeout=120), 'Base terminal: actual build completes before test hold')
+                ck(exclusion(camp, sys.prefix, busy=True), 'Base terminal: live approved mutation blocks exclusive installation access')
                 term.send('d', .3)
                 ck(term.wait_for('Bounded build output tail', 15), 'Base terminal: build output disclosed in scrollable Details')
                 term.send(ESC, .2); term.send(ESC, .2); term.send('q', .3)

@@ -43,11 +43,14 @@ and error. Approved mutations are app-owned and not canceled by Close/Cancel che
 add Base Images build/rollback, identity/target/definition/mode consent, cached versus explicit
 pull/no-cache refresh, retained copies and bounded app-owned build feedback. UP-14/UP-15 add
 read-only official manager release discovery/local pipx provenance classification and independent
-default-off daily GitHub metadata work. Manager Update stays disabled; next is UP-16's independent
-installation-exclusion/helper/terminal-handoff gate, then UP-17 replacement/recovery.
+default-off daily GitHub metadata work. UP-16's first verified checkpoint adds early process-lifetime
+installation usage/internal exclusion and a stdlib-only console bootstrap. Manager Update stays
+disabled; UP-16 is partial, with helper/external-tool validation, narrow fresh-verifier access and
+terminal handoff still pending before UP-17 replacement/recovery.
 No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-15 verification is below; commands, failures and handoff are in the roadmap.
+UP-01..UP-15 and the first UP-16 checkpoint's verification is below; commands, failures and
+handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -219,6 +222,58 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-16 first safety checkpoint — 2026-10-31
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1655 passed, 84 opt-in skips in each of four serial foreground runs**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0; clean pip checks. 231.41/219.66/222.74/218.99 s; all **1739 ordered IDs/outcomes identical**. Only two known lowest-Typer deprecations |
+| New default regressions | **44 new cases**: 41 real host/process installation-lock cases, one bootstrap-template classifier case and two missing-bootstrap package-content gates. Cross-data/config/HOME/XDG/TMPDIR convergence, prefix aliases/separate environments, concurrent shared readers, exclusive/startup refusal including help/version, exclusion before dependency import/data creation, process-lifetime worker-drain protection, threaded idempotence, reverse lock order, unsafe parent/owner/modes/symlink/hardlink/FIFO/inode replacement refusal, persistent modes/inodes, process death and fork-only/exec descriptor ownership. Existing classifier/command/package assertions retained |
+| Affected real Docker/OpenCode/pipx/terminal | **29 tests/702 logged checks passed**, no skips/deselections, `up16a-final`, 1047.39 s. All prior 26 affected rows plus real pipx lifecycle and two real shell/exec rows. Actual default/custom-space pipx bootstrap launchers refuse exclusive startup across data/config overrides without creating those paths. Live installed dashboards permit other shared CLI readers but block exclusive access; normal exit releases it. Both distributions' attached shell and long real Docker exec hold leases. Approved real base mutations block exclusive access. Prior base races, rollback/retained layers, diagnostics, version evidence, discovery, environment update/recovery and terminal restoration assertions rerun |
+| Scope and limits | **UP-16 is partial**, split at the independently verified startup safety boundary under D-057. No independent helper/external interpreter/pipx validation, narrow fresh-verifier capability, terminal handoff, manager replacement or recovery is implemented or claimed. Manager Update remains disabled. Locks do not coordinate older manager code, direct library calls, arbitrary external pipx/Docker or orphaned daemon work after manager death. No automatic release of the lease at main/dashboard return, generic bypass, shared-to-exclusive upgrade, installer, restart, schema/image/version change or host setup |
+
+The console target changes to the minimal stdlib `launcher:main`; current-code `cli.main()` still
+acquires/reenters the lease for old generated wrappers and module invocation. Strict distribution
+validation now requires that exact bootstrap target and both bootstrap modules, retaining existing
+metadata/assets/license/tests/legacy-installer gates; no CI/release workflow or dependency bound
+changed. Small core context-local lock observations enforce installation-before-data/base ordering
+without changing mutation behavior or timeouts. Provenance inspection recognizes old and new
+standard templates but does not imply older installed code participates in the protocol.
+
+Failure trail retained: missing-lock-module reproducer failed collection. First selected **77
+passed**, 1.40 s; expanded **1 lint failure/130 passed**, 3.67 s, then lowest affected **1 lint
+failure/177 passed**, 12.28 s (two known deprecations). Corrected test-only fork exit handling and
+import/string style, no assertion/lint-gate waiver. Static follow-up **89 passed**, 2.22 s; final
+extended host/package/docs/quality subset **140 passed**, 4.13 s. The first real proof **3 failed/2
+passed/1 teardown error**, 53.53 s (**91 passed/1 failed checks**): the old pipx fixture imported an
+already-existing release tag and tried to recreate it, and the new session test omitted real-Docker
+markers, so its direct release call hit the unit Docker guard. The unfinished test exec correctly
+blocked another exclusive attempt until campaign cleanup. The second proof **1 failed/4 passed**,
+83.90 s (**112 passed checks**) caught the same missing marker in the old pipx row after reaching
+uninstall. Fixed only fixtures/markers; no product check weakened or failure deselected. The pipx
+fixture now uses a private no-tags clone and a committed current-package overlay, testing reviewed
+code rather than stale HEAD, without changing published/source tags. Final 29-test gate passes all
+those rows, including full pipx upgrade/downgrade/uninstall/data-retention/foreign-launcher checks.
+
+Final XML/logs and frozen five product modules plus packaging configuration/checker hashes are
+under `.work/up16a/`; manifests/command/check logs are `.work/logs/up16a-*`. All attempts use isolated
+run-owned resources, private installations, guarded product cleanup/uninstall and leak checks.
+Ending verified own-rootless inventory has no containers/volumes/test tags and the original four
+image IDs unchanged. Persistent lock files and shared build cache remain intact. Existing test_66's
+declared local Git URL rewrite proves real provenance/launcher shapes, not public-release commit
+authenticity; no new public API, token or paid-provider use. No complete campaign, optional installed-
+asset image build, broad legacy TUI, privileged/socket/service, human observation, helper/handoff or
+manager-replacement evidence is claimed. No version bump, merge, push, tag, publication or upload.
+
+Final package checks pass: sdist/wheel build, strict twine/content validation, exact bootstrap
+entry point and frozen-source/wheel equality for all five changed/new product modules; private
+instructions and evidence are absent from the sdist. Document/CLI/quality subset **43 passed**,
+3.18 s (`docs-final.xml`), not another complete suite. No remaining manager/guard/watchdog Python
+process found. Removed only **13 exact manifested completed pytest roots** behind own-UID/inode/
+process/socket/mount guards. `/tmp/opencode` empty, **1048529 free inodes**; intentional additional
+fixed-namespace installation lock files are preserved as protocol state, not leaks to delete.
+Logs/XML/private fixtures/package artifacts/build cache/prior evidence stay intact. A final
+prose-only check's manifested scratch follows the same guard after its run.
 
 ### Unpublished UP-14 + UP-15 — 2026-10-31
 

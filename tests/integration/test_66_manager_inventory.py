@@ -5,7 +5,9 @@ exercises real pipx/PEP 610 records and launchers, NOT authenticity of a public 
 No source/provenance check is patched; the local transport fixture is declared, not shipped.
 """
 import json
+import select
 import shutil
+import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -13,6 +15,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 from campaign import ROOT
 from pty_term import ESC, Term
+
+
+def exclusion(camp, prefix, *, busy):
+    code = ("from opencode_sandbox.installation_locks import exclusive\n"
+            f"with exclusive({str(prefix)!r}): print('exclusive acquired')\n")
+    result = camp._run([sys.executable, '-B', '-c', code], check=False)
+    return result.returncode != 0 and 'installation busy' in result.stderr.lower() if busy else result.returncode == 0
 
 
 @pytest.mark.parametrize('layout', ['default', 'custom-spaces'])
@@ -59,6 +68,29 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
         assert ck(value['verified'], 'Manager real pipx: recognized tagged VCS/runtime/Python/custom paths/actual launcher agree'), value
         ck(value['evidence']['commit'] == commit and value['evidence']['tag'] == 'v' + version, 'Manager real pipx: exact recorded commit and version tag retained')
         ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real pipx: inspection did not rewrite records or launcher')
+        # This external guard runs from the test venv, not from the guarded application. It
+        # exercises the real fixed namespace/prefix key without patching the installed package.
+        hold = subprocess.Popen([sys.executable, '-B', '-c',
+            ("from opencode_sandbox.installation_locks import exclusive\n"
+             f"with exclusive({str(prefix)!r}):\n print('ready', flush=True)\n input()\n")],
+            env=camp.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        camp.note(f'non-mutating exclusive guard pid={hold.pid} for isolated installed prefix; stdin lifetime, always reaped')
+        try:
+            assert select.select([hold.stdout], [], [], 15)[0], 'Exclusive guard did not report readiness'
+            assert hold.stdout.readline().strip() == 'ready'
+            other_env = dict(env, OPENCODE_SANDBOX_HOME=str(base / 'excluded-data'),
+                             OPENCODE_SANDBOX_CONFIG=str(base / 'excluded-config'))
+            for args in (['--version'], ['--help'], ['create', 'ocs-test-refused']):
+                refused = camp._run([str(launcher), *args], env=other_env, check=False)
+                ck(refused.returncode == 2 and 'installation busy' in refused.stderr.lower(),
+                   'Manager real pipx: exclusive access refuses ' + ' '.join(args) + ' across data/config overrides')
+            ck(not (base / 'excluded-data').exists() and not (base / 'excluded-config').exists(),
+               'Manager real pipx: excluded entry point created no data/config paths')
+        finally:
+            try: hold.communicate(timeout=10)
+            finally:
+                if hold.poll() is None: hold.kill(); hold.communicate(timeout=10)
+        ck(exclusion(camp, prefix, busy=False), 'Manager real pipx: exclusive exit releases guard, persistent inode retained')
         record_path = prefix / 'pipx_metadata.json'
         original = record_path.read_bytes()
         for field, changed in [('pip_args', ['--no-deps']), ('pinned', True), ('suffix', '-custom')]:
@@ -104,6 +136,8 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
                 term = Term([str(launcher), 'tui'], *size, env=env, log=camp.log)
                 try:
                     assert ck(term.wait_for('OpenCode Sandbox', 30), 'Manager terminal: actual installed launcher starts dashboard')
+                    ck(exclusion(camp, prefix, busy=True), 'Manager terminal: supported live dashboard prevents exclusive installation access')
+                    ck(json.loads(run().stdout)['installation']['verified'], 'Manager terminal: another supported read-only instance can coexist')
                     term.send('v', .4)
                     assert ck(term.wait_for('verified official-tag pipx', 15), 'Manager terminal: real installation classification visible')
                     ck(state['requests'] == requests and 'Close' in term.text(), 'Manager terminal: opening remains network-free with visible compact controls')
@@ -121,6 +155,7 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
                     ck('verified manager handoff is not implemented' in term.text(), 'Manager terminal: Update remains unavailable; no replacement begun')
                     term.send(ESC, .2); term.send('q', .3)
                     ck(term.exit_code(15) == 0 and term.restored(), 'Manager terminal: normal exit restores terminal')
+                    ck(exclusion(camp, prefix, busy=False), 'Manager terminal: exited dashboard no longer holds installation lease')
                 finally: term.close()
         finally:
             server.shutdown(); thread.join(); server.server_close()

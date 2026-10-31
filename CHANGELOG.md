@@ -32,6 +32,12 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   rollback-preserving publication. Choose cached rebuild or explicit Refresh & Rebuild;
   `build --refresh` and `opencode update-base --refresh` pull upstream and bypass build cache
   without pruning it. App-owned builds expose bounded output in Details and survive Close.
+- Early process-lifetime installation leases for supported CLI/dashboard instances, independent
+  of data/configuration locations. A small stdlib bootstrap acquires shared access before CLI
+  imports; internal exclusive access refuses while another instance/session/worker is alive.
+  Persistent private lock files are never treated as stale or repaired. This is the first
+  manager-handoff safety checkpoint, not an updater: helper/verifier/handoff and replacement
+  remain unavailable, and older managers or external pipx/Docker do not honor these locks.
 
 ### Fixed
 

@@ -50,6 +50,29 @@ pipx install --python python3.11 \
 
 `opencode-sandbox --help`, `--version` and `doctor` work without Docker.
 
+### Startup coordination
+
+Supported manager CLI/dashboard processes hold shared installation access for their entire
+lifetime, including attached sessions and worker shutdown. The packaged launcher takes this
+lease before importing the CLI; existing wrappers invoking the current CLI also take it before
+dispatch. Other normal instances may run together. Internal exclusive installation access refuses
+while any supported instance is alive, even with different data/configuration overrides. A normal
+startup during exclusive access reports **Manager installation busy** (exit 2), including help
+and version commands; close the other instance or wait for its operation to finish, then retry.
+
+Coordination uses private persistent files in `/tmp/opencode-sandbox-locks-<UID>/`, keyed by the
+canonical application Python environment path, not by HOME, TMPDIR, XDG or product overrides.
+Unsafe/unwritable lock paths fail closed without repairs or a fallback. **Never delete a lock
+file because it appears stale:** a live process may hold that inode; process exit releases the
+lock without removing the file. The protocol is advisory, not protection against another process
+with the same user's access. Older manager versions, direct Python library use and arbitrary
+external pipx/Docker commands do not honor it. Stop other manager instances/sessions before a
+manual pipx replacement; these locks cannot make an external replacement safe automatically.
+
+Manager installation in Updates is still disabled. This first coordination checkpoint does not
+provide an independent updater/helper, verification bypass, terminal handoff, replacement or
+recovery workflow; those require separate verification before installation can be offered.
+
 ## Prepare Docker
 
 The manager only uses **your own rootless Docker daemon**, reached through a Docker context

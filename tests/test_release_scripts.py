@@ -72,7 +72,8 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
     info = f"opencode_sandbox-{v}.dist-info"
     requires_python = requires_python or tomllib.loads((check_dist.ROOT / "pyproject.toml").read_text())["project"]["requires-python"]
     files = {f"{info}/METADATA": f"Name: opencode-sandbox\nVersion: {v}\nRequires-Python: {requires_python}\nLicense-Expression: MIT\n",
-             f"{info}/entry_points.txt": "[console_scripts]\nopencode-sandbox = opencode_sandbox.cli:main\n",
+             f"{info}/entry_points.txt": "[console_scripts]\nopencode-sandbox = opencode_sandbox.launcher:main\n",
+             'opencode_sandbox/launcher.py': 'x', 'opencode_sandbox/installation_locks.py': 'x',
              f"{info}/licenses/LICENSE": "MIT",
              **{f"opencode_sandbox/assets/images/{a}": "x" for a in check_dist.assets()}}
     with zipfile.ZipFile(dist / f"opencode_sandbox-{v}-py3-none-any.whl", "w") as wheel:
@@ -81,6 +82,7 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
                 wheel.writestr(name, text)
     tree = tmp_path / f"opencode_sandbox-{v}"
     for name in ("LICENSE", "README.md", "pyproject.toml", "src/opencode_sandbox/__init__.py",
+                 'src/opencode_sandbox/launcher.py', 'src/opencode_sandbox/installation_locks.py',
                  *(f"src/opencode_sandbox/assets/images/{a}" for a in check_dist.assets()), *extra):
         if name not in drop:
             (tree / name).parent.mkdir(parents=True, exist_ok=True)
@@ -113,6 +115,14 @@ def test_a_missing_image_asset_or_licence_is_reported(tmp_path):
                                          f"opencode_sandbox-{check_dist.version()}.dist-info/licenses/LICENSE"})
     problems = check_dist.check(dist)
     assert any("image assets" in p for p in problems) and any("LICENSE missing" in p for p in problems)
+
+
+@pytest.mark.parametrize('module', ['launcher.py', 'installation_locks.py'])
+def test_missing_bootstrap_modules_fail_both_package_gates(tmp_path, module):
+    dist = distributions(tmp_path, drop={'opencode_sandbox/' + module, 'src/opencode_sandbox/' + module})
+    problems = check_dist.check(dist)
+    assert any('wheel:' in value and module in value for value in problems)
+    assert any('sdist:' in value and module in value for value in problems)
 
 
 def test_tests_in_the_sdist_are_reported(tmp_path):

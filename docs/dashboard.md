@@ -156,8 +156,9 @@ This label means local provenance records agree, **not** authenticated public ta
 identity, an execution grant, preserved dependency versions or a promise of rollback. Details
 shows the inspection time, source/commit/paths, release URL/notes (bounded plain text), unsupported
 reason and [manual installation guidance](install.md#upgrade-or-change-the-version).
-**Manager Update remains unavailable**, including for recognized installations, until the separate
-installation-exclusion, independent helper, terminal-handoff and replacement/recovery gates pass.
+**Manager Update remains unavailable**, including for recognized installations. Early shared
+[startup coordination](install.md#startup-coordination) is implemented; independent helper,
+fresh-verification access, terminal handoff and replacement/recovery gates are still pending.
 There is no installer, Python switch, automatic restart or universal Update All operation here.
 
 ### Environment actions

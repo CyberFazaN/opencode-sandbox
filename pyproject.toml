@@ -39,7 +39,7 @@ Changelog = "https://github.com/CyberFazaN/opencode-sandbox/blob/main/CHANGELOG.
 test = ["pytest>=8"]
 
 [project.scripts]
-opencode-sandbox = "opencode_sandbox.cli:main"
+opencode-sandbox = "opencode_sandbox.launcher:main"
 [tool.setuptools.dynamic]
 version = {attr = "opencode_sandbox.__version__"}
 

@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-15 and PERF complete. Next: UP-16 (installation exclusion/terminal handoff).**
+- **UP-00..UP-15 and PERF complete. UP-16 partial: early usage/exclusion verified; next is independent helper/verifier/terminal handoff.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -302,7 +302,8 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-15 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
+UP-00..UP-15 and the one-time PERF checkpoint are complete. UP-16 has a verified first
+startup/exclusion checkpoint but remains partial; UP-17/UP-18 are pending. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -319,7 +320,8 @@ UP-09; three later packages remain after completing UP-14/UP-15), not
 a quota or permission to combine
 unrelated risks. Read-only manager discovery can be developed independently of base refresh;
 manager execution remains later and must not delay the earlier component workflows. UP-18 is
-not release preparation. UP-00..UP-15 are DONE; later tasks are PENDING. Next is UP-16;
+not release preparation. UP-00..UP-15 are DONE; UP-16 is PARTIAL and later tasks are PENDING.
+Continue UP-16's helper/verifier/terminal-handoff gate;
 UP-11's independent environment recovery gate is verified. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
@@ -339,7 +341,7 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-11 | DONE: environment actions and independent recovery gate | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers, immutable exact consent/locked revalidation, live refusals, app-owned non-cancelable mutations, persistent journal/recovery routing. Four full suites (1471 passed/78 skips each), 18 affected real tests/400 checks including actual update/full-layer rollback and independent missing/failed/successful recovery on both distributions. Evidence below; no base/manager bundling |
 | UP-12 + UP-13 | DONE: base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Build/Rebuild/Check/Rollback, identity/target/definition/mode consent, candidate-ID verification/guarded publication, retained copies and explicit multi-copy selection; cached versus pull/no-cache refresh, no prune/migration. Four complete suites (1525 passed/80 skips each), 24 affected real tests/581 checks, both distributions including separate cached/full-refresh package builds, concurrency/pinned creation, failed candidates, retained layers and 80x24/larger terminal ownership. Evidence below |
 | UP-14 + UP-15 | DONE: read-only manager discovery/local installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Official published-full-release provider, strict tags/numeric comparison/no downgrade, independent failures and local evidence, separate daily GitHub source/claims. Local actual package/VCS/pipx/Python/options/invocation/launcher/custom-location agreement; manual guidance for foreign/editable/shadowed/ambiguous/unsupported settings. 86 new default cases, four full suites (1611 passed/82 skips each), 26 affected real tests/637 checks including default/custom-space pipx and real manager terminals. Local provenance is not public commit authentication or an execution grant; Update disabled. Evidence below |
-| UP-16 | Installation exclusion and terminal handoff | UP-14 + UP-15, UP-05 | Supported instances coordinate across data directories; safe self-contained helper/interpreter/external pipx, clean TUI exit before mutation, startup exclusion and narrow verification path; process and pty tests |
+| UP-16 | PARTIAL: early installation usage/exclusion verified; helper/verifier/handoff pending | UP-14 + UP-15, UP-05 | First independent startup checkpoint: stdlib console bootstrap, canonical-prefix process-lifetime shared leases/internal exclusive access across overrides, ordered private persistent inodes, fork/exec ownership and shutdown protection. 44 new default cases, four complete suites (1655 passed/84 skips each), 29 affected real tests/702 checks including installed pipx lifecycle, live dashboards/shell/exec/base mutations. Still requires independently validated self-contained helper/external interpreter/pipx, narrow fresh-verifier capability and clean restored-terminal handoff before UP-16 is DONE; no replacement exposed |
 | UP-17 | Manager replacement, verification and failure recovery | UP-16 | Exact confirmed target and revalidation, actual fresh-process verification, no automatic restart. Independently verify (1) replacement/success and (2) failure/interruption states, private recovery record and instructions before/during/after install. Separate focused commits/checkpoints for these gates; isolated pipx and real terminal evidence, never inferred backup/rollback safety |
 | UP-18 | Cross-layer verification and record consolidation | UP-01..UP-17 | Run affected/full regressions, required real combinations, dependency endpoints, docs/CLI/packaging checks; record evidence/limits, promote durable facts and retire the effort record when complete; no release work |
 
@@ -2122,6 +2124,151 @@ a materially different architecture, record the blocker and ask the owner before
   guarded after its run. No product change after final complete/real gates; review, local commit on
   `work/updates` and STOP. Nothing merged, pushed, tagged, bumped, uploaded or released.
 
+### UP-16 first safety checkpoint — 2026-10-31 — early process-lifetime usage/exclusion
+
+- Resumed clean `work/updates` at `f1cb9ce`; local/repository instructions, TODO, BASELINE,
+  D-056/D-057, architecture and handoff reconciled. Own-rootless daemon verified: no containers/
+  volumes, original Debian/Arch/Arch-input/Ubuntu image IDs unchanged. `/tmp/opencode` empty at
+  entry. No user launcher/install/credential or Docker/service setting touched.
+- Investigated actual console entry point/CLI dispatch, data/base lock order, provenance and
+  metadata/script recognition, dashboard operation/session ownership, Textual worker shutdown,
+  attached-session watchdog/signal handling, package/entry-point gates and real pipx/pty fixtures.
+  The old entry point imports CLI/core/Typer before main; a context released on main/dashboard
+  return would also permit exclusion before worker/thread-pool shutdown. These are separate
+  startup safety risks, so **split UP-16 at an independently runnable verified checkpoint** under
+  D-057, not completion of the helper/handoff gate or consolidation with UP-17. Missing-lock-module
+  reproducer failed collection; no existing installation-usage protocol was present.
+- New `launcher.py` is a minimal stdlib console bootstrap; `installation_locks.py` imports no core,
+  Typer or application dependencies. Acquire shared usage before importing the CLI. Current-code
+  `cli.main()` acquires/reenters before dispatch for existing generated wrappers and module
+  invocation too. No import-time package side effects; direct Python library/Typer-app calls are
+  not a supported startup route. Help/version/empty invocation are not lock bypasses.
+- One fixed `/tmp/opencode-sandbox-locks-<UID>/` private namespace, shared with existing base
+  protocols but distinct `installation-<hash>.lock` files. Key is canonical absolute application
+  Python prefix, independent of product data/config, HOME, TMPDIR, XDG and pipx overrides; aliases
+  converge, separate venvs using one Python binary do not merge. Prefix path, not venv inode,
+  survives replacement. No-follow/relative opens check parent ownership/sticky writability,
+  exact own-UID 0700 directory and 0600 regular single-link file, inode agreement after acquisition
+  and on usage reentry. Unsafe namespace/files are refused without repair or fallback. Persistent
+  files are never deleted, treated as stale or keyed by live PID. Exit/death releases flock,
+  without replacing inodes. Bootstrap validation is deliberately independent of core-dependent
+  base guards; no speculative shared-lock refactor or dependency cycle.
+- Normal processes take non-waiting shared flock; an internal exclusive guard refuses any live
+  shared/exclusive holder, including its own process. No upgrade/release/reacquire trick or
+  production early-release API. Concurrent ordinary instances/readers still work. Busy normal
+  startup exits 2 with static guidance before dispatch/data creation. A process-global mutex makes
+  repeated/threaded startup idempotent. The lease is deliberately retained until **process exit**,
+  not main/dashboard return, covering non-daemon and thread-pool draining. Five product modules
+  and the packaging configuration/checker were frozen before final complete/real gates.
+- All namespace/lock fds are CLOEXEC; exec'd helpers/clients inherit none even with close_fds=False.
+  At-fork hooks serialize descriptor ownership and close the child's copies without LOCK_UN, so
+  fork-only children neither unlock the live parent nor retain its lease after parent death.
+  Child manager entry reacquires its own lease. New installation acquisition refuses inside
+  context-local data/environment/base guards; small core lock observations add that order check
+  without changing mutation semantics/timing. An already-held usage lease can reenter safely.
+- Provenance classifier recognizes both existing standard `cli:main` and new `launcher:main`
+  records/scripts, including pip's long/space wrapper; this does not claim old installed code
+  participates in locks or that local provenance grants execution. Strict package entry-point
+  validation now requires the **new exact** target, and both bootstrap modules must be present
+  in wheel/sdist. Prior metadata/license/assets/tests/retired-installer checks remain; no CI/release
+  workflow, dependency bounds, manager version, metadata/backup schema or image assets changed.
+- **No independent helper or external-tool validation, narrow fresh-verifier capability, terminal
+  handoff, manager consent/replacement/recovery or automatic restart exists here.** No generic
+  environment/CLI bypass permits normal startup under exclusive access. Manager Update remains
+  disabled. UP-16 must still prove external interpreter/pipx independence/settings preservation,
+  self-contained helper lifetime, controlled verifier access without inherited-descriptor leaks,
+  operation/session quiescence and terminal restoration **before** any future mutation. Existing
+  restored-terminal tests prove ordinary exits only, not that pending handoff gate. Older managers,
+  direct library use, external pipx/Docker and orphaned daemon work after manager death do not
+  honor this advisory protocol; a same-user hostile process is outside the boundary.
+
+  | Final complete layer | Result |
+  |---|---|
+  | Python 3.11/current | **1655 passed, 84 opt-in skips**, 231.41 s |
+  | Python 3.11/lowest | **1655 passed, 84 opt-in skips**, 219.66 s; two known Typer deprecations |
+  | Python 3.14/current | **1655 passed, 84 opt-in skips**, 222.74 s |
+  | Python 3.14/lowest | **1655 passed, 84 opt-in skips**, 218.99 s; two known Typer deprecations |
+  | Affected real Docker/OpenCode/pipx/pty | **29 passed/702 logged checks**, no skips/deselections, `up16a-final`, 1047.39 s |
+
+  Complete commands: `env PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q --tb=short
+  --junitxml=.work/up16a/final-<label>.xml --basetemp=/tmp/opencode/up16a-final<label>`;
+  `311/venv311`, `311low/venv311low`, `314/venv314`, `314low/venv314low` serial foreground,
+  clean pip checks/inode preflight. Python 3.11.18/3.14.8, current Typer 0.27.3/Textual 8.2.8,
+  lowest 0.16.0/4.0.0. All **1739 ordered IDs/outcomes identical**. New **44 default cases**:
+  41 real host/process installation-lock cases, one bootstrap classifier template and two package
+  content regressions. Two new real distro session cases account for 84 opt-in skips. No passing
+  layer is inferred from those skips or from the historical 6.1.0 release.
+- Real command: `env PYTHONPATH="$PWD/src" OCS_TEST_DOCKER=1 OCS_TEST_RUN=up16a-final
+  .work/venv311/bin/python -m pytest -q -rA --tb=short tests/integration/test_42_base_coordination.py
+  tests/integration/test_43_diagnostics.py tests/integration/test_44_version_evidence.py
+  tests/integration/test_51_updates.py tests/integration/test_52_discovery.py
+  tests/integration/test_53_environment_updates.py tests/integration/test_54_base_updates.py
+  tests/integration/test_65_pipx.py tests/integration/test_66_manager_inventory.py
+  tests/integration/test_67_installation_exclusion.py --junitxml=.work/up16a/real-final.xml
+  --basetemp=/tmp/opencode/up16a-real-final`.
+  The prior 26 affected rows rerun, assertions retained: packaged/retained base races, diagnostics/
+  probes, observations/lifecycle/restore, manual/daily discovery, environment update/rollback and
+  independent recovery, exact base cached/full refresh/candidate/copy/retained-layer/terminal rules.
+  Actual held base mutations now also demonstrate exclusive installation refusal.
+- Real installed default/custom-space pipx launchers run the new bootstrap, preserve actual source/
+  VCS/Python/options/invocation/PATH classification and ordinary 80x24/120x40 terminal behavior.
+  An independent non-mutating external test guard targets only the run-owned installed prefix:
+  version/help/create startup refuses across alternate data/config paths, which stay absent.
+  A live installed dashboard permits another shared CLI reader but refuses exclusive access;
+  ordinary dashboard exit restores the terminal/releases usage. Guard processes are manifested/
+  reaped; private installations uninstalled. The existing explicitly declared private Git URL
+  rewrite/loopback release hook is not public-source authentication, helper independence or an
+  updater. Product records/executable bytes stay unchanged by inspection/exclusion.
+- `test_67` proves real retained Debian/Arch attached shells and long Docker exec hold the source
+  manager's installation lease while active and release it after completion, without imposing a
+  short deadline or changing attached-client/watchdog behavior. Private environment IDs/names,
+  process handles and release files belong to the run; product cleanup handles failures as well.
+- `test_65` adds full real pipx install/upgrade/reinstall/force upgrade/downgrade/uninstall,
+  installed basic CLI/assets, environment/data retention and foreign/legacy launcher assertions.
+  Its old fixture cloned published tags and attempted to create the same version tag; additionally
+  it installed stale HEAD, not the package under review. Corrected **only the fixture**: no-tags
+  private clone overlaid/committed with the current package, two tags created only there. Source/
+  published history is untouched. Production version stays 6.1.0; the fixture's next-patch version
+  is only a private upgrade-test input. Direct real Docker probes use the existing real markers,
+  never weaken the unit suite's no-host-Docker guard. Optional installed-asset image build not run.
+- Failure trail: collection reproducer as above. Selected **77 passed**, 1.40 s; expanded **1 lint
+  failure/130 passed**, 3.67 s; lowest affected **1 lint failure/177 passed**, 12.28 s, two known
+  deprecations. Replaced test fork error handling with explicit exit-status/finally semantics and
+  fixed import/string style; no lint/assertion waiver. Static **89 passed**, 2.22 s; final host/
+  package/document/quality subset **140 passed**, 4.13 s. Final four full suites include all fixes.
+- `up16a-proof`: **3 failed/2 passed/1 teardown error**, 53.53 s, **91 passed/1 failed checks**.
+  Existing local v6.1.0 tag collided in the private pipx fixture; new session row lacked real-Docker
+  markers, and direct release hit the no-real-Docker unit guard. Its unfinished real exec correctly
+  kept a lease that blocked the next row until campaign cleanup. Corrected fixtures and ensured
+  owned clients are always reaped. `up16a-proof2`: **1 failed/4 passed**, 83.90 s, **112 passed
+  checks**: old pipx row also needed the real markers for its direct container/volume retention
+  check after reaching uninstall. Added those markers; no product check suppressed/deselected.
+  Final 29-test/702-check gate reruns all failed rows and their original lifecycle/launcher assertions.
+- Final hashes, XML and logs `.work/up16a/final-source-sha256.json`, `final-*.xml`, `real-final.xml`;
+  real manifests/check logs `.work/logs/up16a-*`. All attempts have isolated product/pipx/source/
+  launcher roots and manifested owned resources, guarded product cleanup/uninstall/leak checks.
+  Final own-rootless inventory: no containers/volumes/test image tags, original Debian
+  `d5905c3f5026...`, Arch `418889644792...`, Arch input `3cbf69d2d595...`, Ubuntu `68ee22004a91...`
+  unchanged (full IDs in ignored inventory evidence). Shared build cache and persistent protocol
+  lock inodes intentionally remain. No user install, launcher, Python selection, credential,
+  public API or paid-provider use; no complete campaign/broad legacy TUI, privileged/socket/service,
+  human observation or pending helper/handoff/replacement claim. Finish packaging/current records,
+  review and commit this first UP-16 checkpoint locally, then STOP. Next remains **UP-16**, not
+  UP-17. No bump/merge/push/tag/upload/publication or release work.
+- Final package/document/resource checkpoint: sdist/wheel build, strict twine/content validation,
+  exact bootstrap entry point and equality of all five product modules to their frozen complete/
+  real hashes and wheel bytes pass. Private instructions/evidence are absent from the sdist.
+  Document/CLI/quality subset **43 passed**, 3.18 s (`docs-final.xml`); later prose-only follow-up
+  does not substitute for another full run. All product/packaging hashes remain unchanged after
+  final full/real gates. No remaining manager/guard/watchdog Python process found. Guarded cleanup
+  removed only **13 exact manifested completed pytest roots** (own UID, no live process/socket/
+  mount references); `/tmp/opencode` empty, **1048529 free inodes**. Additional intentional fixed-
+  namespace installation lock inodes remain persistent, not stale files to delete. Ignored result
+  `.work/up16a/cycle-cleanup-*.json`; logs/XML/private fixtures/package artifacts/shared build cache
+  and prior evidence retained. Final prose-only scratch is separately manifested/guarded after
+  its run. Review intended diff, commit locally on `work/updates` and STOP at this verified first
+  UP-16 checkpoint. Do not mark UP-16 complete or begin UP-17 from this evidence.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
@@ -2130,31 +2277,39 @@ a materially different architecture, record the blocker and ask the owner before
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
    `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, UP-06 `d7e587e`,
    PERF `6b53f46`, UP-07/UP-08 `cacffea`, UP-10 `8aa7df5`, UP-09 `1aca6ca`, UP-11 `a5843d6`,
-   UP-12/UP-13 `997a7d8`, then the UP-14/UP-15 package commit. Recover PERF's measured verification cadence from
+   UP-12/UP-13 `997a7d8`, UP-14/UP-15 `f1cb9ce`, then the first UP-16 startup/exclusion checkpoint.
+   Recover PERF's measured verification cadence from
    BASELINE; it does not reduce the shared/high-risk or real gates for the next package.
     Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
      category-owned advisory clearing, identity-bound evidence/discovery, exact targets and
       compact Updates UI, default-off independent daily GitHub/npm discovery, explicit environment
-   actions/recovery, base actions/explicit refresh and read-only manager release/pipx evidence
+   actions/recovery, base actions/explicit refresh, read-only manager release/pipx evidence and
+   early process-lifetime installation usage/internal exclusion
    are implemented. Image assets, manager
    version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Select **UP-16**, installation exclusion and terminal handoff. Inspect actual startup/CLI/TUI/
+3. Continue **UP-16**, independent helper/verifier/terminal handoff. Its first startup/exclusion
+   checkpoint is verified, **UP-16 is not DONE**. Inspect actual bootstrap/CLI/TUI/
    session ownership and lock order, new local provenance evidence, current pipx behavior/defaults
    and existing standalone diagnostic child patterns before designing the minimal helper boundary.
    UP-14/UP-15 classification is **local record agreement**, not public tag-to-commit authenticity,
    updater independence or permission to mutate. In real tests its official URL was deliberately
    mapped to private fixture sources; do not mistake that for public release authentication.
    Manager Update stays unavailable until UP-17's independent success/failure recovery gates pass.
-   Coordinate supported instances across all data/config overrides with an installation-scoped
-   usage/exclusive protocol, acquired before data/environment/base guards. Other supported live
-   instances prevent replacement; normal startup refuses during exclusive replacement except
-   narrow explicit fresh verification. Preserve descriptor ownership/noninheritance, fixed secure
-   namespace/inode checks, read-only source-lock separation and existing session/mutation ownership.
+   Preserve the new canonical-prefix process-lifetime shared usage/non-waiting exclusive protocol,
+   acquired before data/environment/base guards across all data/config overrides. Other supported
+   live instances block exclusive access; normal startup refuses it, with **no bypass yet**.
+   No production early release is safe merely because Dashboard.run returns: worker/thread-pool
+   draining can continue. Prove quiescence/process lifetime before future helper ownership; no
+   in-process upgrade or release/reacquire shortcut. Implement only narrowly scoped fresh
+   verification, not ordinary CLI dispatch under an environment/argument bypass. Preserve new
+   CLOEXEC/at-fork close-without-unlock semantics, fixed secure namespace/inode checks,
+   source-lock separation and existing session/mutation ownership. The strict package entry point
+   is now launcher:main; current-code cli.main still leases older wrappers/module invocation.
    Old managers and arbitrary external pipx/Docker do not honor new locks; disclose that boundary.
-   The future helper must be self-contained stdlib and independent of the replaceable environment;
+   The pending helper must be self-contained stdlib and independent of the replaceable environment;
    independently validate an external interpreter/pipx executable and recognized path/settings
    preservation, never assume PATH pipx proves it. No Python installation/switch, installer revival,
    shell evaluation, foreign-launcher takeover or force-as-backup assumption. Close Textual cleanly

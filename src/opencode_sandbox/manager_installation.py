@@ -117,7 +117,8 @@ def _running_distribution():
     files = dist.files or []
     roots = [Path(dist.locate_file(p)).parent for p in files if str(p).endswith('.dist-info/METADATA')]
     if len(roots) != 1: raise c.SandboxError('Distribution metadata location is ambiguous')
-    if [(ep.name, ep.value) for ep in dist.entry_points if ep.group == 'console_scripts'] != [(NAME, 'opencode_sandbox.cli:main')]:
+    points = [(ep.name, ep.value) for ep in dist.entry_points if ep.group == 'console_scripts']
+    if points not in ([(NAME, 'opencode_sandbox.cli:main')], [(NAME, 'opencode_sandbox.launcher:main')]):
         raise c.SandboxError('Distribution console entry point is unexpected')
     return module, roots[0]
 
@@ -169,7 +170,8 @@ def classify():
         quoted = '"' + str(executable) + '"' if ' ' in str(executable) else str(executable)
         shebang = script.startswith(('#!' + str(executable) + '\n',
                                     '#!/bin/sh\n\'\'\'exec\' ' + quoted + ' "$0" "$@"\n\' \'\'\'\n'))
-        if not shebang or 'from opencode_sandbox.cli import main' not in lines \
+        if not shebang or not any(line in lines for line in ('from opencode_sandbox.cli import main',
+                                                           'from opencode_sandbox.launcher import main')) \
                 or '    sys.exit(main())' not in lines:
             raise c.SandboxError('Application launcher template/interpreter is unrecognized')
         data_home = _location('XDG_DATA_HOME', Path.home() / '.local/share')

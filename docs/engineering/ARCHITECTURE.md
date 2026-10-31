@@ -16,7 +16,8 @@ evidence, compatible stable discovery and explicit policy comparisons. UP-10 add
 cached compact Updates interface; UP-09 adds default-off dashboard discovery; UP-11 binds explicit
 environment actions and recovery to existing handlers. UP-12/UP-13 bind base actions and explicit
 cached/full-refresh builds; UP-14/UP-15 add read-only manager discovery/classification. Manager
-installation exclusion/handoff/replacement remains pending and disabled.
+UP-16's first safety checkpoint adds early process-lifetime usage/exclusive coordination. Its
+independent helper/verifier/handoff gate and UP-17 replacement remain pending; Manager Update is disabled.
 
 ## Boundaries
 
@@ -37,13 +38,14 @@ installation exclusion/handoff/replacement remains pending and disabled.
 | `core.py` | Paths, locks, metadata (schema 2), labels, Docker access, create/start/stop/session/exec, snapshot, recreate and recovery journals, export, delete, image build, `error_text` | D-001..D-004, D-016, D-026, D-027, D-030, D-031, D-033, D-034 |
 | `runtime_identity.py` | Bounded acquisition and authenticated rootless response-sender proof; shared by CLI/TUI and standalone stdlib diagnostic | D-003, D-048, D-052 |
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
+| `launcher.py`, `installation_locks.py` | Stdlib-only console bootstrap and canonical-prefix shared process-lifetime lease/internal non-waiting exclusion; no updater, verifier bypass or early-release API | D-056, D-057 |
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
 | `update_cache.py` | Bounded private disposable evidence/attempt files, optional durable replacement and secure source-scoped exclusion; no metadata/journal authority or mutation locks | D-056 |
-| `update_discovery.py` | Dashboard-only optional daily npm attempt and Docker-free policy-filtered cached availability; no manager provider or component executor | D-056 |
+| `update_discovery.py` | Dashboard-only independent optional daily GitHub/npm attempts and Docker-free qualified cached availability; no component executor | D-056 |
 | `updates.py`, `updates_tui.py`, `environment_updates_tui.py` | Read-only base inventory, compact local/cached-first Updates views, independent checks and owned cancellation; environment target/policy forms and immutable consent invoke existing component handlers, not a universal mutation engine | D-056, D-057 |
 | `agent_context.py` | Renders, verifies and refreshes the injected guidance | D-008, D-018 |
 | `integrations.py` | Initial MCP integrations (Context7 by default), provisioned once | D-009 |
@@ -64,6 +66,51 @@ rendered without markup; there is no versions-specific default. Agent Context us
 fallback, and the saved guidance is not verified against that unobserved preview. Successful
 inspection retains the existing file comparison. Neither path writes guidance or starts a
 container; lifecycle generation and CLI verification remain unchanged.
+
+## Early installation access (D-056, UP-16 first checkpoint)
+
+The packaged console entry point is `opencode_sandbox.launcher:main`. It imports only stdlib and
+the stdlib-only `installation_locks` module before taking shared access; no Typer/core/TUI import
+or product-directory creation precedes exclusion. `cli.main()` also takes/reenters that lease
+before dispatch, preserving current-code older console wrappers and module invocation. Merely
+importing/calling the internal Typer app or Python library is not a supported entry point and
+does not acquire a lease. The package version remains an inert constant, not an import-time lock.
+
+The fixed own-user 0700 `/tmp/opencode-sandbox-locks-<UID>/` namespace is shared with base guards;
+there is no HOME/TMPDIR/XDG/data/config override or fallback. A distinct `installation-<hash>.lock`
+is keyed by the canonical absolute Python prefix, not the shared interpreter binary or the venv
+inode (which replacement can change). Aliases converge and separate environments do not merge.
+No-follow directory-relative opens validate own UID/exact 0600 regular file/one link, parent
+ownership/sticky writability, and directory/file inode agreement after acquisition. Unsafe paths
+are refused, never repaired, unlinked or regarded as stale. This stdlib bootstrap validation is
+deliberately independent of the core-dependent base implementation; neither imports the other.
+
+Non-waiting shared flock permits concurrent CLI/dashboard processes. Internal exclusive flock
+refuses with any shared/exclusive holder, including the requesting process's own lease: no
+shared-to-exclusive upgrade or release/reacquire gap. Normal startup (help/version included)
+refuses exclusive access with a static error/exit 2, before dispatch. A process-global mutex makes
+usage acquisition idempotent across callers/threads. The shared guard remains referenced until
+process exit, **not** main/dashboard return: non-daemon/thread-pool shutdown cannot leave a live
+worker operating after release. No production early-release API is provided at this checkpoint.
+All directory/lock descriptors are CLOEXEC; fork-only children close their copies without
+LOCK_UN, so they neither unlock the parent nor keep its lock after it exits. Entry in a forked
+child must acquire a new lease. Process death releases the guard; persistent inodes remain.
+
+Installation access is acquired before data coordinator/environment/base guards. A small
+context-local data-lock observation in core complements the existing base-held observation;
+new installation access inside either refuses reverse ordering, while an already-held usage
+lease may reenter without reacquisition. Data/base mutation semantics and diagnostic timing are
+unchanged. Library callers, older managers, manual external pipx/Docker and escaped daemon-side
+work after a killed client do not honor this protocol; it is not a same-user security boundary
+or proof that orphaned work stopped. Provenance classification recognizes both standard old and
+bootstrap console templates, without claiming that an older installed program implements locks.
+
+This independently verified startup checkpoint is only part of UP-16. There is no consumer that
+replaces the manager, independent helper or external-tool validation, narrow fresh-verifier
+capability, terminal handoff, recovery record or automatic restart. Those are separate pending
+gates; exclusive access alone never authorizes mutation. Manager Update remains disabled. Future
+handoff must prove quiescence and move into an independent process rather than close this lease
+while Textual workers could still be alive; no generic environment-variable/CLI bypass is present.
 
 ## Docker access and identity (D-003, D-004, D-052)
 
@@ -324,9 +371,10 @@ authoritative grant. `manager status [--check]` and the Manager Updates view exp
 local/discovery evidence without Docker or pipx execution. Opening runs only local classification,
 not network. Explicit Check starts independent owned workers, preserves version/prior evidence
 on either failure, and Cancel/Close rejects late results. Details includes bounded plain release
-notes/manual guidance, and manager Update stays disabled. UP-16/UP-17 must still independently
-verify installation usage/exclusion, safe external updater/helper, terminal restoration, exact
-target/source consent/revalidation, actual replacement and fresh-process success/failure recovery.
+notes/manual guidance, and manager Update stays disabled. UP-16's early installation usage/
+exclusion checkpoint is implemented above; safe independent external updater/helper, controlled
+fresh verification and terminal handoff remain pending, followed by UP-17's exact target/source
+consent/revalidation, actual replacement and fresh-process success/failure recovery.
 
 Dashboard startup/explicit Refresh publishes complete base-image check results, including success.
 Daemon, resource-support and image advisories own their notification objects and share an explicit
@@ -383,10 +431,11 @@ files are checked with no-follow descriptor-relative access; pathname/inode iden
 again after acquisition. Unsafe paths fail closed without chmod/unlink/recreation. File
 descriptors are non-inheritable; process death releases the advisory flock, not the file.
 
-Acquire only needed data coordinator -> environment IDs in stable order -> base build -> base
-publication. The base guard tracks its execution context and refuses reverse/recursive base
-acquisition; `core.lock` refuses data/environment acquisition inside a base guard. Installation
-usage will precede these levels in UP-16; it is not implemented yet. Build/rollback hold build
+Supported entry points acquire installation usage first, then only needed data coordinator ->
+environment IDs in stable order -> base build -> base publication. The base guard tracks its
+execution context and refuses reverse/recursive base acquisition; `core.lock` refuses data/
+environment acquisition inside a base guard. New installation access inside data/base guards
+also refuses reverse order. Build/rollback hold build
 through candidate/copy verification and their own cleanup, taking publication only for guarded
 inspection, identity rechecks and tag changes. Creation holds environment then publication from
 pin check through Docker creation. All base cleanup takes build then publication nonblocking,

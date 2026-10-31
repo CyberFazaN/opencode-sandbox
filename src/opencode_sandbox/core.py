@@ -256,6 +256,11 @@ def init_dirs():
         p.mkdir(parents=True,exist_ok=True)
         p.chmod(0o700)
 
+_DATA_LOCKS = ContextVar('data_guards', default=())
+
+def locks_held():
+    return bool(_DATA_LOCKS.get())
+
 @contextmanager
 def lock(key, timeout=30.0):
     """Cross-process advisory lock with bounded waiting; all mutations use it."""
@@ -275,8 +280,11 @@ def lock(key, timeout=30.0):
                 if time.monotonic() >= deadline:
                     raise SandboxError(f"Environment busy: {key} (lock timeout)")
                 time.sleep(0.05)
+        token = _DATA_LOCKS.set((*_DATA_LOCKS.get(), key))
         try: yield
-        finally: fcntl.flock(f,fcntl.LOCK_UN)
+        finally:
+            _DATA_LOCKS.reset(token)
+            fcntl.flock(f,fcntl.LOCK_UN)
 
 def now(): return datetime.now(UTC).isoformat()
 

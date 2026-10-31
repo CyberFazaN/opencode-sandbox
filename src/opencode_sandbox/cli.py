@@ -785,10 +785,15 @@ def _exit_on_signal(signum, frame):
 def main():
     import signal
     import sys
+
+    from . import installation_locks
     if sys.argv[1:2] not in ([], ["tui"]):  # Textual handles its own signals
         for sig in (signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, _exit_on_signal)
     try:
+        # Also cover python -m ...cli and previously generated cli:main console wrappers.
+        # The new bootstrap takes this lease before importing the CLI at all.
+        installation_locks.acquire_usage()
         if len(sys.argv)==1:
             if sys.stdin.isatty() and sys.stdout.isatty():
                 from .tui import Dashboard
@@ -798,7 +803,7 @@ def main():
     except c.PrerequisiteError as exc:  # its own exit status (see doctor --help)
         typer.secho(f"Error: {exc}",fg=typer.colors.RED,err=True)
         raise SystemExit(exc.exit_code)
-    except c.SandboxError as exc:
+    except (c.SandboxError, installation_locks.Error) as exc:
         typer.secho(f"Error: {exc}",fg=typer.colors.RED,err=True)
         raise SystemExit(2)
     except OSError as exc:  # e.g. permission denied in a target: a message, not a traceback

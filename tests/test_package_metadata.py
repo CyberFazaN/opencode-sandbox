@@ -10,7 +10,7 @@ REPOSITORY = "https://github.com/CyberFazaN/opencode-sandbox"
 
 def test_distribution_identity():
     assert PROJECT["name"] == "opencode-sandbox"
-    assert PROJECT["scripts"] == {"opencode-sandbox": "opencode_sandbox.cli:main"}
+    assert PROJECT["scripts"] == {"opencode-sandbox": "opencode_sandbox.launcher:main"}
     assert PROJECT["authors"] == [{"name": "CyberFazaN"}]
     assert "unofficial" in PROJECT["description"]
     assert (ROOT / PROJECT["readme"]).is_file()

@@ -1,7 +1,7 @@
 import pytest
 import typer.rich_utils
 
-from opencode_sandbox import base_locks
+from opencode_sandbox import base_locks, installation_locks
 from opencode_sandbox import core as c
 from opencode_sandbox import runtime_identity as rid
 
@@ -15,6 +15,15 @@ def _isolated_manager_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(c, "CONFIG", tmp_path / "ocs-config")
     # Unit tests exercise real host locks, but never the user's shared namespace.
     monkeypatch.setattr(base_locks, "_TMP", tmp_path)
+    monkeypatch.setattr(installation_locks, '_TMP', tmp_path)
+    # main() is process-lifetime in production. In-process entry-point tests must not retain a
+    # lease to a completed test's private inode; never release a real user's lease here.
+    assert installation_locks._LEASE is None
+    yield
+    with installation_locks._MUTEX:
+        if installation_locks._LEASE is not None:
+            installation_locks._LEASE.close()
+            installation_locks._LEASE = None
 
 
 @pytest.fixture(autouse=True)
