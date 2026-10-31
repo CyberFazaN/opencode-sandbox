@@ -75,6 +75,7 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
              f"{info}/entry_points.txt": "[console_scripts]\nopencode-sandbox = opencode_sandbox.launcher:main\n",
              'opencode_sandbox/launcher.py': 'x', 'opencode_sandbox/installation_locks.py': 'x',
              'opencode_sandbox/manager_tools.py': 'x', 'opencode_sandbox/manager_tool_probe.py': 'x',
+             'opencode_sandbox/manager_handoff.py': 'x', 'opencode_sandbox/manager_helper.py': 'x',
              f"{info}/licenses/LICENSE": "MIT",
              **{f"opencode_sandbox/assets/images/{a}": "x" for a in check_dist.assets()}}
     with zipfile.ZipFile(dist / f"opencode_sandbox-{v}-py3-none-any.whl", "w") as wheel:
@@ -85,6 +86,7 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
     for name in ("LICENSE", "README.md", "pyproject.toml", "src/opencode_sandbox/__init__.py",
                  'src/opencode_sandbox/launcher.py', 'src/opencode_sandbox/installation_locks.py',
                  'src/opencode_sandbox/manager_tools.py', 'src/opencode_sandbox/manager_tool_probe.py',
+                 'src/opencode_sandbox/manager_handoff.py', 'src/opencode_sandbox/manager_helper.py',
                  *(f"src/opencode_sandbox/assets/images/{a}" for a in check_dist.assets()), *extra):
         if name not in drop:
             (tree / name).parent.mkdir(parents=True, exist_ok=True)
@@ -119,7 +121,8 @@ def test_a_missing_image_asset_or_licence_is_reported(tmp_path):
     assert any("image assets" in p for p in problems) and any("LICENSE missing" in p for p in problems)
 
 
-@pytest.mark.parametrize('module', ['launcher.py', 'installation_locks.py', 'manager_tools.py', 'manager_tool_probe.py'])
+@pytest.mark.parametrize('module', ['launcher.py', 'installation_locks.py', 'manager_tools.py', 'manager_tool_probe.py',
+                                  'manager_handoff.py', 'manager_helper.py'])
 def test_missing_bootstrap_modules_fail_both_package_gates(tmp_path, module):
     dist = distributions(tmp_path, drop={'opencode_sandbox/' + module, 'src/opencode_sandbox/' + module})
     problems = check_dist.check(dist)

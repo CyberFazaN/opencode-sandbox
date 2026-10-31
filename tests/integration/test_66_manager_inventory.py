@@ -5,17 +5,21 @@ exercises real pipx/PEP 610 records and launchers, NOT authenticity of a public 
 No source/provenance check is patched; the local transport fixture is declared, not shipped.
 """
 import json
+import os
 import select
 import shutil
+import signal
 import subprocess
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
 from campaign import ROOT
 from pty_term import ESC, Term
+from test_manager_helper import result_at, subreaper, wait_helper
 
 
 def exclusion(camp, prefix, *, busy):
@@ -103,6 +107,61 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
                'Manager real tools: pipx inside the application refused before execution despite external shebang')
         finally: (inside / 'pipx').unlink(); inside.rmdir()
         ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real tools: version-only assessment left installed records/launcher unchanged')
+        # Freeze the helper from the ACTUAL installed package, not the source checkout. The
+        # stdlib-only child then outlives that installation's origin and works with it absent.
+        # This is a non-mutating process-exit fixture, NOT restored-terminal handoff evidence.
+        staging = base / 'helper staging'; staging.mkdir()
+        camp.note(f'owned non-mutating helper staging/evidence parent {staging}; all nested artifacts/results retained, no install/verifier dispatch')
+        origin_code = ("import json,sys,threading\nfrom pathlib import Path\n"
+            "from opencode_sandbox import installation_locks as locks\nlocks.acquire_usage()\n"
+            "from opencode_sandbox import manager_handoff as h\n"
+            "assert Path(h.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())\n"
+            "value=h.prepare(json.loads(sys.argv[1]),Path(sys.argv[2]))\nassert value['supported'],value\n"
+            "artifact=value['artifact']\nfixture=h.start_fixture(artifact,budget=20)\nfixture.arm()\n"
+            "threading.Thread(target=lambda:sys.stdin.read()).start()\n"
+            "print(json.dumps({'directory':str(artifact.directory),'helper':fixture.process.pid}),flush=True)\n")
+        helper_env = dict(env, PATH=str(Path(sys.executable).parent) + ':/usr/bin:/bin')
+        helper = None
+        with subreaper():
+            origin = subprocess.Popen([str(prefix / 'bin/python'), '-B', '-c', origin_code, json.dumps(value), str(staging)],
+                                      env=helper_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            camp.note(f'owned installed helper origin pid={origin.pid}; process-lifetime shared lease and non-daemon stdin worker; always reaped')
+            try:
+                assert select.select([origin.stdout], [], [], 15)[0], 'Installed helper origin did not report readiness'
+                line = origin.stdout.readline()
+                assert line, origin.stderr.read()
+                fixture = json.loads(line); helper = fixture['helper']; directory = Path(fixture['directory'])
+                camp.note(f'owned frozen helper pid={helper}, artifact/result evidence {directory}; supervisor adopts/reaps this exact helper after origin exit')
+                ck(directory.parent == staging and (directory / 'helper.pyz').is_file(), 'Manager real helper: actual installed package materializes private independent zipapp')
+                time.sleep(.2)  # main has returned; non-daemon worker and its lease must still live
+                ck(origin.poll() is None and not (directory / 'result.json').exists(), 'Manager real helper: main return with worker draining is not quiescence')
+                ck(exclusion(camp, prefix, busy=True), 'Manager real helper: origin retains process-lifetime usage while fixture waits')
+                assert not hidden.exists()
+                camp.note(f'owned installed venv temporarily hidden {prefix} -> {hidden} for staged-helper process-exit proof; restored in finally before pipx uninstall')
+                prefix.rename(hidden)
+                try:
+                    origin.communicate(timeout=10)
+                    ck(origin.returncode == 0, 'Manager real helper: originating installed process exits normally with its venv absent')
+                    child_pid = helper
+                    status = wait_helper(helper)
+                    helper = None  # reaped PID is never a signal target
+                    ck(status == 0, 'Manager real helper: independent child finishes and is explicitly adopted/reaped')
+                    result = result_at(directory)
+                    ck(result['outcome'] == 'quiescent' and result['fixture'] is True
+                       and result['origin'] == origin.pid and result['helper'] == child_pid and not prefix.exists(),
+                       'Manager real helper: frozen stdlib artifact observes actual process death and acquires exclusion with application absent')
+                    ck(exclusion(camp, prefix, busy=False), 'Manager real helper: fixture exit releases exclusion without changing the persistent lock inode')
+                finally: hidden.rename(prefix)
+            finally:
+                if origin.poll() is None: origin.kill()
+                origin.communicate(timeout=5)
+                if helper is not None:
+                    try:
+                        # This PID is still an unreaped adopted child, never a reaped/reused PID.
+                        os.kill(helper, signal.SIGKILL); os.waitpid(helper, 0)
+                    except (ProcessLookupError, ChildProcessError): pass
+        ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real helper: fixture left installed records/executable unchanged')
+        ck(run().returncode == 0, 'Manager real helper: restored original installation remains operational; no automatic restart')
         # This external guard runs from the test venv, not from the guarded application. It
         # exercises the real fixed namespace/prefix key without patching the installed package.
         hold = subprocess.Popen([sys.executable, '-B', '-c',

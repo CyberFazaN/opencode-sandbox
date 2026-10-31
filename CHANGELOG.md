@@ -44,6 +44,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   binary. Only the inspected pipx 1.18.7 path is supported; unknown or dependent tools get manual
   guidance. This is not run by startup, discovery, status or the dashboard, and is not a helper,
   installation authorization, verifier bypass or terminal-handoff implementation.
+- Internal non-mutating helper fixture freezes a private stdlib-only artifact outside the
+  manager installation. Its independent process waits for actual origin termination, including
+  worker shutdown, before trying non-waiting installation exclusion. It does not install anything,
+  grant verifier access or implement restored-terminal handoff; Manager Update stays disabled.
 
 ### Fixed
 

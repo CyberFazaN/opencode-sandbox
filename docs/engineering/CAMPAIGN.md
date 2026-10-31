@@ -173,6 +173,22 @@ handoff or replacement exists here; ordinary terminal-restoration evidence is no
 No containers/volumes/test tags remain, all original image IDs unchanged, all persistent inodes/
 evidence/build cache preserved. **UP-16 is not complete; Manager Update remains disabled.**
 
+Latest UP-16 artifact/lifetime checkpoint (still partial): **61 new default cases**, four complete
+suites (**1763 passed/84 opt-in skips each**, identical **1847** ordered outcomes) and **29 affected
+real tests/732 checks**, `up16c-verified`, 1032.84 s. All prior affected rows/assertions retained.
+Actual default/custom-space installed packages freeze the stdlib helper outside their venv; the
+origin keeps usage during worker shutdown, then exits while its owned venv is hidden, and the
+frozen external helper acquires exclusion and exits. Supervisor explicitly adopts/reaps that exact
+child; source/launcher bytes unchanged, hidden venv restored before uninstall. Host tests cover
+thread-pool/non-daemon main-return/EOF versus actual death, armed/unarmed interruption, another
+instance, malformed protocol/budgets, spawn signals, private artifact preservation and descriptor/
+environment isolation. Final-review huge-integer budget failure fixed without weakening assertions;
+all four complete suites and the whole affected real gate rerun afterward. No containers/volumes/
+test tags remain and original image IDs are unchanged; persistent inodes/evidence/build cache
+preserved. **Not verifier access or restored-terminal handoff**: no CLI/TUI/startup consumer or
+mutation path; Manager Update stays disabled. Existing ordinary terminal checks are not promoted
+as helper-handoff proof. Full commands/failure trail/limits: BASELINE and the Updates working record.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

@@ -70,7 +70,11 @@ preservation. It rejects target-dependent symlink routes, lazy/absent declared p
 pipx/metadata and unsafe inputs without a grant. Four complete suites (1702 passed/84 skips each)
 and 29 affected real tests/714 checks pass, including actual external pipx with the owned manager
 venv temporarily absent. No startup/status/UI consumer or new public command executes this probe.
-Next: finish UP-16's independent helper materialization/lifetime, narrow fresh-verifier access
+UP-16's third checkpoint stages a private frozen stdlib helper outside the installation and
+exercises only a non-mutating process-exit fixture. A pidfd, not main return or socket EOF, proves
+origin termination before a non-waiting exclusive attempt. Existing process-lifetime leases stay
+intact. This is not verifier access, terminal handoff or installation authority.
+Next: finish UP-16's narrow fresh-verifier access
 and real terminal handoff. No early release or generic bypass exists; Manager Update stays
 disabled. Keep UP-17 replacement/recovery separate. No version bump, release preparation,
 merge, push or publication.

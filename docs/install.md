@@ -69,13 +69,15 @@ with the same user's access. Older manager versions, direct Python library use a
 external pipx/Docker commands do not honor it. Stop other manager instances/sessions before a
 manual pipx replacement; these locks cannot make an external replacement safe automatically.
 
-Manager installation in Updates is still disabled. This first coordination checkpoint does not
-provide an independent updater/helper, verification bypass, terminal handoff, replacement or
-recovery workflow; those require separate verification before installation can be offered.
+Manager installation in Updates is still disabled. There is no updater, fresh-verifier bypass,
+restored-terminal handoff, replacement or recovery workflow; those require separate verification
+before installation can be offered.
 An additional internal prerequisite assessment now checks an existing external pipx/Python
 runtime and recognized locations, with conservative manual fallback. It is not a user command
 and is never run automatically or by the read-only status/Updates checks. No pipx/Python is
-installed, switched or converted by that assessment; helper and handoff remain pending.
+installed, switched or converted by that assessment. An internal non-mutating fixture can now
+stage an independent stdlib helper and prove process-exit coordination; it is not a public command
+or an installation path. Narrow verifier access and restored-terminal handoff remain pending.
 
 ## Prepare Docker
 

@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-15 and PERF complete. UP-16 partial: startup/exclusion and external-tool prerequisite proofs verified; next is independent helper/verifier/terminal handoff.**
+- **UP-00..UP-15 and PERF complete. UP-16 partial: startup/exclusion, external-tool prerequisites and frozen non-mutating helper/lifetime proofs verified; next is narrow verifier access and restored-terminal handoff.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -302,8 +302,9 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-UP-00..UP-15 and the one-time PERF checkpoint are complete. UP-16 has verified startup/exclusion
-and external-tool prerequisite checkpoints but remains partial; UP-17/UP-18 are pending. D-057 consolidates closely related remaining
+UP-00..UP-15 and the one-time PERF checkpoint are complete. UP-16 has verified startup/exclusion,
+external-tool prerequisites and frozen non-mutating helper/lifetime checkpoints but remains partial;
+UP-17/UP-18 are pending. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -321,7 +322,7 @@ a quota or permission to combine
 unrelated risks. Read-only manager discovery can be developed independently of base refresh;
 manager execution remains later and must not delay the earlier component workflows. UP-18 is
 not release preparation. UP-00..UP-15 are DONE; UP-16 is PARTIAL and later tasks are PENDING.
-Continue UP-16's helper/verifier/terminal-handoff gate;
+Continue UP-16's narrow verifier/restored-terminal handoff gate;
 UP-11's independent environment recovery gate is verified. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
@@ -341,7 +342,7 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-11 | DONE: environment actions and independent recovery gate | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers, immutable exact consent/locked revalidation, live refusals, app-owned non-cancelable mutations, persistent journal/recovery routing. Four full suites (1471 passed/78 skips each), 18 affected real tests/400 checks including actual update/full-layer rollback and independent missing/failed/successful recovery on both distributions. Evidence below; no base/manager bundling |
 | UP-12 + UP-13 | DONE: base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Build/Rebuild/Check/Rollback, identity/target/definition/mode consent, candidate-ID verification/guarded publication, retained copies and explicit multi-copy selection; cached versus pull/no-cache refresh, no prune/migration. Four complete suites (1525 passed/80 skips each), 24 affected real tests/581 checks, both distributions including separate cached/full-refresh package builds, concurrency/pinned creation, failed candidates, retained layers and 80x24/larger terminal ownership. Evidence below |
 | UP-14 + UP-15 | DONE: read-only manager discovery/local installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Official published-full-release provider, strict tags/numeric comparison/no downgrade, independent failures and local evidence, separate daily GitHub source/claims. Local actual package/VCS/pipx/Python/options/invocation/launcher/custom-location agreement; manual guidance for foreign/editable/shadowed/ambiguous/unsupported settings. 86 new default cases, four full suites (1611 passed/82 skips each), 26 affected real tests/637 checks including default/custom-space pipx and real manager terminals. Local provenance is not public commit authentication or an execution grant; Update disabled. Evidence below |
-| UP-16 | PARTIAL: startup/exclusion and external-tool prerequisites verified; helper/verifier/handoff pending | UP-14 + UP-15, UP-05 | First checkpoint: stdlib bootstrap/process-lifetime canonical-prefix usage/internal exclusion, ordered private persistent inodes and fork/exec/shutdown safety (`2e6d2d0`). Second: internal dated existing-pipx/Python/runtime/dependency/settings proof, full symlink routes and raw missing-file-independent RECORD inventories, exact source-Python selection. Latest four complete suites (1702 passed/84 skips each), 29 affected real tests/714 checks, including actual external tools with the owned app venv absent. Still requires independent self-contained helper materialization/lifetime/ownership, narrow fresh-verifier capability and clean restored-terminal handoff before UP-16 is DONE; no mutation/handoff consumer or replacement exposed |
+| UP-16 | PARTIAL: startup/exclusion, external-tool prerequisites and frozen helper/lifetime fixture verified; verifier/handoff pending | UP-14 + UP-15, UP-05 | First: stdlib bootstrap/process-lifetime canonical-prefix usage/internal exclusion/fork/exec/shutdown safety (`2e6d2d0`). Second: independent existing-pipx/Python/runtime/dependency/settings proof, full symlink routes/raw RECORD and exact source-Python selection (`462d8fe`). Third: private source-identical stdlib artifact outside target, pidfd-based actual process-exit/non-daemon/thread-pool coordination and non-waiting exclusive fixture, no inherited guards. Latest four complete suites (1763 passed/84 skips each), 29 affected real tests/732 checks, including staged helper frozen from actual installed packages operating after origin exit with app venv absent. Still requires narrow fresh-verifier capability and restored-terminal ownership handoff before UP-16 is DONE; no CLI/TUI/startup consumer, mutation or replacement exposed |
 | UP-17 | Manager replacement, verification and failure recovery | UP-16 | Exact confirmed target and revalidation, actual fresh-process verification, no automatic restart. Independently verify (1) replacement/success and (2) failure/interruption states, private recovery record and instructions before/during/after install. Separate focused commits/checkpoints for these gates; isolated pipx and real terminal evidence, never inferred backup/rollback safety |
 | UP-18 | Cross-layer verification and record consolidation | UP-01..UP-17 | Run affected/full regressions, required real combinations, dependency endpoints, docs/CLI/packaging checks; record evidence/limits, promote durable facts and retire the effort record when complete; no release work |
 
@@ -2417,6 +2418,161 @@ a materially different architecture, record the blocker and ask the owner before
   No product/checker change after final complete/real gates; review, local commit on `work/updates`
   and STOP at this second verified UP-16 trust checkpoint, **not completion of UP-16**.
 
+### UP-16 third artifact/lifetime checkpoint — 2026-10-31 — frozen non-mutating helper
+
+- Resumed clean `work/updates` at `462d8fe`; reconciled instructions/local permissions, TODO,
+  BASELINE, architecture, D-056/D-057 and the running handoff. Own-rootless identity verified:
+  no containers/volumes, same four original full image IDs, `/tmp/opencode` empty. Owner reiterated
+  **nothing goes to the public repository**. All work/evidence/commits local only: no upload,
+  remote change, project tag, merge, push or publication. Local instructions' pre-effort state is
+  historical, not a competing task or new permission. No UP-17 execution/recovery or release work.
+- Investigated actual bootstrap/CLI/TUI/session and worker/lock lifetimes. Main/dashboard return
+  is not process quiescence: non-daemon and thread-pool shutdown can still hold code/data work.
+  The shared lease remains process-lifetime; no release, conversion or in-process reacquire
+  shortcut is added. Under D-057, split at the now-verified **actual artifact and process-exit
+  ownership boundary**, not a mock handoff or promise about a future verifier. **UP-16 stays
+  partial**; narrow fresh-verifier access and restored-terminal handoff remain the next package.
+- `manager_handoff.prepare()` is internal, with no startup/CLI/status/discovery/TUI caller. It
+  freshly reuses the conservative external-tool assessment; support is never install consent.
+  Freeze source copies of `manager_helper.py`, unchanged `installation_locks.py` and unchanged
+  `manager_tool_probe.py` into a deterministic zipapp under a unique private own-UID 0700 directory
+  in an explicitly chosen controlled parent outside the target. Zip/inventory files are single-
+  link own-UID 0600, created exclusively and fsynced with the directory; local SHA-256 and inode
+  identity are rechecked. This is not public-source authenticity, content attestation, a discovery
+  cache, recovery journal or mutation grant. Partial artifacts are preserved rather than repaired.
+- The helper entry imports only stdlib and its two frozen local copies; the diagnostic module's
+  only helper use is its stdlib symlink-route primitive, not its optional pipx diagnostic main.
+  No application, distribution inventory, Typer/Textual or external pipx dependency is required
+  at helper runtime. Run the artifact from the already-assessed external interpreter `-I -B -S`.
+  Preserve exact recorded Python spelling/routes and previous raw RECORD/tool refusal contracts;
+  no tool/Python installation or switch, shell evaluation or external metadata normalization.
+- `start_fixture()` requires the origin's installation identity and proper lock order, acquires/
+  retains usage until true process exit, validates artifact/interpreter again and launches one
+  **non-mutating fixture**. Only explicit seqpacket control, origin pidfd and artifact-directory
+  descriptors cross exec; they are non-inheritable again inside the helper. No guard, terminal,
+  arbitrary command, provider/pip/index/proxy/loader/Python environment or installation authority.
+  Existing callable-signal launch guard prevents interruption between spawn and child ownership;
+  failed starts and explicit cancel reap their exact child. No PID polling/EOF fallback when
+  Linux pidfds are unavailable. No new host setup or public/default startup prerequisite.
+- Frozen entry validates peer UID/PID against pidfd, request shape/bounds/protocol, stdlib flags/
+  runtime/search/routes, artifact hash/private ownership/directory inode and no inherited protocol
+  locks. Readiness and fixture arming are separate. Before arming, lost origin/channel abandons;
+  after arming, channel EOF alone is never quiescence. Wait on **actual origin termination**, not
+  main return, thread cancellation, lease release or guessed PID liveness. Then try unchanged
+  installation-exclusive access once. Another live shared/exclusive holder produces busy without
+  waiting/retry; otherwise write one bounded private fixture result under exclusion, release the
+  helper's guard and exit. No verifier/ordinary CLI bypass, install/pipx/Docker/network dispatch,
+  automatic dashboard restart or persistent process/service. Even SIGKILL after fixture arming
+  can only produce a non-mutating result, never terminal-restoration proof or future consent.
+- Fixture protocol has a maximum 30-second budget and eight-second request/readiness bound;
+  these are **not installation/mutation deadlines**. The living origin owns cancel/reap; once an
+  armed origin exits, the helper owns its remaining finite lifetime and retained private artifact/
+  result. Explicit discard refuses a live child or changed/unfamiliar bytes, records, ownership,
+  inode or files. Tests use a scoped subreaper to adopt/reap the exact orphan, restore its prior
+  supervisor state, and never signal a reaped PID. No generic disk scavenger or new recovery store.
+
+  | Final complete/real layer | Result |
+  |---|---|
+  | Python 3.11/current | **1763 passed, 84 opt-in skips**, 238.53 s |
+  | Python 3.11/lowest | **1763 passed, 84 opt-in skips**, 232.91 s; two known Typer deprecations |
+  | Python 3.14/current | **1763 passed, 84 opt-in skips**, 242.52 s |
+  | Python 3.14/lowest | **1763 passed, 84 opt-in skips**, 232.26 s; two known Typer deprecations |
+  | Affected real Docker/OpenCode/pipx/pty | **29 passed/732 logged checks**, no skips/deselections, `up16c-verified`, 1032.84 s |
+
+- Full commands: `env PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q --tb=short
+  --junitxml=.work/up16c/verified-<label>.xml --basetemp=/tmp/opencode/up16c-verified<label>`;
+  `venv311/311`, `venv311low/311low`, `venv314/314`, `venv314low/314low`, serial foreground,
+  inode preflight/four clean pip checks. Python 3.11.18/3.14.8, current Typer 0.27.3/Textual 8.2.8,
+  lowest 0.16.0/4.0.0. All **1847 ordered IDs/outcomes identical**. **61 new default cases**: 59
+  actual host/process helper cases plus two required-module package gates. Existing mocked,
+  host/files/Git/process, pilot/terminal, security/lifecycle/recovery and static assertions retained.
+- New host cases cover private deterministic artifact/source equality, staging outside/symlink
+  routes, unsafe/missing/relative parents, changed artifact bytes/inodes/permissions/hardlinks/
+  symlinks/directory and unfamiliar inventory/result/files preservation. Actual independent
+  process control, peer/pidfd/channel/protocol/boolean/large/malformed/oversized/duplicate requests,
+  no generic helper dispatch, no inherited guards or credential/Python environment, fork-origin
+  refusal, single use, lock order, required pidfd and no descriptor leak, expiry/cancel/readiness
+  failure and INT/TERM/HUP at spawn with exact reaping. Actual normal/killed armed/unarmed origins,
+  main return with non-daemon or thread-pool shutdown, socket EOF without process death and another
+  supported live shared instance. Synthetic external pipx metadata is real-process boundary
+  coverage, not substituted for the actual installed-package proof below.
+- Real command: `env PYTHONPATH="$PWD/src" OCS_TEST_DOCKER=1 OCS_TEST_RUN=up16c-verified
+  .work/venv311/bin/python -m pytest -q -rA --tb=short tests/integration/test_42_base_coordination.py
+  tests/integration/test_43_diagnostics.py tests/integration/test_44_version_evidence.py
+  tests/integration/test_51_updates.py tests/integration/test_52_discovery.py
+  tests/integration/test_53_environment_updates.py tests/integration/test_54_base_updates.py
+  tests/integration/test_65_pipx.py tests/integration/test_66_manager_inventory.py
+  tests/integration/test_67_installation_exclusion.py --junitxml=.work/up16c/real-verified.xml
+  --basetemp=/tmp/opencode/up16c-real-verified`. Prior 29 rows/assertions all rerun, including
+  both packaged/retained base races/rollback/pins/layers, diagnostics/real binary/lifecycle/
+  restore/discovery, environment update and independent recovery, cached/full refresh, pipx
+  lifecycle/data retention/foreign launchers, active dashboard/session/exec/base-mutation exclusion
+  and 80x24/larger ordinary terminal restoration. No Docker/mutation/verification response mocked.
+- Extended actual default/custom-space `test_66` without replacing existing assertions. An origin
+  runs from the **installed application's own Python/package**, leases before application imports
+  and freezes helper source from that package, explicitly asserting it is not the source checkout.
+  An actual non-daemon worker keeps the origin/usage live after main returns; helper result remains
+  absent and exclusive access refuses. Manifest and temporarily rename only that owned venv,
+  close the origin's input so process shutdown completes, then prove the frozen stdlib helper
+  observes actual death and acquires exclusion while target is absent. Supervisor adopts/reaps
+  the exact child. Restore the venv in finally, assert original source/launcher bytes unchanged
+  and original manager operational, then product/pipx cleanup. Staged helper/result retained as
+  evidence. This is **not a restored-terminal handoff or public release-authentication proof**;
+  private Git URL rewriting and loopback discovery fixtures remain declared exactly as before.
+- Failure trail: absent-module collection reproducer; first helper feedback **1 failed/31 passed**
+  then KeyboardInterrupt (new AST assertion included the bundled diagnostic's unused optional
+  imports; test spawn wrapper also intercepted its later exclusion child). Scoped AST checks to
+  the actual import boundary, leaving helper/lock imports strict and real `-S`/absence proof;
+  restore test wrapper before its later child. Next selected **4 failed/141 passed**, 11.76 s:
+  three origin fixtures used input() at communicate EOF, plus import/fixture-alias lint. Corrected
+  test driving to read EOF/imports without changing exit/reaping/refusal assertions. Lowest
+  selected **145 passed**, 12.22 s; expanded helper/static **70 passed**, 10.05 s; package/helper/
+  static **91 passed**, 10.16 s. Early real proof **2 passed/108 checks**, `up16c-proof`, 50.21 s.
+- First full matrix **1761 passed/84 skips each**, 238.63/234.82/242.35/235.69 s; first affected real
+  **29 passed/732 checks**, `up16c-final`, 1022.21 s. Final review added two huge-integer budget
+  reproducers: **2 failed/57 unrelated cases deselected**, 0.32 s. Calling math.isfinite converted
+  a bounded-wire large integer to float and raised OverflowError instead of static refusal.
+  Direct bounded numeric comparison rejects it and NaN/infinity without conversion. **Kept both
+  assertions unchanged**. Python 3.14 affected **182 passed**, 16.68 s; then all four complete
+  suites and all 29 affected real rows reran on corrected code, results above. Original final-*/
+  real-final evidence and pre-budget-fix source hashes retained, not overwritten or promoted as
+  final-code proof. No skipped/waived failure, softened refusal or focused-as-full claim.
+- Final `.work/up16c/final-source-sha256.json` freezes both new product modules/checker with the
+  unchanged bundled lock/probe/tool source before final complete/real gates. CLI/launcher/TUI,
+  startup usage/lock implementation, assessment/source-Python/raw RECORD contracts, caches/
+  discovery, lifecycle/identity/recovery/journals, version/schemas, assets, dependencies and CI/
+  release workflows unchanged from `462d8fe`. No fresh-verifier bypass or ordinary CLI dispatch
+  under an environment/argument override. Active-operation/session refusal and terminal ownership
+  handoff remain independent pending gates; UP-17 target/source authentication/revalidation,
+  consent, actual replacement and pre/during/post recovery guidance remain separate.
+- All three real attempts used isolated manifested private installs/data/config/sources/launchers,
+  guarded product cleanup/leak checks, exact helper supervision and finally-restored venvs.
+  Final own-rootless inventory has no containers/volumes/test tags and exactly the previous four
+  full original image IDs (`final-inventory.json`). Shared build cache, prior evidence and all
+  persistent protocol inodes retained; run-owned helper artifacts/results remain ignored evidence.
+  No user install/launcher/Python/credential, host service/default context, paid API/provider or
+  host OpenCode V2 execution. No complete campaign, optional installed-asset build, broad legacy
+  TUI, privileged/socket/service, human manual-observation, actual helper terminal-handoff,
+  replacement/recovery or release-readiness claim. Finish final package/docs/resources, review,
+  local commit on `work/updates` and STOP at this verified artifact/lifetime boundary; **UP-16 is
+  still partial**. Nothing is merged, pushed, uploaded, tagged in the project or published.
+- Final package/resources: no-isolation sdist/wheel, strict twine/content validation and equality
+  of all five bundled/orchestrating product modules to frozen full/real source and wheel bytes
+  pass. No private local instructions/evidence in sdist. Document/CLI/quality subset **43 passed**,
+  3.25 s (`docs.xml`), not another complete suite. No remaining manager/helper/probe/guard/watchdog
+  Python process found. Removed only **19 exact manifested completed pytest roots** after own-UID/
+  inode and live process/socket/mount checks; `/tmp/opencode` empty, **1048170 free inodes**. All
+  real staged helper/results, XML/logs/failed runs/source hashes/packages/prior evidence/build
+  cache preserved; added fixed-namespace protocol inodes are persistent, never stale cleanup.
+  Evidence `.work/up16c/cycle-cleanup-*.json`. Any final prose-only scratch is separately manifested
+  and guarded; no product/checker change followed the final four complete suites/real gate. Review,
+  local commit and STOP at this artifact/lifetime boundary; next narrow verifier/terminal handoff,
+  **not UP-16 completion or UP-17 replacement**.
+- Prose-only follow-up: **27 passed**, 1.86 s, `.work/up16c/prose.xml`; language/links/CLI only,
+  not replayed full/real verification. Final documentation-bearing artifacts are retained under
+  `.work/up16c/package-final/`. Review intended source/test/current-record diff, then local commit
+  on `work/updates` and STOP. No publication operation is authorized or performed.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
@@ -2426,7 +2582,7 @@ a materially different architecture, record the blocker and ask the owner before
    `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, UP-06 `d7e587e`,
    PERF `6b53f46`, UP-07/UP-08 `cacffea`, UP-10 `8aa7df5`, UP-09 `1aca6ca`, UP-11 `a5843d6`,
    UP-12/UP-13 `997a7d8`, UP-14/UP-15 `f1cb9ce`, UP-16 startup/exclusion `2e6d2d0`, then the second
-   UP-16 external-tool prerequisite checkpoint.
+   UP-16 external-tool prerequisite `462d8fe`, then the third frozen helper/lifetime checkpoint.
    Recover PERF's measured verification cadence from
    BASELINE; it does not reduce the shared/high-risk or real gates for the next package.
     Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
@@ -2434,14 +2590,16 @@ a materially different architecture, record the blocker and ask the owner before
       compact Updates UI, default-off independent daily GitHub/npm discovery, explicit environment
    actions/recovery, base actions/explicit refresh, read-only manager release/pipx evidence and
    early process-lifetime installation usage/internal exclusion and internal dated external-
-   tool/runtime/dependency/settings prerequisite assessment
+   tool/runtime/dependency/settings prerequisite assessment and a frozen non-mutating helper/
+   process-exit fixture
    are implemented. Image assets, manager
    version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Continue **UP-16**, independent helper materialization/lifetime, verifier and terminal handoff.
-   Startup/exclusion and external-tool prerequisite checkpoints are verified, **UP-16 is not DONE**.
+3. Continue **UP-16**, narrow fresh-verifier access and restored-terminal handoff.
+   Startup/exclusion, external-tool prerequisites and frozen helper/process-exit fixture are
+   verified, **UP-16 is not DONE**.
    Inspect actual bootstrap/CLI/TUI/
    session ownership and lock order, new local provenance evidence, current pipx behavior/defaults
    and existing standalone diagnostic child patterns before designing the minimal helper boundary.
@@ -2460,9 +2618,16 @@ a materially different architecture, record the blocker and ask the owner before
    source-lock separation and existing session/mutation ownership. The strict package entry point
    is now launcher:main; current-code cli.main still leases older wrappers/module invocation.
    Old managers and arbitrary external pipx/Docker do not honor new locks; disclose that boundary.
-   The pending helper must be self-contained stdlib and independent of the replaceable environment;
-   stage/verify its actual artifact outside the venv and prove lifetime/ownership under target
-   absence, not just an external interpreter. Reuse/revalidate the new dated external-tool facts,
+   The helper is now a frozen stdlib artifact outside the target, independently proven from the
+   actual installed package with that venv absent. Its **only entry is a bounded non-mutating
+   fixture**. Do not treat fixture arming/result or PID death as terminal-restoration/consent
+   evidence, and do not turn it into a generic command executor. Preserve the origin's usage
+   lease to actual process exit, pidfd proof (no EOF/PID-poll fallback), narrow inherited descriptor
+   set/non-inheritance, private artifact identity/ownership and exact child reaping. Its 30-second
+   fixture bound is not an install deadline. The artifact/result are not recovery authority or
+   discovery caches. Design narrow fresh-verifier access under the future helper's exclusive
+   coordination without enabling ordinary CLI dispatch, and integrate real terminal restoration/
+   active-operation/session refusal before any future mutation. Reuse/revalidate dated external-tool facts,
    never infer a grant from supported=True or PATH. Only pipx 1.18.7/standard console/filesystem
    dist-info is inspected; unsupported variants get manual guidance, not automatic tool installs.
    Preserve the original recorded source-Python path/full symlink route, not a resolved binary
