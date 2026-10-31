@@ -14,7 +14,7 @@ from opencode_sandbox.cli import app
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "opencode_sandbox"
-GROUPS = {"changes", "backup", "container", "disk", "config", "opencode", "agent-context", "providers"}
+GROUPS = {"changes", "backup", "container", "disk", "config", "opencode", "manager", "agent-context", "providers"}
 
 
 @pytest.fixture

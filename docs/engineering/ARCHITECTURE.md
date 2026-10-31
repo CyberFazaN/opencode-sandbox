@@ -15,7 +15,8 @@ advisories while preserving operation status. UP-07/UP-08 add disposable identit
 evidence, compatible stable discovery and explicit policy comparisons. UP-10 adds the manual/
 cached compact Updates interface; UP-09 adds default-off dashboard discovery; UP-11 binds explicit
 environment actions and recovery to existing handlers. UP-12/UP-13 bind base actions and explicit
-cached/full-refresh builds; manager discovery/classification/updater remains pending.
+cached/full-refresh builds; UP-14/UP-15 add read-only manager discovery/classification. Manager
+installation exclusion/handoff/replacement remains pending and disabled.
 
 ## Boundaries
 
@@ -37,6 +38,7 @@ cached/full-refresh builds; manager discovery/classification/updater remains pen
 | `runtime_identity.py` | Bounded acquisition and authenticated rootless response-sender proof; shared by CLI/TUI and standalone stdlib diagnostic | D-003, D-048, D-052 |
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
+| `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
@@ -142,8 +144,8 @@ waiting for every source to finish.
 `UpdatesScreen` retains UP-10's `v` and one compact table
 shared by Manager/Bases/Environment subviews, stable selection, plain selected summaries and
 generic scrollable Details. Manager installed version is local; installation/release eligibility
-is not guessed. Manager release capabilities remain visibly unavailable, with existing CLI
-guidance. UP-11 binds Environment OpenCode actions; UP-12/UP-13 bind Base Images below.
+is not guessed. UP-14/UP-15 implement read-only manager evidence below; execution remains disabled.
+UP-11 binds Environment OpenCode actions; UP-12/UP-13 bind Base Images below.
 
 Opening renders metadata and Docker-free `environment_history` first (explicitly identity-
 unverified), then independent bounded local base/environment inspection workers. The new
@@ -246,10 +248,10 @@ not written over Textual. Short verification/inspection budgets remain unchanged
 promise daemon-build termination if a client/manager dies or coordinate manual Docker/old managers.
 
 UP-09's `daily_discovery` boolean preference defaults false, including old/invalid preference
-values. Only a running dashboard schedules npm discovery: at startup, after saving Preferences,
+values. Only a running dashboard schedules npm and manager discovery: at startup, after saving Preferences,
 and on a 60-second consideration timer. Explicit CLI/Updates/latest-target resolution uses the
-same source coordinator but does not gain unsolicited network work. No GitHub provider exists
-yet; UP-14 must add its own truthful source contract/hookup, not infer a manager check from npm.
+same source coordinator but does not gain unsolicited network work. UP-14 adds an independent
+GitHub provider/worker, not a manager check inferred from npm or a universal executor.
 
 `opencode_versions.latest(automatic=True)` checks the most recent attempt, not just successful
 evidence. Under a source-keyed private `flock` in that data directory's `update-cache/`, persist/
@@ -273,11 +275,58 @@ can reset disposable throttles, never authorize a mutation or clear a journal. O
 writes remain ordinary disposable replacements; durable fsync is only requested for discovery.
 
 The dashboard uses one stable `Updates (N)` label, no availability toasts or operation-status
-writes. Its Docker-free count uses only qualified dated environment history against npm evidence,
+writes. Its Docker-free count uses qualified dated environment history against npm evidence,
 Notify policy, and no pending journal; Manual/Pinned/Unknown do not yield unsolicited newer-version
-counts. Explicit comparisons are unchanged. Tooltip/Details qualify stale/cached source evidence;
+counts. A newer published manager release adds one independent count, never an execution grant.
+Explicit comparisons are unchanged. Tooltip/Details qualify stale/cached source evidence;
 Details also shows scheduling failures. Disabling cancels owned automatic workers and suppresses
 the indicator, not the manual screen. No probes, temporary starts, installs, service or schema change.
+
+UP-14's `manager_releases` uses only the official GitHub releases endpoint (no token/login, no
+runtime override). The isolated stdlib HTTP child selects the GitHub Accept header and refuses
+redirects; npm retains its existing header/redirect behavior. The parent owns the same finite
+eight-second diagnostic client/process-group budget with a 4 MiB manager body bound. One page
+of up to 100 entries is bounded; a full page refuses as incomplete instead of claiming a latest
+release from truncated history. Filter exact published/non-draft/non-prerelease booleans, valid
+past publication timestamps, canonical official release URLs and strict `vX.Y.Z` tags (no leading
+zero, prerelease/build suffix or command text). Choose numeric highest, never npm/checkout version
+or GitHub's mutable target_commitish. Notes are plain/truncated at 8192 characters, never executed.
+Local version comparison never offers a downgrade. Public tag-to-commit verification is explicitly
+not established by release metadata, caches or the local classifier; it belongs to execution gates.
+
+Manager discovery has a distinct source key/evidence shape and selected release record. Its own
+coordination preserves the same attempt-before-HTTP/coalescing/daily/failure/cancellation/clock
+contract as npm, also honoring HTTP 403/429/503 Retry-After or GitHub rate reset. Cached records
+are revalidated/sanitized, retain independent failed attempts and never authorize replacement.
+Unavailable safe storage disables automatic manager requests only; explicit bounded discovery
+still works without persistence while honoring readable rate limits. Separate app-owned read-only
+dashboard workers publish npm/GitHub independently. Source failures and enabling/disabling work
+do not change operation status, local installed facts, journals or another caller's request.
+
+UP-15's `manager_installation.classify()` is local-only and never invokes/imports pipx. It reconciles
+one actual running distribution/version/entry point, installed module path, bounded no-follow
+own-user regular PEP 610/pipx records, exact official Git URL and requested version tag/commit,
+actual venv/module/distribution/interpreter, pipx source interpreter/Python version and application
+path. Only recognized pipx wire formats 0.5/0.6/0.12 with default options, pip backend, no injections/
+pins/suffix/custom exposure/resources are supported; dependency executable inventory is data, not
+an exposure setting. Unknown fields/settings are manual review, not metadata migration. Normal
+pip console scripts and its exact long/space-path trampoline are inspected, not shell-evaluated;
+unrecognized/special-quoting launchers refuse. The own-user exposed symlink, actual invocation and
+PATH must select that same executable. Explicit custom HOME/BIN/MAN/COMPLETION/SHARED locations
+and matching default Python are recorded; mismatched home/interpreter or unknown PIPX settings
+refuse rather than guess. System/foreign/editable/shadowed/ambiguous metadata also refuses. Metadata
+and option values that might contain credentials are never echoed on refusal; no paths are repaired.
+
+Classification is timestamped local provenance agreement, not authenticated GitHub commit identity,
+future mutation permission, dependency restoration or proof an external pipx/helper is independent.
+The record hash/paths/source/commit/settings evidence is in-memory inspection, not a durable
+authoritative grant. `manager status [--check]` and the Manager Updates view expose independent
+local/discovery evidence without Docker or pipx execution. Opening runs only local classification,
+not network. Explicit Check starts independent owned workers, preserves version/prior evidence
+on either failure, and Cancel/Close rejects late results. Details includes bounded plain release
+notes/manual guidance, and manager Update stays disabled. UP-16/UP-17 must still independently
+verify installation usage/exclusion, safe external updater/helper, terminal restoration, exact
+target/source consent/revalidation, actual replacement and fresh-process success/failure recovery.
 
 Dashboard startup/explicit Refresh publishes complete base-image check results, including success.
 Daemon, resource-support and image advisories own their notification objects and share an explicit

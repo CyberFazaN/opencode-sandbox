@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-13 and PERF complete. Next: UP-14 + UP-15 (manager discovery/classification).**
+- **UP-00..UP-15 and PERF complete. Next: UP-16 (installation exclusion/terminal handoff).**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -15,7 +15,8 @@
   default-off daily npm discovery, durable attempt claims, shared requests and quiet indicators.
   UP-11 adds explicit environment actions/immutable consent and verified checkpoint recovery;
   UP-12/UP-13 add base build/rollback and explicit cached/full-refresh modes with verified
-  publication/copies and terminal ownership. Manager packages remain separate.
+  publication/copies and terminal ownership. UP-14/UP-15 add independent read-only published
+  manager discovery/local pipx classification; manager Update remains disabled.
   D-057 consolidates the remaining
   packages and removes artificial dependencies, without weakening verification gates. The initially
   DNS-blocked packaged-definition gate now passes, alongside retained
@@ -301,7 +302,7 @@ in isolated integration tests, not through assumptions about a successful return
 
 ## Implementation tasks and dependencies
 
-All tasks below are pending except UP-00..UP-13 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
+All tasks below are pending except UP-00..UP-15 and the one-time PERF checkpoint. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -314,11 +315,11 @@ UI with optional background scheduling (UP-10 + UP-09), environment actions/reco
 base actions/refresh (UP-12 + UP-13), manager discovery/classification (UP-14 + UP-15), manager
 handoff (UP-16), replacement/recovery (UP-17), then evidence consolidation (UP-18). This is
 **nine remaining cycles at consolidation approval instead of thirteen** (UP-10 now split from
-UP-09; four later packages remain after completing UP-12/UP-13), not
+UP-09; three later packages remain after completing UP-14/UP-15), not
 a quota or permission to combine
 unrelated risks. Read-only manager discovery can be developed independently of base refresh;
 manager execution remains later and must not delay the earlier component workflows. UP-18 is
-not release preparation. UP-00..UP-13 are DONE; later tasks are PENDING. Next is UP-14 + UP-15;
+not release preparation. UP-00..UP-15 are DONE; later tasks are PENDING. Next is UP-16;
 UP-11's independent environment recovery gate is verified. UP-03's initially DNS-blocked
 packaged-definition gate was retried successfully during UP-04; evidence is recorded below.
 
@@ -337,7 +338,7 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-09 | DONE: optional background discovery | UP-07 + UP-08; delivered UP-10/preferences for presentation | Default-off dashboard-only npm discovery, durable attempt-based 24-hour claims including failure/restart/interruption, cross-caller/process source coalescing, numeric/date/long Retry-After and quiet policy-filtered indicators. No start/probe/install; manual UI stays usable when off/unavailable. 42 new default-suite cases, four full compatibility suites and 12 affected real tests/200 checks; evidence below |
 | UP-11 | DONE: environment actions and independent recovery gate | UP-10, UP-07 + UP-08 | Existing Check/Start/Policy/Update/Rollback/Recover handlers, immutable exact consent/locked revalidation, live refusals, app-owned non-cancelable mutations, persistent journal/recovery routing. Four full suites (1471 passed/78 skips each), 18 affected real tests/400 checks including actual update/full-layer rollback and independent missing/failed/successful recovery on both distributions. Evidence below; no base/manager bundling |
 | UP-12 + UP-13 | DONE: base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Build/Rebuild/Check/Rollback, identity/target/definition/mode consent, candidate-ID verification/guarded publication, retained copies and explicit multi-copy selection; cached versus pull/no-cache refresh, no prune/migration. Four complete suites (1525 passed/80 skips each), 24 affected real tests/581 checks, both distributions including separate cached/full-refresh package builds, concurrency/pinned creation, failed candidates, retained layers and 80x24/larger terminal ownership. Evidence below |
-| UP-14 + UP-15 | Manager release discovery and verified installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Bounded official published-full-release discovery, strict tags/semver/no implicit downgrade, local inventory retained on GitHub failure; actual official-tag pipx identity including custom paths/interpreter/source/launcher, safe manual guidance otherwise. Separate provider and real isolated pipx/foreign/shadowed-launcher tests. Optional daily-source hookup only if UP-09 exists; neither discovery nor classification requires it or exposes execution |
+| UP-14 + UP-15 | DONE: read-only manager discovery/local installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Official published-full-release provider, strict tags/numeric comparison/no downgrade, independent failures and local evidence, separate daily GitHub source/claims. Local actual package/VCS/pipx/Python/options/invocation/launcher/custom-location agreement; manual guidance for foreign/editable/shadowed/ambiguous/unsupported settings. 86 new default cases, four full suites (1611 passed/82 skips each), 26 affected real tests/637 checks including default/custom-space pipx and real manager terminals. Local provenance is not public commit authentication or an execution grant; Update disabled. Evidence below |
 | UP-16 | Installation exclusion and terminal handoff | UP-14 + UP-15, UP-05 | Supported instances coordinate across data directories; safe self-contained helper/interpreter/external pipx, clean TUI exit before mutation, startup exclusion and narrow verification path; process and pty tests |
 | UP-17 | Manager replacement, verification and failure recovery | UP-16 | Exact confirmed target and revalidation, actual fresh-process verification, no automatic restart. Independently verify (1) replacement/success and (2) failure/interruption states, private recovery record and instructions before/during/after install. Separate focused commits/checkpoints for these gates; isolated pipx and real terminal evidence, never inferred backup/rollback safety |
 | UP-18 | Cross-layer verification and record consolidation | UP-01..UP-17 | Run affected/full regressions, required real combinations, dependency endpoints, docs/CLI/packaging checks; record evidence/limits, promote durable facts and retire the effort record when complete; no release work |
@@ -1946,6 +1947,181 @@ a materially different architecture, record the blocker and ask the owner before
   its run. No product change after the final complete/real gates. Review intended diff, commit
   locally on `work/updates` and STOP at this verified package; nothing merged/pushed/released.
 
+### UP-14 + UP-15 — 2026-10-31 — read-only manager discovery/classification
+
+- Resumed clean `work/updates` at `997a7d8`, read local/repository instructions, TODO, BASELINE,
+  architecture, D-056/D-057 and the handoff. Verified own-rootless identity, zero containers/
+  volumes and unchanged four original tagged image IDs. `/tmp/opencode` empty/1048541 free
+  inodes. The local file's pre-effort state is historical, not permission to change main. Scope
+  is this grouped read-only package; UP-16/UP-17 remain separate and no replacement is exposed.
+- Investigated actual installed editable/distribution metadata, pyproject/CLI entry point,
+  install guide and real pipx smoke, pipx 1.18.7 source/metadata/paths/self-managed defaults and
+  listing behavior, existing bounded HTTP/cache/source coordination, dashboard scheduling and
+  generation/Cancel ownership. pipx listing can take locks and normalize legacy records; the
+  classifier therefore never runs/imports pipx. Missing-provider minimal reproducer **collection
+  error**; no prior manager provider/installation evidence implementation existed.
+- `manager_releases.py` adds only the official GitHub published-release source, independent of
+  OpenCode/npm. Strict `vX.Y.Z`, no leading-zero/prerelease/build/shell suffix, exact official
+  release URL, false draft/prerelease booleans and valid published timestamp. Choose numeric
+  highest, never a mutable GitHub latest/date/target_commitish or the unchanged checkout version;
+  comparisons explicitly refuse implicit downgrade. Bounded plain notes (8192 characters and
+  truncation) are data, not rendered markup/commands. One bounded 100-entry page: a full page
+  fails closed as incomplete/manual review, not a claim of exhaustive latest discovery. No
+  speculative tag/commit resolution or authenticated target grant from release metadata.
+- Standalone stdlib `http_probe.py` adds the explicit GitHub Accept/no-redirect mode. No token/
+  login/header credential, required GitHub integration or host package manager. Existing npm
+  headers/behavior remain unchanged. Existing parent short diagnostic runner bounds total
+  DNS/TLS/body/client lifetime to eight seconds, manager body to 4 MiB, owns process-group
+  cancellation/reaping; no change to long builds/installs/commits/arbitrary exec or Docker/probe
+  timing. HTTP error diagnostics do not echo arbitrary URL/proxy text that can contain secrets.
+- Separate manager source key retains validated selected-release evidence and failed attempts.
+  Private source exclusion never spans mutation locks. Persist/fsync an incomplete claim/ID/time
+  before HTTP; optional requests throttle by start for 24h including failures/interruption/restart
+  and backward clocks. Concurrent callers share actual requests/failures, not cached-only lock
+  contention. Explicit refresh may run early but honors Retry-After and GitHub rate reset for
+  403/429/503, even if a readable cache survives unavailable lock storage. Automatic unsafe/
+  unwritable storage fails closed; explicit uncached bounded discovery remains possible. Waiter
+  cancellation cannot cancel another owner; owner interruption retains the incomplete claim.
+- `manager_installation.py` performs dated local-only inspection: exactly one running distribution,
+  version/entry point/module location, bounded no-follow own-UID regular PEP 610/pipx records,
+  exact official Git URL/versioned requested tag/full commit ID, actual venv and interpreter,
+  recorded source Python/version, app path, own executable/standard script template, exposed
+  symlink, actual invocation and PATH all agree. Recognizes default options in wire formats
+  0.5/0.6/0.12; only actual current pipx execution is claimed. Its default environment-name field
+  and non-exposed dependency inventory are ordinary evidence, not custom installation options.
+  No conversion, metadata repair, launcher takeover, pipx execution or Python install/switch.
+- Unknown metadata/fields, custom pip/venv/backend/resources/exposure options, injections/pins/
+  suffixes, relative/mismatched pipx locations or default Python, editable/foreign sources and
+  missing/shadowed/ambiguous launchers yield static manual guidance. Unsupported values/URLs/
+  OS diagnostics are never dumped, because they can contain secrets. Explicit HOME/BIN/MAN/
+  COMPLETION/SHARED locations and source Python are retained as evidence. Standard pip simple
+  shebang and long/space-path trampoline are recognized as exact data, not shell-evaluated;
+  special/unrecognized quoting is unsupported. Local record hash/paths/source/commit are not a
+  public-source authenticity proof or mutation authority; external updater independence and
+  published tag-to-commit identity remain unassessed UP-16/UP-17 prerequisites.
+- Added only read-only `manager status [--check]`, available without Docker/pipx execution. Manager
+  Updates opens with local version/cached release evidence and independent local inspection,
+  never a request. Check starts independent release/classification workers; source/row failures
+  retain the version and other result. Read-only Cancel/Close rejects late results and cannot
+  mutate/install. Compact summary/Details disclose provenance, timestamp, plain notes/errors/
+  manual guidance at 80x24/larger. Existing generation protection prevents old inventory from
+  replacing a newer explicit check. Manager Update is disabled even for recognized installs;
+  no consent/executor/helper/exclusion/replacement/recovery mechanism is prematurely exposed.
+- Existing default-off preference now schedules GitHub/npm through separate owned workers with
+  independent status/claims, not sequential source failure coupling or a universal engine. A
+  newer manager release adds one quiet cached count; npm still counts only qualified Notify
+  histories without pending journals. No extra operation-status writes/toasts, Docker, runtime
+  probes, starts or service. Disabling cancels owned automatic requests and hides indicators,
+  without disabling manual Check. Old npm-only pilot tests isolate the new external source;
+  their real npm provider/assertions are retained, and the new manager provider/worker has its
+  own real-loopback tests. Existing real daily terminals point the manager URL to a separate
+  loopback fixture too; no accidental public API in tests, npm request assertions remain intact.
+
+  | Final complete layer | Result |
+  |---|---|
+  | Python 3.11/current | **1611 passed, 82 opt-in skips**, 225.64 s |
+  | Python 3.11/lowest | **1611 passed, 82 opt-in skips**, 219.72 s; two known Typer deprecations |
+  | Python 3.14/current | **1611 passed, 82 opt-in skips**, 220.54 s |
+  | Python 3.14/lowest | **1611 passed, 82 opt-in skips**, 216.29 s; two known Typer deprecations |
+  | Affected real Docker/OpenCode/pipx/terminal | **26 passed/637 logged checks**, no skips/deselections, `up1415-final`, 981.42 s |
+
+  Complete commands: `env PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q --tb=short
+  --junitxml=.work/up1415/final-<label>.xml --basetemp=/tmp/opencode/up1415-final<label>`;
+  labels/venvs `311/venv311`, `311low/venv311low`, `314/venv314`, `314low/venv314low`.
+  Python 3.11.18/3.14.8; current Typer 0.27.3/Textual 8.2.8, lowest 0.16.0/4.0.0; pytest 9.2.0,
+  clean pip checks, serial foreground with inode preflight. All **1693 ordered IDs/outcomes match**.
+  **86 new default cases**: 43 release provider/coordination, 33 installation and 10 CLI/pilots.
+  Two new real pipx-layout cases explain 82 opt-in skips. No assertion/skip/CI/release gate relaxed;
+  CLI structure adds the actual read-only group but retains the top-level cap/existing command
+  checks. The old disabled-Check assertion/real Manager text now checks implemented local evidence
+  and still asserts Update disabled; no mutation claim is substituted.
+- Provider tests use actual loopback HTTP/isolated stdlib child: no credential header even with
+  dummy GITHUB_TOKEN, strict invalid/draft/prerelease/foreign/duplicate/future/full-page rejection,
+  numeric/no-downgrade/plain notes, body/deadline and no redirect, independent cache, daily success/
+  failure, clock/restart/coalescing/cancellation, 403/429/503 Retry-After/rate-reset and unsafe
+  storage. Installation tests use real private files/symlinks/FIFO/modes plus synthetic runtime
+  identity, default/custom settings/wire variants, interpreter/source/options/launcher ambiguity
+  and dummy-secret non-disclosure. Pilots independently verify remote/local failure, no network
+  on opening, disabled Update, 80x24/larger Details/controls, late Cancel/Close, daily quiet counts/
+  restart, actual overlapping request identity and disabled-HTTP-child reaping/incomplete claims.
+- Real command: `env PYTHONPATH="$PWD/src" OCS_TEST_DOCKER=1 OCS_TEST_RUN=up1415-final
+  .work/venv311/bin/python -m pytest -q -rA --tb=short tests/integration/test_42_base_coordination.py
+  tests/integration/test_43_diagnostics.py tests/integration/test_44_version_evidence.py
+  tests/integration/test_51_updates.py tests/integration/test_52_discovery.py
+  tests/integration/test_53_environment_updates.py tests/integration/test_54_base_updates.py
+  tests/integration/test_66_manager_inventory.py --junitxml=.work/up1415/real-final.xml
+  --basetemp=/tmp/opencode/up1415-real-final`.
+  All 24 prior affected packaged/retained base-race, owned-probe, lifecycle/restore, manual/daily,
+  environment action/recovery and cached/full-refresh base terminal rows pass again. Original
+  candidate/rollback/pin/retained-layer/recovery assertions remain, no Docker result substitution.
+- New real `test_66` creates tagged sources from this exact working package, private HOME/pipx/
+  Git config and default or custom-space locations, invokes real external pipx and the actual
+  installed console launcher (without PYTHONPATH/source shadowing), and uses actual PEP 610/
+  pipx/Python records. A **declared private Git URL rewrite** maps the official URL spelling to
+  a run-owned local tag/commit: transport/provenance-shape evidence, **not public-release commit
+  authenticity**. No source-check replacement/mock or production override exists. Inspection
+  bytes of records/executable stay unchanged; exact recorded tag/commit and paths agree. Real
+  options/pins/suffixes refuse manual preservation, foreign exposed launcher and PATH shadow
+  refuse without taking over/deleting the foreign target. The default layout additionally really
+  uninstalls/reinstalls from a foreign local VCS spec and an editable tree; both get manual guidance.
+  Every private install is uninstalled through pipx; no user launcher/install/Python is touched.
+- Installed-manager terminals at 80x24/120x40 use a test-installed .pth file **only** for the
+  loopback release URL; package/interpreter/source records, invocation, launcher and Docker remain
+  actual. Opening makes no request, Check discovers a higher full release, independent local
+  classification remains visible after HTTP 503, cached release remains dated, Details is usable,
+  Update key cannot install and normal exit restores terminal. Final pre/post installation-record/
+  executable bytes match. No automatic handoff/replacement/recovery, public commit authentication,
+  old pipx execution or human observation claim is inferred from these tests.
+- Independent unauthenticated official public GitHub GET, isolated `.work/up1415/live-data`/
+  config: discovered **v6.1.0**, published `2026-10-30T09:12:11Z`; unchanged checkout 6.1.0 is
+  not presented as a new release. This development tree has multiple editable/generated metadata
+  records and accurately receives manual review, not supported installation authority. Evidence
+  `.work/up1415/official-release-check.json`; no token/login/credential or replacement used.
+- Intermediate failures/evidence retained: missing-provider reproducer collection error. First
+  selected **3 failed/92 passed**, 33.52 s: invalid-type test fixture concatenation (two cases)
+  and new CLI group expected-set update; fixed fixtures/expected group, existing count cap intact.
+  Focused **1 lint failure/116 passed**, 38.42 s; combined **1 lint failure/135 passed**, 50.34 s;
+  removed unused imports, normalized style, no gate change. Lowest affected **145 passed**, 49.66 s;
+  final extended lowest/docs **165 passed**, 51.22 s (only two known Typer deprecations). Early
+  full primary **1601 passed/82 skips**, 224.02 s, predates ten final regressions and is historical,
+  not final evidence. User-doc subset **1 failed/42 passed**, 3.12 s, overlong example comment;
+  shortened prose without changing 80-column assertion. Final four complete gates above include it.
+- `up1415-pipx-proof` **1 failed**, 1.47 s, before any install: missing required harness `check`
+  argument. `proof2` and `proof3` each **1 failed/1 teardown error**, 14.57 s: conservative default
+  metadata assumptions refused the real environment-name field and dependency inventory. Corrected
+  defaults using source/real records, not relaxing custom-options refusal. `proof4` **1 passed/10
+  checks**, 15.47 s. `up1415-pipx-terminal` **1 passed/1 failed/1 teardown error**, 34.17 s,
+  **27 passed/1 failed checks**: actual space-path trampoline uses double quotes, not the presumed
+  single-quoted form. Recognize actual pip's standard template as data (unusual quoting still
+  refuses). `up1415-real-proof` **10 passed/182 checks**, 103.45 s. Final 26-test/637-check real gate
+  expands foreign/editable sources and includes all product corrections; nothing waived/deselected.
+- All seven real attempts used isolated roots/private installations/names/manifests, product pipx
+  uninstall and guarded campaign cleanup/leak checks, including failures. Ending verified own-
+  rootless inventory has zero containers/volumes/helpers and unchanged four original tagged
+  images: Debian `d5905c3f5026...`, Arch `418889644792...`, Arch input `3cbf69d2d595...`, custom
+  Ubuntu `68ee22004a91...` (full IDs in ignored evidence). Shared build cache intentionally remains.
+  Eight product modules frozen in `.work/up1415/final-source-sha256.json` before final complete/
+  real gates. Manager version, schemas, image definitions/assets/revisions, runtime identity,
+  core lifecycle/base guards, cache implementation, diagnostic/probe executors, worker adapter,
+  dependencies and CI/release gates unchanged. No complete campaign/broad legacy test_50,
+  paid-provider, privileged/socket/service or manual-observation evidence; no release-readiness
+  claim, version bump, merge, push, tag, upload or release. Package, review and commit locally,
+  then STOP at UP-14/UP-15. Next is independently verified UP-16 exclusion/helper/terminal handoff,
+  **not** premature UP-17 replacement or a manager installation button.
+- Final package/document checkpoint: sdist/wheel, strict twine/content validation and equality of
+  all eight product modules with frozen full/real source hashes/wheel bytes pass, ignored artifacts
+  `.work/up1415/package/`, `package-build.log`. Final document/CLI/quality subset **43 passed**,
+  3.10 s (`docs-verified.xml`), not another complete run; preceding `docs-final.xml` **1 failed/42
+  passed**, 3.27 s, public-record guard matched a slash-separated publication phrase as a retired
+  internal path. Reworded prose, no gate change. User/current-state records now describe only
+  implemented read-only behavior/evidence/limits and the UP-16 handoff. After evidence preservation,
+  guarded removal of **20 exact manifested completed current-cycle pytest roots** (own UID, no
+  process/socket/mount references), never logs/XML/private source fixtures/package artifacts or
+  persistent lock files. `/tmp/opencode` empty again/**1048541 free inodes**; cleanup manifest and
+  result stay ignored under `.work/up1415/`. Final prose-only scratch is separately manifested and
+  guarded after its run. No product change after final complete/real gates; review, local commit on
+  `work/updates` and STOP. Nothing merged, pushed, tagged, bumped, uploaded or released.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
@@ -1954,40 +2130,45 @@ a materially different architecture, record the blocker and ask the owner before
 2. Expected branch: `work/updates`, UP-00 `3552f67`, UP-01 `d7d6a1f`, UP-02 `4ea5050`, UP-03
    `40211ab`, UP-04 `8291e9c`, UP-05 `32861c6`, consolidation `fae56f3`, UP-06 `d7e587e`,
    PERF `6b53f46`, UP-07/UP-08 `cacffea`, UP-10 `8aa7df5`, UP-09 `1aca6ca`, UP-11 `a5843d6`,
-   then the UP-12/UP-13 package commit. Recover PERF's measured verification cadence from
+   UP-12/UP-13 `997a7d8`, then the UP-14/UP-15 package commit. Recover PERF's measured verification cadence from
    BASELINE; it does not reduce the shared/high-risk or real gates for the next package.
     Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
      category-owned advisory clearing, identity-bound evidence/discovery, exact targets and
-      compact Updates UI, default-off daily npm discovery, explicit environment actions/recovery
-   and base actions/explicit refresh
+      compact Updates UI, default-off independent daily GitHub/npm discovery, explicit environment
+   actions/recovery, base actions/explicit refresh and read-only manager release/pipx evidence
    are implemented. Image assets, manager
    version and schemas still match the seed.
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Select **UP-14 + UP-15**, read-only manager release discovery and verified installation
-   classification. Inspect actual package/version/distribution/VCS metadata, launcher/interpreter,
-   pipx records/source/install options, existing install docs/smokes and bounded provider/cache/
-   source coordination before coding. Manager version is not OpenCode's npm version: use only
-   published full releases from the official GitHub repository, strict tags/semver, no draft/
-   prerelease/unpublished checkout target or implicit downgrade. Retain local installed evidence
-   if discovery/classification fails independently; opening Updates remains network-free. Optional
-   daily-source hookup must preserve durable attempt-based throttle, Retry-After and coalescing,
-   not hold discovery guards over lifecycle locks. No automatic installation/background service.
-   Classify verified official-GitHub versioned-tag pipx only after reconciling the running package,
-   actual interpreter/venv, distribution direct_url/VCS metadata, pipx recorded source, executable,
-   actual launcher and custom locations/settings. PATH pipx alone proves nothing. Editable/foreign/
-   shadowed/ambiguous/unsupported installs need accurate manual guidance, not conversion, force,
-   Python installation/switching or host changes. Test source/launcher/foreign/settings ambiguity
-   independently with real isolated pipx fixtures where needed; never touch the user's launcher/
-   install or use credentials/paid APIs. Keep read-only eligibility separate from consent/execution:
-   manager Update stays unavailable until UP-16/UP-17 exclusion/handoff/replacement/recovery gates.
-   Preserve component independence, both delivered base modes/copies/guards and environment
-   journals/configuration. No universal update engine, Update All, schema change, release work,
-   unrelated performance or host/service task. Keep 80x24 progressive disclosure, independent
-   errors/Cancel and authoritative full compatibility/affected real gates before claiming the
-   package. Original four images remain read-only; do not prune shared build cache or persistent
-   protocol lock files. UP-16/UP-17 remain separate independent gates, not inferred from discovery.
+3. Select **UP-16**, installation exclusion and terminal handoff. Inspect actual startup/CLI/TUI/
+   session ownership and lock order, new local provenance evidence, current pipx behavior/defaults
+   and existing standalone diagnostic child patterns before designing the minimal helper boundary.
+   UP-14/UP-15 classification is **local record agreement**, not public tag-to-commit authenticity,
+   updater independence or permission to mutate. In real tests its official URL was deliberately
+   mapped to private fixture sources; do not mistake that for public release authentication.
+   Manager Update stays unavailable until UP-17's independent success/failure recovery gates pass.
+   Coordinate supported instances across all data/config overrides with an installation-scoped
+   usage/exclusive protocol, acquired before data/environment/base guards. Other supported live
+   instances prevent replacement; normal startup refuses during exclusive replacement except
+   narrow explicit fresh verification. Preserve descriptor ownership/noninheritance, fixed secure
+   namespace/inode checks, read-only source-lock separation and existing session/mutation ownership.
+   Old managers and arbitrary external pipx/Docker do not honor new locks; disclose that boundary.
+   The future helper must be self-contained stdlib and independent of the replaceable environment;
+   independently validate an external interpreter/pipx executable and recognized path/settings
+   preservation, never assume PATH pipx proves it. No Python installation/switch, installer revival,
+   shell evaluation, foreign-launcher takeover or force-as-backup assumption. Close Textual cleanly
+   and restore the real terminal before any future mutation; no automatic restart. UP-16 may stage
+   a non-mutating handoff fixture, not expose a premature install path. Verify exclusion across
+   processes/data dirs, active mutations/sessions/refusals, helper independence/lifetime, verifier
+   access without deadlock, no leaked descriptors and real pty terminal restoration. Keep UP-17
+   exact-target/source consent and execution-time revalidation, pre/during/post recovery record/
+   printed commands, actual replacement and fresh-process success/failure states separate, each
+   independently verified. Preserve all delivered component behavior, complete compatibility/
+   affected real gates, default-off source claims/Retry-After and 80x24 progressive disclosure.
+   No universal executor/Update All, schema/version/image change, release work, unrelated host/
+   performance task or user install mutation. Use isolated run-owned pipx sources/launchers only;
+   original four images, shared build cache and persistent lock inodes remain read-only/preserved.
 4. Follow task-local reproducer -> root cause -> narrow patch -> regression -> rerun. Update user
    docs and current-state records only for what actually changed; record exact evidence and
    outstanding layers here, with any needed new decision entry rather than editing history.

@@ -100,12 +100,13 @@ owned by the dashboard but are shown as a compact notice count and full text in 
 instead of toasts covering the small-terminal controls.
 
 **Optional daily discovery** is off by default. In Preferences (`g`), enable **Daily metadata
-discovery (dashboard only)** to check npm while the dashboard runs. The dashboard considers
+discovery (dashboard only)** to check GitHub manager releases and npm independently while the
+dashboard runs. The dashboard considers
 discovery at startup, after saving Preferences and about once a minute, but attempts each source
 at most once per 24 hours, including failures and interrupted requests. It persists a claim
 before contacting the source; restarting does not reset that attempt. No background service is
-installed, and short CLI commands do not start unsolicited discovery. GitHub/manager discovery
-is not available yet; enabling this setting does not imply a manager check.
+installed, and short CLI commands do not start unsolicited discovery. Each source has its own
+worker, claim, errors and rate limits; a failed/slow source does not block the other's result.
 
 Explicit Check may refresh sooner, but overlapping dashboard/Updates/CLI requests for the same
 source and data directory share the attempt's result or failure. Both explicit and automatic
@@ -114,7 +115,8 @@ screen does not cancel another caller's request. An interrupted request retains 
 attempt rather than inventing success; explicit Check can retry when rate limits permit.
 
 With discovery enabled, a single **Updates (N)** button indicator counts Notify-policy
-environments whose dated last verification is older than the discovered release. It does not
+environments whose dated last verification is older than the discovered release, plus one for a
+newer published manager release. It does not
 probe Docker to calculate that count. Unknown versions, Manual/Pinned policies and pending
 recovery do not generate general newer-version indicators. Explicit comparisons remain available
 for all policies. The indicator is not a fresh runtime verification or install permission; its
@@ -127,6 +129,36 @@ If private scheduling storage is unsafe/unwritable, automatic checks fail closed
 in Updates Details. Explicit checks can still use the bounded network path without persistence;
 cross-process coalescing/throttling cannot be guaranteed without that storage. Clearing the
 disposable cache resets discovery history/throttles, not installed software or recovery journals.
+
+### Manager release and installation checks
+
+In **Sandbox Manager** (`1`), opening shows the running version, cached release evidence and an
+independent local installation inspection. **Check** queries published full releases from the
+official GitHub repository and repeats that inspection. No GitHub login/token is needed or sent;
+drafts, prereleases, invalid tags and unpublished checkouts are not release targets. Tags must be
+exactly `vX.Y.Z`; numeric comparison never offers an implicit downgrade. The unchanged development
+version is not treated as a new release. A missing/failed GitHub response means availability is
+unknown (or dated cached evidence), not current; local inspection failures do not erase release
+information or the installed version. GitHub Retry-After and reported rate-limit reset times also
+apply to explicit Check. A full 100-entry page is refused rather than claiming a truncated latest
+release; use the official release page manually in that case.
+
+Installation inspection does not run pipx, import its internals, rewrite metadata or change Python.
+It reconciles the actual running package/distribution/version, PEP 610 VCS URL/tag/commit, pipx
+metadata, venv/source interpreter, application executable, exposed symlink, invocation and PATH.
+Explicit custom pipx locations and pip's normal long/space-path launcher wrapper are recognized.
+Only recognized metadata with default installation options is classified as **verified official-tag
+pipx**. Custom options, injections, pins, suffixes, unknown settings/formats, editable/foreign
+sources and missing/shadowed/ambiguous launchers require manual review; values of unsupported
+options are not printed because they can contain secrets. Nothing takes over a foreign launcher.
+
+This label means local provenance records agree, **not** authenticated public tag-to-commit
+identity, an execution grant, preserved dependency versions or a promise of rollback. Details
+shows the inspection time, source/commit/paths, release URL/notes (bounded plain text), unsupported
+reason and [manual installation guidance](install.md#upgrade-or-change-the-version).
+**Manager Update remains unavailable**, including for recognized installations, until the separate
+installation-exclusion, independent helper, terminal-handoff and replacement/recovery gates pass.
+There is no installer, Python switch, automatic restart or universal Update All operation here.
 
 ### Environment actions
 
@@ -213,9 +245,9 @@ not-yet-created pins still enforced. The CLI retains both rollback-preserving
 `opencode update-base` and deliberately no-copy `build`, each with explicit `--refresh`; see
 [base modes and limits](opencode.md#versions).
 
-**Manager release discovery/installation classification and update remain unimplemented.** The
-manager's disabled Update explains that limit. No Update All, automatic installation or background
-service is added.
+Manager installation remains unavailable; read-only release/installation checks are described
+[above](#manager-release-and-installation-checks). No Update All, automatic installation or
+background service is added.
 
 ## State
 

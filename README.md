@@ -57,7 +57,9 @@ Consider something else if:
   available when registry discovery fails.
 - **Updates inventory** in the dashboard (`v`): compact component views, local/cached-first,
   explicit version checks and full evidence in Details. Opening it does not trigger discovery.
-  Optional daily npm discovery is off by default and runs only while the dashboard is open.
+  Optional daily GitHub/npm discovery is off by default and runs only while the dashboard is open.
+  Manager checks show published full releases and local installation evidence without running
+  pipx; manager installation remains unavailable pending separate handoff/recovery verification.
   Environment Start/Update/Policy/Rollback/Recover reuse existing handlers with exact confirmation;
   read-only Cancel never cancels an approved mutation.
   Base Build/Rebuild and Rollback preserve copies; cached builds and explicit Refresh & Rebuild

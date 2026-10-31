@@ -40,6 +40,7 @@ Problems fixed in a release are described in `CHANGELOG.md`, their evidence in `
 | pacman downloads from a mirror can stall during Arch image builds | Mitigated: the builds retry pacman three times |
 | Retained Debian 12 environments receive LTS security support only (until 2028-06-30) | The current default definition is Debian 13; manager/base upgrades do not upgrade retained containers. A system backup keeps the old OS; only an explicit new environment or no-system restore chooses the new local base |
 | Base rollback verifies the installed manager's current OS definition | `rollback-base` on the Debian-13 manager refuses a Debian-12 base copy; old copies are not deleted automatically, and retained Debian 12 environments/system backups remain usable. It is not an OS downgrade mechanism |
+| Manager inspection is not installation authorization | Local default-option pipx provenance can be recognized, but public tag-to-commit authentication, independent updater/exclusion/handoff/replacement/recovery remain separate unimplemented gates; Manager Update stays disabled. Unknown/custom options and shadowed/foreign launchers require manual review |
 
 ## Not verified
 

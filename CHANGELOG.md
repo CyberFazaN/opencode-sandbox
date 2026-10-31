@@ -11,8 +11,13 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 - Compact Updates views (`v`) replace the dashboard's Versions report: Manager, Base Images and
   Environment OpenCode, local/cached-first without network requests or version probes on opening.
   Explicit Check has independent registry/object results and cancellable owned read-only work;
-  Details discloses full evidence, errors, recovery and existing CLI guidance. Manager checks
-  remain unavailable at this checkpoint.
+  Details discloses full evidence, errors, recovery and existing CLI guidance.
+- Read-only Manager checks (`manager status --check` and Updates): official published full
+  GitHub releases, dated independent failures, strict release tags and no implicit downgrade.
+  Local-only pipx provenance inspection reconciles the running package, VCS record, interpreter,
+  recorded source/options, actual executable/launcher and custom locations. Unsupported/editable/
+  foreign/shadowed/ambiguous installs get manual guidance, never takeover or conversion. Optional
+  daily discovery now includes an independent GitHub source; manager installation remains disabled.
 - Optional daily npm metadata discovery in dashboard Preferences, off by default: durable
   attempt claims throttle failures/restarts/interruption, shared source requests coalesce across
   CLI/Updates/background callers, and Retry-After applies to explicit checks too. One quiet

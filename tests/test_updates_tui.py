@@ -49,7 +49,8 @@ def test_local_first_compact_views_focus_and_details(sources, size, entry):
         screen = app.screen
         assert isinstance(screen, UpdatesScreen)
         assert not any(call[-1] is True or call == ("npm",) for call in calls)
-        assert screen.view == "manager" and screen.query_one("#updates-check", Button).disabled
+        assert screen.view == "manager" and not screen.query_one("#updates-check", Button).disabled
+        assert screen.query_one('#updates-update', Button).disabled
         for view, key in (("bases", "2"), ("environments", "3"), ("manager", "1")):
             await pilot.press(key)
             assert screen.view == view and app.focused is screen.query_one("#updates-table")

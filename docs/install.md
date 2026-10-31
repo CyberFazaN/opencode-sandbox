@@ -140,6 +140,22 @@ Continue with [getting-started.md](getting-started.md).
 
 ## Upgrade or change the version
 
+Read-only evidence is available without Docker or running pipx:
+
+```sh
+opencode-sandbox manager status          # local provenance and cached releases
+opencode-sandbox manager status --check  # query official GitHub releases
+```
+
+The dashboard's [Manager view](dashboard.md#manager-release-and-installation-checks) exposes the
+same evidence with independent errors. These commands never replace the installation, touch a
+launcher, convert an editable/foreign install, install/switch Python or start unsolicited discovery.
+A verified official-tag pipx classification means local records agree, not public commit
+authentication or permission to update. Manager installation is not yet available in Updates.
+For unrecognized options, injections, pins, suffixes or ambiguous/shadowed launchers, inspect your
+existing configuration and follow the matching manual workflow; do not assume a generic force
+command preserves custom settings. A missing/unrecognized record is not permission to repair it.
+
 Install the other release tag with `--force`; this is also how you go back to an older release:
 
 ```sh

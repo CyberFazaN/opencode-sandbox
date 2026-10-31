@@ -17,14 +17,14 @@ and existing operations -> explicit base refresh -> verified pipx manager self-u
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
 UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen. UP-10 is now a
-verified split checkpoint; UP-09, UP-11 and UP-12/UP-13 are complete too, and four later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
+verified split checkpoint; UP-09, UP-11, UP-12/UP-13 and UP-14/UP-15 are complete too, and three later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
 depend on base refresh. Tightly
 related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
 package or safety boundary, not mechanically after each ID. Environment recovery, manager
 handoff, replacement and failure recovery retain independent verification gates. The working
 roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
 
-Current checkpoint: UP-00..UP-13 complete. Explicit reports, honest partial inventory, shared
+Current checkpoint: UP-00..UP-15 complete. Explicit reports, honest partial inventory, shared
 base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.
 Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
 their existing timing. Dashboard advisories now replace/clear by category without erasing active
@@ -35,8 +35,9 @@ real Debian/Arch update/rollback/recovery/restore/probe checks pass (BASELINE).
 UP-10 now replaces Versions with three compact local/cached-first Updates views, explicit
 independent Check/Details and owned cancellation at 80x24/larger. Opening does not contact the
 network or execute version probes; stopped checks never start containers. Manager discovery
-and execution remain visibly unavailable, with existing CLI guidance. The approved
-UP-10/UP-09 package is split after the verified UI because of its scope and real-terminal fixes.
+now has independent read-only release/installation evidence; manager execution remains unavailable.
+The approved UP-10/UP-09 package was split after the verified UI because of its scope and
+real-terminal fixes.
 UP-09 adds default-off dashboard-only daily npm discovery, persisted attempt claims across
 failures/restarts/interruption, cross-caller/process source coalescing and a quiet policy-filtered
 cached-availability indicator. Explicit refresh remains available; Retry-After still applies.
@@ -50,8 +51,14 @@ with immutable consent, retained copies, bounded UI build output and existing ha
 cached reuse and pull/no-cache package-layer rebuilds pass separately on both distributions,
 alongside concurrency, pinned creation, retained layers and terminal selection/worker ownership.
 Four complete compatibility suites and the affected 24-test real gate pass (BASELINE).
-Next: UP-14 + UP-15, read-only manager release discovery and verified installation classification;
-manager handoff/execution stay separate. No version bump, release preparation, merge, push or publication.
+UP-14/UP-15 add official published-full-release GitHub discovery, source-scoped daily claims,
+independent failures, strict tags/no downgrade and conservative local pipx provenance/settings
+classification. Opening stays network-free, manager Update stays disabled, and unsupported/
+editable/foreign/shadowed/ambiguous installations receive manual guidance. Four complete suites
+(1611 passed/82 skips each) and 26 affected real tests/637 checks pass, including isolated real
+pipx/source/options/launcher and manager terminals; local provenance is not public commit authentication.
+Next: UP-16, installation exclusion and independent helper/terminal handoff, without conflating
+that gate with UP-17 replacement/recovery. No version bump, release preparation, merge, push or publication.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by
 about 8%; findings and recommended verification cadence are in

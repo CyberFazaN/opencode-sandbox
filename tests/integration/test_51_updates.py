@@ -62,7 +62,7 @@ def test_manual_updates_terminal(campaign, checks, distro, size):
     try:
         ck(t.wait_for(name, 30), "Updates terminal: dashboard metadata visible")
         t.send("v", .5)
-        ck(t.wait_for("Installation classification: not assessed", 15), "Updates terminal: immediate Manager view, eligibility not invented")
+        ck(t.wait_for("Installation: manual review", 15), "Updates terminal: local Manager classification, no invented execution eligibility")
         t.send("3", .5)
         ck(t.wait_for("last verified", 20) and "stopped" in t.text(), "Updates terminal: dated stopped version, actual state")
         ck(state["requests"] == 0, "Updates terminal: opening/views made zero HTTP requests")

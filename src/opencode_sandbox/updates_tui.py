@@ -12,6 +12,8 @@ from textual.widgets.data_table import CellDoesNotExist
 
 from . import __version__, distros, updates
 from . import core as c
+from . import manager_installation as mi
+from . import manager_releases as mr
 from . import opencode_versions as v
 from . import update_cache as cache
 from .tui_runtime import publish, work
@@ -55,6 +57,9 @@ class UpdatesScreen(Screen):
         self.selection = {"environments": environment_id}
         self.remote = v.discovery()
         self._cached_remote = dict(self.remote)
+        self.manager_remote = mr.discovery()
+        self._cached_manager_remote = dict(self.manager_remote)
+        self._manager_notice = None
         self.inventory_error = None
         self._discovery_notice = None
         self._alive = False
@@ -105,7 +110,7 @@ class UpdatesScreen(Screen):
         except Exception as exc:
             self.inventory_error = c.error_text(exc)
         self._render_view()
-        for section in ("bases", "environments"):
+        for section in ("manager", "bases", "environments"):
             entries = [(key, self._next(section, key)) for key in self.items[section]]
             self._track(self._inventory_worker(section, entries))
         self.set_interval(1, self._refresh_discovery)
@@ -117,6 +122,12 @@ class UpdatesScreen(Screen):
             self._cached_remote = current
             self.remote = current
             self._discovery_notice = None
+            self._render_selected()
+        current_manager = mr.discovery()
+        if current_manager != self._cached_manager_remote and ('github',) not in self._active:
+            self._cached_manager_remote = current_manager
+            self.manager_remote = current_manager
+            self._manager_notice = None
             self._render_selected()
         self.query_one("#updates-discovery", Static).update(plain_lines(self.discovery_text()))
         if self.view == 'bases': self._render_selected()
@@ -149,6 +160,9 @@ class UpdatesScreen(Screen):
 
     def _inspect(self, section, key, *, check):
         try:
+            if section == 'manager':
+                installation = mi.classify()
+                return {'installation': installation, 'state': installation['classification']}
             if section == "bases": return updates.base_inventory(distros.get(key), check=check)
             m = c.resolve(key)
             return {"name": m["name"], "metadata": m, "policy": v.policy(m), **v.environment_version(m, check=check)}
@@ -158,7 +172,7 @@ class UpdatesScreen(Screen):
     def _receive(self, section, key, token, item, checked):
         if not self._alive or self._generation.get((section, key)) is not token: return
         previous = self.items[section][key]
-        if item.get("error") and "verification" not in item:
+        if section != 'manager' and item.get("error") and "verification" not in item:
             item["verification"] = "history-unverified" if previous.get("verification") == "history-unverified" else "last-verified"
             if previous.get("state") == "inspecting local image…": item["state"] = "unknown"
         if not item.get("error"): previous.pop("error", None)
@@ -212,7 +226,18 @@ class UpdatesScreen(Screen):
         self._render_selected()
 
     def discovery_text(self):
-        if self.view == "manager": return "Published releases: not checked\nRelease discovery and installation verification are not available here yet."
+        if self.view == 'manager':
+            state = self.manager_remote
+            success, attempt = state.get('success'), state.get('attempt')
+            text = (f"GitHub: {success['value']} — cached; checked {cache.when(success['at'])}"
+                    + ('; stale' if state.get('stale') else '')) if success else 'GitHub: never checked; availability unknown'
+            if ('github',) in self._active: return text + '\nChecking published manager releases… local installation evidence remains available.'
+            worker = self.app._manager_discovery_worker_ref
+            if self.app._discovery_enabled and worker is not None and not worker.is_finished:
+                return text + '\nDashboard checking GitHub… local installation evidence remains available.'
+            if self._manager_notice: return text + '\n' + self._manager_notice
+            if attempt and not attempt['ok']: return text + '\nCheck failed: ' + attempt['error']
+            return text + '\nCheck reads official published full releases; no installation or downgrade.'
         success, attempt = self.remote.get("success"), self.remote.get("attempt")
         stale = self.remote.get("stale") or bool(success and time.time() - success["at"] >= 86400)
         text = (f"npm: {success['value']} — cached; checked {cache.when(success['at'])}"
@@ -240,8 +265,13 @@ class UpdatesScreen(Screen):
         self.query_one("#updates-discovery", Static).update(plain_lines(self.discovery_text()))
         check_reason = None
         if self.view == "manager":
-            text = f"Sandbox Manager {__version__}\nInstallation classification: not assessed\nManager release checking/update is not available here yet.\nDetails: existing installation and manual upgrade guidance."
-            check_reason = "Manager release discovery is not available here yet."
+            installation = (item or {}).get('installation')
+            text = '\n'.join([f'Sandbox Manager {__version__}', mr.comparison(__version__, self.manager_remote.get('release')),
+                              'Installation: ' + (installation['classification'] if installation else 'inspecting local evidence…'),
+                              installation['reason'] if installation else 'Local inspection does not run pipx or contact the network.',
+                              'Full evidence, release notes and manual guidance: Details.'])
+            if item and item.get('notice'): text = '\n'.join(text.splitlines()[:4] + [item['notice']])
+            if item and item.get('error'): text = '\n'.join(text.splitlines()[:4] + ['Local check failed: ' + item['error']])
         elif item is None:
             text = "No environments listed." + (f"\nLocal inventory failed: {self.inventory_error}" if self.inventory_error else "")
             check_reason = "No selected object; Check still queries npm."
@@ -281,8 +311,9 @@ class UpdatesScreen(Screen):
             reason = (base_operation['phase'] if active_base else 'An operation is running.') + '\nClose/Cancel check does not cancel it; wait for its result (Details).'
         self.query_one("#updates-reason", Static).update(reason.strip())
         button = self.query_one("#updates-check", Button)
-        button.disabled = self.view == "manager"
-        button.tooltip = check_reason or "Query npm and check the selected object's OpenCode version"
+        button.disabled = False
+        button.tooltip = ('Read published GitHub releases and independently inspect local installation; no pipx execution'
+                          if self.view == 'manager' else check_reason or "Query npm and check the selected object's OpenCode version")
         self.query_one("#updates-cancel", Button).disabled = not (self._active or self._preparing)
         controls = self.query_one("#updates-environment-buttons")
         controls.display = self.view == "environments"
@@ -312,7 +343,17 @@ class UpdatesScreen(Screen):
         if self.app.screen is self: self.action_details()
 
     def action_check(self):
-        if self.view == "manager": return
+        if self.view == 'manager':
+            if ('github',) not in self._active:
+                self._active[('github',)] = self._manager_release_worker()
+                self._track(self._active[('github',)])
+            if ('manager', 'manager') not in self._active:
+                token = self._next('manager', 'manager')
+                self.items['manager']['manager']['checking'] = True
+                self._active['manager', 'manager'] = self._check_worker('manager', 'manager', token)
+                self._track(self._active['manager', 'manager'])
+            self._render_view()
+            return
         # One UI waiter per screen; the provider also coalesces other screens/CLI/background.
         if ("npm",) not in self._active:
             self._active[("npm",)] = self._registry_worker()
@@ -355,14 +396,37 @@ class UpdatesScreen(Screen):
         self.remote.update(result)
         self._render_selected()
 
+    @work(thread=True, group='updates-manager-discovery')
+    def _manager_release_worker(self):
+        try:
+            release = mr.latest()
+            result = mr.discovery()
+            if result.get('release') != release or not (result.get('attempt') or {}).get('ok'):
+                result = {'success': cache.evidence(release['version'], mr.SOURCE, {'url': mr.API}), 'release': release,
+                          'attempt': {'at': time.time(), 'ok': True}, 'stale': False}
+        except Exception as exc:
+            attempt = mr.discovery()['attempt']
+            if not attempt or attempt['ok']: attempt = {'at': time.time(), 'ok': False}
+            result = {'attempt': {**attempt, 'error': c.error_text(exc)}, 'stale': True}
+        publish(self.app, self._manager_release_received, result)
+
+    def _manager_release_received(self, result):
+        if not self._alive: return
+        self._active.pop(('github',), None)
+        self._cached_manager_remote = mr.discovery()
+        self._manager_notice = None
+        self.manager_remote.update(result)
+        self._render_selected()
+
     def action_cancel_checks(self):
         if self._preparing:
             self._preparing.cancel()
             self._preparing = self._prepare_token = None
         if ("npm",) in self._active: self._discovery_notice = "npm check canceled; previous discovery retained."
+        if ('github',) in self._active: self._manager_notice = 'GitHub check canceled; previous discovery retained.'
         for request, worker in self._active.items():
             worker.cancel()
-            if request != ("npm",):
+            if len(request) == 2:
                 section, key = request
                 self._next(section, key)
                 self.items[section][key].pop("checking", None)
@@ -543,11 +607,14 @@ class UpdatesScreen(Screen):
             lines += [str(c.pending_operation(m)), f"Last operation error: {m.get('last_error') or 'none'}", ""]
         lines += [self.discovery_text(), ""]
         if self.view != "manager": lines += ["Discovery evidence:", json.dumps(self.remote, indent=2), ""]
-        lines += ["Optional dashboard discovery: " + ("enabled (npm only)" if self.app._discovery_enabled else "off"),
+        else: lines += ['Manager discovery evidence:', json.dumps(self.manager_remote, indent=2), '']
+        lines += ["Optional dashboard discovery: " + ("enabled (GitHub + npm, independent sources)" if self.app._discovery_enabled else "off"),
                   "Automatic attempts are daily, failures included. Explicit Check may refresh sooner; Retry-After still applies.",
                   "Automatic discovery never starts containers or runs binary/image probes."]
         if self.app._discovery_status:
             lines += ["Last dashboard scheduling result:", json.dumps(self.app._discovery_status, indent=2)]
+        if self.app._manager_discovery_status:
+            lines += ['Last manager scheduling result:', json.dumps(self.app._manager_discovery_status, indent=2)]
         notes = self._notices()
         if notes:
             lines += ["Dashboard notices (retained; compact here so controls remain visible):",
@@ -557,9 +624,9 @@ class UpdatesScreen(Screen):
             if self.view == "environments": lines.append(self.item_summary(item))
         if self.inventory_error: lines.append("Local inventory failed: " + self.inventory_error)
         if self.view == "manager":
-            lines += ["Installation not classified. Do not infer pipx ownership from PATH or this screen.",
-                      "Manual installation/upgrade: follow docs/install.md for your existing installation.",
-                      "No release has been checked, no target selected, and no replacement is authorized."]
+            lines += [mi.GUIDANCE, 'CLI: opencode-sandbox manager status --check',
+                      'Discovery is not target consent or tag-to-commit verification. No replacement is authorized.',
+                      'Manager Update stays unavailable until independent exclusion/handoff/replacement/recovery gates pass.']
         elif self.view == "bases" and key:
             d = distros.get(key)
             lines += [f"Tag: {d.image}; manager definition: {d.name} {d.version}, revision {d.revision}",

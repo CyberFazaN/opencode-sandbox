@@ -74,7 +74,7 @@ class SettingsScreen(Screen):
             yield Checkbox("Show quick environments", id="show-quick")
             yield Checkbox("Refresh after terminal session", id="refresh-return")
             yield Checkbox("Daily metadata discovery (dashboard only)", id="daily-discovery")
-            yield Static("Default off. npm only; at most one automatic attempt/24h.\nNo start, version probe or install. Manager discovery: not available yet.", markup=False)
+            yield Static("Default off. GitHub + npm; one automatic attempt/source/24h.\nNo start, version probe or installation.", markup=False)
             with Horizontal():
                 yield Button("Save", id="save-settings", variant="primary")
                 yield Button("Cancel", id="cancel-settings")

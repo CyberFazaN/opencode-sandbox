@@ -129,6 +129,21 @@ volumes/helpers, unchanged original four image IDs, and no test tags/aliases; bu
 intact. No complete campaign, installed-pipx/manager, paid-provider, privileged/service or manual
 observation is renewed; release gates/historical release evidence remain unchanged.
 
+UP-14/UP-15 manager discovery/classification: **86 new default cases**, four complete suites
+(**1611 passed/82 opt-in skips each**) and **26 affected real tests/637 checks passed**,
+`up1415-final`, 981.42 s. Prior 24 affected base/race/diagnostic/lifecycle/restore/discovery/
+environment-recovery/base-terminal rows rerun unchanged in strength. New `test_66` covers actual
+isolated pipx default/custom-space locations, source/Python/VCS/launcher agreement, unsupported
+settings, foreign/PATH-shadowed launchers and actual foreign/editable installs. Installed-manager
+pty checks at 80x24/120x40 use a loopback release-source hook only, retain real invocation/records,
+keep local/cached evidence on remote failure, leave Update disabled and restore terminals. The
+declared local Git URL rewrite is transport-fixture evidence, not public-release authenticity or
+manager replacement/handoff/recovery evidence. An independent official unauthenticated GitHub GET
+found published v6.1.0; no paid API/login/upload. All intermediate default-metadata/template/harness
+failures were retained, fixed and rerun (BASELINE/roadmap). No complete campaign or manual/
+privileged/socket/service claim. Final daemon inventory has no containers/volumes/helpers and
+unchanged original four image IDs; build cache and persistent locks remain intact.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

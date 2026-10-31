@@ -23,6 +23,10 @@ def history(m, version="2.1.4"):
 
 @pytest.fixture
 def metadata_sources(monkeypatch, registry):
+    from opencode_sandbox import manager_releases
+    # This pre-existing suite isolates npm scheduling; manager scheduling has its own real-HTTP
+    # pilots/provider tests. Never let the newly added independent source contact public GitHub.
+    monkeypatch.setattr(manager_releases, 'latest', lambda **kwargs: None)
     registry["body"] = b'{"versions":{"2.2.0":{"version":"2.2.0"}}}'
     monkeypatch.setattr(readiness, "image_checks", list)
     monkeypatch.setattr(readiness, "daemon_check", lambda: readiness.Check("daemon", "Docker", readiness.PASSED, "test"))
@@ -129,7 +133,7 @@ def test_background_and_explicit_updates_check_share_one_real_request(metadata_s
         assert screen.remote["success"] == v.discovery()["success"]  # never retimestamp shared evidence
         assert len(registry["requests"]) == 1 and not metadata_sources
         await pilot.press("d")
-        assert "enabled (npm only)" in app.screen.report
+        assert "enabled (GitHub + npm, independent sources)" in app.screen.report
     run(test, (80, 24))
 
 

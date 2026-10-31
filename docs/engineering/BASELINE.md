@@ -41,11 +41,13 @@ immutable consent, locked revalidation and the existing handlers/journals. Recov
 also review interrupted OpenCode updates; failed restoration persists its actual successor journal
 and error. Approved mutations are app-owned and not canceled by Close/Cancel check. UP-12/UP-13
 add Base Images build/rollback, identity/target/definition/mode consent, cached versus explicit
-pull/no-cache refresh, retained copies and bounded app-owned build feedback. Next is UP-14 + UP-15,
-read-only manager release discovery/installation classification; manager execution stays pending.
+pull/no-cache refresh, retained copies and bounded app-owned build feedback. UP-14/UP-15 add
+read-only official manager release discovery/local pipx provenance classification and independent
+default-off daily GitHub metadata work. Manager Update stays disabled; next is UP-16's independent
+installation-exclusion/helper/terminal-handoff gate, then UP-17 replacement/recovery.
 No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-13 verification is below; commands, failures and handoff are in the roadmap.
+UP-01..UP-15 verification is below; commands, failures and handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
 D-057 consolidates the remaining work into related packages with technical-only dependencies;
@@ -217,6 +219,54 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-14 + UP-15 — 2026-10-31
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1611 passed, 82 opt-in skips in each of four serial foreground runs**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Clean pip checks; only two known lowest-Typer deprecations. 225.64/219.72/220.54/216.29 s; all **1693 ordered IDs/outcomes identical** |
+| New independent regressions | **86 new default cases**: 43 release provider/coordination, 33 local provenance/settings and 10 CLI/pilot cases. Real bounded loopback HTTP, strict published-release/tag/URL/version filters, no downgrade, plain notes, unauthenticated headers/redirect refusal/size/deadline, independent caches, Retry-After/rate-reset, claims/restart/clock/coalescing/cancellation/unsafe storage. Actual private file/symlink/FIFO/permissions and synthetic runtime identity prove conservative source/interpreter/options/launcher refusal without leaking dummy secrets. Pilots prove independent source failures, network-free opening, daily quiet counts/restart, shared requests, canceled-child reaping, compact controls/Details and permanently disabled manager Update. Two new opt-in installed-pipx layouts |
+| Affected real Docker/OpenCode/pipx/terminal | **26 tests/637 logged checks passed**, no skips/deselections, `up1415-final`, 981.42 s. All 24 prior affected base-race/diagnostic/lifecycle/restore/discovery/environment-recovery/base-mode terminal rows rerun. New isolated real pipx installs from tagged run-owned sources reconcile actual PEP 610/pipx/Python/launcher records at default paths and custom paths with spaces. Unknown options/pins/suffixes, foreign/PATH-shadowed launchers, actual foreign VCS and editable sources refuse without takeover. Real installed-manager terminals at 80x24/120x40 independently check loopback releases, preserve cached/local evidence after GitHub failure, keep Update unavailable and restore the terminal |
+| Public read-only source smoke | One isolated unauthenticated official GitHub GET discovered **v6.1.0**, published 2026-10-30. The unchanged running checkout version is not a new release; development/ambiguous distribution metadata receives manual review. No GitHub login/token or installation/replacement used |
+| Boundaries | pipx source tests explicitly map the official URL spelling to a local tagged fixture using a private Git config; they prove real record/launcher behavior, **not authenticity of a public release commit**. Only current pipx 1.18.7 was executed; wire formats 0.5/0.6/0.12 are recognized/tested as local evidence. Local provenance agreement never grants execution; authenticated source-commit resolution, external updater/helper independence, cross-instance exclusion, handoff, actual replacement and recovery remain unimplemented. No complete campaign/legacy broad TUI workflow, paid-provider, privileged/socket/service or manual-observation claim; CI/release gates, manager version/schemas/image assets remain unchanged |
+
+Failure trail: the missing-provider reproducer failed collection. First selected run **3 failed/92
+passed** (33.52 s): two invalid-type test fixtures concatenated non-string tags, and CLI structure
+needed the new read-only group. Corrected fixtures and added the group without changing the
+top-level count cap or existing command assertions. Focused **1 lint failure/116 passed** (38.42 s)
+and combined **1 lint failure/135 passed** (50.34 s); import/template style fixes, no gate change.
+Lowest affected **145 passed** (49.66 s), then extended lowest/docs subset **165 passed** (51.22 s).
+An early full primary suite **1601 passed/82 skips** (224.02 s) predates ten added final regressions,
+not the final checkpoint above. Documentation **1 failed/42 passed** (3.12 s) caught an overlong
+command comment; shortened it, preserving the 80-column gate.
+
+Real proof attempts were retained and cleaned: first failed before installing because the harness
+omitted a required argument; next two each failed with a recorded refusal/teardown error, exposing
+the current default environment-name field and non-exposed dependency-executable inventory. Both
+are now recognized as actual default evidence rather than misclassified custom settings; custom
+exposure/options remain refused. Next **1 passed/10 checks** (15.47 s). Expanded terminals **1
+passed/1 failed/1 teardown error** (34.17 s; 27 passed/1 failed checks) caught pip's double-quoted
+space-path trampoline, not the assumed single-quoted form. Recognized the actual standard template
+as data, without executing shell text; default/custom layouts plus previous Updates/daily terminals
+then **10 passed/182 checks** (103.45 s). Final expanded 26-test gate above includes real foreign/
+editable installs and all source fixes; no failed check was waived or deselected.
+
+Final XML/logs/hashes: `.work/up1415/final-*.xml`, `real-final.xml`, `final-source-sha256.json`;
+campaign manifests/logs `.work/logs/up1415-*`. Eight changed/new product modules were frozen before
+the final complete/real gates. Each real attempt used isolated roots, manifests, run-owned pipx
+installs and guarded product cleanup/uninstall. Ending verified own-rootless inventory has no
+containers/volumes/helpers, no test tags and the unchanged four original image IDs. Shared build
+cache and persistent locks remain intact. No user launcher, installation, credential or Python
+was changed; no version bump, schema/image revision, upload, merge, push, tag or release.
+
+Final sdist/wheel, strict twine/content checks and byte equality for all eight changed/new
+product modules pass. Final document/CLI/quality subset **43 passed**, 3.10 s (`docs-verified.xml`),
+not another complete suite. Its preceding **1 failed/42 passed**, 3.27 s, caught public-record
+prose resembling a retired internal path; reworded prose without changing the gate. After
+retaining logs/XML/installed-source evidence/package artifacts, removed only **20 exact
+manifested completed pytest roots**, with no live process/socket/mount references. `/tmp/opencode`
+is empty again with **1048541 free inodes**; persistent protocol locks and prior evidence are
+untouched. A final prose-only check's manifested scratch follows the same guard before removal.
 
 ### Unpublished UP-12 + UP-13 — 2026-10-31
 

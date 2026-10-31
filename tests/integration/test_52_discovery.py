@@ -32,6 +32,12 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
     state = {"requests": 0, "fail": False}
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
+            if self.path == '/manager':
+                self.send_response(200); self.end_headers()
+                self.wfile.write(json.dumps([{'tag_name': 'v6.1.0', 'draft': False, 'prerelease': False,
+                    'published_at': '2026-10-30T12:00:00Z', 'body': 'test manager release',
+                    'html_url': 'https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.1.0'}]).encode())
+                return
             state["requests"] += 1
             self.send_response(503 if state["fail"] else 200)
             self.end_headers()
@@ -42,9 +48,10 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
     thread.start()
     directory = camp.tmp("discovery-terminal")
     script, calls_path = directory / "dashboard.py", directory / "docker.jsonl"
-    script.write_text("import json\nfrom opencode_sandbox import core as c, opencode_versions as v\n"
+    script.write_text("import json\nfrom opencode_sandbox import core as c, opencode_versions as v, manager_releases as mr\n"
                       "from opencode_sandbox.tui import Dashboard\n"
                       f"v.REGISTRY='http://127.0.0.1:{server.server_port}/metadata'\n"
+                      f"mr.API='http://127.0.0.1:{server.server_port}/manager'\n"
                       "real_docker=c.docker\n"
                       "def docker(*args, **kwargs):\n"
                       f" with open({str(calls_path)!r},'a') as stream: stream.write(json.dumps(args)+'\\n')\n"

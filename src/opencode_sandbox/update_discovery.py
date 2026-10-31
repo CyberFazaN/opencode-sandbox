@@ -1,8 +1,9 @@
 """Optional dashboard metadata discovery and quiet cached comparisons, never runtime probes.
 
-Only npm is implemented. A later GitHub source must supply its own discovery/attempt contract;
-there is no speculative manager request, generic executor or component mutation here.
+The npm and GitHub providers own independent source/attempt contracts; neither authorizes a
+mutation. Dashboard workers call them independently so one source cannot delay the other's UI.
 """
+from . import __version__, manager_releases
 from . import core as c
 from . import opencode_versions as v
 
@@ -12,6 +13,18 @@ def check():
     try: v.latest(automatic=True)
     except c.SandboxError as exc: error = c.error_text(exc)
     return {**v.discovery(), "scheduling_error": error}
+
+
+def manager_check():
+    error = None
+    try: manager_releases.latest(automatic=True)
+    except c.SandboxError as exc: error = c.error_text(exc)
+    return {**manager_releases.discovery(), 'scheduling_error': error}
+
+
+def manager_available():
+    release = manager_releases.discovery()['release']
+    return int(manager_releases.comparison(__version__, release).startswith('Update available:'))
 
 
 def available():

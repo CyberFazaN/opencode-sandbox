@@ -36,6 +36,7 @@ def test_describe_never_offers_a_downgrade():
 def registry(monkeypatch):
     """Real HTTP over loopback; each test sets the response."""
     state = {"status": 200, "body": b"{}", "delay": 0, "headers": {}, "requests": []}
+    state['request_headers'] = []
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -44,6 +45,7 @@ def registry(monkeypatch):
         def do_GET(self):
             import time
             state["requests"].append((self.path, self.headers.get("Accept")))
+            state['request_headers'].append(dict(self.headers))
             time.sleep(state["delay"])
             self.send_response(state["status"])
             for key, value in state["headers"].items(): self.send_header(key, value)

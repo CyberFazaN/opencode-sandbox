@@ -20,6 +20,25 @@ app=typer.Typer(cls=_HelpOrder,help="Manage isolated OpenCode workspaces on root
 ENVIRONMENTS, SESSIONS, DATA, HOST = "Environments", "Sessions", "Settings, changes and data", "Maintenance"
 profiles=typer.Typer(help="Provider profiles: named credentials for model providers (values never displayed).",no_args_is_help=True)
 app.add_typer(profiles,name="providers",rich_help_panel=DATA)
+manager_app=typer.Typer(help="Read-only Sandbox Manager releases and installation evidence (not OpenCode/npm).",no_args_is_help=True)
+app.add_typer(manager_app,name="manager",rich_help_panel=HOST)
+
+
+@manager_app.command('status')
+def manager_status(check: bool=typer.Option(False,'--check',help='Check official published full GitHub releases; never install')):
+    """Show local installation classification and dated release evidence, without Docker or pipx execution."""
+    from . import manager_installation as mi
+    from . import manager_releases as mr
+    installation = mi.classify()
+    error = None
+    release = mr.discovery()['release']
+    if check:
+        try: release = mr.latest()
+        except c.SandboxError as exc: error = c.error_text(exc)
+    typer.echo(c.printable(json.dumps({'installation': installation, 'discovery': mr.discovery(),
+                                     'comparison': mr.comparison(installation['version'], release),
+                                     'release': release, 'check_error': error}, indent=2)))
+    if error: raise typer.Exit(2)
 
 opencode_app=typer.Typer(help="OpenCode versions: check, policy, update and roll back (base images and environments).",no_args_is_help=True)
 app.add_typer(opencode_app,name="opencode",rich_help_panel=HOST)
@@ -747,7 +766,7 @@ def tui():
     Dashboard().run()
 
 ORDER=("create","list","status","check","start","stop","promote","delete","run","shell","exec","quick","tui",
-       "config","changes","backup","container","agent-context","providers","repair","opencode","disk","build","doctor")
+       "config","changes","backup","container","agent-context","providers","repair","opencode","manager","disk","build","doctor")
 
 
 def _confirm(question, docker=False):
