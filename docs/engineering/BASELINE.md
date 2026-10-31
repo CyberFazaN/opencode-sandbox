@@ -44,12 +44,13 @@ add Base Images build/rollback, identity/target/definition/mode consent, cached 
 pull/no-cache refresh, retained copies and bounded app-owned build feedback. UP-14/UP-15 add
 read-only official manager release discovery/local pipx provenance classification and independent
 default-off daily GitHub metadata work. UP-16's first verified checkpoint adds early process-lifetime
-installation usage/internal exclusion and a stdlib-only console bootstrap. Manager Update stays
-disabled; UP-16 is partial, with helper/external-tool validation, narrow fresh-verifier access and
+installation usage/internal exclusion and a stdlib-only console bootstrap. Its second verified
+checkpoint adds internal dated external-tool/runtime/settings assessment. Manager Update stays
+disabled; UP-16 is partial, with independent helper materialization/lifetime, narrow fresh-verifier access and
 terminal handoff still pending before UP-17 replacement/recovery.
 No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-15 and the first UP-16 checkpoint's verification is below; commands, failures and
+UP-01..UP-15 and both partial UP-16 checkpoints' verification is below; commands, failures and
 handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
@@ -222,6 +223,67 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-16 second trust checkpoint — 2026-10-31
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot suites | **1702 passed, 84 opt-in skips in each of four serial foreground runs**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0; clean pip checks. 227.97/227.03/227.23/223.80 s. All **1786 ordered IDs/outcomes identical**; only two known lowest-Typer deprecations |
+| New default regressions | **47 new cases**: 45 external-tool host/process cases and two package-content gates. Actual isolated child execution with synthetic pipx packages/metadata, standard/space/symlink scripts, exact source-Python selection, effective paths, target absence, dependency/search/import and whole-symlink-route independence, declared missing/lazy files, raw RECORD size/shape, unsafe paths and unsupported versions/settings. Dummy-secret environment/output non-disclosure; owned child timeout/output/cancel reaping and changed-tool refusal. These synthetic package cases are not substituted for real pipx evidence |
+| Affected real Docker/OpenCode/pipx/terminal | **29 tests/714 logged checks passed**, no skips/deselections, `up16b-final`, 1222.86 s. All prior 29 rows rerun, including pipx lifecycle, shared/exclusive startup/session/exec/base-mutation coordination and 80x24/larger terminals. Actual external test-venv pipx 1.18.7/Python/dependencies preserve classified default/custom-space home/bin/man and the exact recorded source-interpreter selection. Probes still work with the run-owned application venv temporarily absent; an in-target pipx console copy is refused even with an external shebang. App records/executable bytes remain unchanged; hidden venvs always restored, owned installs uninstalled |
+| Boundaries | **UP-16 remains partial**. The new API is internal in-memory prerequisite evidence, not called by startup/status/discovery/UI, not a user command or durable grant. Only inspected pipx 1.18.7 with recognized standard console scripts and filesystem dist-info RECORD inventories is supported; unsupported cases get manual guidance. Existing external code is trusted local tooling, not sandboxed/authenticated by the probe. No independent helper artifact/lifetime transfer, verifier bypass, restored-terminal handoff, manager replacement/recovery or automatic restart exists; Manager Update stays disabled |
+
+The standalone source is sent in memory to an external interpreter, first `-I -B -S` for stdlib
+identity, then `-I -B` for only the recognized pipx `--version` path. Imports/search/declared dependency
+inventories and effective settings must be outside the replaceable prefix; exact source-Python
+spelling and every symlink-route component are preserved/checked. External script/interpreter
+identity is reread. Only explicit recognized settings, HOME/PATH and fixed locale/no-bytecode
+controls are forwarded; raw pip/index/proxy/provider/loader/Python environment is not. No list,
+install, metadata normalization, tool/Python installation or switch, Docker, cache/state write or
+network discovery is added. Existing diagnostic runner owns the eight-second/128 KiB **per-child**
+budget and process-group cleanup; long mutation/session timing is unchanged. Strict package
+validation now also requires both prerequisite modules; prior gates remain and no workflow changed.
+
+Failure trail: missing-module reproducer failed collection; a direct ruff check caught an import
+style issue, corrected without a waiver. Early **33 passed**, 2.04 s; lowest affected **124 passed**,
+4.47 s; early real proof **2 passed/90 checks**, 47.85 s. Additional route/permission regressions
+then **129 passed**, 4.65 s. Two source-Python regressions deliberately **failed** (0.33 s, 38
+unrelated cases deselected only for this reproducer): early canonicalization substituted a binary
+endpoint and erased an alias through the target. Preserve the requested path, validate its full
+route, and compare the observed canonical endpoint separately. Lowest extended **152 passed**,
+5.09 s, with only known deprecations.
+
+The first complete attempt passed **1699/84 skips** on both 3.11 variants (228.02/222.54 s), but
+Python 3.14 had **1 failed/1698 passed/84 skips**, 227.40 s; the fourth run was not started. CPython
+3.14's `Distribution.files` filters missing RECORD entries and hid a declared target-dependent
+lazy path. Kept the assertion/fixture unchanged and read bounded unfiltered filesystem dist-info
+CSV RECORD instead: 512 KiB/8192 rows per distribution, 64 distributions/16384 rows overall;
+unknown formats refuse. Added three malformed/empty/oversized inventory cases. Python 3.14
+focused **80 passed**, 4.72 s, then reran **all four complete suites** above on corrected source.
+Earlier failed/pass XML/logs/hashes remain as `.work/up16b/pre-record-fix-*`; none was overwritten
+or promoted as final evidence. No failed assertion was weakened, skipped or suppressed.
+
+Final XML/hashes/inventory under `.work/up16b/`, manifests/commands/check logs `.work/logs/up16b-*`.
+Two new product modules and the packaging checker frozen before final complete/real gates; CLI,
+TUI, core/lifecycle/identity, startup/base/source locks, discovery/cache, schemas, manager version,
+assets, dependency bounds and CI/release workflows unchanged from the first UP-16 checkpoint.
+Both real attempts used isolated run-owned installs/data/config/source/launcher paths, manifested
+temporary venv hiding/restoration and exact scratch cleanup, product uninstall/cleanup and leak
+guards. Final own-rootless inventory has no containers/volumes/test tags; all four original image
+IDs unchanged. Prior evidence, persistent protocol inodes and build cache are preserved. No user
+installation/launcher/Python, real credential, public API or paid-provider use; no complete campaign,
+optional installed-asset build, broad legacy TUI, privileged/socket/service, human observation,
+helper/handoff/replacement or release-readiness claim. No bump/merge/push/tag/upload/publication.
+
+Final package build, strict twine/content validation and byte equality of both new product modules
+with frozen complete/real source and wheel bytes pass; no private instructions/evidence in the
+sdist. Final document/CLI/quality subset **43 passed**, 3.25 s (`docs.xml`), not another complete
+run. No remaining manager/probe/guard/watchdog Python process found. Guarded cleanup removed only
+**16 exact manifested completed pytest roots**, with own-UID/inode/process/socket/mount checks;
+`/tmp/opencode` empty, **1048524 free inodes**. Additional intentional installation-lock inodes
+remain persistent protocol state. Logs/XML/failed-attempt evidence/private fixtures/artifacts/
+build cache/prior records are preserved. Final prose-only scratch is separately manifested and
+guarded after its run; no product/checker change followed the final full/real gates.
 
 ### Unpublished UP-16 first safety checkpoint — 2026-10-31
 

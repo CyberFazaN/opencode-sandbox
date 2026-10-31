@@ -15,9 +15,10 @@ advisories while preserving operation status. UP-07/UP-08 add disposable identit
 evidence, compatible stable discovery and explicit policy comparisons. UP-10 adds the manual/
 cached compact Updates interface; UP-09 adds default-off dashboard discovery; UP-11 binds explicit
 environment actions and recovery to existing handlers. UP-12/UP-13 bind base actions and explicit
-cached/full-refresh builds; UP-14/UP-15 add read-only manager discovery/classification. Manager
+cached/full-refresh builds; UP-14/UP-15 add read-only manager discovery/classification.
 UP-16's first safety checkpoint adds early process-lifetime usage/exclusive coordination. Its
-independent helper/verifier/handoff gate and UP-17 replacement remain pending; Manager Update is disabled.
+second checkpoint adds independent external-tool/runtime prerequisite facts. The independent
+helper/verifier/handoff gate and UP-17 replacement remain pending; Manager Update is disabled.
 
 ## Boundaries
 
@@ -39,6 +40,7 @@ independent helper/verifier/handoff gate and UP-17 replacement remain pending; M
 | `runtime_identity.py` | Bounded acquisition and authenticated rootless response-sender proof; shared by CLI/TUI and standalone stdlib diagnostic | D-003, D-048, D-052 |
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
 | `launcher.py`, `installation_locks.py` | Stdlib-only console bootstrap and canonical-prefix shared process-lifetime lease/internal non-waiting exclusion; no updater, verifier bypass or early-release API | D-056, D-057 |
+| `manager_tools.py`, `manager_tool_probe.py` | Explicit internal dated external-tool prerequisite assessment and self-contained isolated diagnostic source; only known existing pipx version/runtime/settings checks, no helper/handoff/executor or automatic consumer | D-056, D-057 |
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
@@ -106,11 +108,63 @@ or proof that orphaned work stopped. Provenance classification recognizes both s
 bootstrap console templates, without claiming that an older installed program implements locks.
 
 This independently verified startup checkpoint is only part of UP-16. There is no consumer that
-replaces the manager, independent helper or external-tool validation, narrow fresh-verifier
+replaces the manager, independent helper, narrow fresh-verifier
 capability, terminal handoff, recovery record or automatic restart. Those are separate pending
 gates; exclusive access alone never authorizes mutation. Manager Update remains disabled. Future
 handoff must prove quiescence and move into an independent process rather than close this lease
 while Textual workers could still be alive; no generic environment-variable/CLI bypass is present.
+
+### External-tool prerequisites (UP-16 second checkpoint)
+
+`manager_tools.assess()` consumes dated recognized local classification but never treats it as
+consent or a durable grant. No startup, CLI status, discovery or UI path calls it. It neither
+holds installation-exclusive access nor changes installed code/configuration. A PATH candidate
+alone proves nothing: inspect a bounded standard pipx console script and literal Python shebang
+or exact pip shell trampoline as data, never shell-evaluate it. Reject ambiguous wrappers/env
+shebangs, wrong owners, writable files/parents and tools/interpreters inside the target. Check
+every symlink-route component, not only the final binary: an external alias that passes through
+the replaceable venv still depends on that venv. Identity/stat and script hash are reread after
+both child probes; a changed candidate cannot publish supported prerequisite facts.
+
+The diagnostic source is sent in memory to the already-existing external interpreter, not
+imported from the replaceable environment. First run stdlib-only with `-I -B -S`; require Python
+3.11+, independent executable/prefix/base/stdlib/search paths. Then run `-I -B` with the actual
+recognized pipx script's fixed `--version` argv. Only inspected pipx **1.18.7** and its expected
+entry point are supported; its version exit precedes logging/directories/listing/metadata repair.
+No list, environment, install, Python fetch, shell, host npm or Docker call is added. Existing
+diagnostics own a finite eight-second/128 KiB budget **per child**, including DNS-free startup,
+pipe draining, cancellation and process-group reaping. These are not updater/build deadlines.
+
+The pipx child validates declared dependency closure using its existing packaging dependency,
+including active environment markers/default extras, installed versions, metadata file inventory,
+all observed import/namespace/search paths and resolved locations. Read bounded raw CSV RECORD
+files from recognized filesystem dist-info (512 KiB/8192 rows per distribution, 64 distributions/
+16384 rows overall), never CPython 3.14's missing-file-filtered `Distribution.files`; unknown
+metadata/provider formats refuse. Declared paths into an absent target must not disappear from
+the proof. Unsafe/foreign/writable or
+target-dependent routes refuse even when pipx itself is external or a dependency is lazy/not
+imported by --version. File inventories qualify paths, not content authenticity or future
+installability; their digest is local evidence, never attestation. The diagnostic itself has
+stdlib top-level imports only. Imported external pipx/dependency code is the user's existing
+trusted tooling, not sandboxed or cryptographically authenticated by this inspection.
+
+Only classified effective HOME/BIN/MAN/COMPLETION/SHARED locations and the **recorded source
+interpreter path** are passed explicitly; validate the external pipx resolves them as expected.
+Keep the requested source-Python spelling (a venv path may share a binary), validate its complete
+route, and report the observed canonical endpoint separately. Do not canonicalize away target
+dependencies or silently replace the selection. Refuse settings under the replaceable prefix
+and unknown PIPX settings rather than guess preservation. Children receive only these settings,
+HOME/PATH and fixed locale/no-bytecode controls; ambient Python, loader, pip/index/proxy/provider
+credentials are not forwarded, logged or persisted. Future installation network/environment
+consent is separate; this is not a promise to preserve arbitrary custom options or dependencies.
+
+Results are timestamped in-memory prerequisite facts, independent of release caches and recovery
+state. Probe output/import/metadata errors are not echoed, because they can contain secrets;
+unsupported cases receive static manual guidance. Cancellation propagates rather than publishing
+a late result. Successful assessment is still **execution unavailable**. Actual helper materialization
+outside the venv, lifetime/quiescence/ownership transfer, narrow fresh-verifier capability and
+restored-terminal handoff remain pending UP-16 gates, followed separately by UP-17 consent,
+source authentication/revalidation, replacement and success/failure recovery.
 
 ## Docker access and identity (D-003, D-004, D-052)
 

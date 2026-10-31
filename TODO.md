@@ -64,7 +64,13 @@ refuses it before dispatch. Private persistent lock inodes, lock order and fork/
 ownership have real-process regressions. Four complete suites (1655 passed/84 skips each) and
 29 affected real tests/702 checks pass, including actual installed pipx lifecycle/launchers and
 live session/mutation exclusion. This is a split checkpoint, **not completion of UP-16**.
-Next: finish UP-16's independent helper/external-tool validation, narrow fresh-verifier access
+UP-16's second verified trust checkpoint adds internal dated external pipx/Python/runtime and
+dependency-inventory assessment, with literal source-Python selection and effective-location
+preservation. It rejects target-dependent symlink routes, lazy/absent declared paths, unsupported
+pipx/metadata and unsafe inputs without a grant. Four complete suites (1702 passed/84 skips each)
+and 29 affected real tests/714 checks pass, including actual external pipx with the owned manager
+venv temporarily absent. No startup/status/UI consumer or new public command executes this probe.
+Next: finish UP-16's independent helper materialization/lifetime, narrow fresh-verifier access
 and real terminal handoff. No early release or generic bypass exists; Manager Update stays
 disabled. Keep UP-17 replacement/recovery separate. No version bump, release preparation,
 merge, push or publication.

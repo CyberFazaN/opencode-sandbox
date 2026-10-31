@@ -38,6 +38,12 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   Persistent private lock files are never treated as stale or repaired. This is the first
   manager-handoff safety checkpoint, not an updater: helper/verifier/handoff and replacement
   remain unavailable, and older managers or external pipx/Docker do not honor these locks.
+- Internal read-only external-tool prerequisite assessment checks an existing pipx console
+  script, independent Python/runtime/dependency paths and recognized effective locations. It
+  preserves the recorded source-Python selection rather than silently substituting a shared
+  binary. Only the inspected pipx 1.18.7 path is supported; unknown or dependent tools get manual
+  guidance. This is not run by startup, discovery, status or the dashboard, and is not a helper,
+  installation authorization, verifier bypass or terminal-handoff implementation.
 
 ### Fixed
 

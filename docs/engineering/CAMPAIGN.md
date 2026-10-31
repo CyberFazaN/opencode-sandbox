@@ -158,6 +158,21 @@ and persistent protocol inodes are preserved. No independent helper/verifier/ter
 manager replacement/recovery, complete campaign, privileged/service or manual-observation claim.
 Manager Update remains disabled; **UP-16 is not complete**.
 
+UP-16 second trust checkpoint (still partial): **47 new default cases**, four complete suites
+(**1702 passed/84 opt-in skips each**, identical 1786 ordered outcomes), and **29 affected real
+tests/714 checks passed**, `up16b-final`, 1222.86 s. All prior affected rows/assertions retained.
+Actual external pipx 1.18.7/dependency/runtime checks preserve default/custom-space effective
+locations and the recorded source-Python path, work while the owned manager venv is temporarily
+absent, refuse an in-target console despite an outside shebang, and leave app bytes unchanged.
+Synthetic host/process cases separately cover lazy/missing declared paths, runtime/import/search/
+symlink-route dependence, unsafe/unknown settings, output secrecy and cancellation/reaping. A
+source-Python normalization reproducer and Python 3.14's missing-RECORD filtering failure were
+fixed without weakening assertions; the four complete suites and all 29 real rows then reran.
+No startup/status/UI consumer, helper artifact/lifetime transfer, fresh-verifier bypass, terminal
+handoff or replacement exists here; ordinary terminal-restoration evidence is not a handoff proof.
+No containers/volumes/test tags remain, all original image IDs unchanged, all persistent inodes/
+evidence/build cache preserved. **UP-16 is not complete; Manager Update remains disabled.**
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

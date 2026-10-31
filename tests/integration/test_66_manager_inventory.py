@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 import pytest
 from campaign import ROOT
@@ -68,6 +69,40 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
         assert ck(value['verified'], 'Manager real pipx: recognized tagged VCS/runtime/Python/custom paths/actual launcher agree'), value
         ck(value['evidence']['commit'] == commit and value['evidence']['tag'] == 'v' + version, 'Manager real pipx: exact recorded commit and version tag retained')
         ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real pipx: inspection did not rewrite records or launcher')
+        # Internal dated prerequisite API, not manager consent/execution or a verifier bypass.
+        # The actual installed launcher supplied `value`; all probe children use external pipx.
+        probe = ('import json,sys\nfrom opencode_sandbox.manager_tools import assess\n'
+                 'print(json.dumps(assess(json.loads(sys.argv[1]))))\n')
+        probe_env = dict(camp.env, HOME=str(home), PATH=str(Path(sys.executable).parent) + ':/usr/bin:/bin')
+        def inspect_tools(environment=probe_env):
+            result = camp._run([sys.executable, '-B', '-c', probe, json.dumps(value)], env=environment, check=True)
+            return json.loads(result.stdout)
+        tool_facts = inspect_tools()
+        assert ck(tool_facts['supported'], 'Manager real tools: actual external Python/pipx/dependency closure is independent'), tool_facts
+        ck(tool_facts['evidence']['settings']['PIPX_HOME'] == str(pipx_home)
+           and tool_facts['evidence']['settings']['PIPX_BIN_DIR'] == str(bindir)
+           and tool_facts['evidence']['settings']['PIPX_MAN_DIR'] == str(base / 'man'),
+           'Manager real tools: default/custom-space pipx home/bin/man locations explicitly retained')
+        ck(tool_facts['evidence']['settings']['PIPX_DEFAULT_PYTHON'] == value['evidence']['source_python']
+           and 'Unavailable' in tool_facts['execution'], 'Manager real tools: source Python preserved; no helper or execution grant')
+        hidden = prefix.with_name('ocs-test-tool-independence-hidden')
+        assert not hidden.exists()
+        camp.note(f'owned application venv temporarily renamed {prefix} -> {hidden} only for non-mutating external-tool independence proof; always restored')
+        prefix.rename(hidden)
+        try:
+            independent = inspect_tools()
+            ck(independent['supported'] and not prefix.exists(), 'Manager real tools: external stdlib/pipx probes work with application venv absent')
+        finally: hidden.rename(prefix)
+        inside = prefix / 'ocs-test-external-tool-refusal'; inside.mkdir()
+        pipx_script = Path(sys.executable).parent / 'pipx'
+        (inside / 'pipx').write_bytes(pipx_script.read_bytes()); (inside / 'pipx').chmod(0o700)
+        camp.note(f'owned test-only pipx console copy {inside / "pipx"}; exact file/directory removed after refusal proof')
+        try:
+            refused_tools = inspect_tools(dict(probe_env, PATH=str(inside) + ':' + probe_env['PATH']))
+            ck(not refused_tools['supported'] and 'replaceable installation' in refused_tools['reason'],
+               'Manager real tools: pipx inside the application refused before execution despite external shebang')
+        finally: (inside / 'pipx').unlink(); inside.rmdir()
+        ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real tools: version-only assessment left installed records/launcher unchanged')
         # This external guard runs from the test venv, not from the guarded application. It
         # exercises the real fixed namespace/prefix key without patching the installed package.
         hold = subprocess.Popen([sys.executable, '-B', '-c',

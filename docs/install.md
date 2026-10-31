@@ -72,6 +72,10 @@ manual pipx replacement; these locks cannot make an external replacement safe au
 Manager installation in Updates is still disabled. This first coordination checkpoint does not
 provide an independent updater/helper, verification bypass, terminal handoff, replacement or
 recovery workflow; those require separate verification before installation can be offered.
+An additional internal prerequisite assessment now checks an existing external pipx/Python
+runtime and recognized locations, with conservative manual fallback. It is not a user command
+and is never run automatically or by the read-only status/Updates checks. No pipx/Python is
+installed, switched or converted by that assessment; helper and handoff remain pending.
 
 ## Prepare Docker
 

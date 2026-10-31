@@ -49,7 +49,8 @@ def check(dist):
             problems.append("wheel: LICENSE missing in dist-info/licenses")
         if "opencode-sandbox = opencode_sandbox.launcher:main" not in wheel.read(f"{info}/entry_points.txt").decode():
             problems.append("wheel: console script opencode-sandbox missing")
-        for required in ('opencode_sandbox/launcher.py', 'opencode_sandbox/installation_locks.py'):
+        for required in ('opencode_sandbox/launcher.py', 'opencode_sandbox/installation_locks.py',
+                         'opencode_sandbox/manager_tools.py', 'opencode_sandbox/manager_tool_probe.py'):
             if required not in names: problems.append(f'wheel: {required} missing')
         packaged = sorted(n[len("opencode_sandbox/assets/images/"):] for n in names
                           if n.startswith("opencode_sandbox/assets/images/") and not n.endswith("/"))
@@ -63,6 +64,7 @@ def check(dist):
         names = {m.name[len(top):] for m in sdist.getmembers() if m.name.startswith(top)}
         for required in ("LICENSE", "README.md", "pyproject.toml", "src/opencode_sandbox/__init__.py",
                           'src/opencode_sandbox/launcher.py', 'src/opencode_sandbox/installation_locks.py',
+                          'src/opencode_sandbox/manager_tools.py', 'src/opencode_sandbox/manager_tool_probe.py',
                          *(f"src/opencode_sandbox/assets/images/{a}" for a in assets())):
             if required not in names:
                 problems.append(f"sdist: {required} missing")
