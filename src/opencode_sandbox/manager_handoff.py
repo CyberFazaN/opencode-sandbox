@@ -352,6 +352,11 @@ def _prepare(installation, parent, local_review, *, update=False):
         fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
         try: os.fsync(fd)
         finally: os.close(fd)
+        # Sync the newly created artifact directory's entry too, not just its contents. The
+        # later prepared-state write syncs the pipx/root namespace before admitting an installer.
+        fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        try: os.fsync(fd)
+        finally: os.close(fd)
         artifact = Artifact(directory, str(prefix), facts['evidence']['python'], digest,
                              _private(directory, directory=True), _private(directory / FILES[0]),
                              tuple(facts['evidence']['python_identity']), review_sha256=review_digest,

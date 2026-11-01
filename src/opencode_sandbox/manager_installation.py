@@ -99,7 +99,7 @@ def _running_distribution():
 def classify():
     """Return safe local evidence/reason even when remote discovery is offline. No cached grant."""
     result = {'version': __version__, 'at': time.time(), 'classification': 'manual review', 'verified': False,
-              'reason': '', 'guidance': GUIDANCE, 'execution': 'Unavailable: manager replacement and failure-recovery gates remain pending'}
+              'reason': '', 'guidance': GUIDANCE, 'execution': 'Unavailable from classification alone; an explicit exact review and independent helper gates are mandatory'}
     try:
         module, dist = _running_distribution()
         direct = _json(dist / 'direct_url.json')
@@ -186,3 +186,16 @@ def classify():
         # credentials. Known reasons are static; unexpected parse/file errors have a safe class.
         result['reason'] = str(exc) if isinstance(exc, c.SandboxError) else f'Local installation evidence unavailable ({type(exc).__name__})'
     return result
+
+
+def update_reason(installation, release):
+    """Read-only UI eligibility, NEVER execution consent or cached target authority."""
+    if not installation: return 'Inspect the local installation before reviewing an update.'
+    if installation.get('verified') is not True: return 'Manual update required: ' + installation.get('reason', 'installation not recognized')
+    if not release: return 'Check published manager releases first; no exact newer release is selected.'
+    try:
+        version = releases.version(release['tag'])
+        if version != release['version']: return 'Published release evidence disagrees; check releases again.'
+        if releases._key(version) <= releases._key(installation['version']): return 'No strictly newer published manager release is selected.'
+    except (c.SandboxError, KeyError, TypeError): return 'Release version is unsupported; review manual guidance.'
+    return None

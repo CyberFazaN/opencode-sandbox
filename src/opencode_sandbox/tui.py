@@ -146,6 +146,7 @@ class Dashboard(App):
         super().__init__(*args, **kwargs)
         self._handoff_activity = Activity()
         self._manager_fixture = None
+        self._manager_update_intent = None
         self._session_active = False
 
     TITLE = "OpenCode Sandbox"
@@ -188,7 +189,8 @@ class Dashboard(App):
 
     def check_action(self, action: str, parameters) -> bool | None:
         # Dashboard keys must not act on a hidden selection behind sub-screens.
-        return self._manager_fixture is None and not (action in self._DASHBOARD_ACTIONS and len(self.screen_stack) > 1)
+        return self._manager_fixture is None and self._manager_update_intent is None \
+            and not (action in self._DASHBOARD_ACTIONS and len(self.screen_stack) > 1)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -244,6 +246,7 @@ class Dashboard(App):
         self.refresh_discovery_preferences()
 
     def refresh_discovery_preferences(self):
+        if self._manager_update_intent is not None: return
         from . import preferences
         try: enabled = preferences.read()["daily_discovery"]
         except (c.SandboxError, OSError, ValueError): enabled = False
@@ -419,7 +422,7 @@ class Dashboard(App):
         return sorted(state)
 
     def _refresh_if_changed(self) -> None:
-        if len(self.screen_stack) > 1:
+        if self._manager_update_intent is not None or len(self.screen_stack) > 1:
             return  # the table lives on the dashboard screen; picked up after the sub-screen closes
         if self._metadata_state() != self._metadata_seen:
             self.action_refresh()
@@ -739,6 +742,9 @@ class Dashboard(App):
         No helper starts/arms here and no usage lease is released. The CLI must independently
         verify clean app return and real terminal restoration. No public action/flag/env binding.
         """
+        return self._request_manager_handoff(artifact, verify=verify, update=False)
+
+    def _request_manager_handoff(self, artifact, *, verify=False, update=False):
         import threading
 
         from . import installation_locks, manager_handoff
@@ -751,7 +757,7 @@ class Dashboard(App):
         if len(self.screen_stack) != 1:
             raise c.SandboxError('Close the current screen or consent before manager handoff')
         if self._manager_fixture is not None: raise c.SandboxError('Manager handoff is already pending')
-        if type(artifact) is not manager_handoff.Artifact or type(verify) is not bool:
+        if type(artifact) is not manager_handoff.Artifact or type(verify) is not bool or artifact.update is not update:
             raise c.SandboxError('Invalid non-mutating handoff fixture request')
         artifact.check()
         if artifact.used or artifact.prefix != installation_locks.identity():
@@ -760,6 +766,58 @@ class Dashboard(App):
         self._handoff_activity.seal(self.workers)
         self._manager_fixture = manager_handoff.TerminalRequest(artifact, verify)
         self.exit(self._manager_fixture)
+
+    def run_manager_update(self, approval):
+        """App-owned approved staging; never cancel work or release usage to manufacture idle."""
+        from . import manager_review
+        if type(approval) is not manager_review.Approval: raise c.SandboxError('Exact manager review approval is required')
+        if self._session_active or self._operation_pending or self._manager_update_intent is not None:
+            self.notify('A session or operation is active; wait and review the manager update again.', severity='warning')
+            return
+        self._manager_update_intent = intent = object()
+        self._operation_pending = self._updates_mutation_active = True
+        self._set_busy('Staging approved manager handoff; dashboard will close only after work finishes...')
+        self._manager_stage_worker(intent, approval)
+
+    @work(thread=True, group='manager-stage')
+    def _manager_stage_worker(self, intent, approval):
+        from . import manager_handoff
+        try:
+            staged = manager_handoff.prepare_update(approval)
+            if not staged['supported']: raise c.SandboxError(staged['reason'])
+            artifact, error = staged['artifact'], None
+        except Exception as exc: artifact, error = None, c.error_text(exc)
+        publish(self, self._manager_staged, intent, artifact, error)
+
+    def _manager_staged(self, intent, artifact, error):
+        if self._manager_update_intent is not intent: return
+        if error:
+            self._manager_update_failed(error)
+            return
+        import time
+        self._manager_update_artifact = artifact
+        self._manager_update_deadline = time.monotonic() + 15
+        self._manager_update_timer = self.set_interval(.05, self._finish_manager_handoff)
+
+    def _manager_update_failed(self, error):
+        self._manager_update_intent = None
+        self._updates_mutation_active = False
+        self._finished('Manager handoff refused; no installer started. ' + error, True)
+
+    def _finish_manager_handoff(self):
+        import time
+        # The staging callback can arrive before its thread body exits. Observe actual bodies
+        # and queued workers; final seal is atomic and prevents later canceled-body admission.
+        with self._handoff_activity._mutex: running = self._handoff_activity._running
+        if running or any(not worker.is_finished for worker in self.workers):
+            if time.monotonic() < self._manager_update_deadline: return
+            self._manager_update_timer.stop()
+            self._manager_update_failed('Dashboard work is still running; wait before reviewing again.')
+            return
+        self._manager_update_timer.stop()
+        self._operation_pending = self._updates_mutation_active = False
+        try: self._request_manager_handoff(self._manager_update_artifact, update=True)
+        except c.SandboxError as exc: self._manager_update_failed(str(exc))
 
     def run_environment_update_action(self, m, action, plan, callback):
         """App-owned work survives closing Updates. Never replace/cancel an approved mutation."""
@@ -1040,7 +1098,7 @@ class Dashboard(App):
             self._session_active = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if self._manager_fixture is not None: return
+        if self._manager_fixture is not None or self._manager_update_intent is not None: return
         action = event.button.id
         if action == "new": self.action_create_environment()
         elif action == "current": self.action_current_folder()

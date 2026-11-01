@@ -17,7 +17,7 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   Local-only pipx provenance inspection reconciles the running package, VCS record, interpreter,
   recorded source/options, actual executable/launcher and custom locations. Unsupported/editable/
   foreign/shadowed/ambiguous installs get manual guidance, never takeover or conversion. Optional
-  daily discovery now includes an independent GitHub source; manager installation remains disabled.
+  daily discovery now includes an independent GitHub source, with no automatic installation.
 - Optional daily npm metadata discovery in dashboard Preferences, off by default: durable
   attempt claims throttle failures/restarts/interruption, shared source requests coalesce across
   CLI/Updates/background callers, and Retry-After applies to explicit checks too. One quiet
@@ -35,46 +35,24 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 - Early process-lifetime installation leases for supported CLI/dashboard instances, independent
   of data/configuration locations. A small stdlib bootstrap acquires shared access before CLI
   imports; internal exclusive access refuses while another instance/session/worker is alive.
-  Persistent private lock files are never treated as stale or repaired. This is the first
-  manager-handoff safety checkpoint, not an updater: helper/verifier/handoff and replacement
-  remain unavailable, and older managers or external pipx/Docker do not honor these locks.
-- Internal read-only external-tool prerequisite assessment checks an existing pipx console
-  script, independent Python/runtime/dependency paths and recognized effective locations. It
-  preserves the recorded source-Python selection rather than silently substituting a shared
-  binary. Only the inspected pipx 1.18.7 path is supported; unknown or dependent tools get manual
-  guidance. This is not run by startup, discovery, status or the dashboard, and is not a helper,
-  installation authorization, verifier bypass or terminal-handoff implementation.
-- Internal non-mutating helper fixture freezes a private stdlib-only artifact outside the
-  manager installation. Its independent process waits for actual origin termination, including
-  worker shutdown, before trying non-waiting installation exclusion. It does not install anything,
-  grant verifier access or implement restored-terminal handoff; Manager Update stays disabled.
-- Optional internal fresh-verifier access uses a dedicated fixed read-only runtime query under
-  helper-owned exclusion. An unlocked read-only witness is checked against the live helper's
-  kernel lock record and closed before querying; no exclusive descriptor is inherited, even by
-  early Python startup descendants. Parent-death protection stops an interrupted direct verifier.
-  Ordinary CLI startup has no bypass. This is not source/launcher authentication, replacement
-  success or restored-terminal handoff; Manager Update remains disabled.
-- Internal non-mutating restored-terminal handoff fixture unifies implicit/explicit dashboard
-  exit, refuses active sessions/operations and actual worker bodies even after Textual task
-  cancellation, and checks foreground tty identity/exact modes and driver shutdown before arming
-  the independent helper. No usage lease is released early. No public trigger, replacement or
-  recovery path is added; Manager Update stays disabled.
-- Internal read-only exact manager-source resolution binds a published full official release to
-  its Git tag, bounded annotated-tag chain and exact commit. Fresh revalidation refuses changed
-  publication or source instead of selecting another target. GitHub rate limits are shared with
-  release discovery without turning cached availability into consent. This trusts GitHub HTTPS
-  evidence, not signed-tag authentication; no public action, installation or recovery is enabled.
-- Internal exact manager review binds fresh local installation/tool facts, critical records and
-  observed symlink routes to the published source. Its scrollable consent fixture defaults to
-  Cancel and requires explicit public-default network acceptance; detected custom installer or
-  credential configuration receives manual fallback without value disclosure. Fresh origin-side
-  revalidation refuses changed evidence. No helper payload, replacement or recovery is enabled;
-  Manager Update remains disabled.
-- Internal approved-local-observation replay freezes shared stdlib file/route checks outside the
-  manager installation. A private bounded fixture input binds the exact review; actual origin
-  death and helper-owned non-waiting exclusion precede replay. Changed input/records/routes
-  refuse. No target application, fresh external-tool/source/network validation, installer or
-  recovery is inferred; Manager Update stays disabled.
+  Persistent private lock files are never treated as stale or repaired. Older managers, direct
+  library callers and external pipx/Docker do not honor these locks; normal startup has no bypass.
+- Explicit exact-tag manager updates in Updates and `manager update --tag`, with Cancel-first
+  source/commit/installation/tool/network consent, real foreground terminal restoration and
+  actual worker/process-death exclusion. A frozen stdlib helper revalidates published GitHub
+  source, existing pipx/Python/dependencies and effective public-default client policy before
+  exact-tag replacement; no tool/Python switch, automatic restart/rollback or Update All.
+  Recognized locations/source Python are retained; unknown/custom settings get manual guidance,
+  not silent removal. Only inspected pipx 1.18.7 is supported. Host build code is not sandboxed,
+  HTTPS/API evidence is not signed-tag authentication, and force is not a backup.
+- Durable incomplete-update state and private recovery inputs outside the replaceable venv.
+  A parked installer independently proves live kernel ownership and durable process admission
+  before exec. Owned groups/adopted descendants are reaped without stale-PID signals; exact
+  installed records/source/commit/launcher and separate runtime/CLI-health queries determine
+  success, not an installer exit code or cache. Explicit frozen verify-only recovery survives a
+  broken launcher, with manual previous-tag reinstall guidance. Unknown hard-interruption
+  quiescence remains blocked in the same boot and may need a reboot before verification;
+  no identical-dependency or offline restoration promise, automatic reboot or state reset.
 
 ### Fixed
 

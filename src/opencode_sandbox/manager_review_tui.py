@@ -1,4 +1,4 @@
-"""Internal-only exact manager consent form; no public route, helper or install action."""
+"""Exact manager consent; an immutable receipt is not a helper or durable execution grant."""
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -18,20 +18,21 @@ class ManagerReviewScreen(ModalScreen[review.Approval | None]):
     BINDINGS = [Binding('escape', 'cancel', 'Cancel')]
     AUTO_FOCUS = '#manager-review-cancel'
 
-    def __init__(self, prepared):
+    def __init__(self, prepared, *, update=False):
         super().__init__()
         if type(prepared) is not review.Review: raise c.SandboxError('An exact prepared manager review is required')
         self.prepared = prepared
-        self.message = c.printable(review.text(prepared))
+        self.update = update
+        self.message = c.printable(review.text(prepared, update=update))
 
     def compose(self) -> ComposeResult:
         with Vertical(id='manager-review'):
-            yield Static('Review Sandbox Manager — internal fixture, no installation', markup=False)
+            yield Static('Review Sandbox Manager update' if self.update else 'Review Sandbox Manager — internal fixture, no installation', markup=False)
             yield TextArea(self.message, read_only=True, id='manager-review-text')
             yield Checkbox('I accept this exact target and public-default network policy', id='manager-review-network')
             with Horizontal():
                 yield Button('Cancel', id='manager-review-cancel', compact=True)
-                yield Button('Confirm review', id='manager-review-confirm', variant='warning', compact=True, disabled=True)
+                yield Button('Update & close' if self.update else 'Confirm review', id='manager-review-confirm', variant='warning', compact=True, disabled=True)
 
     def action_cancel(self): self.dismiss(None)
 

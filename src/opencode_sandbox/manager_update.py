@@ -32,7 +32,16 @@ class Refused(RuntimeError):
 
 def notice(text):
     try: print(text, flush=True)
-    except OSError: pass  # terminal loss never authorizes another mutation or erases durable state
+    except OSError:
+        # A lost terminal must not turn final interpreter stdout flushing into exit 120 or
+        # prevent private result persistence. Redirect only this helper's broken output fd.
+        descriptor = None
+        try:
+            descriptor = os.open(os.devnull, os.O_WRONLY | os.O_CLOEXEC)
+            os.dup2(descriptor, sys.stdout.fileno())
+        except (OSError, ValueError, AttributeError): pass
+        finally:
+            if descriptor is not None: os.close(descriptor)
 
 
 def _own(locks, prefix):
@@ -54,7 +63,8 @@ def reconcile(locks, record, path, *, installer_exit=None):
     _own(locks, prefix)
     current = locks.operation_state(prefix)
     if current is None or current['operation'] != record['operation'] or current['owner'] != state.owner() \
-            or current['phase'] != 'verifying' or current['installer'] is not None:
+            or current['phase'] != 'verifying' or current['installer'] is not None or current['record'] != str(path) \
+            or current['target'] != record['target'] or current['previous'] != record['previous']:
         raise Refused('Expected-result reconciliation requires authoritative quiescent verification state')
     deadline = time.monotonic() + 40  # two separate fixed read-only clients per expected installation
     result = None
@@ -131,6 +141,17 @@ def execute(locks, directory, expected, *, prefix, origin, helper_sha256):
         notice('Installer did not return normally; checking only independently proven stopped state.')
         # replace() reserves/reaps its leader and records whether descendants are quiescent.
         current = locks.operation_state(prefix)
+        if current['phase'] in ('prepared', 'manual-recovery') and current['installer'] is None \
+                and current['owner'] == state.owner() and current['operation'] == record['operation'] \
+                and current['record'] == str(path) and current['target'] == record['target'] and current['previous'] == record['previous'] \
+                and installer.drain()[0]:
+            # This still-live original subreaper can prove its own children stopped after a
+            # launch/admission failure. A later process cannot infer that from installer=None.
+            if current['phase'] == 'prepared':
+                current.update(phase='manual-recovery', result='interrupted', at=time.time())
+                locks.record_operation(current, prefix)
+            current.update(phase='verifying', result=None, at=time.time())
+            locks.record_operation(current, prefix)
         if current['phase'] != 'verifying' or current['installer'] is not None:
             notice('Installer interruption has unconfirmed quiescence. Startup stays blocked; use the private recovery record.')
             operation.result(path, {'operation': record['operation'], 'result': 'interrupted', 'installer_exit': None})

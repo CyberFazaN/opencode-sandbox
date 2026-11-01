@@ -108,9 +108,10 @@ def configure(installed, fault):
     (package / '__main__.py').write_text(code)
 
 
-def start(installed, endpoint, tmp_path, *, tag='v6.2.0'):
+def start(installed, endpoint, tmp_path, *, tag='v6.2.0', admission_failure=False):
     prefix, launcher, _package, _marker, environment, _publish = installed
     log = tmp_path / 'helper.log'
+    admission_fault = b'raise OSError("owned admission failure")'
     code = ('import io,json,sys,threading,zipfile\nfrom pathlib import Path\n'
         f'sys.argv=[{str(launcher)!r}]\n'
         'from opencode_sandbox import manager_review as r,manager_targets as t,manager_releases as releases,manager_handoff as h\n'
@@ -122,6 +123,7 @@ def start(installed, endpoint, tmp_path, *, tag='v6.2.0'):
         '  for name in old.namelist():\n'
         '   raw=old.read(name)\n'
         f'   if name=="manager_execution.py": raw=raw.replace(b"SOURCE_API = source.API",{("SOURCE_API = " + repr(endpoint)).encode()!r})\n'
+        + (f'   if name=="manager_installer.py": raw=raw.replace(b"locks.record_operation(current, prefix)  # durable BEFORE allowing exec",{admission_fault!r})\n' if admission_failure else '') +
         '   new.writestr(name,raw)\n'
         ' return output.getvalue()\n'
         'h._bundle=bundle\n'
@@ -194,6 +196,26 @@ def test_real_origin_death_exclusive_frozen_execution_and_independent_outcome_cl
 
 
 def operation_record(): return 'operation.json'
+
+
+def test_whole_update_failed_durable_admission_keeps_pipx_parked_and_independently_recovers_previous(installed, tmp_path):
+    configure(installed, 'none')
+    origin = helper = None
+    with serve(graph(commit='b' * 40)) as (endpoint, _server), subreaper():
+        try:
+            origin, value, log = start(installed, endpoint, tmp_path, admission_failure=True)
+            helper = value['helper']; origin.communicate(timeout=10)
+            assert wait_helper(helper, timeout=20) == 2; helper = None
+            assert result_at(value['directory'])['outcome'] == 'previous-verified', log.read_text()
+            assert not installed[3].exists() and locks.operation_state(installed[0])['phase'] == 'complete'
+        finally:
+            if origin is not None:
+                if origin.poll() is None: origin.kill()
+                origin.communicate(timeout=5)
+            if helper is not None:
+                try:
+                    if os.waitpid(helper, os.WNOHANG)[0] == 0: os.kill(helper, signal.SIGKILL); os.waitpid(helper, 0)
+                except ChildProcessError: pass
 
 
 @pytest.mark.parametrize('hard', [False, True])

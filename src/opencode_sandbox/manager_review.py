@@ -1,9 +1,10 @@
-"""Internal origin-side exact manager review. No executor, durable grant or handoff payload.
+"""Origin-side exact manager review, never an executor or a durable grant.
 
 Fresh classification/tools/source and observed file/routes are bound in an immutable review.
 The internal form can record explicit review consent, but neither it nor origin revalidation
-authorizes replacement: independent post-exit/exclusive revalidation, expected-result checks and
-failure recovery are still absent. Normal installation usage is never released or converted.
+authorizes replacement by itself: the frozen helper independently revalidates after actual exit,
+owns exclusion, brackets the installer with durable state and verifies its actual result. Normal
+installation usage is never released or converted.
 """
 import hashlib
 import json
@@ -123,7 +124,7 @@ def revalidate(review):
         raise c.SandboxError('Manager review evidence unavailable; no installation was changed') from None
 
 
-def text(review):
+def text(review, *, update=False):
     """Plain scrollable impact/identity review. No raw environment, configuration or metadata dump."""
     value = json.loads(review.binding)
     old, tool = value['installation']['evidence'], value['tools']
@@ -141,16 +142,23 @@ def text(review):
         'Network policy: public defaults only. Download the exact GitHub tag plus PyPI/build dependencies.',
         'Package/build code runs on the host as this user, not in a Docker sandbox.',
         'No ambient proxy/index/pip/Git/credential configuration is silently discarded: detected custom settings refuse.',
-        'A future executor must apply and independently verify this network policy; no installer exists here.',
+        ('The independent helper rechecks effective pip/Git policy, exact source and this installation before any replacement.' if update else
+         'This non-mutating fixture does not invoke the independent installer.'),
         'Replace only this manager installation. Do not migrate environments, user configuration, workspaces or volumes.',
-        'Close the dashboard and restore the terminal before any future replacement. Never restart automatically.',
+        'Close the dashboard and restore the terminal before replacement. Never restart automatically.',
         'Other supported manager sessions/workers must finish; the usage lease lasts through actual process exit.',
         'Old managers and arbitrary external pipx do not honor these locks. pipx force is not a backup.',
         'Previous-tag reinstall is recovery guidance, not identical dependencies or guaranteed offline recovery.',
         'GitHub HTTPS source observations are not signed-tag authentication; tags can move after a read.',
         'Changed source, files, routes, tools or settings require a new review. Fresh installed-result checks are mandatory.',
-        'This internal consent fixture changes nothing. Independent exclusive revalidation, replacement and recovery are pending.',
-        'Manager Update remains disabled. Approval alone cannot launch or arm a helper.', '',
+        *(('After approval, close the dashboard, finish workers and exit this manager. The helper waits for actual process death.',
+           'Private recovery inputs and incomplete-update state are durable before the parked installer may execute.',
+           'Success requires independently verified source/commit/version/launcher and fresh runtime/CLI health, not a pipx exit code.',
+           'Failures can leave startup blocked. An external frozen verify-only recovery command survives a broken launcher/venv.',
+           'A hard-killed helper may leave descendants; unproved same-boot quiescence stays blocked and may require a reboot before explicit verification.',
+           'No mutation Cancel, automatic rollback, automatic restart, environment migration or configuration reapplication.') if update else
+          ('This internal consent fixture changes nothing. Independent exclusive revalidation remains a separate gate.',
+           'Manager Update remains disabled in this non-mutating fixture. Approval alone cannot launch or arm a helper.')), '',
         'Release notes (plain text; full bounded notes hash retained):', review.target.notes,
         '[Notes truncated]' if review.target.notes_truncated else '',
     ])

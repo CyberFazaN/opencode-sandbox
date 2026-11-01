@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-16 and PERF complete. UP-17 partial: independent gates, actual isolated pipx replacement, expected-result checks and explicit failure/manual-reinstall recovery verified internally. Public consent/terminal connection and final integration remain pending. Manager Update stays disabled in the public UI.**
+- **UP-00..UP-17 and PERF implemented, including public manager review/CLI/TUI handoff. UP-18 final integration/regression and record consolidation are in progress. No release readiness or publication is claimed.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -3307,6 +3307,43 @@ a materially different architecture, record the blocker and ask the owner before
   final real interruption/public-terminal combinations, then UP-18 final complete regression and
   consolidated records. Public Manager Update is still disabled at this internal executor
   checkpoint. No routine STOP/approval, full-suite replay, release/tag/push/publication or bump.
+
+### Final integration checkpoint — public connection implemented
+
+- Continued directly after `63c113f`: public Updates manager Update now selects only eligible
+  newer release information and prepares a fresh exact review; availability is not authorization.
+  Cancel-first consent/public-default acknowledgement precedes app-owned staging and real body/
+  queued-worker drain. Admission sealing, active-session/operation refusals, clean Linux driver/
+  original foreground tty restoration, origin-held lifetime usage and actual pidfd death remain
+  mandatory. CLI `manager update --tag` has real-terminal/default-Cancel consent, with no unattended
+  bypass. Its exit means handoff, not installation success. No automatic restart/migration.
+- Public real-terminal default-layout success and broken-target/manual-reinstall/frozen recovery
+  passed (`up17g-public-proof`: **1 passed**, 60.39 s). Final test-67 now also includes real public
+  larger/custom-space UI, handled native installer interruption, hard helper death with escaped
+  native transport child, and terminal loss; these added scenarios have **not run yet**. They
+  belong in the final affected real checkpoint, not another unchanged campaign replay.
+- New source review refinements: child independently checks immutable/home/search-path inputs;
+  result reconciliation refuses conflicting authoritative sources; live original subreaper may
+  verify a safely stopped pre-exec/admission failure instead of unnecessarily requiring reboot;
+  helper output loss cannot defeat private result persistence. Unsuppressed Git key-name probing
+  detects effective configuration outside known compile-prefix paths before fixed public policy
+  suppresses it. Artifact parent-directory entries are fsynced too before durable prepared state.
+  No arbitrary environment/command/callback or ordinary-startup exception was added.
+- Directly affected parent-fd/durable GO/refusals and whole host update/recovery/interruption tests
+  pass. Public pilots cover 80x24/larger, Cancel-first/approval/no helper inside Textual, staging
+  errors and no nonterminal CLI network. The terminal test supervisor now reserves/reaps only its
+  actual child and never signals a reaped origin PID while the detached updater finishes; a
+  focused ownership regression reproduces the former hazard. This is scoped test safety, not
+  the separately deferred suite audit. Source/quoting corrections in new test fault injectors
+  were fixed without suppressing product failures or assertions.
+- Final pre-freeze affected checks **159 passed**, 59.43 s (`.work/up17g/freeze-check.xml`), including
+  stdlib bundle/critical paths/operation/expected-result/public/CLI/docs/static. All planned product
+  changes are now implemented; next run the complete regression only at this final checkpoint,
+  the final required affected real combinations, packaging/contracts and compatibility endpoints.
+  Freeze code/test inputs first, preserve failed/pass evidence/cache/persistent locks and remove
+  only manifested owned scratch. Promote final facts/evidence to permanent records and retire
+  this running record only when UP-18 actually completes. No unrelated audit, branch migration,
+  release, version bump, project tag, merge, push, upload or publication.
 
 ## Resume and context-compaction handoff
 

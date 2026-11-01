@@ -80,6 +80,23 @@ def test_unclassified_installation_cannot_stage_or_launch_helper(tmp_path):
     assert not result['supported'] and not list(tmp_path.iterdir())
 
 
+def test_new_helper_directory_entry_is_synced_as_well_as_its_private_contents(tools, tmp_path, monkeypatch):
+    parent = tmp_path / 'owned-staging'; parent.mkdir(mode=0o700)
+    seen, actual = [], os.fsync
+    def synced(fd):
+        info = os.fstat(fd); seen.append((info.st_dev, info.st_ino))
+        return actual(fd)
+    monkeypatch.setattr(os, 'fsync', synced)
+    staged = manager_handoff.prepare(tools[0], parent)
+    assert staged['supported'], staged
+    artifact = staged['artifact']
+    for path in (parent, artifact.directory):
+        info = path.stat()
+        assert (info.st_dev, info.st_ino) in seen
+    assert artifact.process is None
+    artifact.discard()
+
+
 def test_staged_artifact_is_private_deterministic_and_contains_exact_standalone_sources(artifact):
     directory = artifact.directory
     assert stat.S_IMODE(directory.stat().st_mode) == 0o700

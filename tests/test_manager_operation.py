@@ -65,3 +65,23 @@ def test_operation_inputs_and_results_never_overwrite_existing_private_evidence(
     operation.result(path, {'operation': record['operation'], 'result': 'unavailable'})
     operation.result(path, {'operation': record['operation'], 'result': 'target-verified'})
     assert len(list(path.parent.glob('result-*.json'))) == 2 and path.read_bytes() == before
+
+
+def test_conflicting_authoritative_source_identity_never_reconciles_from_an_immutable_record(prepared, monkeypatch):
+    from opencode_sandbox import installation_locks as locks
+    from opencode_sandbox import installation_state as state
+    from opencode_sandbox import manager_update
+    record, path, *_ = prepared
+    prefix = record['prefix']
+    monkeypatch.setattr(manager_update, '_verify', lambda *args: pytest.fail('conflicting state reached runtime verification'))
+    with locks.exclusive(prefix):
+        value = operation.status(record, path)
+        locks.record_operation(value, prefix)
+        value.update(phase='installing'); locks.record_operation(value, prefix)
+        value.update(phase='verifying'); locks.record_operation(value, prefix)
+        corrupt = state.read(prefix); corrupt['target']['commit'] = 'e' * 40
+        authoritative = state.location(prefix); authoritative.write_text(json.dumps(corrupt))
+        before = authoritative.read_bytes()
+        with pytest.raises(manager_update.Refused, match='authoritative'):
+            manager_update.reconcile(locks, record, path)
+        assert authoritative.read_bytes() == before

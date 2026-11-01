@@ -337,8 +337,10 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
                     term.send('c', .4)
                     ck(term.wait_for('HTTP 503', 20) and 'cached' in term.text(), 'Manager terminal: failed GitHub check keeps dated release and local installation')
                     state['status'] = 200
+                    requests_before_review = state['requests']
                     term.send('u', .2)
-                    ck('verified manager handoff is not implemented' in term.text(), 'Manager terminal: Update remains unavailable; no replacement begun')
+                    ck(term.wait_for('manual preservation', 15) and state['requests'] == requests_before_review,
+                       'Manager terminal: explicit Update freshly refuses setup-only custom installer/network settings before source requests or replacement')
                     term.send(ESC, .2); term.send('q', .3)
                     ck(term.exit_code(15) == 0 and term.restored(), 'Manager terminal: normal exit restores terminal')
                     ck(exclusion(camp, prefix, busy=False), 'Manager terminal: exited dashboard no longer holds installation lease')

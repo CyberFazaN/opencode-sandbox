@@ -156,12 +156,24 @@ This label means local provenance records agree, **not** authenticated public ta
 identity, an execution grant, preserved dependency versions or a promise of rollback. Details
 shows the inspection time, source/commit/paths, release URL/notes (bounded plain text), unsupported
 reason and [manual installation guidance](install.md#upgrade-or-change-the-version).
-**Manager Update remains unavailable**, including for recognized installations. Early shared
-[startup coordination](install.md#startup-coordination), independent helper/fixed runtime query
-and an internal non-mutating terminal-handoff/refusal fixture are implemented. None is a public
-installation path. Exact source/target consent, replacement/expected-result verification and
-independent failure recovery remain pending.
-There is no installer, Python switch, automatic restart or universal Update All operation here.
+For a recognized installation and a newer published target, **Update** (`u`) prepares a fresh
+exact source/commit, tool, installation and impact review. Cancel is focused first; explicitly
+accept the public-default network policy, then choose **Update & close**. A cached availability
+display is never an execution grant. Detected custom installer/proxy/index/Git/credential settings
+require manual preservation, without secret disclosure or silent removal.
+
+Approved staging waits for actual workers, closes Textual cleanly and verifies the original local
+foreground terminal/driver shutdown. The independent helper waits for actual process death and
+exclusive access, revalidates everything, then performs exact-tag pipx replacement and separate
+installed-source/version/launcher/runtime/CLI-health checks. Other supported manager instances
+prevent replacement; old managers and external pipx do not honor the locks. No Python switch,
+automatic restart, image rebuild, environment migration or universal Update All is added.
+
+Wait for the independent final result before restarting. Private durable recovery instructions
+are printed before mutation. Pending or failed verification blocks startup even after helper
+death; read [manager update and recovery](install.md#explicit-reviewed-manager-update), including
+the conservative hard-interruption/quiescence limitation. The frozen recovery command only
+verifies; any previous-tag reinstall is a separate manual action, not a guaranteed backup.
 
 ### Environment actions
 
@@ -248,7 +260,7 @@ not-yet-created pins still enforced. The CLI retains both rollback-preserving
 `opencode update-base` and deliberately no-copy `build`, each with explicit `--refresh`; see
 [base modes and limits](opencode.md#versions).
 
-Manager installation remains unavailable; read-only release/installation checks are described
+Manager review/update is independent of these base actions; see
 [above](#manager-release-and-installation-checks). No Update All, automatic installation or
 background service is added.
 

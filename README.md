@@ -59,7 +59,8 @@ Consider something else if:
   explicit version checks and full evidence in Details. Opening it does not trigger discovery.
   Optional daily GitHub/npm discovery is off by default and runs only while the dashboard is open.
   Manager checks show published full releases and local installation evidence without running
-  pipx; manager installation remains unavailable pending separate handoff/recovery verification.
+  pipx. Explicit manager updates review an exact newer published tag, close the dashboard, and
+  hand off to an independent verifier/updater; there is no automatic restart or Update All.
   Environment Start/Update/Policy/Rollback/Recover reuse existing handlers with exact confirmation;
   read-only Cancel never cancels an approved mutation.
   Base Build/Rebuild and Rollback preserve copies; cached builds and explicit Refresh & Rebuild

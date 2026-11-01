@@ -62,8 +62,9 @@ The latter query never dispatches normal CLI or weakens startup leasing; the ori
 runtime query is unchanged. A subsequent internal checkpoint adds actual exact-tag pipx replacement,
 durable parked-child admission, independent result/quiescence checks and explicit frozen verify-only
 recovery, verified on isolated real pipx success and failed-target/manual-reinstall recovery.
-Public consent/terminal connection and final integration remain pending;
-Manager Update stays disabled.
+Public Cancel-first Updates consent and the foreground-terminal CLI handoff are implemented;
+final integration/regression and consolidated verification remain in progress. This is not a
+release-readiness recommendation.
 No image-definition, metadata/backup schema or manager-version change was made.
 
 UP-01..UP-16 and the verified partial UP-17 checkpoints' verification is below; commands, failures and

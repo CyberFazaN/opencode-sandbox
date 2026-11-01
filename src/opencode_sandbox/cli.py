@@ -20,7 +20,7 @@ app=typer.Typer(cls=_HelpOrder,help="Manage isolated OpenCode workspaces on root
 ENVIRONMENTS, SESSIONS, DATA, HOST = "Environments", "Sessions", "Settings, changes and data", "Maintenance"
 profiles=typer.Typer(help="Provider profiles: named credentials for model providers (values never displayed).",no_args_is_help=True)
 app.add_typer(profiles,name="providers",rich_help_panel=DATA)
-manager_app=typer.Typer(help="Read-only Sandbox Manager releases and installation evidence (not OpenCode/npm).",no_args_is_help=True)
+manager_app=typer.Typer(help="Sandbox Manager releases, installation evidence and explicitly reviewed updates (not OpenCode/npm).",no_args_is_help=True)
 app.add_typer(manager_app,name="manager",rich_help_panel=HOST)
 
 
@@ -36,9 +36,30 @@ def manager_status(check: bool=typer.Option(False,'--check',help='Check official
         try: release = mr.latest()
         except c.SandboxError as exc: error = c.error_text(exc)
     typer.echo(c.printable(json.dumps({'installation': installation, 'discovery': mr.discovery(),
-                                     'comparison': mr.comparison(installation['version'], release),
-                                     'release': release, 'check_error': error}, indent=2)))
+                                      'comparison': mr.comparison(installation['version'], release),
+                                      'release': release, 'check_error': error}, indent=2)))
     if error: raise typer.Exit(2)
+
+
+@manager_app.command('update')
+def manager_update(tag: str=typer.Option(...,'--tag',help='Exact newer published full release tag vX.Y.Z; freshly revalidated, never latest or an implicit downgrade')):
+    """Review an exact manager update in a real terminal, then exit for independent replacement.
+
+    Confirmation requires a foreground terminal and defaults to Cancel. No automatic restart,
+    image build or environment migration. Exit means handoff only; wait for the independent
+    helper's final result/private record before restarting.
+    """
+    from . import manager_handoff as handoff
+    from . import manager_review as review
+    terminal = handoff.Terminal()  # refuse noninteractive/redirected invocations before any network
+    prepared = review.prepare(tag)
+    typer.echo(review.text(prepared, update=True))
+    if not typer.confirm(f'Update only this Sandbox Manager {prepared.version} -> {prepared.target.version}, accept public-default network policy and exit now?', default=False):
+        typer.echo('Canceled; no installation was changed.')
+        return
+    staged = handoff.prepare_update(review.Approval(prepared))
+    if not staged['supported']: raise c.SandboxError(staged['reason'])
+    handoff.complete_terminal_update(handoff.TerminalRequest(staged['artifact']), terminal)
 
 opencode_app=typer.Typer(help="OpenCode versions: check, policy, update and roll back (base images and environments).",no_args_is_help=True)
 app.add_typer(opencode_app,name="opencode",rich_help_panel=HOST)
@@ -774,7 +795,7 @@ def _dashboard():
     dashboard = Dashboard()
     result = dashboard.run()
     if result is None: return
-    if type(result) is not handoff.TerminalRequest or result is not dashboard._manager_fixture \
+    if type(result) is not handoff.TerminalRequest or type(result.artifact) is not handoff.Artifact or result is not dashboard._manager_fixture \
             or dashboard.is_running or dashboard.return_code != 0:
         raise c.SandboxError('Dashboard did not complete a clean fixture handoff; nothing was armed')
     from textual.drivers.linux_driver import LinuxDriver
@@ -782,7 +803,8 @@ def _dashboard():
     if type(driver) is not LinuxDriver or driver.is_headless or driver.is_inline \
             or any(thread is None or thread.is_alive() for thread in (driver._key_thread, driver._writer_thread)):
         raise c.SandboxError('Local terminal driver shutdown could not be verified; nothing was armed')
-    handoff.complete_terminal_fixture(result, terminal)
+    if result.artifact.update: handoff.complete_terminal_update(result, terminal)
+    else: handoff.complete_terminal_fixture(result, terminal)
 
 ORDER=("create","list","status","check","start","stop","promote","delete","run","shell","exec","quick","tui",
        "config","changes","backup","container","agent-context","providers","repair","opencode","manager","disk","build","doctor")

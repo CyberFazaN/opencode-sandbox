@@ -78,6 +78,14 @@ def installer_policy(prefix, evidence, facts, context, cwd, deadline):
     ceiling = str(Path(cwd).resolve().parent)
     if os.pathsep in ceiling: raise Refused('Helper directory has an ambiguous Git discovery boundary')
     environment['GIT_CEILING_DIRECTORIES'] = ceiling
+    # Also inspect the client's unsuppressed effective key names. A Git compiled for a custom
+    # prefix may have a system config outside our known /etc paths; do not silently suppress it.
+    baseline = {'HOME': context['HOME'], 'PATH': path, 'LANG': 'C.UTF-8', 'GIT_CEILING_DIRECTORIES': ceiling,
+                'PYTHONDONTWRITEBYTECODE': '1'}
+    baseline.update({name: context[name] for name in ('XDG_CONFIG_HOME', 'XDG_CONFIG_DIRS') if context.get(name)})
+    code, out, _ = processes.run([str(git), 'config', '--null', '--list', '--name-only'],
+                                environment=baseline, cwd=cwd, deadline=deadline)
+    if code or out: raise Refused('Custom effective Git configuration requires manual preservation; values are not displayed')
     code, out, _ = processes.run([str(git), 'config', '--null', '--list'], environment=environment, cwd=cwd, deadline=deadline)
     expected = [(policy.GIT[f'GIT_CONFIG_KEY_{n}'].lower() + '\n' + policy.GIT[f'GIT_CONFIG_VALUE_{n}']).encode() for n in range(7)]
     if code or out.split(b'\0') != [*expected, b'']: raise Refused('Effective Git policy differs from public defaults')

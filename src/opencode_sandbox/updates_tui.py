@@ -298,7 +298,8 @@ class UpdatesScreen(Screen):
             text = "\n".join(lines[:5])
         self.query_one("#updates-selected", Static).update(plain_lines(text))
         reason = check_reason or ""
-        reason += "\n" + {"manager": "Update unavailable: verified manager handoff is not implemented yet.",
+        reason += "\n" + {"manager": mi.update_reason((item or {}).get('installation'), self.manager_remote.get('release'))
+                                    or 'Update reviews this exact manager target, then closes the dashboard for independent replacement.',
                             "bases": "Build/Rebuild selects cached or full refresh; existing environments do not change.",
                             "environments": "Actions review live eligibility before consent; Check never starts a container."}[self.view]
         if self.operation_result: reason = "Operation result — Details for full text\n" + plain(self.operation_result)
@@ -321,7 +322,7 @@ class UpdatesScreen(Screen):
         self.query_one("#updates-keys", Static).update(
             "c Check d Details | s Start u Update p Policy r Rollback e Recover | Esc Close"
             if self.view == "environments" else 'c Check d Details | b/u Build/Rebuild r Rollback | Esc Close'
-            if self.view == 'bases' else "1/2/3: views   ↑/↓: select   c: Check   d/Enter: Details   Esc: Close")
+            if self.view == 'bases' else "1/2/3 views | c Check u Review update d Details | Esc Close")
         blocked = self.view != "environments" or item is None or bool(self._preparing) or self.app._operation_pending
         for action in ("update", "start", "policy", "rollback", "recover"):
             button = self.query_one("#updates-" + action, Button)
@@ -332,6 +333,10 @@ class UpdatesScreen(Screen):
         if self.view == 'bases':
             update.disabled = item is None or bool(self._preparing) or self.app._operation_pending
             update.tooltip = 'Review live base identity, exact target and cached/full-refresh mode before building'
+        elif self.view == 'manager':
+            manager_reason = mi.update_reason((item or {}).get('installation'), self.manager_remote.get('release'))
+            update.disabled = bool(manager_reason) or bool(self._preparing) or self.app._operation_pending
+            update.tooltip = manager_reason or 'Prepare a fresh exact source/tool/installation review; no installation before explicit consent and clean exit'
         self.query_one('#updates-base-rollback', Button).disabled = self.view != 'bases' or bool(self._preparing) or self.app._operation_pending
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted):
@@ -435,6 +440,8 @@ class UpdatesScreen(Screen):
         self._render_view()
 
     def action_environment(self, action):
+        if self.view == 'manager' and action == 'update':
+            self.action_manager_update(); return
         if self.view == 'bases' and action in ('update', 'rollback'):
             self.action_base('build' if action == 'update' else 'rollback'); return
         from .environment_updates_tui import PolicyScreen, TargetScreen
@@ -456,6 +463,42 @@ class UpdatesScreen(Screen):
         except Exception as exc:
             self.operation_result = c.error_text(exc)
             self._render_selected()
+
+    def action_manager_update(self):
+        if not self._alive or self.app._operation_pending or self._preparing: return
+        item = self.items['manager'].get('manager', {})
+        release = self.manager_remote.get('release')
+        reason = mi.update_reason(item.get('installation'), release)
+        if reason:
+            self.operation_result = reason
+            self._render_selected(); return
+        self._prepare_token = token = object()
+        self._preparing = self._prepare_manager_worker(release['tag'], token)
+        self._track(self._preparing)
+        self._render_selected()
+
+    @work(thread=True, group='updates-manager-review')
+    def _prepare_manager_worker(self, tag, token):
+        from . import manager_review
+        try: publish(self.app, self._manager_prepared, token, manager_review.prepare(tag), None)
+        except Exception as exc: publish(self.app, self._manager_prepared, token, None, c.error_text(exc))
+
+    def _manager_prepared(self, token, prepared, error):
+        from .manager_review_tui import ManagerReviewScreen
+        if not self._alive or self._prepare_token is not token: return
+        self._preparing = self._prepare_token = None
+        if self.app.screen is not self: return
+        if error:
+            self.operation_result = error
+            self._render_selected(); return
+        self._render_selected()
+        self.app.push_screen(ManagerReviewScreen(prepared, update=True), self._manager_approved)
+
+    def _manager_approved(self, approval):
+        if approval is None or not self._alive or self.app.screen is not self or self.app._operation_pending: return
+        self.action_cancel_checks()
+        self.app.pop_screen()
+        self.app.run_manager_update(approval)
 
     def action_base(self, action):
         from .base_updates_tui import BaseTargetScreen
@@ -625,8 +668,10 @@ class UpdatesScreen(Screen):
         if self.inventory_error: lines.append("Local inventory failed: " + self.inventory_error)
         if self.view == "manager":
             lines += [mi.GUIDANCE, 'CLI: opencode-sandbox manager status --check',
-                      'Discovery is not target consent or tag-to-commit verification. No replacement is authorized.',
-                      'Manager Update stays unavailable until independent exclusion/handoff/replacement/recovery gates pass.']
+                       'Discovery is not target consent or tag-to-commit verification. No replacement is authorized.',
+                       'Update performs a fresh exact review, then exits for an independent frozen helper after terminal restoration.',
+                       'Only verified official-tag pipx/default settings are supported; custom installer/network settings require manual preservation.',
+                       'No automatic restart/rollback; private verify-only recovery instructions are printed before mutation.']
         elif self.view == "bases" and key:
             d = distros.get(key)
             lines += [f"Tag: {d.image}; manager definition: {d.name} {d.version}, revision {d.revision}",

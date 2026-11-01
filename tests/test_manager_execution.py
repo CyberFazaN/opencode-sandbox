@@ -206,5 +206,19 @@ def test_private_helper_directory_does_not_inherit_an_ancestor_workspace_git_con
     assert 'dummy-secret' not in json.dumps(result)
     # Do not ignore a repository placed IN the operation directory itself.
     subprocess.run([GIT, '-C', str(private), 'init', '--quiet'], check=True, capture_output=True, env={'PATH': os.defpath})
-    with pytest.raises(execution.Refused, match='Effective Git policy'):
+    with pytest.raises(execution.Refused, match='Git configuration|Effective Git policy'):
         execution.installer_policy(Path(evidence['venv']), evidence, tool, context, private, time.monotonic() + 8)
+
+
+def test_unsuppressed_client_keys_reveal_nonstandard_system_git_configuration_without_value_disclosure(setup):
+    evidence, tool, context = facts(setup)
+    command = Path(shutil.which('git'))
+    command.unlink()
+    command.write_text(f'#!{EXTERNAL}\nimport os,sys\n'
+                       'if sys.argv[1:]==["config","--null","--list","--name-only"]:\n'
+                       ' print("dummy-secret-scoped-config-key");raise SystemExit(0)\n'
+                       f'os.execve({GIT!r},[{GIT!r},*sys.argv[1:]],dict(os.environ))\n')
+    command.chmod(0o700)
+    with pytest.raises(execution.Refused, match='manual preservation') as caught:
+        execution.installer_policy(Path(evidence['venv']), evidence, tool, context, setup[1], time.monotonic() + 8)
+    assert 'dummy-secret' not in str(caught.value)
