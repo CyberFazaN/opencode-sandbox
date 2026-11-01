@@ -21,6 +21,7 @@ from test_manager_installer import wait_marker
 from test_manager_tools import tools as external_tools
 
 from opencode_sandbox import installation_locks as locks
+from opencode_sandbox import manager_installer
 
 tools = external_tools
 EXTERNAL = sys.executable
@@ -92,10 +93,12 @@ def configure(installed, fault):
         ' assert os.environ["PIP_INDEX_URL"]=="https://pypi.org/simple" and os.environ["PIP_CONFIG_FILE"]==os.devnull\n'
         ' assert os.environ["GIT_CONFIG_VALUE_0"]=="never" and os.environ["GIT_CONFIG_VALUE_1"]=="always"\n'
         ' assert "GITHUB_TOKEN" not in os.environ\n'
-        f' Path({str(marker)!r}).write_text(json.dumps({{"pid":os.getpid()}}))\n')
+        + ('' if fault == 'pause' else f' Path({str(marker)!r}).write_text(json.dumps({{"pid":os.getpid()}}))\n'))
     if fault == 'pause':
         code += (f' child=subprocess.Popen([{EXTERNAL!r},"-I","-B","-S","-c","import time;time.sleep(30)"],start_new_session=True)\n'
-                 f' Path({str(marker)!r}).write_text(json.dumps({{"pid":os.getpid(),"descendant":child.pid}}))\n'
+                 f' partial=Path({str(marker.with_suffix(".partial"))!r})\n'
+                 ' partial.write_text(json.dumps({"pid":os.getpid(),"descendant":child.pid}))\n'
+                 f' partial.replace({str(marker)!r})\n'
                  ' time.sleep(30)\n return 0\n')
     elif fault == 'before': code += ' return 19\n'
     else:
@@ -223,6 +226,7 @@ def test_whole_update_interruption_preserves_or_closes_barrier_only_after_indepe
     configure(installed, 'pause')
     prefix, launcher, _package, marker, environment, _publish = installed
     origin = helper = child = descendant = None
+    assert not manager_installer._children()  # only this test's subsequently created family may be drained
     with serve(graph(commit='b' * 40)) as (endpoint, _server), subreaper():
         try:
             origin, value, _log = start(installed, endpoint, tmp_path)
@@ -270,3 +274,4 @@ def test_whole_update_interruption_preserves_or_closes_barrier_only_after_indepe
                     try:
                         if os.waitpid(pid, os.WNOHANG)[0] == 0: os.kill(pid, signal.SIGKILL); os.waitpid(pid, 0)
                     except ChildProcessError: pass
+            assert manager_installer.drain()[0], 'Owned interruption-test descendants must be reaped even if an assertion fails'
