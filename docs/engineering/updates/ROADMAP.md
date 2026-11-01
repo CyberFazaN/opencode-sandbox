@@ -3153,6 +3153,22 @@ a materially different architecture, record the blocker and ask the owner before
   verification/consolidated records/report. No release/tag/push/publication, branch migration or
   unrelated documentation/test-suite audit. Current shared/startup changes require meaningful final
   regression; the earlier full local-replay matrix is not final evidence for these newer changes.
+- Continuation engineering notes (not completed gates): the current fixed runtime verifier must
+  keep its three-field read-only query and ordinary startup must never gain an argument/env
+  exemption. Expected installed PEP 610/pipx/source/launcher checks can be frozen filesystem logic;
+  basic CLI health needs a separate fixed read-only health query or another design preserving
+  unconditional normal usage leasing, not ordinary dispatch under borrowed exclusion. Existing
+  pipx 1.18.7 force reuses the venv/ignores a Python switch and can unlink launchers; verify every
+  outcome rather than infer backups. A helper crash can leave ordinary installer descendants:
+  the durable pending-state barrier is required even when the flock disappears. Future recovery
+  must prove owned child/group quiescence or retain manual-recovery state, never blindly signal
+  reused PIDs or clear an interrupted record from cache/exit code. Keep pre/during/post private
+  records and printed independent instructions outside the venv; no automatic rollback or
+  dependency-restoration promise. Effective public-default pip/Git/credential policy still has no
+  executor and needs actual subprocess/network tests. Private Git rewrites used by existing
+  installed tests are declared transport fixtures, not public source authentication or authority
+  to weaken policy. Final UI enablement and UP-18 remain pending, with one consolidated completion
+  report only after actual roadmap completion; a necessary context handoff is not completion.
 
 ## Resume and context-compaction handoff
 
