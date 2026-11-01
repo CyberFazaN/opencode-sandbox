@@ -14,7 +14,7 @@ import time
 from importlib import metadata
 from pathlib import Path
 
-from . import __version__
+from . import __version__, manager_records
 from . import core as c
 from . import manager_releases as releases
 
@@ -44,10 +44,8 @@ def _json(path):
 
 
 def _path(value):
-    if isinstance(value, dict) and set(value) == {'__type__', '__Path__'} and value.get('__type__') == 'Path': value = value['__Path__']
-    if not isinstance(value, str) or not value or not Path(value).is_absolute() or any(ord(x) < 32 for x in value):
-        raise c.SandboxError('Installation evidence has an invalid absolute path')
-    return Path(value)
+    try: return manager_records.path(value)
+    except manager_records.Refused as exc: raise c.SandboxError(str(exc)) from None
 
 
 def _own_directory(path):
@@ -78,33 +76,8 @@ def _source(direct):
 def _settings(record):
     # Explicitly recognized pipx 0.5/0.6 and current 0.12 wire formats, with conservative defaults
     # for additive fields. Unknown fields/settings are unsupported, not silently dropped.
-    allowed = {'main_package', 'python_version', 'source_interpreter', 'venv_args', 'injected_packages',
-               'pipx_metadata_version', 'backend', 'environment', 'exposure_enabled', 'pinned'}
-    if set(record) - allowed or record.get('pipx_metadata_version') not in ('0.5', '0.6', '0.12'):
-        raise c.SandboxError('Unrecognized pipx metadata/settings; preservation cannot be proved')
-    if record.get('venv_args') != [] or record.get('injected_packages') != {} or record.get('backend', 'pip') != 'pip' \
-            or record.get('environment') not in (None, NAME) or record.get('exposure_enabled', True) is not True or record.get('pinned', False) is not False:
-        raise c.SandboxError('Custom pipx venv/backend/injections/pin/exposure settings require manual preservation')
-    package = record.get('main_package')
-    if not isinstance(package, dict): raise c.SandboxError('Missing pipx main package evidence')
-    expected = {'package', 'package_or_url', 'pip_args', 'include_dependencies', 'include_apps', 'apps', 'app_paths',
-                'apps_of_dependencies', 'app_paths_of_dependencies', 'package_version', 'suffix', 'pinned',
-                'expected_apps', 'lock_file', 'include_resources_from', 'include_apps_from', 'cooldown_days',
-                'man_pages', 'man_paths', 'man_pages_of_dependencies', 'man_paths_of_dependencies',
-                'completions', 'completion_paths', 'completions_of_dependencies', 'completion_paths_of_dependencies'}
-    if set(package) - expected: raise c.SandboxError('Unrecognized pipx package settings; preservation cannot be proved')
-    defaults = {'pip_args': [], 'include_dependencies': False, 'include_apps': True, 'suffix': '', 'pinned': False,
-                'expected_apps': [], 'lock_file': None,
-                'include_resources_from': [], 'include_apps_from': [], 'cooldown_days': None,
-                'man_pages': [], 'man_paths': [], 'man_pages_of_dependencies': [], 'man_paths_of_dependencies': {},
-                'completions': [], 'completion_paths': [], 'completions_of_dependencies': [], 'completion_paths_of_dependencies': {}}
-    if any(package.get(key, value) != value for key, value in defaults.items()):
-        raise c.SandboxError('Custom pipx package options/resources/pins require manual preservation (values not displayed)')
-    if package.get('pip_args') != [] or package.get('include_dependencies') is not False or package.get('include_apps') is not True:
-        raise c.SandboxError('Required pipx installation settings are missing or unsupported')
-    if not isinstance(package.get('apps_of_dependencies', []), list) or not isinstance(package.get('app_paths_of_dependencies', {}), dict):
-        raise c.SandboxError('Invalid dependency inventory in pipx metadata')
-    return package
+    try: return manager_records.settings(record)
+    except manager_records.Refused as exc: raise c.SandboxError(str(exc)) from None
 
 
 def _running_distribution():

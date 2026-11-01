@@ -28,7 +28,8 @@ FILES = ('helper.pyz', 'artifact.json', 'result.json')
 REVIEW = 'review.json'
 BUNDLE = ('manager_helper.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py',
           'manager_observations.py', 'installation_state.py', 'manager_source.py', 'manager_process.py',
-          'manager_network.py', 'manager_pip_probe.py', 'manager_execution.py', 'http_probe.py')
+          'manager_network.py', 'manager_pip_probe.py', 'manager_execution.py', 'http_probe.py',
+          'manager_records.py', 'manager_result.py', 'manager_health.py')
 
 
 @dataclass(frozen=True)

@@ -49,7 +49,7 @@ def launcher(value, target):
     lines = raw.decode('utf-8').splitlines()
     if not lines: raise Refused('External pipx launcher is empty')
     if lines[0] == '#!/bin/sh' and len(lines) >= 3 and lines[2] == "' '''":
-        match = re.fullmatch(r"'''exec' (?:\"([^\"$`\\]+)\"|([^\s\"$`\\]+)) \"\$0\" \"\$@\"", lines[1])
+        match = re.fullmatch(r"'''exec' (?:\"([^\"'$`\\]+)\"|([A-Za-z0-9_@%+=:,./-]+)) \"\$0\" \"\$@\"", lines[1])
         if not match: raise Refused('External pipx shell trampoline is unrecognized; it was not evaluated')
         python, body = path(match[1] or match[2]), lines[3:]
     else:

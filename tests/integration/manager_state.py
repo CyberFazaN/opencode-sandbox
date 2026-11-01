@@ -1,4 +1,5 @@
-"""Actual installed startup barrier after an independent frozen writer exits; not updater proof."""
+"""Actual installed startup barrier and separate expected-result queries; not replacement proof."""
+import json
 import sys
 
 from opencode_sandbox import manager_handoff
@@ -11,6 +12,9 @@ def exercise(camp, ck, prefix, launcher, environment, previous, base):
     record = operation / 'operation.json'; record.write_text('{"fixture":true}\n'); record.chmod(0o600)
     source = {'version': previous['version'], 'tag': previous['evidence']['tag'],
               'commit': previous['evidence']['commit'], 'source': 'https://github.com/CyberFazaN/opencode-sandbox.git'}
+    settings = {'PIPX_HOME': str(prefix.parent.parent), 'PIPX_BIN_DIR': str(launcher.parent),
+                'PIPX_DEFAULT_PYTHON': previous['evidence']['source_python']}
+    python_version = json.loads((prefix / 'pipx_metadata.json').read_bytes())['python_version']
     camp.note(f'owned operation-barrier fixture archive={archive}, record={record}; authoritative private state below '
               f'{prefix.parent.parent}/.opencode-sandbox-updates; no installer, exact schema-1 record retained across test uninstall')
     code = ('import json,sys,time\nfrom pathlib import Path\n'
@@ -23,8 +27,13 @@ def exercise(camp, ck, prefix, launcher, environment, previous, base):
             '  locks.record_operation(value,prefix)\n'
             ' else:\n'
             '  value=locks.operation_state(prefix)\n'
-            '  from manager_verifier import run\n'
-            '  observed=run(locks,prefix,deadline=time.monotonic()+8)\n'
+            '  from manager_result import verify,inspect\n'
+            f'  settings={settings!r}\n  python_version={python_version!r}\n'
+            '  try: inspect(Path(prefix),settings,value["target"],python_version=python_version)\n'
+            '  except RuntimeError: pass\n'
+            '  else: raise AssertionError("incorrect expected target verified")\n'
+            '  assert locks.operation_state(prefix)["phase"]=="prepared"\n'
+            '  observed=verify(locks,Path(prefix),settings,source,python_version=python_version,deadline=time.monotonic()+8)\n'
             '  assert observed["version"]==source["version"] and observed["prefix"]==prefix\n'
             '  value.update(owner=state.owner(),phase="manual-recovery",result="interrupted",at=time.time())\n'
             '  locks.record_operation(value,prefix)\n'
@@ -48,4 +57,4 @@ def exercise(camp, ck, prefix, launcher, environment, previous, base):
     writer('complete')
     healthy = camp._run([str(launcher), '--version'], env=environment, check=True)
     ck(healthy.stdout.strip() == 'opencode-sandbox ' + source['version'],
-       'Manager operation state: explicit frozen fixture verifies previous runtime and terminal state permits ordinary startup again')
+       'Manager operation state: frozen exact metadata/source/commit/settings/launcher, fixed runtime and separate CLI-help verification precede explicit reopening')

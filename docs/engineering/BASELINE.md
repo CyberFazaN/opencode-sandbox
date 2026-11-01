@@ -54,9 +54,13 @@ restored-terminal handoff with actual-work/session refusals and exact foreground
 UP-17's first checkpoint adds internal exact published release/tag/commit resolution and fresh
 same-target revalidation. Its second adds internal immutable origin review/explicit consent and
 fresh origin-side installation/tool/source/public-network revalidation. Its third adds frozen
-post-origin-death/exclusive replay of approved local file/route observations only; fresh independent
-tool/dependency/source/network execution validation, effective installer network policy and
-replacement/recovery remain pending;
+post-origin-death/exclusive replay of approved local file/route observations only. Subsequent
+checkpoints add the durable incomplete-operation startup barrier, separate fresh frozen external
+tool/dependency/published-source and effective pip/Git public-default diagnostics, and exact
+installed-record/launcher checks with separate fresh runtime and fixed CLI-help construction.
+The latter query never dispatches normal CLI or weakens startup leasing; the original three-field
+runtime query is unchanged. These internal non-mutating gates do not implement replacement,
+interruption/failure recovery or the public updater, which remain pending;
 Manager Update stays disabled.
 No image-definition, metadata/backup schema or manager-version change was made.
 

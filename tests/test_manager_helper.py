@@ -89,7 +89,8 @@ def test_staged_artifact_is_private_deterministic_and_contains_exact_standalone_
     with zipfile.ZipFile(directory / 'helper.pyz') as archive:
         expected = ('manager_helper.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py',
                     'manager_observations.py', 'installation_state.py', 'manager_source.py', 'manager_process.py',
-                    'manager_network.py', 'manager_pip_probe.py', 'manager_execution.py', 'http_probe.py')
+                    'manager_network.py', 'manager_pip_probe.py', 'manager_execution.py', 'http_probe.py',
+                    'manager_records.py', 'manager_result.py', 'manager_health.py')
         assert manager_handoff.BUNDLE == expected
         assert archive.namelist() == ['__main__.py', *expected[1:]]
         for source in expected:
@@ -108,9 +109,12 @@ def test_staged_artifact_is_private_deterministic_and_contains_exact_standalone_
                     if name == 'installation_locks.py' and node.level:
                         assert node.module is None and node.names[0].name == 'installation_state'
                         continue  # fixed stdlib bootstrap import, also frozen as a top-level module
-                    if name == 'manager_execution.py' and node.level:
+                    if name in ('manager_execution.py', 'manager_result.py', 'manager_health.py') and node.level:
                         assert node.module is None and all(item.name + '.py' in expected for item in node.names)
                         continue  # same stdlib modules shared by origin-side preflight
+                    if name == 'manager_health.py' and node.module in ('typer.main', 'opencode_sandbox', 'opencode_sandbox.cli'):
+                        assert not node.level
+                        continue  # fixed target client, only AFTER witness validation/closure
                     assert not node.level
                     names = [node.module.split('.')[0]]
                 else: continue

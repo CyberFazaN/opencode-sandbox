@@ -23,8 +23,11 @@ fixed read-only fresh runtime query under helper exclusion. Its fifth adds an in
 terminal handoff/refusal fixture. UP-17's first checkpoint adds internal read-only exact published
 release/tag/commit resolution and fresh same-target revalidation. Its second adds internal exact
 origin review/consent and fresh origin-side revalidation. Its third adds frozen post-exit/exclusive
-replay of approved local file/route observations only; fresh independent tool/dependency/source/
-network execution gates, replacement and failure recovery remain pending. Manager Update is disabled.
+replay of approved local file/route observations only. Later internal checkpoints add durable
+incomplete-operation startup blocking, independent frozen tool/dependency/source/effective-client-
+policy diagnostics and exact installed-file/launcher checks plus separate runtime and fixed
+CLI-help construction queries. These are non-mutating prerequisites, not a replacement/recovery
+engine or public updater. Manager Update is disabled.
 
 ## Boundaries
 
@@ -54,6 +57,9 @@ network execution gates, replacement and failure recovery remain pending. Manage
 | `manager_targets.py` | Internal explicit exact published release/ref/peeled-commit observation and fresh same-target revalidation; fixed GitHub HTTPS authority, no cached target grant, install consent or executor | D-056, D-057 |
 | `manager_review.py`, `manager_review_tui.py` | Internal immutable exact origin installation/tool/source/public-default network review, explicit scrollable consent receipt and fresh origin-side revalidation; no public route, executor, independent exclusive check, durable grant or helper payload | D-056, D-057 |
 | `manager_observations.py` | Shared stdlib bounded critical-record/route primitives and frozen approved-local-observation replay under real helper-owned exclusion; no target import, fresh tool/source/network execution, installer or recovery authority | D-056, D-057 |
+| `installation_state.py` | Private durable incomplete-operation barrier outside the replaceable pipx venv, strict format-1 transitions and own-exclusive-owner writes; unknown/pending state blocks ordinary bootstrap, never repaired or cleared by a cache | D-056, D-057 |
+| `manager_source.py`, `manager_process.py`, `manager_network.py`, `manager_pip_probe.py`, `manager_execution.py` | Shared stdlib published-graph semantics and independently frozen bounded external-runtime/dependency/effective pip/Git/source diagnostics; refuse custom settings rather than read/strip them, no installer or cached authority | D-056, D-057 |
+| `manager_records.py`, `manager_result.py`, `manager_health.py` | Shared conservative pipx record semantics, exact expected source/commit/version/settings/launcher/in-prefix RECORD checks and separate authenticated fixed CLI-help construction under exclusion; no normal command dispatch, startup exemption or operation completion authority | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |

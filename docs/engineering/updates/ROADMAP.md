@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-16 and PERF complete. UP-17 partial: source/origin-consent, frozen post-exit/exclusive local replay, durable startup barrier and independent tool/dependency/source/effective public-default client-policy diagnostics verified. Replacement, expected installed result and failure/interruption recovery remain pending. Manager Update stays disabled.**
+- **UP-00..UP-16 and PERF complete. UP-17 partial: source/origin-consent, frozen post-exit/exclusive local replay, durable startup barrier, independent tool/dependency/source/effective public-default client-policy diagnostics, and separate expected-file/runtime/CLI-health primitives verified. Actual replacement, post-replacement results and failure/interruption recovery remain pending. Manager Update stays disabled.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -3207,6 +3207,65 @@ a materially different architecture, record the blocker and ask the owner before
   exact pipx replacement with durable pre/during/post state, interruption/failure recovery, then
   public consent/terminal hookup and UP-18 final broad verification/consolidation. Preserve prior
   evidence, shared cache and persistent lock inodes. No version bump/merge/tag/push/publication.
+
+### Remaining-roadmap implementation — expected files, runtime and fixed CLI health
+
+- `68ac828` commits the independent execution-diagnostic block above. Continued directly into
+  independent expected-result primitives, not another per-item STOP or complete-suite replay.
+- Added frozen stdlib `manager_records` shared with the local classifier; `manager_result`
+  checks exact expected source/tag/commit/distribution version, recognized pipx defaults/source
+  Python, venv version/isolation, exact standard executable template, exposed launcher and the
+  entire raw manager RECORD's in-prefix routes/critical inventory. It never imports target code
+  and its filesystem result alone does not prove runtime health or authenticate code bytes.
+- Added **separate** fixed `manager_health` query. External frozen -S bootstrap proves a live
+  helper's own kernel exclusion with an unlocked witness, establishes parent-death protection,
+  and closes the witness before initializing target site hooks. It constructs/renders only the
+  CLI command graph using the command's own context class; never calls CLI/launcher/main/invoke,
+  root/version callbacks, Docker or any caller-selected command. Ordinary entry remains refused.
+  The existing three-field version/prefix/module `manager_verifier` query is unchanged.
+  `manager_result.verify` brackets these two fresh processes with filesystem checks; it returns
+  facts only and cannot mark an operation complete or prove an installer stopped.
+- Focused verification: initial files/classifier/helper **116 passed**, 9.84 s; first broad
+  expected-result run **180 passed/1 failed**, 18.17 s (new test used nonexistent package `-m`
+  entry instead of the real launcher module; fixed the test command, preserved refusal assertion).
+  Subsequent primary affected **234 passed**, 20.54 s. Installed `up17f-proof` then correctly
+  failed both layouts: a clean current Typer installation has no standalone Click dependency,
+  while the new help query had incorrectly imported it. Retained private same-fixture reproducer
+  `.work/up17f/debug-manifest.json`/`debug-health.log`; same run-owned source reinstalled then
+  uninstalled again, original pending state/evidence preserved. Fixed query to use the command's
+  own context implementation, with a target-context regression and no new dependency.
+- Final compatibility affected subset **234 passed**, 22.44 s, Python 3.14/lowest (two known Typer
+  warnings). Installed `up17f-proof2`: **2 passed / 448 checks**, 146.35 s, both actual pipx layouts,
+  all earlier rows plus explicit wrong-target refusal while pending, exact previous records/source/
+  commit/settings/launcher, unchanged fixed runtime and separate fresh CLI-help checks before the
+  explicit fixture reopening. No application replacement or full recovery workflow is claimed.
+  Primary integration-focused checks **137 passed**, 28.01 s after the context fix.
+- Final source review also found an unquoted-metacharacter/triple-quote gap in standard-looking
+  shell console trampoline parsing. Tightened external pipx parsing before any subprocess and
+  installed launcher template checks; ordinary safe/space-containing templates remain supported.
+  Seven new data-only regressions refuse shell/Python quoting ambiguity without evaluating it.
+  Directly affected tools/files/health/frozen-source/static primary **162 passed**, 15.93 s. The
+  earlier installed positive templates are unchanged; this refusal-only tightening does not claim
+  a new real malicious-path execution test. No complete unit-suite replay or full campaign yet.
+  Final language/link/CLI/package-contract focused checks **63 passed**, 2.73 s; Ruff and
+  `git diff --check` clean. Actual package/complete compatibility consolidation remains UP-18.
+- Current read-only daemon reconciliation: original four image IDs unchanged, no containers or
+  volumes (`.work/up17f/current-inventory.json`). No user installation/data/configuration changed;
+  owned failed/pass artifacts, isolated state, shared cache and persistent lock inodes retained.
+- Next coherent block is the **actual updater and independent recovery**. Use exact argv pipx
+  replacement only after the above fresh gates and replay. Persist private immutable recovery
+  inputs and authoritative prepared state before launch; a parked external child must not enter
+  pipx until its exact process/group identity and installing state are durable. Never reuse the
+  30-second fixture or eight-second diagnostic budgets as installation deadlines. Keep the
+  installer leader unreaped until group cleanup, prove owned child/group quiescence or retain
+  manual-recovery state, and never signal a reused PID. Verify target and previous results
+  independently, not from pipx status; only verified completion plus quiescence can reopen normal
+  startup. A frozen explicit verification/recovery path must work with a broken launcher/venv;
+  previous-tag reinstall is manual guidance, not a backup, exact dependency restore or guaranteed
+  offline recovery. Public consent/terminal integration remains disabled until both real success
+  and failure/interruption gates pass. Finish UP-18 and one final consolidated report afterward.
+  Owner's autonomous workflow correction remains controlling; no routine milestone approval,
+  version bump, branch migration, unrelated audit, merge/tag/push/upload/publication is authorized.
 
 ## Resume and context-compaction handoff
 

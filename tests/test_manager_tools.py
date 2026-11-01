@@ -243,3 +243,25 @@ def test_probe_source_has_only_stdlib_top_level_imports():
     imports = {node.names[0].name.split('.')[0] if isinstance(node, ast.Import) else node.module.split('.')[0]
                for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))}
     assert imports <= sys.stdlib_module_names
+
+
+@pytest.mark.parametrize('metacharacter', [';', '&', '*', "'", '('])
+def test_unquoted_shell_metacharacters_in_external_console_interpreter_refuse_before_any_execution(tools, tmp_path, monkeypatch, metacharacter):
+    evidence, launcher, *_ = tools
+    alias = tmp_path / ('python' + metacharacter + 'not-a-command')
+    alias.symlink_to(sys.executable)
+    body = launcher.read_text().splitlines()[1:]
+    launcher.write_text('#!/bin/sh\n' + "'''exec' " + str(alias) + ' "$0" "$@"\n' + "' '''\n" + '\n'.join(body) + '\n')
+    monkeypatch.setattr(c, 'call', lambda *args, **kwargs: pytest.fail('unsafe shell route reached a diagnostic child'))
+    result = manager_tools.assess(evidence)
+    assert not result['supported'] and 'trampoline' in result['reason']
+
+
+def test_shell_quoting_cannot_hide_a_python_triple_quote_in_external_console_route(tools, tmp_path, monkeypatch):
+    evidence, launcher, *_ = tools
+    alias = tmp_path / "python'''not-a-console"; alias.symlink_to(sys.executable)
+    body = launcher.read_text().splitlines()[1:]
+    launcher.write_text('#!/bin/sh\n' + "'''exec' \"" + str(alias) + '\" "$0" "$@"\n' + "' '''\n" + '\n'.join(body) + '\n')
+    monkeypatch.setattr(c, 'call', lambda *args, **kwargs: pytest.fail('ambiguous Python trampoline reached a diagnostic child'))
+    observed = manager_tools.assess(evidence)
+    assert not observed['supported'] and 'trampoline' in observed['reason']
