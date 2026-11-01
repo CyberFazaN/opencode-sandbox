@@ -110,7 +110,9 @@ def test_doctor_help_documents_the_exit_status():
 
 @pytest.mark.parametrize("classification", [rid.MISSING, rid.NOT_CONFIGURED, rid.UNAVAILABLE])
 def test_an_operation_without_a_usable_daemon_exits_with_its_code(monkeypatch, classification, capsys):
+    from opencode_sandbox import opencode_versions as versions
     daemon(monkeypatch, classification)
+    monkeypatch.setattr(versions, 'latest', lambda: pytest.fail('An unusable daemon must refuse before npm discovery'))
     monkeypatch.setattr(sys, "argv", ["opencode-sandbox", "build"])
     with pytest.raises(SystemExit) as e:
         cli.main()

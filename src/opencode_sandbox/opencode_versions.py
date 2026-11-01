@@ -491,8 +491,9 @@ def _base_build_plan(d, target, refresh, keep_previous, current):
 def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=True):
     """Resolve before consent; inspect only, never build/probe or infer authority from a cache."""
     d = distros.get(distros.DEFAULT if distro is None else distro)
-    target = resolve_target(version)  # release discovery guard is released before base guards
+    target = supported(version) if version != 'latest' else None  # local validation needs no daemon/network
     c.ensure_runtime()
+    if target is None: target = resolve_target('latest')  # source guard is released before base guards
     with c.base_lock(d.id, 'publication'):
         current = c.inspect_base_image(d, d.image, missing=True)
         return _base_build_plan(d, target, refresh, keep_previous, current)
