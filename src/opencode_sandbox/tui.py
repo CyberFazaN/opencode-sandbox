@@ -141,6 +141,13 @@ class CreateScreen(ModalScreen[dict | None]):
 
 
 class Dashboard(App):
+    def __init__(self, *args, **kwargs):
+        from .tui_runtime import Activity
+        super().__init__(*args, **kwargs)
+        self._handoff_activity = Activity()
+        self._manager_fixture = None
+        self._session_active = False
+
     TITLE = "OpenCode Sandbox"
     # Compact, wrapping button rows: at 80x24 the old layout left one table row and
     # hid 11 of 20 buttons off-screen.
@@ -181,7 +188,7 @@ class Dashboard(App):
 
     def check_action(self, action: str, parameters) -> bool | None:
         # Dashboard keys must not act on a hidden selection behind sub-screens.
-        return not (action in self._DASHBOARD_ACTIONS and len(self.screen_stack) > 1)
+        return self._manager_fixture is None and not (action in self._DASHBOARD_ACTIONS and len(self.screen_stack) > 1)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -726,6 +733,34 @@ class Dashboard(App):
             return
         self.exit()
 
+    def _request_manager_fixture(self, artifact, *, verify=False):
+        """Internal ONLY: exit toward a non-mutating fixture, not an enabled Update action.
+
+        No helper starts/arms here and no usage lease is released. The CLI must independently
+        verify clean app return and real terminal restoration. No public action/flag/env binding.
+        """
+        import threading
+
+        from . import installation_locks, manager_handoff
+        if threading.get_ident() != self._thread_id or not self.is_running or self._exit:
+            raise c.SandboxError('Manager handoff requires the live dashboard UI thread')
+        if self._session_active:
+            raise c.SandboxError('An attached session is active; exit it before manager handoff')
+        if self._operation_pending or getattr(self, '_updates_mutation_active', False):
+            raise c.SandboxError('An operation is active; wait before manager handoff')
+        if len(self.screen_stack) != 1:
+            raise c.SandboxError('Close the current screen or consent before manager handoff')
+        if self._manager_fixture is not None: raise c.SandboxError('Manager handoff is already pending')
+        if type(artifact) is not manager_handoff.Artifact or type(verify) is not bool:
+            raise c.SandboxError('Invalid non-mutating handoff fixture request')
+        artifact.check()
+        if artifact.used or artifact.prefix != installation_locks.identity():
+            raise c.SandboxError('Manager handoff artifact does not match this unused installation fixture')
+        installation_locks.acquire_usage()  # retained through actual process exit, never upgraded
+        self._handoff_activity.seal(self.workers)
+        self._manager_fixture = manager_handoff.TerminalRequest(artifact, verify)
+        self.exit(self._manager_fixture)
+
     def run_environment_update_action(self, m, action, plan, callback):
         """App-owned work survives closing Updates. Never replace/cancel an approved mutation."""
         if self._operation_pending:
@@ -990,6 +1025,7 @@ class Dashboard(App):
 
     def _attach_ready(self, m, shell) -> None:
         self._operation_pending = False
+        self._session_active = True
         try:
             with self.suspend(), c.runtime_feedback():
                 c.interactive(m, shell=shell)
@@ -1000,8 +1036,11 @@ class Dashboard(App):
                 self._set_busy("Session exited")
         except Exception as exc:
             self._finished(c.error_text(exc), True)
+        finally:
+            self._session_active = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if self._manager_fixture is not None: return
         action = event.button.id
         if action == "new": self.action_create_environment()
         elif action == "current": self.action_current_folder()

@@ -762,8 +762,27 @@ def tui():
     """Open the dashboard (also: opencode-sandbox without arguments in a terminal)."""
     if not c._tty():
         raise c.SandboxError("the dashboard needs an interactive terminal; in scripts use the commands (see --help)")
+    _dashboard()
+
+
+def _dashboard():
+    """One exit boundary for implicit/explicit dashboards; ordinary return never grants handoff."""
+    from . import manager_handoff as handoff
     from .tui import Dashboard
-    Dashboard().run()
+    try: terminal = handoff.Terminal()
+    except (OSError, ValueError, c.SandboxError): terminal = None
+    dashboard = Dashboard()
+    result = dashboard.run()
+    if result is None: return
+    if type(result) is not handoff.TerminalRequest or result is not dashboard._manager_fixture \
+            or dashboard.is_running or dashboard.return_code != 0:
+        raise c.SandboxError('Dashboard did not complete a clean fixture handoff; nothing was armed')
+    from textual.drivers.linux_driver import LinuxDriver
+    driver = dashboard._driver
+    if type(driver) is not LinuxDriver or driver.is_headless or driver.is_inline \
+            or any(thread is None or thread.is_alive() for thread in (driver._key_thread, driver._writer_thread)):
+        raise c.SandboxError('Local terminal driver shutdown could not be verified; nothing was armed')
+    handoff.complete_terminal_fixture(result, terminal)
 
 ORDER=("create","list","status","check","start","stop","promote","delete","run","shell","exec","quick","tui",
        "config","changes","backup","container","agent-context","providers","repair","opencode","manager","disk","build","doctor")
@@ -796,8 +815,7 @@ def main():
         installation_locks.acquire_usage()
         if len(sys.argv)==1:
             if sys.stdin.isatty() and sys.stdout.isatty():
-                from .tui import Dashboard
-                Dashboard().run()
+                _dashboard()
             else: app(args=["--help"])
         else: app()
     except c.PrerequisiteError as exc:  # its own exit status (see doctor --help)

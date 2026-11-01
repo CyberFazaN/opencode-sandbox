@@ -157,8 +157,10 @@ identity, an execution grant, preserved dependency versions or a promise of roll
 shows the inspection time, source/commit/paths, release URL/notes (bounded plain text), unsupported
 reason and [manual installation guidance](install.md#upgrade-or-change-the-version).
 **Manager Update remains unavailable**, including for recognized installations. Early shared
-[startup coordination](install.md#startup-coordination) is implemented; independent helper,
-fresh-verification access, terminal handoff and replacement/recovery gates are still pending.
+[startup coordination](install.md#startup-coordination), independent helper/fixed runtime query
+and an internal non-mutating terminal-handoff/refusal fixture are implemented. None is a public
+installation path. Exact source/target consent, replacement/expected-result verification and
+independent failure recovery remain pending.
 There is no installer, Python switch, automatic restart or universal Update All operation here.
 
 ### Environment actions

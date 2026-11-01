@@ -17,14 +17,14 @@ and existing operations -> explicit base refresh -> verified pipx manager self-u
 Keep the three component lifecycles independent. Manager self-update must not delay the earlier
 work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
 UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen. UP-10 is now a
-verified split checkpoint; UP-09, UP-11, UP-12/UP-13 and UP-14/UP-15 are complete too, and three later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
+verified split checkpoint; UP-09, UP-11, UP-12/UP-13, UP-14/UP-15 and UP-16 are complete too, and two later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
 depend on base refresh. Tightly
 related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
 package or safety boundary, not mechanically after each ID. Environment recovery, manager
 handoff, replacement and failure recovery retain independent verification gates. The working
 roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
 
-Current checkpoint: UP-00..UP-15 complete. Explicit reports, honest partial inventory, shared
+Current checkpoint: UP-00..UP-16 complete. Explicit reports, honest partial inventory, shared
 base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.
 Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
 their existing timing. Dashboard advisories now replace/clear by category without erasing active
@@ -77,9 +77,14 @@ intact. This is not verifier access, terminal handoff or installation authority.
 UP-16's fourth checkpoint adds dedicated fixed read-only fresh runtime access under the helper's
 exclusive guard, with an unlocked read-only witness, kernel owner-fd proof, close-before-query and
 startup parent-death protection. No exclusive descriptor is exported. Normal CLI startup remains excluded; runtime facts are not source/launcher
-authentication or replacement success. The helper still has no CLI/TUI consumer or install path.
-Next: finish UP-16's real restored-terminal handoff. No early release or generic bypass exists; Manager Update stays
-disabled. Keep UP-17 replacement/recovery separate. No version bump, release preparation,
+authentication or replacement success. The fifth checkpoint completes UP-16 with an internal-only
+CLI/TUI non-mutating handoff: active work/sessions refuse, actual worker bodies remain tracked
+after task cancellation, and clean driver shutdown/exact foreground tty restoration precede
+arming. The helper still waits for actual process death; no lease is released early. Four complete
+suites (1861 passed/84 skips each) and 29 affected real tests/872 checks pass, including installed
+pipx/real-terminal, Debian/Arch mutation and attached-session refusals. No public trigger or install
+path exists. Next: UP-17 exact source/target consent, replacement verification and independently
+verified failure recovery. Manager Update stays disabled. No version bump, release preparation,
 merge, push or publication.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by

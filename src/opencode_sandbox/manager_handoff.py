@@ -1,8 +1,8 @@
 """Internal helper materialization/process-exit fixture, not manager-update authorization.
 
-No CLI/TUI/startup consumer, normal-CLI bypass, terminal handoff or installation execution. The
-fixture is deliberately separate from consent/recovery; supported external-tool evidence grants
-neither. Artifacts/results are private and outside the target, not disposable discovery caches.
+An internal CLI/TUI restored-terminal fixture exists, with no public action/command/startup
+trigger, normal-CLI bypass or installation execution. The fixture is separate from consent/
+recovery; supported tools grant neither. Private artifacts/results are not disposable caches.
 """
 import hashlib
 import io
@@ -11,7 +11,10 @@ import os
 import socket
 import stat
 import subprocess
+import sys
 import tempfile
+import termios
+import threading
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +25,67 @@ from . import manager_tool_probe as paths
 from . import manager_tools as tools
 
 FILES = ('helper.pyz', 'artifact.json', 'result.json')
+
+
+@dataclass(frozen=True)
+class TerminalRequest:
+    artifact: object
+    verify: bool = False
+
+
+class Terminal:
+    """Observe the original local foreground terminal; never repair or infer it from PID death.
+
+    Ordinary dashboard startup is unaffected when observation is unavailable. Only the internal
+    fixture requires all three original streams on the same foreground tty and exact restoration.
+    Visual-mode teardown still belongs to Textual; real-pty tests assert its bytes precede handoff.
+    """
+    def __init__(self):
+        self.owner, self.thread = os.getpid(), threading.get_ident()
+        self.streams = (sys.__stdin__, sys.__stdout__, sys.__stderr__)
+        self.before = self._observe()
+        self.used = False
+
+    def _observe(self):
+        rows = []
+        for stream in self.streams:
+            fd = stream.fileno()
+            info = os.fstat(fd)
+            if not os.isatty(fd) or os.tcgetpgrp(fd) != os.getpgrp():
+                raise c.SandboxError('Manager handoff requires the original foreground terminal')
+            rows.append((fd, info.st_dev, info.st_ino, info.st_rdev, termios.tcgetattr(fd)))
+        if len({row[3] for row in rows}) != 1:
+            raise c.SandboxError('Manager handoff requires one local terminal for all streams')
+        return rows
+
+    def check(self):
+        if self.used or self.owner != os.getpid() or self.thread != threading.get_ident() \
+                or self.streams != (sys.__stdin__, sys.__stdout__, sys.__stderr__) or self.before != self._observe():
+            raise c.SandboxError('Terminal restoration could not be verified; no handoff was armed')
+
+
+def complete_terminal_fixture(request, terminal):
+    """Called only after clean Dashboard.run()/driver shutdown, never while suspended/running.
+
+    No callback/executor/installation payload. Snapshot verification and flushed plain output
+    precede the helper launch/arming. Its pidfd still waits for actual origin death, including
+    residual non-daemon/executor shutdown. The originating usage lease is never released here.
+    """
+    if type(request) is not TerminalRequest or type(terminal) is not Terminal \
+            or type(request.artifact) is not Artifact or type(request.verify) is not bool:
+        raise c.SandboxError('Restored-terminal handoff is unavailable; no fixture was armed')
+    terminal.check()
+    try:
+        print('Non-mutating manager handoff fixture: terminal restored; no installation will be changed.', flush=True)
+        fixture = start_fixture(request.artifact, verify=request.verify)
+        try:
+            terminal.check()
+            fixture.arm()
+            fixture.control.close()  # armed ownership transfer, NOT cancel or proof of origin death
+        except BaseException:
+            fixture.close()
+            raise
+    finally: terminal.used = True
 
 
 def _private(path, *, directory=False):

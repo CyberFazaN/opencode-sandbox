@@ -89,7 +89,7 @@ def _probe(python, target, mode, environment, *, candidate=None):
 def assess(installation):
     """Dated prerequisite facts only. Not called by status, discovery, startup or the dashboard."""
     result = {'at': time.time(), 'supported': False, 'reason': '',
-              'execution': 'Unavailable: independent helper/verifier/handoff and replacement gates remain pending'}
+              'execution': 'Unavailable: manager replacement and failure-recovery gates remain pending'}
     try:
         if not isinstance(installation, dict) or installation.get('verified') is not True:
             raise c.SandboxError('A recognized local installation classification is required before external-tool inspection')

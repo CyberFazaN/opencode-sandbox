@@ -206,6 +206,24 @@ source/launcher/basic-CLI/replacement verification or restored-terminal handoff*
 startup consumer or install path. Manager Update remains disabled, UP-16 partial. Persistent
 inodes/evidence/build cache preserved; no complete campaign/manual/privileged/release claim.
 
+UP-16 final restored-terminal checkpoint (2026-11-01): **39 new default cases**, four complete
+suites (**1861 passed/84 opt-in skips each**, all **1945** ordered outcomes identical), and the
+same **29 affected real tests/872 checks**, `up16e-verified`, 1183.76 s. Actual default/custom-space
+pipx packages each run seven new terminal scenarios, with a test-only injected key and no product
+trigger: real driver/tty restoration before arming, implicit 80x24/explicit 120x40, actual origin
+shutdown drain, live/canceled worker refusal then real Debian/Arch start, actual Docker shell
+client/session refusal/return, changed tty-mode refusal, and another installed dashboard's busy
+exclusion. No source/launcher/expected replacement-result or recovery claim. Configuration recovery
+retains app ownership through Close; process-lifetime usage/pidfd/unlocked verifier witness remain
+unchanged. First fixture failures exposed isolated HOME hiding rootless contexts; identity refused
+correctly. Existing read-only DOCKER_CONFIG preserved as in pipx lifecycle tests, no context or
+identity patch; failed evidence retained. Optional host renderer/import-path review then all four
+complete suites and all 29 real rows reran. **UP-16 complete for non-mutating handoff only**, no
+public action/command/env trigger or updater. Manager Update disabled until independent UP-17 gates.
+Original images unchanged, no containers/volumes/test tags/owned process leaks; no complete
+campaign/manual/privileged/release-readiness claim. Evidence/failure trail/commands: BASELINE and
+Updates roadmap. No bump/merge/push/upload/remote change/project tag/publication.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

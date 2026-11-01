@@ -126,7 +126,7 @@ def _running_distribution():
 def classify():
     """Return safe local evidence/reason even when remote discovery is offline. No cached grant."""
     result = {'version': __version__, 'at': time.time(), 'classification': 'manual review', 'verified': False,
-              'reason': '', 'guidance': GUIDANCE, 'execution': 'Unavailable: handoff/replacement gates are not implemented'}
+              'reason': '', 'guidance': GUIDANCE, 'execution': 'Unavailable: manager replacement and failure-recovery gates remain pending'}
     try:
         module, dist = _running_distribution()
         direct = _json(dist / 'direct_url.json')

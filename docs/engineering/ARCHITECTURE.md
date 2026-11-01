@@ -19,8 +19,8 @@ cached/full-refresh builds; UP-14/UP-15 add read-only manager discovery/classifi
 UP-16's first safety checkpoint adds early process-lifetime usage/exclusive coordination. Its
 second checkpoint adds independent external-tool/runtime prerequisite facts. Its third stages
 an independent stdlib helper with a non-mutating process-exit fixture. Its fourth adds a dedicated
-fixed read-only fresh runtime query under helper exclusion. Restored-terminal handoff and UP-17
-replacement remain pending; Manager Update is disabled.
+fixed read-only fresh runtime query under helper exclusion. Its fifth adds an internal restored-
+terminal handoff/refusal fixture. UP-17 replacement/recovery remain pending; Manager Update is disabled.
 
 ## Boundaries
 
@@ -43,7 +43,7 @@ replacement remain pending; Manager Update is disabled.
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
 | `launcher.py`, `installation_locks.py` | Stdlib-only console bootstrap/canonical-prefix process-lifetime usage/internal exclusion; unlocked read-only witness for dedicated fixed verifier, never a lease export, ordinary-startup exemption or early-release API | D-056, D-057 |
 | `manager_tools.py`, `manager_tool_probe.py` | Explicit internal dated external-tool prerequisite assessment and self-contained isolated diagnostic source; only known existing pipx version/runtime/settings checks, no helper/handoff/executor or automatic consumer | D-056, D-057 |
-| `manager_handoff.py`, `manager_helper.py` | Internal private frozen stdlib artifact/bounded non-mutating pidfd fixture with optional dedicated fresh runtime query; no terminal-handoff or installation dispatch, no startup/CLI/TUI consumer | D-056, D-057 |
+| `manager_handoff.py`, `manager_helper.py` | Private frozen stdlib artifact/bounded non-mutating pidfd fixture, optional fixed runtime query and internal restored-terminal boundary; no public action/command/startup trigger or installation executor | D-056, D-057 |
 | `manager_verifier.py` | Frozen external fixed-query launcher/parent-death bootstrap and dedicated installed read-only client; kernel descriptor/channel/pidfd checks, no normal CLI dispatch or source/launcher/installation-success grant | D-056, D-057 |
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
@@ -63,7 +63,7 @@ replacement remain pending; Manager Update is disabled.
 | `cleanup.py` | Disk usage inventory and cleanup limited to this data directory's objects | D-011 |
 | `cli.py` | Typer CLI (grouped commands); no arguments starts the dashboard | D-021 |
 | `tui.py`, `management_tui.py`, `backup_tui.py`, `git_tui.py`, `preferences.py` | Textual dashboard and its screens (plain text for sandbox content, errors through `core.error_text`) | D-021, D-032, D-034 |
-| `tui_runtime.py` | Thread-worker adapter for scoped readiness/diagnostic cancellation and guarded read-only result publication; no UI retry loop | D-052, D-056 |
+| `tui_runtime.py` | Thread-worker adapter for scoped diagnostics/cancellation/publication and app-local actual-body admission barrier for internal handoff; no UI retry loop or installation quiescence shortcut | D-052, D-056 |
 
 `tui.ReportScreen` is the shared plain-text, scrollable read-only report for Agent Context,
 Updates Details, readiness and cleanup results. Its title is a required explicit keyword argument,
@@ -113,9 +113,9 @@ work after a killed client do not honor this protocol; it is not a same-user sec
 or proof that orphaned work stopped. Provenance classification recognizes both standard old and
 bootstrap console templates, without claiming that an older installed program implements locks.
 
-This independently verified startup checkpoint is only part of UP-16. No manager replacement
-consumer, restored-terminal handoff, recovery record or automatic
-restart exists. Those are separate pending gates; exclusive access alone never authorizes mutation.
+This independently verified startup checkpoint is only part of UP-16. The internal non-mutating
+terminal handoff is described below; no replacement consumer, recovery record or automatic restart
+exists. Those remain separate gates; exclusive access alone never authorizes mutation.
 Manager Update remains disabled. Any future mutating handoff must preserve the actual process-exit
 boundary rather than close this lease while Textual workers could still be alive; no generic
 environment-variable/CLI bypass is present.
@@ -169,8 +169,8 @@ state. Probe output/import/metadata errors are not echoed, because they can cont
 unsupported cases receive static manual guidance. Cancellation propagates rather than publishing
 a late result. Successful assessment is still **execution unavailable**. Independent helper
 materialization/process-exit coordination and narrow runtime-verifier access are described below.
-Restored-terminal handoff remains pending UP-16, followed separately by UP-17 consent,
-source authentication/revalidation, replacement and success/failure recovery.
+The internal restored-terminal fixture is described below, followed separately by pending UP-17
+consent, source authentication/revalidation, replacement and success/failure recovery.
 
 ### Frozen helper/process-exit fixture (UP-16 third checkpoint)
 
@@ -215,11 +215,10 @@ its remaining finite lifetime. Explicit artifact discard refuses a live child or
 files, ownership, inode, bytes or records. After origin exit the private artifact/result are retained
 for the caller/supervisor's evidence, never scavenged by generic cleanup. Test-only subreapers adopt
 and reap the exact orphaned fixture child without relying on PID 1 or signalling a reaped PID.
-No automatic dashboard restart, ordinary CLI bypass or install command exists. The normal CLI,
-launcher and TUI are unchanged. Active-session/mutation
-refusal and restored-terminal ownership transfer still require their own UI/real-terminal gate;
-this fixture must not be promoted into permission to mutate. UP-16 remains partial and Manager
-Update stays disabled until the independent UP-16/UP-17 gates pass.
+No automatic dashboard restart, ordinary CLI bypass or install command exists. The fifth
+checkpoint's CLI/TUI fixture boundary below adds active-session/work refusal and independently
+observed terminal restoration; none of these fixtures is permission to mutate. Manager Update
+stays disabled until the independent UP-17 replacement and recovery gates pass.
 
 ### Dedicated fresh runtime verifier (UP-16 fourth checkpoint)
 
@@ -269,9 +268,56 @@ authority, source authentication or a health claim. No persistent process or aut
 This gate requires usable Linux pidfds, proc flock fdinfo and parent-death protection with no unsafe
 fallback. Ordinary manager startup does not gain a new prerequisite. Expected release/source/commit,
 actual exposed launcher, basic CLI health and post-replacement result/recovery verification remain
-UP-17 gates. Restored-terminal transfer and active-session/mutation refusal still need independent
-UP-16 UI/real-pty proof; the fixture's arming/runtime result is not that evidence. Manager Update
-remains disabled and no public verifier or helper command is added.
+UP-17 gates. Independent restored-terminal transfer/refusal proof uses the fifth checkpoint below,
+not inference from a runtime result. Manager Update remains disabled; no public verifier/helper command.
+
+### Internal restored-terminal handoff (UP-16 fifth checkpoint)
+
+Both implicit and explicit dashboards now use `cli._dashboard()`. Ordinary startup/quit does not
+prepare tools/artifacts, start a helper or request an installation. An internal-only dashboard
+method can accept one already prepared, unused own-installation artifact for the **non-mutating
+fixture**. There is no product key, button, command, flag, environment trigger or installation
+payload. Exact release/source consent and exposure of Manager Update remain UP-17.
+
+The request must run on the live UI thread with no attached session, pending operation, approved
+mutation or open sub-screen/consent. Attached-session lifetime is now explicit through the entire
+suspend/interactive/resume path, cleared in finally even on failure; the old pending-operation flag
+alone was false while attached. The shared worker adapter counts actual executing bodies, not
+Textual tasks that may already say canceled/finished. All wrapped workers and the existing app-
+owned configuration recovery use the same mutex-protected admission barrier. Requests refuse
+running bodies and queued live workers, never cancel them. Once sealed, even a canceled queued
+thread entering later cannot start application work. Screen-owned workers remain screen-owned;
+approved configuration recovery remains app-owned and survives closing Recovery Center. No
+existing mutation/session deadline or cancellation/recovery semantics change.
+
+The internal request seals admission and exits Textual with a matching one-use typed result; it
+does not start/arm a helper or release usage. The CLI accepts only that exact result after clean
+return, zero return code, and full local Linux driver shutdown: no headless/inline/custom-driver
+fallback, no live input/output thread. Before dashboard entry it observes all three original
+streams on one real foreground tty. After return it checks stream/descriptor/device/inode,
+foreground process group, process/thread ownership and **exact original termios**, without
+repairing changed modes. Unsupported observation does not break ordinary dashboard use; it only
+refuses the internal fixture. Visual teardown is Textual's responsibility; real-pty assertions
+independently require alternate-screen exit, shown cursor and disabled mouse before handoff output.
+
+Only after those checks does the CLI flush a plain non-mutating handoff notice, launch the existing
+fixed helper and recheck the terminal before arming. Failed start/restoration/arming cancels/reaps
+that exact helper. After acknowledged arming the origin closes its private control channel without
+cancellation; the external fixture owns its bounded remainder. The shared usage lease **still lasts
+until actual process exit**, including residual non-daemon/executor shutdown; the pidfd, not the
+restored terminal or main return, permits the helper's one non-waiting exclusive attempt. A second
+supported live manager still yields busy, not a retry or bypass. The helper inherits no terminal
+or lease. No automatic dashboard restart, network/install/source executor, persistent recovery
+record or change to the frozen helper/verifier/installation-lock protocol is introduced. The
+30-second fixture lifetime is not a future updater deadline.
+
+Test-only pty injection supplies a temporary F9 binding and an owned artifact without shipping a
+user action. Installed default/custom-space pipx packages exercise actual CLI/App/driver shutdown,
+fresh verifier, both terminal sizes, live shutdown draining, refused live/canceled lifecycle
+workers that subsequently complete real Debian/Arch starts, actual attached Docker shell clients,
+changed tty modes, and another actual installed dashboard. Loopback/private Git source transport
+remains a declared fixture, not public release authentication. UP-17 must keep all these boundaries
+when it adds exact source/target consent, replacement and independently verified recovery.
 
 ## Docker access and identity (D-003, D-004, D-052)
 
@@ -533,9 +579,9 @@ local/discovery evidence without Docker or pipx execution. Opening runs only loc
 not network. Explicit Check starts independent owned workers, preserves version/prior evidence
 on either failure, and Cancel/Close rejects late results. Details includes bounded plain release
 notes/manual guidance, and manager Update stays disabled. UP-16's early installation usage/
-exclusion checkpoint is implemented above; safe independent external updater/helper, controlled
-fresh verification and terminal handoff remain pending, followed by UP-17's exact target/source
-consent/revalidation, actual replacement and fresh-process success/failure recovery.
+exclusion, independent helper, fixed runtime access and internal non-mutating terminal handoff/
+refusals are implemented above. UP-17's exact target/source consent/revalidation, actual replacement,
+expected installed-result verification and independent failure recovery remain pending.
 
 Dashboard startup/explicit Refresh publishes complete base-image check results, including success.
 Daemon, resource-support and image advisories own their notification objects and share an explicit

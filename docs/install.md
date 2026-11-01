@@ -70,8 +70,7 @@ external pipx/Docker commands do not honor it. Stop other manager instances/sess
 manual pipx replacement; these locks cannot make an external replacement safe automatically.
 
 Manager installation in Updates is still disabled. There is no updater, ordinary-startup bypass,
-restored-terminal handoff, replacement or recovery workflow; those require separate verification
-before installation can be offered.
+replacement or recovery workflow; those require separate verification before installation is offered.
 An additional internal prerequisite assessment now checks an existing external pipx/Python
 runtime and recognized locations, with conservative manual fallback. It is not a user command
 and is never run automatically or by the read-only status/Updates checks. No pipx/Python is
@@ -79,7 +78,10 @@ installed, switched or converted by that assessment. An internal non-mutating fi
 stage an independent stdlib helper and prove process-exit coordination; it is not a public command
 or an installation path. An optional dedicated read-only verifier can now observe local runtime
 facts while that helper retains exclusive access; normal CLI commands still refuse, and it is
-not a replacement/source/launcher verification result. Restored-terminal handoff remains pending.
+not a replacement/source/launcher verification result. An internal-only terminal fixture now
+refuses active work/sessions and checks clean dashboard shutdown and exact terminal restoration
+before arming that non-mutating helper. It has no public key/button/command and does not install
+anything. Actual process exit, not terminal restoration or dashboard return, still gates exclusion.
 
 ## Prepare Docker
 

@@ -54,6 +54,11 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   early Python startup descendants. Parent-death protection stops an interrupted direct verifier.
   Ordinary CLI startup has no bypass. This is not source/launcher authentication, replacement
   success or restored-terminal handoff; Manager Update remains disabled.
+- Internal non-mutating restored-terminal handoff fixture unifies implicit/explicit dashboard
+  exit, refuses active sessions/operations and actual worker bodies even after Textual task
+  cancellation, and checks foreground tty identity/exact modes and driver shutdown before arming
+  the independent helper. No usage lease is released early. No public trigger, replacement or
+  recovery path is added; Manager Update stays disabled.
 
 ### Fixed
 

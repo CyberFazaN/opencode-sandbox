@@ -239,6 +239,10 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
                     hook_path.unlink(); hook_module.unlink()
         ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real verifier: successful/interrupted fresh access leaves installation records/executable unchanged')
         ck(json.loads(run().stdout)['installation']['verified'], 'Manager real verifier: original installed launcher still operational; no automatic restart/replacement')
+        from manager_terminal import exercise
+        exercise(camp, ck, prefix, helper_env, value, staging, base, layout)
+        ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager real handoff: successful/refused terminal fixtures leave installation records/executable unchanged')
+        ck(json.loads(run().stdout)['installation']['verified'], 'Manager real handoff: original launcher remains operational; no replacement or automatic restart')
         # This external guard runs from the test venv, not from the guarded application. It
         # exercises the real fixed namespace/prefix key without patching the installed package.
         hold = subprocess.Popen([sys.executable, '-B', '-c',

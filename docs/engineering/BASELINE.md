@@ -49,11 +49,12 @@ checkpoint adds internal dated external-tool/runtime/settings assessment. Its th
 independent stdlib helper and proves a non-mutating process-exit/exclusion fixture, including
 worker shutdown and operation with the installed application absent. Its fourth adds a dedicated
 fixed read-only fresh runtime query under helper exclusion, using an unlocked witness and live
-peer fdinfo rather than inheriting a lease. Manager Update stays disabled; UP-16 is partial, with
-restored-terminal handoff pending before UP-17 replacement/recovery.
+peer fdinfo rather than inheriting a lease. Its fifth completes UP-16's internal non-mutating
+restored-terminal handoff with actual-work/session refusals and exact foreground tty/driver checks.
+Manager Update stays disabled before the separate UP-17 replacement/recovery gates.
 No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-15 and the partial UP-16 checkpoints' verification is below; commands, failures and
+UP-01..UP-16 verification is below; commands, failures and
 handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
@@ -226,6 +227,66 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-16 final terminal-handoff checkpoint — 2026-11-01
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot/host-pty suites | **1861 passed, 84 opt-in skips each**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Serial foreground, clean pip checks/inode preflight, **253.43/248.04/256.13/249.14 s**, all **1945 ordered IDs/outcomes identical**; only two known lowest-Typer warnings |
+| New default cases | **39 cases**: UI-thread, active operation/session, open screen/consent and stale/foreign request refusals; actual canceled-live worker tracking, sealed/queued admission and body-finally cleanup; configuration recovery retains app ownership through Close; no launch on request alone, abnormal CLI return and failed restoration/arming, exact tty snapshot changes without repair. Six host real-pty cases cover 80x24/120x40 implicit/explicit entry, restored modes and visual teardown before handoff output, main return/shutdown drain versus actual process death, changed modes, canceled/live worker refusal and ordinary quit without implicit reuse |
+| Affected real Docker/OpenCode/pipx/pty | **29 tests/872 logged checks**, no skips/deselections, `up16e-verified`, **1183.76 s**. All previous 29 rows/assertions retained. Both actual installed default/custom-space pipx layouts pass seven added terminal scenarios each: implicit/explicit sizes, non-daemon drain, live/canceled worker then actual Debian/Arch start, actual attached Docker shell client, changed real tty modes, and second installed dashboard busy refusal. Fixed fresh verifier works after genuine terminal restoration and origin exit; original installation/records/launcher unchanged and operational |
+| Boundary | **UP-16 complete for non-mutating handoff**, not an updater. No public key/button/command/env trigger, source/target/install payload, ordinary-startup bypass, early usage release, exclusive descriptor export or automatic restart. Manager Update stays disabled until separately verified UP-17 consent/replacement/expected-result and failure recovery. No human/manual observation or release-readiness claim |
+
+The CLI uses one dashboard exit boundary. It observes original streams/foreground tty identity/
+exact termios before entry; after matching clean zero-code App.run result and full supported local
+Linux driver/input/output shutdown, validates exact restoration without repair, flushes the plain
+non-mutating notice, launches the existing independent helper, rechecks and arms it. Failure cancels/
+reaps the exact started helper. Unsupported tty observation/custom/headless/inline drivers cannot
+arm the fixture but ordinary dashboard use is unchanged. Active work is not canceled to force
+handoff. A mutex-protected app-local barrier counts actual bodies and refuses queued/live workers;
+after sealing no late canceled thread can enter application work. Configuration recovery remains
+app-owned. Explicit attached-session lifetime covers suspend/interactive/resume/finally, rather than
+the old pending-operation flag that was false during a session. None of these app-local facts grants
+installation exclusion: the originating usage lease persists through actual process exit, and the
+existing pidfd/non-waiting helper protocol remains unchanged. No frozen helper/verifier/lock code change.
+
+This cycle's failure/feedback trail and exact commands are in the working record. First real
+installed proof **2 failed**, 97.52 s, and second **2 failed**, 38.41 s: isolated HOME hid the rootless
+context store, and identity correctly refused. The first fixture lacked continuous pty draining/
+explicit worker-error evidence; added both and removed duplicate inherited mount dispatch. Retain
+read-only DOCKER_CONFIG as in the existing pipx lifecycle row; no context/default/identity/credential
+copied or changed. Corrected real proof **2 passed/248 checks**, 75.36 s. First complete checkpoint
+**1861/84 skips each** (257.21/248.81/254.04/255.94 s), real **29/872**, 1013.47 s. Review then made
+the optional host-pty renderer check explicit and isolated its import-path setup; no assertion,
+deadline or product code changed. **All four complete suites and all 29 real rows reran** above on
+final frozen source/test inputs. Host renderer absence is an explicit optional skip, never used in
+these gates; real-campaign configuration requires it. No failed product assertion suppressed.
+
+Evidence `.work/up16e/verified-*.xml`, `real-verified.xml`, `final-source-sha256.json`; prior passes/
+failures retained separately. Installed real fixtures use declared private Git source transport,
+not public source/release authenticity. Test-only F9 injection calls the internal method through
+actual CLI/App/driver/terminal/lease/helper/verifier code; host-only diagnostics are disabled only
+in the host-pty layer, while installed real tests use actual diagnostics/clients/operations. All
+default/cross-layer security, rootless identity, diagnostics, lifecycle/journals/recovery, Git,
+backup, cleanup, pins, discovery and terminal assertions remain intact. Manager version/schemas,
+assets/dependencies, launcher, installation locks, frozen helper/verifier and CI/release workflows
+unchanged. No broad legacy TUI, privileged/socket/service/daemon change, real credential/provider/
+paid API, complete campaign, actual replacement/failure recovery or release-readiness claim.
+
+Final no-isolation sdist/wheel, strict twine/content validation and eleven frozen product-file/
+wheel byte comparisons pass; private local instructions/evidence absent from sdist. Documentation/
+CLI/quality follow-up **43 passed**, 3.35 s, not another complete suite. Own-rootless final inventory
+matches all original four full image IDs, no containers/volumes/test tags or owned manager/helper/
+verifier/terminal/probe/guard/watchdog Python processes. Guarded removal of **21 exact manifested
+completed pytest roots**, own-UID/inode/live-process/socket/mount checked; **960 host fixture
+records/artifacts** archived separately before cleanup. `/tmp/opencode` empty, **1046809 free inodes**.
+All real staged helper/results, pty bytes, failed/pass XML/logs/source hashes/package artifacts,
+prior evidence, shared build cache and persistent protocol inodes retained. Only exact owned
+scratch removed; no user data/install/launcher/credentials, host context/service or original image
+changed. Prose follow-up scratch separately manifested/guarded. No bump/merge/push/upload/remote
+change/project tag/publication, and no product/checker/test change after final complete/real gates.
+Final prose language/link/CLI follow-up: **27 passed**, 2.06 s (`prose.xml`), separately scoped;
+final documentation-bearing package retained under `.work/up16e/package-final/`.
 
 ### Unpublished UP-16 fourth verifier-access checkpoint — 2026-10-31
 

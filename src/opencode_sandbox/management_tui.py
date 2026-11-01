@@ -8,7 +8,7 @@ from textual.widgets import Button, Checkbox, DataTable, Input, Static, TextArea
 
 from . import core as c
 from . import preferences
-from .tui_runtime import publish, work
+from .tui_runtime import admission, publish, work
 
 
 class ProviderScreen(Screen):
@@ -212,7 +212,10 @@ class RecoveryScreen(Screen):
         self.app._operation_pending = self.app._updates_mutation_active = True
         self.app._set_busy("Recovering configuration change…")
         # App-owned worker, not canceled/replaced when this screen is closed.
-        self.app.run_worker(lambda: self._recover_runtime(eid, expected), thread=True, group="environment-operation")
+        def recover():
+            with admission(self.app) as admitted:
+                if admitted: self._recover_runtime(eid, expected)
+        self.app.run_worker(recover, thread=True, group="environment-operation")
 
     def _recover_runtime(self, eid, expected):
         with c.runtime_feedback(progress=None, cancelled=None):
