@@ -59,6 +59,11 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   cancellation, and checks foreground tty identity/exact modes and driver shutdown before arming
   the independent helper. No usage lease is released early. No public trigger, replacement or
   recovery path is added; Manager Update stays disabled.
+- Internal read-only exact manager-source resolution binds a published full official release to
+  its Git tag, bounded annotated-tag chain and exact commit. Fresh revalidation refuses changed
+  publication or source instead of selecting another target. GitHub rate limits are shared with
+  release discovery without turning cached availability into consent. This trusts GitHub HTTPS
+  evidence, not signed-tag authentication; no public action, installation or recovery is enabled.
 
 ### Fixed
 

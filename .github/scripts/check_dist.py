@@ -52,7 +52,7 @@ def check(dist):
         for required in ('opencode_sandbox/launcher.py', 'opencode_sandbox/installation_locks.py',
                          'opencode_sandbox/manager_tools.py', 'opencode_sandbox/manager_tool_probe.py',
                          'opencode_sandbox/manager_handoff.py', 'opencode_sandbox/manager_helper.py',
-                         'opencode_sandbox/manager_verifier.py'):
+                         'opencode_sandbox/manager_verifier.py', 'opencode_sandbox/manager_targets.py'):
             if required not in names: problems.append(f'wheel: {required} missing')
         packaged = sorted(n[len("opencode_sandbox/assets/images/"):] for n in names
                           if n.startswith("opencode_sandbox/assets/images/") and not n.endswith("/"))
@@ -68,7 +68,7 @@ def check(dist):
                           'src/opencode_sandbox/launcher.py', 'src/opencode_sandbox/installation_locks.py',
                           'src/opencode_sandbox/manager_tools.py', 'src/opencode_sandbox/manager_tool_probe.py',
                           'src/opencode_sandbox/manager_handoff.py', 'src/opencode_sandbox/manager_helper.py',
-                          'src/opencode_sandbox/manager_verifier.py',
+                          'src/opencode_sandbox/manager_verifier.py', 'src/opencode_sandbox/manager_targets.py',
                          *(f"src/opencode_sandbox/assets/images/{a}" for a in assets())):
             if required not in names:
                 problems.append(f"sdist: {required} missing")

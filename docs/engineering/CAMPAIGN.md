@@ -224,6 +224,21 @@ Original images unchanged, no containers/volumes/test tags/owned process leaks; 
 campaign/manual/privileged/release-readiness claim. Evidence/failure trail/commands: BASELINE and
 Updates roadmap. No bump/merge/push/upload/remote change/project tag/publication.
 
+UP-17 first exact-source checkpoint (2026-11-01): four complete compatibility suites (**1959
+passed/84 opt-in skips each**, **2043** ordered outcomes identical), **98 new default cases**
+(97 source/transport/cache/concurrency/refusal cases, one required-package-module check), and
+the unchanged **29 affected real tests/888 checks**, `up17a-final`, 1135.62 s. Default/custom-space
+actual installed pipx packages add real private annotated Git object/commit resolution, separate-
+process fresh same-target revalidation, moved-target refusal, HTTP 429/restarted shared throttling,
+and unchanged operational installed records/launcher; all prior real terminal/helper/verifier/
+exclusion/lifecycle assertions retained. This proves private transport/installed behavior, **not
+public release authenticity**, signed-tag authentication, installation consent, expected-build/
+replacement success or recovery. UP-17 remains partial and Manager Update disabled. Final four
+suites/full affected real gate ran after the test-style lint correction; failed evidence retained,
+no assertions relaxed. No original image/container/volume/owned-process leak; no complete campaign,
+manual/privileged/release-readiness claim. Commands, counts, failure trail and boundaries: BASELINE
+and Updates roadmap. No bump/merge/push/upload/remote change/project tag/publication.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

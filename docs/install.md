@@ -82,6 +82,10 @@ not a replacement/source/launcher verification result. An internal-only terminal
 refuses active work/sessions and checks clean dashboard shutdown and exact terminal restoration
 before arming that non-mutating helper. It has no public key/button/command and does not install
 anything. Actual process exit, not terminal restoration or dashboard return, still gates exclusion.
+An internal-only read-only source resolver now observes an exact published release/tag/commit
+and revalidates it without relying on discovery caches. This is not installation consent or
+signed-tag verification. It is not run by ordinary startup, status, discovery or the dashboard;
+Manager Update remains disabled until replacement and independent failure recovery are verified.
 
 ## Prepare Docker
 

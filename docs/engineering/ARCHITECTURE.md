@@ -20,7 +20,9 @@ UP-16's first safety checkpoint adds early process-lifetime usage/exclusive coor
 second checkpoint adds independent external-tool/runtime prerequisite facts. Its third stages
 an independent stdlib helper with a non-mutating process-exit fixture. Its fourth adds a dedicated
 fixed read-only fresh runtime query under helper exclusion. Its fifth adds an internal restored-
-terminal handoff/refusal fixture. UP-17 replacement/recovery remain pending; Manager Update is disabled.
+terminal handoff/refusal fixture. UP-17's first checkpoint adds internal read-only exact published
+release/tag/commit resolution and fresh same-target revalidation. Installation consent, replacement
+and failure recovery remain pending; Manager Update is disabled.
 
 ## Boundaries
 
@@ -47,6 +49,7 @@ terminal handoff/refusal fixture. UP-17 replacement/recovery remain pending; Man
 | `manager_verifier.py` | Frozen external fixed-query launcher/parent-death bootstrap and dedicated installed read-only client; kernel descriptor/channel/pidfd checks, no normal CLI dispatch or source/launcher/installation-success grant | D-056, D-057 |
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
+| `manager_targets.py` | Internal explicit exact published release/ref/peeled-commit observation and fresh same-target revalidation; fixed GitHub HTTPS authority, no cached target grant, install consent or executor | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
@@ -72,6 +75,54 @@ rendered without markup; there is no versions-specific default. Agent Context us
 fallback, and the saved guidance is not verified against that unobserved preview. Successful
 inspection retains the existing file comparison. Neither path writes guidance or starts a
 container; lifecycle generation and CLI verification remain unchanged.
+
+## Exact manager source evidence (UP-17 first checkpoint)
+
+`manager_targets.resolve` is internal and explicit, with no startup/status/discovery/CLI/TUI
+consumer. It accepts a strict exact full stable tag and a version comparison input, requires a
+strictly newer target, and never selects latest or downgrades/reinstalls implicitly. The caller's
+installed-version string is not installation identity proof. Local pipx classification and cached
+availability do not supply source authenticity or consent.
+
+The authority is the fixed official repository's GitHub HTTPS API, using standard TLS trust, no
+redirects, authentication/cookies, ambient token/proxy/loader/site/index settings or Git execution.
+Separate isolated stdlib HTTP children and parent ownership bound the entire read-only graph to
+eight seconds, including source-lock wait, with 128 KiB per response. That is not an installation
+deadline. The exact published full release must have the requested tag, canonical official URL,
+positive release ID and valid publication time. The exact `refs/tags/vX.Y.Z` must resolve through
+zero to four annotated-tag objects to a commit; validate every OID, object type and canonical
+repository object URL, reject cycles/unknown types/foreign or malformed identities, and check the
+commit object. Only the inspected 40-character lower-case GitHub SHA-1 format is supported. Do
+not use release `target_commitish` (which can be a branch), pagination/latest caches, abbreviated
+hashes or URL data as executable instructions. Duplicate/non-finite JSON refuses.
+
+Fresh release/ref reads bracket the graph; observed changes refuse. This is not a remote lock or
+an atomic GitHub snapshot, and a tag can still move later. The frozen in-memory target includes
+release ID/tag/version/publication, bounded printable notes, a hash of the full bounded notes,
+and the complete tag-OID/commit chain. `revalidate` fetches that same exact target afresh, ignoring
+timestamps for equality, refusing changes (including a replacement tag object pointing at the same
+commit, edited notes beyond the displayed prefix or recreated release). It never substitutes a
+newer release or falls back to old success after HTTP failure. The source observation is neither
+signed-tag/commit-signature verification nor proof the source builds the expected package.
+
+Source requests reuse the GitHub discovery source guard, but write a separate disposable durable
+attempt-before-request record with no target, grant, installation or recovery data. No automatic
+source-resolution scheduling exists; each explicit call/revalidation makes fresh requests, even
+after waiting for another caller. GitHub Retry-After/rate-reset claims from either path block both
+paths; source success/failure never overwrites latest-release success or its daily attempt claim.
+Unsafe claim/coordination storage refuses this internal gate without repair. Ordinary discovery
+retains its existing manual fallback/default-off daily policy. Cache corruption can remove
+throttling evidence but can never authorize installation or supply a target. No source guard is
+held across an installation mutation.
+
+The helper bundle, verifier and terminal fixtures are unchanged: this module is not frozen into
+an updater or connected to handoff/exclusive execution yet. UP-17 still must bind exact target
+and installation/tool/network settings to human consent, revalidate under independent exclusion,
+perform exact-tag replacement, verify actual expected version/source/commit/exposed launcher/basic
+CLI, and independently prove external recovery records/instructions and interrupted/partial states.
+Remote tag movement between revalidation and pipx fetch remains a risk requiring installed-commit
+verification, not a claim that source resolution alone makes replacement safe. Manager Update
+stays disabled. Private Git/loopback API tests prove parser/installed behavior, not public authenticity.
 
 ## Early installation access (D-056, UP-16 first checkpoint)
 

@@ -76,6 +76,10 @@ def cache_key():
     return 'manager:' + API
 
 
+def target_key():
+    return 'manager-target:' + API
+
+
 def discovery():
     data = cache.read(cache_key())
     success = cache.observation(data, SOURCE, {'url': API})
@@ -93,13 +97,31 @@ def discovery():
             'stale': success is None or time.time() - success['at'] >= 86400 or bool(attempt and not attempt['ok'])}
 
 
-def _attempt():
+def _attempt(key=None):
     # Future claims after clock rollback still throttle; they are not fresh success evidence.
-    item = cache.read(cache_key()).get('attempt')
+    item = cache.read(cache_key() if key is None else key).get('attempt')
     if not isinstance(item, dict) or type(item.get('at')) not in (int, float) or not math.isfinite(item['at']) \
             or not 0 < item['at'] <= 253402300799 or type(item.get('ok')) is not bool \
             or (not item['ok'] and not isinstance(item.get('error'), str)): return None
     return item
+
+
+def _rate_gate():
+    # Exact-target requests share GitHub's rate limit, not latest-release success/cache claims.
+    for item in (_attempt(), _attempt(target_key())):
+        retry = (item or {}).get('retry_until')
+        if type(retry) in (int, float) and time.time() < retry <= 253402300799:
+            raise c.SandboxError('Cannot check manager releases: rate limited; retry after ' + cache.when(retry))
+
+
+def _rate_until(error):
+    if error.get('status') not in (403, 429, 503): return None
+    until = _retry_until(error.get('retry_after', ''))
+    reset = error.get('rate_reset', '')
+    if not until and isinstance(reset, str) and reset.isdigit() and len(reset) < 14:
+        value = int(reset)
+        if time.time() < value <= 253402300799: until = value
+    return until
 
 
 def _result(attempt):
@@ -115,9 +137,7 @@ def latest(timeout=8, *, automatic=False):
             attempt = _attempt()
             if (waited and attempt and attempt.get('error') == 'check did not complete') or (attempt and attempt != previous):
                 return _result(attempt)
-            retry = (attempt or {}).get('retry_until')
-            if type(retry) in (int, float) and time.time() < retry <= 253402300799:
-                raise c.SandboxError('Cannot check manager releases: rate limited; retry after ' + cache.when(retry))
+            _rate_gate()
             if automatic and attempt and time.time() < attempt['at'] + 86400: return _result(attempt)
             return _request(timeout, automatic=automatic)
     except cache.Unavailable:
@@ -136,9 +156,7 @@ def _retry_until(value):
 
 def _request(timeout, *, automatic=False):
     old = discovery()
-    retry = (_attempt() or {}).get('retry_until')
-    if type(retry) in (int, float) and time.time() < retry <= 253402300799:
-        raise c.SandboxError('Cannot check manager releases: rate limited; retry after ' + cache.when(retry))
+    _rate_gate()
     attempt = {'at': time.time(), 'ok': False, 'id': secrets.token_hex(16), 'error': 'check did not complete'}
     saved = {'success': old['success'], 'release': old['release'], 'attempt': attempt}
     if not cache.write(cache_key(), saved, durable=True) and automatic:
@@ -150,12 +168,7 @@ def _request(timeout, *, automatic=False):
             try: error = json.loads(p.stderr)
             except ValueError: error = {}
             if isinstance(error, dict) and type(error.get('status')) is int:
-                if error['status'] in (403, 429, 503):
-                    attempt['retry_until'] = _retry_until(error.get('retry_after', ''))
-                    reset = error.get('rate_reset', '')
-                    if not attempt['retry_until'] and isinstance(reset, str) and reset.isdigit() and len(reset) < 14:
-                        until = int(reset)
-                        if time.time() < until <= 253402300799: attempt['retry_until'] = until
+                attempt['retry_until'] = _rate_until(error)
                 raise c.SandboxError(f"HTTP {error['status']}")
             # Do not echo arbitrary proxy/URL diagnostics (which can contain credentials).
             raise c.SandboxError('GitHub request failed; check network/TLS/proxy configuration')

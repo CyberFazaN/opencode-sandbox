@@ -83,8 +83,14 @@ after task cancellation, and clean driver shutdown/exact foreground tty restorat
 arming. The helper still waits for actual process death; no lease is released early. Four complete
 suites (1861 passed/84 skips each) and 29 affected real tests/872 checks pass, including installed
 pipx/real-terminal, Debian/Arch mutation and attached-session refusals. No public trigger or install
-path exists. Next: UP-17 exact source/target consent, replacement verification and independently
-verified failure recovery. Manager Update stays disabled. No version bump, release preparation,
+path exists. UP-17's first verified read-only source checkpoint now resolves an exact published
+release/ref/annotated-tag chain/commit and freshly revalidates the same target. It trusts official
+GitHub HTTPS evidence, not local records/cache, signed tags or installation consent. Source and
+discovery share rate limits without conflating success claims. Four complete suites (1959 passed/
+84 skips each) and the full 29-test affected real gate (888 checks) pass. No startup/status/UI/
+helper consumer or install path exists. Next: UP-17 installation/tool/network consent and exclusive
+revalidation, actual replacement/expected-result verification and independently verified failure
+recovery. Manager Update stays disabled. No version bump, release preparation,
 merge, push or publication.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by

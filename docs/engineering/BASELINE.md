@@ -51,7 +51,9 @@ worker shutdown and operation with the installed application absent. Its fourth 
 fixed read-only fresh runtime query under helper exclusion, using an unlocked witness and live
 peer fdinfo rather than inheriting a lease. Its fifth completes UP-16's internal non-mutating
 restored-terminal handoff with actual-work/session refusals and exact foreground tty/driver checks.
-Manager Update stays disabled before the separate UP-17 replacement/recovery gates.
+UP-17's first checkpoint adds internal exact published release/tag/commit resolution and fresh
+same-target revalidation. Installation consent and replacement/recovery remain separate pending
+gates; Manager Update stays disabled.
 No image-definition, metadata/backup schema or manager-version change was made.
 
 UP-01..UP-16 verification is below; commands, failures and
@@ -227,6 +229,69 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-17 first exact-source checkpoint — 2026-11-01
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot/host-pty suites | **1959 passed, 84 opt-in skips each**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Four clean pip checks, serial foreground, inode preflight; **264.68/261.97/267.11/263.63 s**. All **2043 ordered IDs/outcomes identical**, only two known lowest-Typer warnings |
+| New default cases | **98 cases**: **97 exact-source cases** (real loopback HTTP/isolated child processes plus validation/cache/concurrency/cancellation/refusal tests), one required-module wheel/sdist gate. Lightweight/nested annotated tags, full official release/ref/object/commit agreement, strict newer versions, malformed/duplicate/non-finite/foreign/cyclic/mixed-OID refusal, graph bracketing, full notes hash, fresh same-target versus latest/cache/no-fallback, total budget/actual inflight cancellation, shared rate limits/restart/unsafe storage, and source-only transport boundaries |
+| Affected real Docker/OpenCode/pipx/pty | **29 tests/888 checks passed**, no skips/deselections, `up17a-final`, **1135.62 s**. Same 29 rows/all prior assertions retained. Both actual installed default/custom-space pipx packages add private annotated Git source/OID resolution, fresh independent installed-process revalidation, moved-target refusal, HTTP 429/restarted source/discovery throttling and unchanged operational original launcher/records. Prior real terminal/handoff/shutdown drain, verifier/descendant interruption, actual Debian/Arch mutations/sessions and exclusion tests remain intact |
+| Boundary | **UP-17 partial**, only read-only exact published source identity/revalidation complete. No public trigger, startup/status/discovery/UI consumer, helper payload or install consent; no replacement, expected installed source/launcher/basic-CLI success or failure recovery. Manager Update remains disabled. GitHub HTTPS/API evidence is not signed-tag authentication; tests use explicitly private Git/loopback API, not public release authentication |
+
+The independent source gate does not treat a release's `target_commitish`, cached availability or
+local provenance agreement as an expected commit. It validates the exact official release by tag,
+publication, ID and notes plus the Git ref/zero-to-four annotated-tag chain/commit, bracketing the graph
+with fresh release/ref reads. The immutable in-memory target retains the full bounded notes hash
+and object chain. Revalidation compares that same exact target freshly, never substituting latest
+or falling back after failure. Source observations are not remote locks/atomic snapshots, proof
+source builds the expected package or consent to mutate. Tag movement after revalidation remains
+a risk requiring actual installed-commit verification at the later replacement gate.
+
+Isolated stdlib HTTP children have an **eight-second total diagnostic budget** (including source-
+lock wait), 128 KiB responses, no redirects/authentication or ambient token/proxy/loader/site/index
+settings. No Git/pipx execution, Python switch or installer. The source path reuses only the GitHub
+source guard/rate-limit parser, with a separate durable disposable attempt-before-request claim
+containing no target, grant, install/recovery state. Source success/failure does not overwrite
+latest-release success/daily attempts. Both paths honor Retry-After/rate-reset; unsupported safe
+storage refuses without repair. No scheduling or source lock across mutation. Independent future
+installation/network/proxy/index consent is not inferred from the source child's minimal environment.
+
+Failure trail retained: missing API reproducer **1 failed**, .02 s. First focused **2 failed/142
+passed**, 15.08 s (inconsistent shared test tag-OID payload and static exception type), then lowest
+3.14 source/release/terminal/quality **188 passed**, 27.58 s. Preflight **1 prose-reference failure/
+202 passed**, 17.62 s (a slash in CHANGELOG looked like an internal path); reworded, guard unchanged.
+Initial complete primary suite **1 lint failure/1958 passed/84 skips**, 265.47 s (nested test context
+style); no other preliminary full combination run. After context-only correction focused
+source/quality **113 passed**, 12.28 s. **All four complete suites and the full affected real gate
+then passed on final frozen source/checker/test inputs** above. No test assertion weakened or
+failure suppressed. First real installed proof **2 tests/264 checks passed**, 76.83 s; final real
+gate includes all final changes. No real OpenCode manager replacement or recovery is claimed.
+
+Evidence `.work/up17a/verified-*.xml`, `real-final.xml`, `final-source-sha256.json`, separate failed/
+focused inputs/logs and `.work/logs/up17a-*`. No human/manual observation, broad complete campaign,
+privileged/socket/service/daemon change, paid API/real provider credential, public network-source
+authentication, release-readiness or UP-17 completion claim. Version, schemas, image assets,
+dependency bounds, CLI/TUI, startup/leases, frozen helper/verifier/terminal protocol and CI/release
+workflows unchanged; distribution content validation additionally requires the new source module.
+No version bump, merge, push, upload, remote change, project tag or publication.
+
+Final follow-up: no-isolation sdist/wheel, strict twine/content validation and **42 frozen product
+module/wheel byte comparisons pass**; private local instructions/evidence absent from sdist.
+Documentation/CLI/quality first follow-up **1 prose-reference failure/42 passed**, 3.43 s (another
+slash ambiguity in this record), reworded without changing the guard; corrected **43 passed**,
+3.24 s (`docs-final.xml`), explicitly focused rather than another complete regression. Guarded
+cleanup removed **14 exact manifested completed pytest roots**, after own-UID/inode/live-process/
+socket/mount checks; **480 host fixture records/artifacts** archived before removal. All real
+source-target evidence, staged helper/results, pty captures, failed/pass XML/logs/hashes/packages,
+prior evidence, shared build cache and persistent protocol inodes retained. `/tmp/opencode` empty,
+**1046485 free inodes**. Only exact owned scratch removed; original four image IDs unchanged and
+no owned process/container/volume/test-tag leaks. Prose-only scratch separately manifested/guarded.
+No product/checker/test changes followed the final complete/real gates. UP-17 remains partial;
+the next package is installation/tool/network consent and independent exclusive revalidation,
+then separately proven replacement/expected-result and failure recovery. Manager Update disabled.
+Final prose language/link/CLI follow-up **27 passed**, 1.96 s (`prose.xml`), separately scoped;
+the final complete/real product/checker/test hashes remain intact.
 
 ### Unpublished UP-16 final terminal-handoff checkpoint — 2026-11-01
 
