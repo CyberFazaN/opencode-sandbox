@@ -5,11 +5,11 @@ import re
 import secrets
 import sys
 import time
-from datetime import datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from . import core as c
+from . import manager_source
 from . import update_cache as cache
 
 REPOSITORY = 'https://github.com/CyberFazaN/opencode-sandbox'
@@ -39,22 +39,7 @@ def comparison(installed, release):
 
 
 def _release(item):
-    if not isinstance(item, dict) or item.get('draft') is not False or item.get('prerelease') is not False:
-        raise ValueError('not a full release')
-    tag = item.get('tag_name')
-    value = version(tag)
-    published = item.get('published_at')
-    if not isinstance(published, str) or not published.endswith('Z') or len(published) > 40:
-        raise ValueError('not published')
-    if not 0 < datetime.fromisoformat(published).timestamp() <= time.time():
-        raise ValueError('invalid publication date')
-    url = REPOSITORY + '/releases/tag/' + tag
-    if item.get('html_url') != url: raise ValueError('foreign release URL')
-    body = item.get('body')
-    if body is None: body = ''
-    if not isinstance(body, str): raise TypeError('invalid release notes')
-    return {'version': value, 'tag': tag, 'url': url, 'published_at': published,
-            'notes': c.printable(body[:8192]), 'notes_truncated': len(body) > 8192}
+    return manager_source.release(item)
 
 
 def select(items):

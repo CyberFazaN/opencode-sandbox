@@ -100,7 +100,8 @@ def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, h
     original = executable.read_bytes()
     unusable = hook.parent / 'ocs_test_local_unusable.pth'
     assert not unusable.exists()
-    for mode, size in [('unchanged', (80, 24)), ('changed', (120, 40)), ('no-runtime', (80, 24))]:
+    for mode, size in [('unchanged', (80, 24)), ('changed', (120, 40)), ('no-runtime', (80, 24)),
+                       ('execution', (80, 24)), ('execution-policy-fault', (120, 40)), ('execution-source-fault', (80, 24))]:
         state = base / ('local-replay-' + mode + '.json')
         stage = base / ('local-replay-staging-' + mode); stage.mkdir()
         environment = dict(public, OPENCODE_SANDBOX_HOME=str(base / ('local-data-' + mode)),
@@ -109,8 +110,15 @@ def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, h
                   f'exact owned launcher fault restored and startup-refusal hook {unusable} removed in finally; '
                   'stdlib helper local observations only, no fresh tool/dependency/source/network or installation-success claim')
         helper = None
+        pip_site = next((prefix.parent.parent / 'shared').glob('lib/python*/site-packages'))
+        pip_hook, pip_module = pip_site / 'ocs_test_policy.pth', pip_site / 'ocs_test_policy.py'
+        assert not pip_hook.exists() and not pip_module.exists()
         with serve(graph(commit=commit, tags=(annotation,))) as (endpoint, server), subreaper():
             options = {'endpoint': endpoint, 'state': str(state), 'local_validate': True, 'staging': str(stage)}
+            if mode.startswith('execution'):
+                options['execution_validate'] = True
+                camp.note('owned execution validation transport is substituted in frozen source only; actual pipx/Python/dependency/shared-pip/Git probes, '
+                          'not public release authenticity or an installer; private policy hook and source mutation only on named fixtures')
             module.write_text('import runpy\n' + f"runpy.run_path({str(ROOT / 'tests/manager_review_fixture.py')!r})['install']({options!r})\n")
             hook.write_text('import ocs_test_manager_review\n')
             term = Term([str(launcher), 'tui'], *size, env=environment, log=camp.log)
@@ -128,18 +136,29 @@ def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, h
                     unusable.write_text('import os; os._exit(73)\n')
                     refused = camp._run([str(prefix / 'bin/python'), '-c', 'pass'], env=environment, check=False)
                     ck(refused.returncode == 73, 'Manager local replay: owned late startup hook proves target runtime unavailable, not patched verifier reply')
+                if mode == 'execution-policy-fault':
+                    pip_module.write_text('import os\nos.environ["PIP_INDEX_URL"]="https://dummy-secret.invalid/simple"\n')
+                    pip_hook.write_text('import ocs_test_policy\n')
+                if mode == 'execution-source-fault': server['routes'] = graph(commit='d' * 40, tags=(annotation,))
                 requests = len(server['requests'])
                 state.with_suffix('.release').touch()
                 ck(term.exit_code(15) == 0 and term.restored(), 'Manager local replay: actual originating installed process exits after real terminal restoration')
                 status = wait_helper(helper, timeout=15); helper = None
                 ck(status == 0, 'Manager local replay: exact adopted frozen helper finishes and is reaped')
                 result = result_at(directory)
+                expected = 'review-failed' if mode == 'changed' else 'execution-failed' if mode.endswith('-fault') else 'quiescent'
                 ck(result.get('review', {}).get('identity') == value['identity']
-                   and result['outcome'] == ('review-failed' if mode == 'changed' else 'quiescent')
+                   and result['outcome'] == expected
                    and result['review']['ok'] is (mode != 'changed'),
                    'Manager local replay: helper-owned kernel exclusion replays only approved local observations, changed launcher refuses')
-                ck(len(server['requests']) == requests and 'verifier' not in result,
-                   'Manager local replay: no target package/runtime/normal CLI, external tool or network execution is inferred from local replay')
+                if mode.startswith('execution'):
+                    ck(result.get('execution', {}).get('ok') is (mode == 'execution')
+                       and len(server['requests']) == requests + (0 if mode == 'execution-policy-fault' else 6),
+                       'Manager execution validation: actual frozen external runtime/dependencies/effective pip/Git policy and fresh exact source checked; independent faults refuse')
+                    ck('dummy-secret' not in json.dumps(result), 'Manager execution validation: no effective policy/credential diagnostics disclosed')
+                else:
+                    ck(len(server['requests']) == requests and 'verifier' not in result,
+                       'Manager local replay: no target package/runtime/normal CLI, external tool or network execution is inferred from local replay')
                 ck(exclusion(camp, prefix, busy=False), 'Manager local replay: helper exit releases exclusion, no witness/lease leak or lock-file deletion')
             finally:
                 state.with_suffix('.release').touch()
@@ -151,5 +170,7 @@ def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, h
                             os.kill(helper, signal.SIGKILL); os.waitpid(helper, 0)
                     except ChildProcessError: pass
                 if unusable.exists(): unusable.unlink()
+                if pip_hook.exists(): pip_hook.unlink()
+                if pip_module.exists(): pip_module.unlink()
                 if executable.read_bytes() != original: executable.write_bytes(original)
                 hook.unlink(); module.unlink()

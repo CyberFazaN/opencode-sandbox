@@ -2,7 +2,8 @@
 
 Replay approved file hashes/routes under existing exclusion without importing the application.
 NOT fresh classification, external dependency/tool execution, published-source/network policy
-validation, replacement authority or recovery. There is no command/callback/environment executor.
+validation, replacement authority or recovery. The separate manager_execution gate does fresh
+diagnostics. There is no command/callback/environment executor here.
 """
 import hashlib
 import json
@@ -142,14 +143,8 @@ def capsule(*, origin, prefix, version, identity, binding, target, context):
     return raw
 
 
-def validate(locks, directory, expected, *, prefix, origin, deadline):
-    """Called ONLY after pidfd-proven origin death and the helper's existing exclusive attempt.
-
-    Independently prove own kernel exclusion without exporting a lock, then compare the approved
-    local observations. No target package import, tool/normal CLI/source/network/installer process.
-    The context is bound data, never applied as an execution environment. File I/O is bounded in
-    size; deadline checks do not promise preemption of an unresponsive filesystem.
-    """
+def load(locks, directory, expected, *, prefix, origin):
+    """Read the identity-bound private capsule under independently proved own exclusion."""
     with locks._verification(prefix) as (witness, owner_fd):
         locks._verify_descriptor(witness, os.getpid(), owner_fd, prefix)
         fd = os.open('review.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=directory)
@@ -162,13 +157,24 @@ def validate(locks, directory, expected, *, prefix, origin, deadline):
         if len(raw) > LIMIT or hashlib.sha256(raw).hexdigest() != expected['sha256']:
             raise Refused('Approved local observation input changed')
         value = parse(raw)
-        binding, records = _shape(value, prefix, origin)
+        _shape(value, prefix, origin)
         if value['identity'] != expected['identity']: raise Refused('Approved local observation identity disagrees')
-        for path, observed in binding['routes'].items():
-            if canonical(route(path, deadline=deadline)) != canonical(observed): raise Refused(FAILURE)
-        for path in records:
-            if time.monotonic() >= deadline: raise Refused('Local observations timed out')
-            if hashlib.sha256(read_record(path)).hexdigest() != binding['records'][str(path)]: raise Refused(FAILURE)
-        for path, observed in binding['routes'].items():
-            if canonical(route(path, deadline=deadline)) != canonical(observed): raise Refused(FAILURE)
-        return {'ok': True, 'identity': value['identity']}
+        return value
+
+
+def validate(locks, directory, expected, *, prefix, origin, deadline):
+    """Replay only local observations after origin death; not fresh execution validation.
+
+    Context is bound data, never applied as an execution environment. File I/O is bounded in
+    size; deadline checks do not promise preemption of an unresponsive filesystem.
+    """
+    value = load(locks, directory, expected, prefix=prefix, origin=origin)
+    binding, records = _shape(value, prefix, origin)
+    for path, observed in binding['routes'].items():
+        if canonical(route(path, deadline=deadline)) != canonical(observed): raise Refused(FAILURE)
+    for path in records:
+        if time.monotonic() >= deadline: raise Refused('Local observations timed out')
+        if hashlib.sha256(read_record(path)).hexdigest() != binding['records'][str(path)]: raise Refused(FAILURE)
+    for path, observed in binding['routes'].items():
+        if canonical(route(path, deadline=deadline)) != canonical(observed): raise Refused(FAILURE)
+    return {'ok': True, 'identity': value['identity']}

@@ -87,15 +87,18 @@ def test_staged_artifact_is_private_deterministic_and_contains_exact_standalone_
     raw = (directory / 'helper.pyz').read_bytes()
     assert raw == manager_handoff._bundle() and hashlib.sha256(raw).hexdigest() == artifact.sha256
     with zipfile.ZipFile(directory / 'helper.pyz') as archive:
-        assert archive.namelist() == ['__main__.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py', 'manager_observations.py', 'installation_state.py']
-        for name, source in [('__main__.py', 'manager_helper.py'), ('installation_locks.py', 'installation_locks.py'),
-                             ('manager_tool_probe.py', 'manager_tool_probe.py'), ('manager_verifier.py', 'manager_verifier.py'),
-                             ('manager_observations.py', 'manager_observations.py'), ('installation_state.py', 'installation_state.py')]:
+        expected = ('manager_helper.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py',
+                    'manager_observations.py', 'installation_state.py', 'manager_source.py', 'manager_process.py',
+                    'manager_network.py', 'manager_pip_probe.py', 'manager_execution.py', 'http_probe.py')
+        assert manager_handoff.BUNDLE == expected
+        assert archive.namelist() == ['__main__.py', *expected[1:]]
+        for source in expected:
+            name = '__main__.py' if source == 'manager_helper.py' else source
             assert archive.read(name) == Path(manager_handoff.__file__).with_name(source).read_bytes()
             tree = ast.parse(archive.read(name))
             # The bundled path module's unused diagnostic main has local pipx imports, but
             # importing its route primitive (the helper's only use) requires stdlib alone.
-            nodes = tree.body if name == 'manager_tool_probe.py' else ast.walk(tree)
+            nodes = tree.body if name in ('manager_tool_probe.py', 'manager_pip_probe.py') else ast.walk(tree)
             for node in nodes:
                 if isinstance(node, ast.Import): names = [item.name.split('.')[0] for item in node.names]
                 elif isinstance(node, ast.ImportFrom):
@@ -105,10 +108,13 @@ def test_staged_artifact_is_private_deterministic_and_contains_exact_standalone_
                     if name == 'installation_locks.py' and node.level:
                         assert node.module is None and node.names[0].name == 'installation_state'
                         continue  # fixed stdlib bootstrap import, also frozen as a top-level module
+                    if name == 'manager_execution.py' and node.level:
+                        assert node.module is None and all(item.name + '.py' in expected for item in node.names)
+                        continue  # same stdlib modules shared by origin-side preflight
                     assert not node.level
                     names = [node.module.split('.')[0]]
                 else: continue
-                assert all(item in sys.stdlib_module_names or item in ('installation_locks', 'manager_tool_probe', 'manager_verifier', 'manager_observations', 'installation_state') for item in names), names
+                assert all(item in sys.stdlib_module_names or item + '.py' in expected for item in names), names
     assert not list(Path(artifact.prefix).iterdir()) and artifact.process is None
     artifact.discard()
     assert not directory.exists()

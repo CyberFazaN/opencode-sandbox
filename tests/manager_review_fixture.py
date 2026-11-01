@@ -34,6 +34,22 @@ def install(options):
         partial.replace(state)
     if options.get('local_validate'):
         from opencode_sandbox import manager_handoff
+        if options.get('execution_validate'):
+            # Explicit test-only transport substitution in the FROZEN source, never a product
+            # endpoint/environment/request option and never public-source authenticity evidence.
+            import io
+            import zipfile
+            original_bundle = manager_handoff._bundle
+            def transport_bundle():
+                buffer = io.BytesIO()
+                with zipfile.ZipFile(io.BytesIO(original_bundle())) as old, zipfile.ZipFile(buffer, 'w') as new:
+                    for name in old.namelist():
+                        raw = old.read(name)
+                        if name == 'manager_execution.py':
+                            raw = raw.replace(b'SOURCE_API = source.API', ('SOURCE_API = ' + repr(options['endpoint'])).encode())
+                        new.writestr(name, raw)
+                return buffer.getvalue()
+            manager_handoff._bundle = transport_bundle
         complete = manager_handoff.complete_terminal_fixture
         def completed(request, terminal):
             complete(request, terminal)  # observe ONLY after the real checks/start/arm completed
@@ -94,6 +110,7 @@ def install(options):
                     staged = manager_handoff.prepare_review_fixture(receipt, Path(options['staging']))
                     assert staged['supported'], staged
                     artifact = staged['artifact']
+                    artifact.execution = options.get('execution_validate', False)
                     report(staged=True, directory=str(artifact.directory), local_identity=artifact.review_identity)
                     self.call_from_thread(self.queue_handoff, artifact)
                     return

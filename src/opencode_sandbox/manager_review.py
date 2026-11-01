@@ -14,12 +14,13 @@ from pathlib import Path
 from . import core as c
 from . import installation_locks as locks
 from . import manager_installation as installation
+from . import manager_network
 from . import manager_observations as observations
 from . import manager_releases as releases
 from . import manager_targets as targets
 from . import manager_tools as tools
 
-SYSTEM_CONFIGS = ('/etc/gitconfig', '/usr/etc/gitconfig', '/etc/pip.conf')
+SYSTEM_CONFIGS = manager_network.SYSTEM_CONFIGS
 CONTEXT = observations.CONTEXT
 NETWORK = 'public-defaults'
 
@@ -31,29 +32,13 @@ def _digest(value): return hashlib.sha256(_json(value).encode()).hexdigest()
 
 
 def _environment():
-    names = {'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
-             'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE', 'CURL_HOME', 'SSLKEYLOGFILE', 'NETRC', 'SSH_ASKPASS',
-             'SSH_ASKPASS_REQUIRE', 'SSH_AUTH_SOCK', 'SSH_AGENT_PID', 'BASH_ENV', 'ENV'}
-    if any(value and (name.upper() in names or name.upper().startswith(('PIP_', 'GIT_', 'UV_', 'PYTHON', 'LD_', 'DYLD_')))
-           for name, value in os.environ.items()):
-        raise c.SandboxError('Custom installer/network environment requires manual preservation; values are not displayed')
+    try: manager_network.environment_check(os.environ)
+    except manager_network.Refused as exc: raise c.SandboxError(str(exc)) from None
 
 
 def _configurations(evidence, facts):
-    home = tools._path(str(Path.home()))
-    config = tools._path(os.environ.get('XDG_CONFIG_HOME') or str(home / '.config'))
-    directories = (os.environ.get('XDG_CONFIG_DIRS') or '/etc/xdg').split(os.pathsep)
-    paths = [Path(value) for value in SYSTEM_CONFIGS]
-    paths += [tools._path(value) / 'pip/pip.conf' for value in directories]
-    paths += [home / name for name in ('.gitconfig', '.git-credentials', '.netrc', '_netrc', '.pip/pip.conf')]
-    paths += [config / 'git/config', config / 'pip/pip.conf', home / '.config/git/config', home / '.config/pip/pip.conf']
-    paths += [Path(value) / 'pip.conf' for value in (evidence['venv'], evidence['locations']['shared_libs'],
-              facts['pipx_runtime']['runtime']['prefix'])]
-    for path in paths:
-        try: path.lstat()
-        except FileNotFoundError: continue
-        raise c.SandboxError('Custom pip/Git/credential configuration requires manual preservation; no file is read or changed')
-    return sorted(set(paths))
+    try: return manager_network.configurations(evidence, facts, {**os.environ, 'HOME': str(Path.home())}, system=SYSTEM_CONFIGS)
+    except manager_network.Refused as exc: raise c.SandboxError(str(exc)) from None
 
 
 def _route(value):

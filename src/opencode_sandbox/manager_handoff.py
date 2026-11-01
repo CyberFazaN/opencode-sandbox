@@ -26,6 +26,9 @@ from . import manager_tools as tools
 
 FILES = ('helper.pyz', 'artifact.json', 'result.json')
 REVIEW = 'review.json'
+BUNDLE = ('manager_helper.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py',
+          'manager_observations.py', 'installation_state.py', 'manager_source.py', 'manager_process.py',
+          'manager_network.py', 'manager_pip_probe.py', 'manager_execution.py', 'http_probe.py')
 
 
 @dataclass(frozen=True)
@@ -78,7 +81,7 @@ def complete_terminal_fixture(request, terminal):
     terminal.check()
     try:
         print('Non-mutating manager handoff fixture: terminal restored; no installation will be changed.', flush=True)
-        fixture = start_fixture(request.artifact, verify=request.verify)
+        fixture = start_fixture(request.artifact, verify=request.verify, execution=request.artifact.execution)
         try:
             terminal.check()
             fixture.arm()
@@ -114,9 +117,8 @@ def _record(path):
 def _bundle():
     content = io.BytesIO()
     with zipfile.ZipFile(content, 'w', compression=zipfile.ZIP_STORED) as archive:
-        for source, name in [('manager_helper.py', '__main__.py'), ('installation_locks.py', 'installation_locks.py'),
-                             ('manager_tool_probe.py', 'manager_tool_probe.py'), ('manager_verifier.py', 'manager_verifier.py'),
-                             ('manager_observations.py', 'manager_observations.py'), ('installation_state.py', 'installation_state.py')]:
+        for source in BUNDLE:
+            name = '__main__.py' if source == 'manager_helper.py' else source
             fd = os.open(Path(__file__).with_name(source), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
             with os.fdopen(fd, 'rb') as stream:
                 info = os.fstat(stream.fileno())
@@ -145,6 +147,7 @@ class Artifact:
     review_sha256: str = ''
     review_identity: str = ''
     review_file_identity: tuple = ()
+    execution: bool = False
 
     def check(self):
         if self.owner != os.getpid(): raise c.SandboxError('External helper artifact belongs to another process')
@@ -181,10 +184,10 @@ class Artifact:
         if FILES[2] in names:
             value = _record(self.directory / FILES[2])
             base = {'protocol', 'fixture', 'sha256', 'origin', 'helper', 'outcome'}
-            if self.process is None or not isinstance(value, dict) or set(value) not in (base, base | {'verifier'}, base | {'review'}, base | {'review', 'verifier'}) \
+            if self.process is None or not isinstance(value, dict) or not base <= set(value) or set(value) - base - {'verifier', 'review', 'execution'} \
                     or value['protocol'] != 1 or value['fixture'] is not True or value['sha256'] != self.sha256 \
                     or value['origin'] != self.owner or value['helper'] != self.process.pid \
-                    or value['outcome'] not in ('quiescent', 'busy', 'cancelled', 'abandoned', 'expired', 'verification-failed', 'review-failed'):
+                    or value['outcome'] not in ('quiescent', 'busy', 'cancelled', 'abandoned', 'expired', 'verification-failed', 'review-failed', 'execution-failed'):
                 raise c.SandboxError('External helper result is unfamiliar; preserved')
             if 'review' in value:
                 review = value['review']
@@ -193,10 +196,19 @@ class Artifact:
                         or set(review) != ({'ok', 'identity'} if review['ok'] else {'ok', 'identity', 'reason'}) \
                         or (not review['ok'] and (value['outcome'] != 'review-failed' or 'verifier' in value
                             or review['reason'] != 'Approved local manager observations changed or unavailable; no installation was changed')) \
-                        or (review['ok'] and value['outcome'] not in ('quiescent', 'verification-failed')):
+                         or (review['ok'] and value['outcome'] not in ('quiescent', 'verification-failed', 'execution-failed')):
                     raise c.SandboxError('External helper local observation result is unfamiliar; preserved')
-            elif value['outcome'] == 'review-failed' or self.review_sha256 and value['outcome'] in ('quiescent', 'verification-failed'):
+            elif value['outcome'] == 'review-failed' or self.review_sha256 and value['outcome'] in ('quiescent', 'verification-failed', 'execution-failed'):
                 raise c.SandboxError('External helper local observation result is missing; preserved')
+            if 'execution' in value:
+                check = value['execution']
+                if not self.execution or not isinstance(check, dict) or type(check.get('ok')) is not bool \
+                        or check != ({'ok': True} if check['ok'] else {'ok': False, 'reason': 'Independent manager execution validation failed; no installation was changed'}) \
+                        or value['outcome'] not in (('quiescent', 'verification-failed') if check['ok'] else ('execution-failed',)) \
+                        or value.get('review', {}).get('ok') is not True or not check['ok'] and 'verifier' in value:
+                    raise c.SandboxError('External helper execution result is unfamiliar; preserved')
+            elif value['outcome'] == 'execution-failed' or self.execution and value['outcome'] in ('quiescent', 'verification-failed'):
+                raise c.SandboxError('External helper execution result is missing; preserved')
             if 'verifier' in value and (not self.verify or not isinstance(value['verifier'], dict)
                                         or type(value['verifier'].get('ok')) is not bool):
                 raise c.SandboxError('External helper verifier result is unfamiliar; preserved')
@@ -303,7 +315,7 @@ class Fixture:
         finally: self.control.close()
 
 
-def start_fixture(artifact, *, budget=30.0, verify=False):
+def start_fixture(artifact, *, budget=30.0, verify=False, execution=False):
     """One finite non-mutating fixture, with pidfd proof of this process's actual exit.
 
     Explicit close/cancel remains the origin's responsibility while alive. After an armed origin
@@ -321,6 +333,8 @@ def start_fixture(artifact, *, budget=30.0, verify=False):
     if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not 0 < budget <= 30:
         raise c.SandboxError('External helper fixture budget must be finite and at most 30 seconds')
     if type(verify) is not bool: raise c.SandboxError('External helper verification choice must be boolean')
+    if type(execution) is not bool or execution and not artifact.review_sha256:
+        raise c.SandboxError('Independent execution validation requires an approved local review fixture')
     if tuple(tools._controlled(artifact.python, Path(artifact.prefix))[1]) != artifact.python_identity:
         raise c.SandboxError('External helper interpreter changed since preparation')
     control, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET | socket.SOCK_CLOEXEC)
@@ -336,12 +350,13 @@ def start_fixture(artifact, *, budget=30.0, verify=False):
                                        pass_fds=(child.fileno(), pidfd, directory), close_fds=True, start_new_session=True,
                                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                        cwd=artifact.directory, env={'HOME': str(Path.home()), 'PATH': os.defpath, 'LANG': 'C.UTF-8'})
-            artifact.process, artifact.used, artifact.verify = process, True, verify
+            artifact.process, artifact.used, artifact.verify, artifact.execution = process, True, verify, execution
             fixture = Fixture(artifact, control, process)
         child.close()
         control.settimeout(8)
         request = {'protocol': 1, 'prefix': artifact.prefix, 'sha256': artifact.sha256, 'budget': budget}
         if verify: request['verify'] = True
+        if execution: request['execution_validate'] = True
         if artifact.review_sha256:
             request['local_review'] = {'sha256': artifact.review_sha256, 'identity': artifact.review_identity,
                                        'file_identity': list(artifact.review_file_identity)}

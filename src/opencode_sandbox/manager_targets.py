@@ -6,11 +6,9 @@ tag authentication. Revalidation observes the same target afresh; it does not lo
 or an installation. A future exclusive executor must independently bind/revalidate installation,
 tools, consent and source and verify what was actually installed.
 """
-import hashlib
 import json
 import math
 import os
-import re
 import secrets
 import sys
 import time
@@ -19,13 +17,14 @@ from pathlib import Path
 
 from . import core as c
 from . import manager_releases as releases
+from . import manager_source
 from . import update_cache as cache
 
-SOURCE_API = 'https://api.github.com/repos/CyberFazaN/opencode-sandbox'
+SOURCE_API = manager_source.API
 ENDPOINT = SOURCE_API  # test transport may substitute loopback, never a product setting/argument
 LIMIT = 131072
 TIMEOUT = 8.0  # whole read-only graph, NOT a future installation/build deadline
-MAX_TAGS = 4
+MAX_TAGS = manager_source.MAX_TAGS
 
 
 @dataclass(frozen=True)
@@ -48,22 +47,6 @@ class Target:
 
     @property
     def url(self): return releases.REPOSITORY + '/releases/tag/' + self.tag
-
-
-def _oid(value):
-    # GitHub's inspected Git database API uses SHA-1. Unknown formats fail closed, not truncated.
-    if not isinstance(value, str) or not re.fullmatch('[0-9a-f]{40}', value):
-        raise ValueError('Invalid Git object identity')
-    return value
-
-
-def _object(value):
-    if not isinstance(value, dict) or value.get('type') not in ('tag', 'commit'):
-        raise ValueError('Unsupported Git reference type')
-    oid, kind = _oid(value.get('sha')), value['type']
-    if value.get('url') != SOURCE_API + '/git/' + kind + 's/' + oid:
-        raise ValueError('Foreign Git object URL')
-    return kind, oid
 
 
 def _unique(pairs):
@@ -99,46 +82,13 @@ def _get(path, deadline, attempt):
     return value
 
 
-def _release(tag, deadline, attempt):
-    item = _get('/releases/tags/' + tag, deadline, attempt)
-    release = releases._release(item)
-    rid = item.get('id')
-    if release['tag'] != tag or type(rid) is not int or not 0 < rid < 2**63 \
-            or item.get('url') != SOURCE_API + '/releases/' + str(rid):
-        raise ValueError('Invalid exact published release identity')
-    return release, rid, hashlib.sha256((item.get('body') or '').encode()).hexdigest()
-
-
-def _ref(tag, deadline, attempt):
-    item = _get('/git/ref/tags/' + tag, deadline, attempt)
-    if item.get('ref') != 'refs/tags/' + tag or item.get('url') != SOURCE_API + '/git/refs/tags/' + tag:
-        raise ValueError('Invalid exact Git tag reference')
-    return _object(item.get('object'))
-
-
 def _resolve(tag, deadline, attempt):
-    publication = _release(tag, deadline, attempt)
-    root = kind, oid = _ref(tag, deadline, attempt)
-    objects = []
-    while kind == 'tag':
-        if oid in objects or len(objects) >= MAX_TAGS: raise ValueError('Cyclic or excessive annotated tags')
-        item = _get('/git/tags/' + oid, deadline, attempt)
-        if _oid(item.get('sha')) != oid or item.get('url') != SOURCE_API + '/git/tags/' + oid \
-                or (not objects and item.get('tag') != tag):
-            raise ValueError('Annotated tag identity disagrees')
-        objects.append(oid)
-        kind, oid = _object(item.get('object'))
-    if oid in objects: raise ValueError('One Git object cannot be both annotated tag and commit')
-    item = _get('/git/commits/' + oid, deadline, attempt)
-    if _oid(item.get('sha')) != oid or item.get('url') != SOURCE_API + '/git/commits/' + oid:
-        raise ValueError('Commit identity disagrees')
-    objects.append(oid)
-    # Bracket the graph with fresh publication/ref reads; never accept a mixed observed target.
-    if _ref(tag, deadline, attempt) != root or _release(tag, deadline, attempt) != publication:
-        raise c.SandboxError('Published manager source changed during resolution; review the target again')
-    release, rid, notes_hash = publication
-    return Target(tag, release['version'], rid, release['published_at'], release['notes'],
-                  release['notes_truncated'], notes_hash, tuple(objects), time.time())
+    try: value = manager_source.resolve(tag, lambda path: _get(path, deadline, attempt))
+    except ValueError as exc:
+        if str(exc).startswith('Published manager source changed'): raise c.SandboxError(str(exc)) from None
+        raise
+    value['objects'] = tuple(value['objects'])
+    return Target(**value, at=time.time())
 
 
 def resolve(tag, installed, *, timeout=TIMEOUT):

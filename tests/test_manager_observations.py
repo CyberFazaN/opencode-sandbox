@@ -124,7 +124,7 @@ def test_changed_or_unfamiliar_local_input_is_preserved_not_repaired_or_discarde
     assert before == {path.name for path in artifact.directory.iterdir()} and artifact.process is None
 
 
-def spawn_origin(origin, tmp_path, *, budget=30):
+def spawn_origin(origin, tmp_path, *, budget=30, execution=False, frozen_transport=None):
     prefix, launcher = origin[0][3:]
     external = Path(shutil.which('pipx')).resolve().read_text().splitlines()[0][2:]
     dist = next(prefix.glob('lib/python*/site-packages/*.dist-info'))
@@ -140,8 +140,18 @@ def spawn_origin(origin, tmp_path, *, budget=30):
         f'i._running_distribution=lambda:(Path({str(dist.parent / "opencode_sandbox/__init__.py")!r}),Path({str(dist)!r}))\n'
         'r.SYSTEM_CONFIGS=()\n'
         f't.ENDPOINT={manager_targets.ENDPOINT!r};releases.API=t.ENDPOINT+"/releases?per_page=100"\n'
+        + (('import io,zipfile\noriginal_bundle=h._bundle\n'
+            'def transport_bundle():\n'
+            ' buffer=io.BytesIO()\n'
+            ' with zipfile.ZipFile(io.BytesIO(original_bundle())) as old,zipfile.ZipFile(buffer,"w") as new:\n'
+            '  for name in old.namelist():\n'
+            '   raw=old.read(name)\n'
+            f'   if name=="manager_execution.py": raw=raw.replace(b"SOURCE_API = source.API",{("SOURCE_API = " + repr(frozen_transport)).encode()!r})\n'
+            '   new.writestr(name,raw)\n'
+            ' return buffer.getvalue()\n'
+            'h._bundle=transport_bundle\n') if frozen_transport else '') +
         f'prepared=r.prepare("v6.2.0")\nstaged=h.prepare_review_fixture(r.Approval(prepared),Path({str(stage)!r}))\n'
-        f'assert staged["supported"],staged\na=staged["artifact"]\nf=h.start_fixture(a,budget={budget!r});f.arm()\n'
+        f'assert staged["supported"],staged\na=staged["artifact"]\nf=h.start_fixture(a,budget={budget!r},execution={execution!r});f.arm()\n'
         'def drain():\n sys.stdin.read()\n'
         + (' status=f.process.wait(timeout=5)\n print(json.dumps({"origin_reaped_helper":f.process.pid,"status":status}),flush=True)\n' if budget < 1 else '') +
         'threading.Thread(target=drain).start()\n'

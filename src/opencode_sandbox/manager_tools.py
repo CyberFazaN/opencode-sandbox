@@ -4,12 +4,9 @@ The caller supplies dated local classification, not authoritative consent. No to
 configuration repair, Python switch, helper handoff, verifier bypass or replacement occurs. All
 facts must be revalidated by the future execution gate, independently of caches/this result.
 """
-import hashlib
 import json
 import os
-import re
 import shutil
-import stat
 import time
 from pathlib import Path
 
@@ -22,49 +19,18 @@ KNOWN = {'PIPX_HOME', 'PIPX_BIN_DIR', 'PIPX_MAN_DIR', 'PIPX_COMPLETION_DIR', 'PI
 
 
 def _path(value):
-    if not isinstance(value, str) or not Path(value).is_absolute() or any(not ch.isprintable() for ch in value):
-        raise c.SandboxError('External-tool evidence has an invalid absolute path')
-    return Path(value)
+    try: return probe.path(value)
+    except probe.Refused as exc: raise c.SandboxError(str(exc)) from None
 
 
 def _controlled(path, target):
-    nominal = _path(str(path)).absolute()
-    if nominal.is_relative_to(target):
-        raise c.SandboxError('External tool or interpreter belongs to the replaceable installation')
-    try: resolved = Path(probe.outside(str(nominal), target))
+    try: return probe.controlled(path, target)
     except probe.Refused as exc: raise c.SandboxError(str(exc)) from None
-    info = resolved.stat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid not in (0, os.getuid()) or info.st_mode & 0o022 or not os.access(resolved, os.X_OK):
-        raise c.SandboxError('External tool/interpreter is not a controlled executable regular file')
-    info = resolved.stat()
-    return resolved, [str(resolved), info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns]
 
 
 def _launcher(path, target):
-    resolved, identity = _controlled(path, target)
-    fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
-    with os.fdopen(fd, 'rb') as stream:
-        info = os.fstat(stream.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_size > 8192:
-            raise c.SandboxError('External pipx launcher is not a bounded standard console script')
-        raw = stream.read(8193)
-    text = raw.decode('utf-8')
-    lines = text.splitlines()
-    if not lines: raise c.SandboxError('External pipx launcher is empty')
-    if lines[0] == '#!/bin/sh' and len(lines) >= 3 and lines[2] == "' '''":
-        match = re.fullmatch(r"'''exec' (?:\"([^\"$`\\]+)\"|([^\s\"$`\\]+)) \"\$0\" \"\$@\"", lines[1])
-        if not match: raise c.SandboxError('External pipx shell trampoline is unrecognized; it was not evaluated')
-        python = _path(match[1] or match[2])
-        body = lines[3:]
-    else:
-        if not lines[0].startswith('#!') or any(char.isspace() for char in lines[0][2:]):
-            raise c.SandboxError('External pipx interpreter/shebang is ambiguous; no PATH Python inference')
-        python = _path(lines[0][2:])
-        body = lines[1:]
-    if body != ['import sys', 'from pipx.__main__ import cli', "if __name__ == '__main__':",
-                "    sys.argv[0] = sys.argv[0].removesuffix('.exe')", '    sys.exit(cli())']:
-        raise c.SandboxError('External pipx console template is unrecognized; no wrapper execution')
-    return python, [*identity, hashlib.sha256(raw).hexdigest()]
+    try: return probe.launcher(path, target)
+    except probe.Refused as exc: raise c.SandboxError(str(exc)) from None
 
 
 def _probe(python, target, mode, environment, *, candidate=None):

@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-16 and PERF complete. UP-17 partial: source/origin-consent gates verified; frozen post-exit/exclusive approved-local-observation replay in verification. Fresh independent tool/dependency/source/network execution validation, effective installer network policy, replacement and recovery remain pending. Manager Update stays disabled.**
+- **UP-00..UP-16 and PERF complete. UP-17 partial: source/origin-consent, frozen post-exit/exclusive local replay, durable startup barrier and independent tool/dependency/source/effective public-default client-policy diagnostics verified. Replacement, expected installed result and failure/interruption recovery remain pending. Manager Update stays disabled.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -3169,6 +3169,44 @@ a materially different architecture, record the blocker and ask the owner before
   installed tests are declared transport fixtures, not public source authentication or authority
   to weaken policy. Final UI enablement and UP-18 remain pending, with one consolidated completion
   report only after actual roadmap completion; a necessary context handoff is not completion.
+
+### Remaining-roadmap implementation — independent frozen execution diagnostics
+
+- Added shared stdlib published-source graph/console-route primitives; origin and frozen readers
+  use the same exact-release/ref/tag-chain/commit semantics without application imports. Separate
+  frozen `manager_execution` runs fresh external Python/pipx/dependency/settings probes after actual
+  origin death and own non-waiting exclusion; replay alone remains insufficient. Detected custom
+  environment/configuration still refuses, never reads secrets or repairs files. Fixed public
+  pip/Git settings are independently inspected by actual external shared-pip and Git processes;
+  recognized pipx locations and literal source-Python selection are retained. No installer exists
+  yet and no diagnostic success is durable consent, completion/recovery authority or code attestation.
+- Added bounded stdlib diagnostic capture/group cleanup. The leader remains unreaped until owned
+  group cleanup, and host regressions explicitly adopt/reap its actual descendant. Optional internal
+  restored-terminal diagnostic fixture now freezes the new modules; no public updater is enabled.
+- Primary affected regressions **416 passed**, 77.86 s before the Git-ceiling correction; final
+  changed/new cases **20 passed**, 11.10 s. Python 3.14/lowest affected run **416 passed/1 failed**,
+  90.04 s: an invalid new test compared unrelated pytest HTTP-thread lifetimes. Replaced that
+  assertion with exact diagnostic leader/descendant reaping (not a suppressed failure); corrected
+  compatibility cases **20 passed**, 13.62 s, two known Typer warnings. Complete-suite verification
+  remains reserved for final integration, per the owner's workflow correction.
+- Actual installed `up17e-proof` failed six assertions across both layouts (2 teardown errors):
+  Git inherited the ancestor checkout's local configuration when the private helper was staged in
+  `.work/`. Minimal host reproducer retained; fixed by a derived explicit Git discovery ceiling at
+  the private directory's parent, with a regression proving ancestor config is excluded but a
+  repository inside the helper directory still refuses. Repeated technically affected installed
+  checkpoint `up17e-proof2`: **2 passed / 448 checks**, 146.88 s, default/custom-space pipx, all prior
+  assertions plus actual frozen runtime/dependency/effective shared-pip/Git/fresh-source checks,
+  late independent pip-policy and published-source faults, real terminal restoration and origin
+  drain/death. Endpoint substitution is test-only frozen-source transport, not a product setting
+  or public-authenticity proof. Neither installed checkpoint replaced an application.
+- Separate real official HTTPS check observes v6.1.0 at commit
+  `9ec7f7eedc634d847270d4a520b10aa61d74ed21`, annotated tag
+  `064ae1b83e79b24b0939aabfc33bfef3f20039b1`, then independently rereads the same published graph
+  successfully (`.work/up17e/public-source/result.json`). No mutation or signed-tag claim follows.
+- Continue the remaining approved roadmap autonomously: expected-result/basic-CLI verification,
+  exact pipx replacement with durable pre/during/post state, interruption/failure recovery, then
+  public consent/terminal hookup and UP-18 final broad verification/consolidation. Preserve prior
+  evidence, shared cache and persistent lock inodes. No version bump/merge/tag/push/publication.
 
 ## Resume and context-compaction handoff
 

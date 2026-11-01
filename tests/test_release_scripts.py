@@ -80,6 +80,9 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
              'opencode_sandbox/manager_review.py': 'x', 'opencode_sandbox/manager_review_tui.py': 'x',
              'opencode_sandbox/manager_observations.py': 'x',
              'opencode_sandbox/installation_state.py': 'x',
+             'opencode_sandbox/manager_source.py': 'x', 'opencode_sandbox/manager_process.py': 'x',
+             'opencode_sandbox/manager_network.py': 'x', 'opencode_sandbox/manager_pip_probe.py': 'x',
+             'opencode_sandbox/manager_execution.py': 'x', 'opencode_sandbox/http_probe.py': 'x',
              f"{info}/licenses/LICENSE": "MIT",
              **{f"opencode_sandbox/assets/images/{a}": "x" for a in check_dist.assets()}}
     with zipfile.ZipFile(dist / f"opencode_sandbox-{v}-py3-none-any.whl", "w") as wheel:
@@ -95,6 +98,9 @@ def distributions(tmp_path, drop=(), extra=(), requires_python=None):
                  'src/opencode_sandbox/manager_review.py', 'src/opencode_sandbox/manager_review_tui.py',
                  'src/opencode_sandbox/manager_observations.py',
                  'src/opencode_sandbox/installation_state.py',
+                 'src/opencode_sandbox/manager_source.py', 'src/opencode_sandbox/manager_process.py',
+                 'src/opencode_sandbox/manager_network.py', 'src/opencode_sandbox/manager_pip_probe.py',
+                 'src/opencode_sandbox/manager_execution.py', 'src/opencode_sandbox/http_probe.py',
                  *(f"src/opencode_sandbox/assets/images/{a}" for a in check_dist.assets()), *extra):
         if name not in drop:
             (tree / name).parent.mkdir(parents=True, exist_ok=True)
@@ -131,7 +137,9 @@ def test_a_missing_image_asset_or_licence_is_reported(tmp_path):
 
 @pytest.mark.parametrize('module', ['launcher.py', 'installation_locks.py', 'manager_tools.py', 'manager_tool_probe.py',
                                   'manager_handoff.py', 'manager_helper.py', 'manager_verifier.py', 'manager_targets.py',
-                                  'manager_review.py', 'manager_review_tui.py', 'manager_observations.py', 'installation_state.py'])
+                                  'manager_review.py', 'manager_review_tui.py', 'manager_observations.py', 'installation_state.py',
+                                  'manager_source.py', 'manager_process.py', 'manager_network.py', 'manager_pip_probe.py',
+                                  'manager_execution.py', 'http_probe.py'])
 def test_missing_bootstrap_modules_fail_both_package_gates(tmp_path, module):
     dist = distributions(tmp_path, drop={'opencode_sandbox/' + module, 'src/opencode_sandbox/' + module})
     problems = check_dist.check(dist)

@@ -1,8 +1,9 @@
 """Staged stdlib-only, NON-MUTATING process-exit fixture; no installer/normal CLI dispatch.
 
 Executed only as the frozen zipapp's __main__ under external Python -I -B -S. Local imports are
-bundled source copies, not imports from the replaceable package. Only the optional fixed fresh
-read-only verifier is launched; no shell, pipx, Docker, network or normal-manager bypass.
+bundled source copies, not imports from the replaceable package. Optional fixed read-only runtime
+and independent tool/policy/published-source diagnostics never install, dispatch normal CLI or
+grant access to another process. No shell, Docker, installer or normal-manager bypass.
 """
 import hashlib
 import json
@@ -86,8 +87,9 @@ def main():
         started = time.monotonic()
         request = json.loads(_receive(control, started + 8.0))
         required = {'protocol', 'prefix', 'sha256', 'budget'}
-        if not isinstance(request, dict) or not required <= set(request) or set(request) - required - {'verify', 'local_review'} \
+        if not isinstance(request, dict) or not required <= set(request) or set(request) - required - {'verify', 'local_review', 'execution_validate'} \
                 or ('verify' in request and request['verify'] is not True) \
+                or ('execution_validate' in request and (request['execution_validate'] is not True or 'local_review' not in request)) \
                 or type(request['protocol']) is not int or request['protocol'] != 1 or isinstance(request['budget'], bool) \
                 or not isinstance(request['budget'], (float, int)) \
                 or not 0 < request['budget'] <= BUDGET:
@@ -143,6 +145,19 @@ def main():
                             result['outcome'] = 'review-failed'
                             result['review'] = {'ok': False, 'identity': request['local_review']['identity'],
                                                'reason': 'Approved local manager observations changed or unavailable; no installation was changed'}
+                            _result(directory, result)
+                            return
+                    if request.get('execution_validate'):
+                        try:
+                            from manager_execution import validate as execution_validate
+                            from manager_observations import load, validate
+                            value = load(locks, directory, request['local_review'], prefix=str(target), origin=origin)
+                            execution_validate(locks, value, cwd=artifact.parent, deadline=deadline)
+                            validate(locks, directory, request['local_review'], prefix=str(target), origin=origin, deadline=deadline)
+                            result['execution'] = {'ok': True}
+                        except (OSError, ValueError, TypeError, KeyError, RuntimeError, ImportError, AttributeError, RecursionError):
+                            result['outcome'] = 'execution-failed'
+                            result['execution'] = {'ok': False, 'reason': 'Independent manager execution validation failed; no installation was changed'}
                             _result(directory, result)
                             return
                     if request.get('verify'):
