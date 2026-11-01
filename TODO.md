@@ -5,108 +5,34 @@ recovery, compatibility and usable diagnostics, not feature expansion. Work proc
 coherent task per cycle: investigate, implement, verify, document, commit on a topic branch,
 merge when verified, then stop.
 
-## Active: Updates architecture and UX
+## Completed: Updates architecture and UX (unpublished)
 
-Approved, unpublished development after 6.1.0 (D-056). The complete design, sequenced tasks,
-dependencies, acceptance criteria, verification matrix and next-cycle handoff are in the
-[Updates working roadmap](docs/engineering/updates/ROADMAP.md). This is the active effort;
-the optional and deferred items below are not competing implementation permission.
+The approved D-056/D-057 roadmap **UP-00..UP-18 and PERF is complete locally**, after the
+published 6.1.0 release. Its transient working record is retired under D-045. Durable behavior,
+verification, failure trails and explicit limits are consolidated in
+[ARCHITECTURE](docs/engineering/ARCHITECTURE.md#manager-update-and-independent-recovery),
+[BASELINE](docs/engineering/BASELINE.md#updates-final-integration) and
+[CAMPAIGN](docs/engineering/CAMPAIGN.md#updates-final-integration).
 
-Priority: correctness/reliability fixes -> shared observations/discovery -> compact Updates TUI
-and existing operations -> explicit base refresh -> verified pipx manager self-update.
-Keep the three component lifecycles independent. Manager self-update must not delay the earlier
-work. D-057 groups UP-07 + UP-08, UP-10 + UP-09 (UI first; no scheduler prerequisite), UP-12 +
-UP-13, and UP-14 + UP-15: nine remaining cycles at approval instead of thirteen. UP-10 is now a
-verified split checkpoint; UP-09, UP-11, UP-12/UP-13, UP-14/UP-15 and UP-16 are complete too, and two later packages remain. Base refresh does not depend on environment recovery; manager discovery does not
-depend on base refresh. Tightly
-related subtasks may share a cycle with focused commits and tested handoffs; stop at a coherent
-package or safety boundary, not mechanically after each ID. Environment recovery, manager
-handoff, replacement and failure recovery retain independent verification gates. The working
-roadmap is authoritative for this effort's workflow, superseding older one-task/STOP wording.
+- Three independent local/cached-first Updates views retain `v`; optional daily GitHub/npm
+  discovery defaults off, never installs automatically and never authorizes mutation from cache.
+- Environment actions preserve pins, ownership, data/configuration and existing journals/checkpoints.
+  Base actions provide explicit cached/full-refresh builds, immutable consent and retained rollback
+  copies without migrating existing containers or pruning shared cache.
+- Explicit manager review/update now uses the real terminal/process-death boundary and an
+  independent frozen exact-tag pipx executor. Durable admission/state, fresh expected-result checks
+  and verify-only recovery remain separate from availability/consent and normal startup leasing.
+  Unknown hard-interruption quiescence stays blocked; previous-tag reinstall is manual guidance,
+  not guaranteed dependency/offline restoration. Support remains conservative and Beta.
+- Final integration: 2220 passed/86 real opt-in skips per selected complete compatibility result,
+  changed-component reruns on all four endpoints, and 31 affected real tests/1146 checks, including
+  both distributions, public terminal flows and real pipx replacement/recovery. Scope and unexecuted
+  layers are explicit in BASELINE; this is not a release-readiness recommendation.
 
-Current checkpoint: UP-00..UP-16 complete. Explicit reports, honest partial inventory, shared
-base guards, identity-bound rollback and bounded diagnostics/owned probe cleanup are in place.
-Packaged Debian 13/Arch races and retained-image diagnostic checks pass; long mutations keep
-their existing timing. Dashboard advisories now replace/clear by category without erasing active
-progress. Identity-bound disposable version evidence now retains stopped history/Unknown;
-bounded compatible stable discovery, Manual/Pinned explicit comparisons and exact confirmed
-targets preserve policy/lifecycle restrictions. Four complete compatibility suites and scoped
-real Debian/Arch update/rollback/recovery/restore/probe checks pass (BASELINE).
-UP-10 now replaces Versions with three compact local/cached-first Updates views, explicit
-independent Check/Details and owned cancellation at 80x24/larger. Opening does not contact the
-network or execute version probes; stopped checks never start containers. Manager discovery
-now has independent read-only release/installation evidence; manager execution remains unavailable.
-The approved UP-10/UP-09 package was split after the verified UI because of its scope and
-real-terminal fixes.
-UP-09 adds default-off dashboard-only daily npm discovery, persisted attempt claims across
-failures/restarts/interruption, cross-caller/process source coalescing and a quiet policy-filtered
-cached-availability indicator. Explicit refresh remains available; Retry-After still applies.
-No automatic starts, runtime/image probes, installations or service. Four complete compatibility
-suites and affected real lifecycle/terminal checks pass. UP-11 now binds explicit environment
-Start/Update/Policy/Rollback/Recover with exact consent, locked revalidation and app-owned mutation
-workers. Recovery success/failure has independent real evidence, including missing checkpoints,
-failed removal and routing to configuration recovery; metadata/journals remain authoritative.
-UP-12/UP-13 now bind Base Images Build/Rebuild/Rollback and explicit cached/full-refresh modes
-with immutable consent, retained copies, bounded UI build output and existing handlers. Real
-cached reuse and pull/no-cache package-layer rebuilds pass separately on both distributions,
-alongside concurrency, pinned creation, retained layers and terminal selection/worker ownership.
-Four complete compatibility suites and the affected 24-test real gate pass (BASELINE).
-UP-14/UP-15 add official published-full-release GitHub discovery, source-scoped daily claims,
-independent failures, strict tags/no downgrade and conservative local pipx provenance/settings
-classification. Opening stays network-free, manager Update stays disabled, and unsupported/
-editable/foreign/shadowed/ambiguous installations receive manual guidance. Four complete suites
-(1611 passed/82 skips each) and 26 affected real tests/637 checks pass, including isolated real
-pipx/source/options/launcher and manager terminals; local provenance is not public commit authentication.
-UP-16's first verified safety checkpoint adds a stdlib-only early console bootstrap and canonical-
-prefix process-lifetime shared usage/internal exclusive guards, across data/config overrides.
-Supported live dashboards, workers, CLI sessions and commands block exclusive access; startup
-refuses it before dispatch. Private persistent lock inodes, lock order and fork/exec descriptor
-ownership have real-process regressions. Four complete suites (1655 passed/84 skips each) and
-29 affected real tests/702 checks pass, including actual installed pipx lifecycle/launchers and
-live session/mutation exclusion. This is a split checkpoint, **not completion of UP-16**.
-UP-16's second verified trust checkpoint adds internal dated external pipx/Python/runtime and
-dependency-inventory assessment, with literal source-Python selection and effective-location
-preservation. It rejects target-dependent symlink routes, lazy/absent declared paths, unsupported
-pipx/metadata and unsafe inputs without a grant. Four complete suites (1702 passed/84 skips each)
-and 29 affected real tests/714 checks pass, including actual external pipx with the owned manager
-venv temporarily absent. No startup/status/UI consumer or new public command executes this probe.
-UP-16's third checkpoint stages a private frozen stdlib helper outside the installation and
-exercises only a non-mutating process-exit fixture. A pidfd, not main return or socket EOF, proves
-origin termination before a non-waiting exclusive attempt. Existing process-lifetime leases stay
-intact. This is not verifier access, terminal handoff or installation authority.
-UP-16's fourth checkpoint adds dedicated fixed read-only fresh runtime access under the helper's
-exclusive guard, with an unlocked read-only witness, kernel owner-fd proof, close-before-query and
-startup parent-death protection. No exclusive descriptor is exported. Normal CLI startup remains excluded; runtime facts are not source/launcher
-authentication or replacement success. The fifth checkpoint completes UP-16 with an internal-only
-CLI/TUI non-mutating handoff: active work/sessions refuse, actual worker bodies remain tracked
-after task cancellation, and clean driver shutdown/exact foreground tty restoration precede
-arming. The helper still waits for actual process death; no lease is released early. Four complete
-suites (1861 passed/84 skips each) and 29 affected real tests/872 checks pass, including installed
-pipx/real-terminal, Debian/Arch mutation and attached-session refusals. No public trigger or install
-path exists. UP-17's first verified read-only source checkpoint now resolves an exact published
-release/ref/annotated-tag chain/commit and freshly revalidates the same target. It trusts official
-GitHub HTTPS evidence, not local records/cache, signed tags or installation consent. Source and
-discovery share rate limits without conflating success claims. Four complete suites (1959 passed/
-84 skips each) and the full 29-test affected real gate (888 checks) pass. No startup/status/UI/
-helper consumer or install path exists. UP-17's second checkpoint now adds internal immutable
-origin installation/tool/source/public-default network review and explicit scrollable consent,
-with Cancel focused first and fresh origin-side revalidation. Known custom installer/credential
-configuration receives manual fallback, never silent removal or value disclosure. Four complete
-suites (2038 passed/84 skips each, 2122 identical ordered outcomes) and the same 29-test affected
-real gate (954 checks) pass, including both actual installed pipx layouts and real terminal
-consent/cancel/changed-launcher/configuration refusals. No public entry, helper payload or install
-path exists; an in-memory receipt is not an executable capability. Next: independent post-exit/
-exclusive installation/tool/source/network validation and effective installer network policy,
-then actual replacement/expected-result and independent failure recovery. Manager Update stays
-disabled. No version bump, release preparation,
-merge, push or publication.
-The one-time test-performance checkpoint between UP-06 and that package is complete: two
-test-local improvements preserve all test IDs/results and reduce measured full wall time by
-about 8%; findings and recommended verification cadence are in
-[BASELINE](docs/engineering/BASELINE.md#test-performance-and-local-verification). No application
-or CI/release gate changed; its cadence and all broader verification requirements remain in force.
-The manager version remains 6.1.0.
-Completion does not authorize a merge, version bump, release preparation, tag, push or publication.
+Manager remains **6.1.0**; environment metadata **2**, backup **3**, image definitions unchanged.
+No merge, version bump, release, project tag, push, upload or publication is authorized or performed.
+The subsequent branch migration, documentation review and test-suite review are separate tasks and
+were not begun. The optional/deferred backlog below is not new implementation permission.
 
 ## Delivered in 6.1.0
 

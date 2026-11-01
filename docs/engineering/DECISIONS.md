@@ -941,12 +941,12 @@ process-exit fixture. The fourth adds a dedicated fixed read-only fresh runtime 
 exclusion, not an ordinary CLI exemption. The fifth completes internal non-mutating restored-
 terminal handoff/refusals. UP-17's first checkpoint adds internal exact published-source observation
 and fresh same-target revalidation. Its second adds internal exact origin review/explicit consent
-and fresh origin-side revalidation; independent exclusive execution checks, replacement and
-failure recovery remain pending. Update is disabled.
-The grouped package is split at its approved verified UI checkpoint (D-057). Current behavior remains
-as described by the code and ARCHITECTURE until the corresponding tasks are verified.
-The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from
-TODO under D-045; it is a running-effort record, not a second permanent planning system.
+and fresh origin-side revalidation. The remaining independent execution, exact replacement,
+expected-result/recovery and public consent/terminal gates are now implemented and verified in
+the [final integration record](BASELINE.md#updates-final-integration). No release readiness follows.
+The grouped package used its approved verified split checkpoints (D-057). Current behavior is in
+ARCHITECTURE. The transient task/evidence/handoff record is retired under D-045 after completion;
+the original approved plan and checkpoint details remain in Git, not a second permanent task system.
 
 - One compact Updates screen, retaining the existing shortcut, separates Sandbox Manager,
   Base Images and Environment OpenCode. Use progressive disclosure at 80x24. Share observations,
@@ -1039,5 +1039,6 @@ order and one-ID/local-commit/STOP rhythm, not its architecture or acceptance cr
   Preserve exact consent, journals/checkpoints, rootless/ownership checks, rollback copies,
   terminal restoration, external helper independence and fresh-process installation verification.
 - Keep nine planned remaining packages at approval, not a mandatory cycle count. The detailed
-  dependency/acceptance table and handoff remain in [updates/ROADMAP.md](updates/ROADMAP.md).
+  dependency/acceptance table remains in Git; completed evidence is consolidated in
+  [BASELINE](BASELINE.md#updates-final-integration) and implementation boundaries in ARCHITECTURE.
   No version bump, merge, release work, push, tag, upload or publication is authorized.

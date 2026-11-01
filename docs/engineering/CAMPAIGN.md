@@ -15,7 +15,7 @@ How to run the unit suite and the real campaign: `BASELINE.md` ("Commands") and
 in `tests/integration/` (the real campaign: every check is logged with the row ID it belongs
 to); files under `tests/` are the unit, host and Textual pilot suite.
 
-After D-048 and the startup gate C10 (D-052), 84 rows are active. Installer-only rows B02–B08
+After D-048, C10 (D-052) and the implemented manager update gates B13–B15, 87 rows are active. Installer-only rows B02–B08
 are retired, not passed or renumbered; their original evidence remains in the released 6.0.0
 record in Git history and BASELINE. Unless a later verification is stated, PASS means the
 historical 6.0.0 evidence for the retained behaviour; "6.1.0 candidate" marks evidence from the
@@ -23,9 +23,41 @@ complete verification of the 6.1.0 implementation. I04 and I06 must be re-establ
 release tree. B01 retains the manager's refusal of another user's daemon when run as
 root; retiring installer checks does not retire that boundary.
 
+## Updates final integration
+
+UP-00..UP-18/PERF development is complete locally, unpublished; no release recommendation follows.
+`up18-final` passed **31 affected real tests / 1146 checks**, 1381.67 s, no skips/deselections:
+both distributions' packaged/retained base races, bounded probes, actual OpenCode/lifecycle evidence,
+80x24/larger Updates/discovery/environment/base actions and independent recovery, actual pipx
+lifecycle/provenance, session/exec exclusion, and public manager CLI/TUI replacement/recovery.
+New native manager cases cover default/custom-space paths, failed target health, manual previous-tag
+reinstall plus frozen fresh verification, handled native interruption/escaped descendant cleanup,
+hard helper death/startup blocking and lost-terminal durable completion. Private source/API/clone
+transports are declared fixtures, not public release authentication. All original assertions remain.
+
+Complete unit/host/pilot results are **2220 passed / 86 opt-in skips** per selected compatibility
+result, with **2306 identical ordered outcomes** across Python 3.11/3.14 and current/lowest direct
+dependencies. The initially failed 3.14/lowest complete result was preserved and repeated after
+fixing one fixture rendezvous race and daemon-before-npm preflight ordering; **124 affected cases**
+also passed at all four endpoints. Full command/scope/source hashes and package/static evidence:
+[BASELINE](BASELINE.md#updates-final-integration). No unchanged full real campaign was replayed.
+
+New B13/B14 have real evidence; B15's hard-kill refusal is real PASS but actual post-reboot recovery
+is **BLOCKED, approval not granted and residual risk not accepted**. Next step: on an authorized
+disposable VM, retain a named hard-interrupted operation, reboot, perform an explicit manual repair
+only if needed, then run its original frozen verification command and check normal startup/data
+retention. No automatic reboot, reset, stale-PID signal or cache-based reopening is allowed.
+This and any release-tree/privileged/socket/model/manual rows not run here remain release gates;
+the following earlier checkpoint and 6.1.0 PASS evidence is historical where not explicitly renewed.
+
+### Earlier Updates checkpoint evidence
+
+These dated phase records retain their scope/failure trail; then-pending/disabled stages are not
+current product status or fresh verification of unexecuted layers. The working record is retired.
+
 Unpublished Updates work (D-056): UP-01 corrects shared reports and Agent Context heading/fallback;
 UP-02 preserves independent local/registry inventory results and surfaces partial failures. New
-report evidence is unit/host/pilot only (BASELINE and the Updates working roadmap). The real/pty
+report evidence at that checkpoint was unit/host/pilot only (BASELINE). The real/pty
 PASS entries below are historical, not new verification of these changes; report-specific
 real-terminal and live-source checks remain to be re-established in UP-18.
 
@@ -38,7 +70,7 @@ packaged builds/races passed. UP-04 extends the same test with real CLI list/exp
 multi-copy `--yes` refusal, alias retag after consent refusal, exact immutable publication and
 replaced-base preservation. All four packaged/retained cases passed with running containers and
 writable-layer markers intact (76 checks). Full campaign/pty evidence is not renewed by these
-scoped tests; commands and remaining gates are in the Updates roadmap.
+scoped tests; checkpoint commands remain in Git and final gates are qualified above.
 
 UP-05 adds host-process/loopback-HTTP deadlines, cancellation/reaping and 80x24 pilot regressions.
 `test_43_diagnostics.py` covers real bounded exec/image probes on retained Debian/Arch, canceled
@@ -124,7 +156,7 @@ definition/tool/binary assertion is weakened. Real failure injection runs after 
 verification; current base, copies, pins, retained containers/layers and cleanup are checked.
 Single/multi-copy rollback, both mode confirmations and app-owned terminal progress/Close/Quit
 behavior pass at 80x24/120x40. Initial harness/expectation errors and final UI priority correction
-were recorded and rerun, not waived (BASELINE/working roadmap). Ending daemon has zero containers/
+were recorded and rerun, not waived (BASELINE/checkpoint Git history). Ending daemon has zero containers/
 volumes/helpers, unchanged original four image IDs, and no test tags/aliases; build cache stays
 intact. No complete campaign, installed-pipx/manager, paid-provider, privileged/service or manual
 observation is renewed; release gates/historical release evidence remain unchanged.
@@ -283,6 +315,9 @@ No full campaign/privileged/release-readiness claim; no bump/merge/push/upload/p
 | B10 | P0 | The pipx installation creates, starts and uses an environment; a full image build and verification from the installed package's assets | `test_65_pipx.py`; the image build with `OCS_TEST_PIPX_BUILD=1` (into an `ocs-test-` tag, removed afterwards); the campaign run through the pipx launcher with `OCS_TEST_MANAGER` (`test_10_lifecycle.py`, `test_35_prerequisites.py`, `test_40_opencode.py`, `test_50_tui.py`) | PASS (6.1.0 release tree: installed-pipx image build and whole 56-test/513-check campaign, both-image first prompts; candidate: real create/start/exec at both endpoints) |
 | B11 | P0 | Upgrade/downgrade between tags: `pipx upgrade` and `pipx reinstall` keep a tag spec, including interpreter repair with `reinstall --python`; `pipx install` without `--force` refuses, `pipx install --force <spec>@<tag>` moves to the other tag and back; environments survive | `test_65_pipx.py` | PASS (D-049 real on 3.11/3.14) |
 | B12 | P1 | `pipx uninstall` removes its launcher and keeps environments, containers and volumes; a foreign/legacy launcher and its target are neither replaced nor deleted; after the test removes its own legacy launcher a working pipx launcher can be installed | `test_65_pipx.py`; the transition from a legacy source installation is documented, not automatic | PASS (D-049 real on 3.11/3.14; volume presence and foreign target contents checked) |
+| B13 | P0 | Exact public manager consent, actual process-lifetime usage/worker/session refusal, restored foreground terminal and helper-owned exclusion; no ordinary-CLI bypass | `test_66_manager_inventory.py`, `test_67_installation_exclusion.py`, `test_67_manager_update.py`; host/pilot manager boundary tests | PASS (`up18-final`: real installed public CLI/TUI, both pipx layouts/terminal sizes, actual source/tool/terminal gates and non-daemon drain; real session/exec refusals on both distributions) |
+| B14 | P0 | Exact-tag pipx replacement with durable parked-child admission; independent expected source/commit/version/launcher/runtime/CLI result and explicit failure/manual-reinstall recovery; data retained | `test_67_manager_update.py`; host whole-update/operation/installer tests | PASS (`up18-final`: actual force replacement, failed target health/barrier, actual manual previous-tag reinstall and original frozen verification; terminal loss still retains verified result; no inferred backup or automatic restart) |
+| B15 | P1 | Hard interruption never clears pending state from group absence/cache/exit status; independently verified recovery after old-process quiescence | `test_67_manager_update.py`, host interruption/operation tests; authorized post-reboot continuation still required | BLOCKED (real hard-kill/escaped-child/empty-group refusal and handled cleanup PASS in `up18-final`; actual reboot/frozen post-boot recovery unexecuted and not authorized, no accepted risk. Reproducible next step above; do not call this release-ready) |
 
 ## C. Rootless Docker and images
 
@@ -405,18 +440,20 @@ No full campaign/privileged/release-readiness claim; no bump/merge/push/upload/p
 
 ## Counts
 
-84 active rows, including the P1 startup/socket-activation gate C10 (D-052). Seven
+87 active rows, including C10 (D-052) and B13–B15. Seven
 installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 (three P1). Their removal is not a PASS and does not change the historical 6.0.0 totals.
 
 | Priority | Rows | PASS | PASS in part | BLOCKED | NOT TESTED | FAIL |
 |---|---|---|---|---|---|---|
-| P0 | 46 | 46 | 0 | 0 | 0 | 0 |
-| P1 | 33 | 33 | 0 | 0 | 0 | 0 |
+| P0 | 48 | 48 | 0 | 0 | 0 | 0 |
+| P1 | 34 | 33 | 0 | 1 | 0 | 0 |
 | P2 | 5 | 4 | 1 | 0 | 0 | 0 |
-| All | 84 | 83 | 1 | 0 | 0 | 0 |
+| All | 87 | 85 | 1 | 1 | 0 | 0 |
 
 - PASS in part: D09 (the host reboot is BLOCKED with accepted risk and a next step).
+- B15 is BLOCKED without accepted risk; its post-reboot path is not renewed by same-boot refusal
+  or unit/host proof. The unpublished Updates implementation is not a release recommendation.
 - C10 was re-established in the complete installed-pipx campaigns of the 6.1.0 candidate and
   of the release tree, not just host sockets or warmed direct Docker.
 - I04 passed on the 6.1.0 release tree (56 tests/513 checks); every real row's module ran

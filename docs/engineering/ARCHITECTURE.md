@@ -6,28 +6,14 @@ state and verification: `BASELINE.md`. User-facing behaviour is in `README.md` a
 `docs/` (D-041; the rootless daemon setup in `docs/install.md`, the daemon identity check in
 `docs/security.md`, the injected guidance in `docs/opencode.md`).
 
-Approved staged architecture: D-056 and the [Updates working roadmap](updates/ROADMAP.md).
-UP-01 implements generic reports and the Agent Context presentation correction; UP-02 preserves
-independent local/registry version results. UP-03 adds daemon-wide base coordination and locked
-image revalidation; UP-04 adds explicit identity-bound rollback-copy selection; UP-05 bounds
-diagnostic execution and owns client/probe cleanup. UP-06 replaces/clears category-owned dashboard
-advisories while preserving operation status. UP-07/UP-08 add disposable identity-bound version
-evidence, compatible stable discovery and explicit policy comparisons. UP-10 adds the manual/
-cached compact Updates interface; UP-09 adds default-off dashboard discovery; UP-11 binds explicit
-environment actions and recovery to existing handlers. UP-12/UP-13 bind base actions and explicit
-cached/full-refresh builds; UP-14/UP-15 add read-only manager discovery/classification.
-UP-16's first safety checkpoint adds early process-lifetime usage/exclusive coordination. Its
-second checkpoint adds independent external-tool/runtime prerequisite facts. Its third stages
-an independent stdlib helper with a non-mutating process-exit fixture. Its fourth adds a dedicated
-fixed read-only fresh runtime query under helper exclusion. Its fifth adds an internal restored-
-terminal handoff/refusal fixture. UP-17's first checkpoint adds internal read-only exact published
-release/tag/commit resolution and fresh same-target revalidation. Its second adds internal exact
-origin review/consent and fresh origin-side revalidation. Its third adds frozen post-exit/exclusive
-replay of approved local file/route observations only. Later internal checkpoints add durable
-incomplete-operation startup blocking, independent frozen tool/dependency/source/effective-client-
-policy diagnostics and exact installed-file/launcher checks plus separate runtime and fixed
-CLI-help construction queries. These are non-mutating prerequisites, not a replacement/recovery
-engine or public updater. Manager Update is disabled.
+The unpublished Updates architecture (D-056/D-057) is implemented: independent local/registry
+results, daemon-wide base guards and immutable rollback selection, bounded owned diagnostics,
+identity-bound evidence, optional default-off discovery, compact Updates views and explicit
+component-specific actions. Environment recovery reuses its existing journals/checkpoints;
+base builds preserve their own candidates/copies; manager updates use an independent frozen
+pipx helper. There is no universal update executor, Update All, automatic installation/restart,
+implicit environment migration or user-configuration reapplication. Final evidence and limits:
+[Updates final integration](BASELINE.md#updates-final-integration).
 
 ## Boundaries
 
@@ -50,16 +36,17 @@ engine or public updater. Manager Update is disabled.
 | `base_locks.py` | Secure UID/verified-endpoint/distribution build and publication guards outside product path overrides; acquisition-order checks | D-056 |
 | `launcher.py`, `installation_locks.py` | Stdlib-only console bootstrap/canonical-prefix process-lifetime usage/internal exclusion; unlocked read-only witness for dedicated fixed verifier, never a lease export, ordinary-startup exemption or early-release API | D-056, D-057 |
 | `manager_tools.py`, `manager_tool_probe.py` | Explicit internal dated external-tool prerequisite assessment and self-contained isolated diagnostic source; only known existing pipx version/runtime/settings checks, no helper/handoff/executor or automatic consumer | D-056, D-057 |
-| `manager_handoff.py`, `manager_helper.py` | Private frozen stdlib artifact/bounded non-mutating pidfd fixture, optional fixed runtime query and internal restored-terminal boundary; no public action/command/startup trigger or installation executor | D-056, D-057 |
+| `manager_handoff.py`, `manager_helper.py` | Private frozen stdlib artifacts, authenticated live-origin intent, actual pidfd death, restored-terminal boundary and fixed fixture/update/parked-child/verify-only recovery modes; no normal CLI exemption | D-056, D-057 |
 | `manager_verifier.py` | Frozen external fixed-query launcher/parent-death bootstrap and dedicated installed read-only client; kernel descriptor/channel/pidfd checks, no normal CLI dispatch or source/launcher/installation-success grant | D-056, D-057 |
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
 | `manager_targets.py` | Internal explicit exact published release/ref/peeled-commit observation and fresh same-target revalidation; fixed GitHub HTTPS authority, no cached target grant, install consent or executor | D-056, D-057 |
-| `manager_review.py`, `manager_review_tui.py` | Internal immutable exact origin installation/tool/source/public-default network review, explicit scrollable consent receipt and fresh origin-side revalidation; no public route, executor, independent exclusive check, durable grant or helper payload | D-056, D-057 |
+| `manager_review.py`, `manager_review_tui.py` | Immutable exact origin installation/tool/source/public-default network review and public Cancel-first consent; fresh origin-side revalidation, never an executor, independent exclusive check or durable grant | D-056, D-057 |
 | `manager_observations.py` | Shared stdlib bounded critical-record/route primitives and frozen approved-local-observation replay under real helper-owned exclusion; no target import, fresh tool/source/network execution, installer or recovery authority | D-056, D-057 |
 | `installation_state.py` | Private durable incomplete-operation barrier outside the replaceable pipx venv, strict format-1 transitions and own-exclusive-owner writes; unknown/pending state blocks ordinary bootstrap, never repaired or cleared by a cache | D-056, D-057 |
 | `manager_source.py`, `manager_process.py`, `manager_network.py`, `manager_pip_probe.py`, `manager_execution.py` | Shared stdlib published-graph semantics and independently frozen bounded external-runtime/dependency/effective pip/Git/source diagnostics; refuse custom settings rather than read/strip them, no installer or cached authority | D-056, D-057 |
 | `manager_records.py`, `manager_result.py`, `manager_health.py` | Shared conservative pipx record semantics, exact expected source/commit/version/settings/launcher/in-prefix RECORD checks and separate authenticated fixed CLI-help construction under exclusion; no normal command dispatch, startup exemption or operation completion authority | D-056, D-057 |
+| `manager_operation.py`, `manager_installer.py`, `manager_update.py` | Immutable private recovery inputs, independently admitted parked exact-tag pipx child, reserved-leader/pidfd/subreaper cleanup, durable before/during/after state and fresh result classification; explicit frozen verify-only recovery, never automatic reinstall/rollback/restart | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
@@ -86,10 +73,107 @@ fallback, and the saved guidance is not verified against that unobserved preview
 inspection retains the existing file comparison. Neither path writes guidance or starts a
 container; lifecycle generation and CLI verification remain unchanged.
 
-## Exact manager source evidence (UP-17 first checkpoint)
+## Manager update and independent recovery
 
-`manager_targets.resolve` is internal and explicit, with no startup/status/discovery/CLI/TUI
-consumer. It accepts a strict exact full stable tag and a version comparison input, requires a
+Public entry points are Updates → Sandbox Manager → Update and `manager update --tag` in a real
+foreground terminal. They require a strict newer published full tag and a fresh exact review;
+read-only discovery/classification alone is never authorization. Cancel is focused first; the
+public form requires explicit target/public-network acceptance. Unknown installation settings,
+editable/foreign/shadowed launchers and detected custom installer/network/credential configuration
+receive manual guidance, not conversion or silent removal. Only inspected pipx 1.18.7 is supported.
+
+Origin preparation/revalidation keeps normal shared installation usage through **actual process
+exit**. Approved TUI staging is app-owned, blocks conflicting actions, waits for actual bodies/
+queued workers, then atomically seals admission. Logical cancellation is never treated as idle;
+read-only checks may cancel, but actual body/child completion is still required.
+The CLI checks the exact returned request, clean Linux driver/input/output-thread shutdown and
+original foreground tty/termios restoration before launching/arming. Acknowledged arming or socket
+EOF is not quiescence: the external helper waits for the inherited origin pidfd, then makes one
+non-waiting exclusive attempt. Any supported live instance prevents replacement; no lease upgrade,
+early release, exported exclusive descriptor or normal startup exemption exists.
+
+`manager_handoff.BUNDLE` is the exact 18-module stdlib source inventory. The private single-link
+0600 zipapp/input/inventory files live in a unique 0700 directory below the canonical pipx home's
+`.opencode-sandbox-updates/operations/`, outside the replaceable venv. File contents and newly
+created directory entries are fsynced. Source-identical non-mutating fixtures remain separate;
+an immutable Review/Approval and `review.json` observations are not executable capabilities,
+durable grants or recovery records. The live-origin protocol authenticates UID/PID/pidfd,
+artifact identity/hash and mode; the helper imports no replaceable application code.
+
+After death/exclusion, local replay compares only approved bounded records/routes/context.
+`manager_execution` separately runs fresh external Python/pipx dependency and recognized-location
+checks, public GitHub release/ref/tag-chain/commit reads, and effective pip/Git policy diagnostics.
+It never applies the capsule context as an arbitrary environment. Known configuration paths must
+be absent; unsuppressed Git key names also detect nonstandard effective configuration before fixed
+public policy suppresses it. Actual shared pip configuration must match fixed public PyPI/no-input/
+disabled-keyring settings; Git is HTTPS-only with verified TLS, no redirects, proxy/extra headers
+or credential helper. Private-directory Git discovery ceilings prevent ancestor project config.
+This constrains standard clients, **not arbitrary trusted host build/site/tool code**. No code
+signing, complete lazy-file attestation, immutable dependency restore or host sandbox is claimed.
+
+Preflight is finite (60 seconds overall, eight-second published-graph budget); it also verifies
+the previous actual installation before pipx may consume its raw RECORD. The 30-second origin
+wait/fixture budget never becomes an installation deadline. Current observations are rechecked
+before durable preparation. The immutable private `operation.json` (format 1) binds a fresh nonce,
+prefix, previous/target source/tag/commit/version, recognized settings and literal source Python,
+tool/helper paths, fixed installer search/home/ceiling inputs and helper digest. Its identity is
+the hash of all inputs. Independent recovery instructions are printed before mutation.
+
+`installation_state` format 1 is authoritative at
+`<canonical-pipx-home>/.opencode-sandbox-updates/<sha256(canonical-prefix)>.json`. It is independent
+of product/HOME overrides and caches, persists beyond venv removal/helper death, and is advanced
+only by an actual own-process kernel-exclusive owner. Prepared → installing → verifying → complete
+is the normal sequence; manual-recovery transitions retain failure/interruption. Unknown, corrupt,
+unsafe or other-version state is preserved and blocks startup without repair/reset/migration.
+Normal startup checks it while retaining its lifetime shared lease, even on refusal.
+
+The isolated external installer child parks under parent-death SIGKILL before any external/site
+code. Its exact pid/start/group is durable in installing state **before GO**. The child independently
+opens/closes its own unlocked witness to prove the authenticated live parent's exact kernel
+exclusive ownership, then checks its own recorded identity and immutable operation inputs. It
+inherits no installation lock/witness and execs only existing pipx with argv `install --force`, the
+literal existing source Python and exact official tag. No Python fetch/switch, latest discovery,
+shell command, automatic retry/reinstall or dependency-backup assumption is permitted.
+
+The helper retains the installer leader unreaped until group cleanup, preventing PID-reuse
+signals. Its dedicated subreaper owns adopted descendants; pidfd signaling requires their actual
+PPID and reaps them, including escaped groups. Unproved quiescence stays manual. Installation and
+builds have no short diagnostic deadline; handled signals bound cleanup, not legitimate work.
+Output loss redirects only the helper's broken stdout fd; private phase/results still persist.
+
+`manager_result` independently checks exact PEP 610/distribution/pipx identities, source Python,
+venv isolation/version, exact standard launcher/exposed symlink and every raw manager RECORD route
+inside the prefix. Separate fresh clients query the fixed version/prefix/module tuple and construct
+only the real CLI command/help graph using its own context class. No command/main/root/version
+callback, Docker or caller-selected dispatch executes. The original runtime query is not broadened;
+the separate health bootstrap closes its unlocked witness **before target site initialization**.
+Parent-death protection precedes target startup; nonce/kernel credentials bind replies to the real
+fresh PID. Normal CLI still refuses under exclusion. Fixed clients have their own bounded budgets.
+
+Target and previous expected results are verified independently, never inferred from pipx exit,
+cache or local replay. Outcomes are target-verified, previous-verified (requested update failed but
+previous installation operational), target-unverified or unavailable/interrupted. Private result
+and the exact owner's final quiescence phase are durable before a verified completion marker may
+reopen startup. No further child starts after that phase; completed records remain historical,
+not ongoing health observations. Actual source/record conflicts refuse without repair.
+
+The printed external frozen `recover` mode only verifies. It requires the original helper digest/
+record and matching authoritative operation, own exclusion and dead prior owner, then fresh expected
+result clients. A known final owner-quiescence phase or never-admitted prepared state supports
+same-boot recovery; a hard-killed owner with unconfirmed descendants cannot. Even an empty old
+group is insufficient. A different boot independently proves old descendants gone; the manager
+never reboots or signals old PIDs itself. Manual previous-tag reinstall is separate guidance, not
+automatic rollback, an identical dependency restore or an offline promise. Existing settings/data,
+workspaces, provider profiles, images, environment pins/journals and OpenCode configuration remain
+independent. Older managers, external pipx/Docker and hostile same-UID code do not honor this protocol.
+
+The following sections document the retained component/fixture contracts, not another pending
+implementation roadmap. Verification scope and unexecuted layers are in BASELINE/CAMPAIGN.
+
+## Exact manager source evidence
+
+`manager_targets.resolve` serves explicit origin review, never ordinary startup/status/discovery.
+It accepts a strict exact full stable tag and a version comparison input, requires a
 strictly newer target, and never selects latest or downgrades/reinstalls implicitly. The caller's
 installed-version string is not installation identity proof. Local pipx classification and cached
 availability do not supply source authenticity or consent.
@@ -125,17 +209,12 @@ retains its existing manual fallback/default-off daily policy. Cache corruption 
 throttling evidence but can never authorize installation or supply a target. No source guard is
 held across an installation mutation.
 
-The helper bundle, verifier and terminal fixtures are unchanged: this module is not frozen into
-an updater or connected to handoff/exclusive execution yet. Origin-side exact review/consent is
-described below; the future executor must independently revalidate the approved exact target and
-installation/tool/network settings under exclusion,
-perform exact-tag replacement, verify actual expected version/source/commit/exposed launcher/basic
-CLI, and independently prove external recovery records/instructions and interrupted/partial states.
-Remote tag movement between revalidation and pipx fetch remains a risk requiring installed-commit
-verification, not a claim that source resolution alone makes replacement safe. Manager Update
-stays disabled. Private Git/loopback API tests prove parser/installed behavior, not public authenticity.
+The frozen executor shares `manager_source` graph semantics without importing this core/cache-
+dependent wrapper. It revalidates afresh under exclusion. Remote tag movement after any read still
+requires expected installed-commit verification; source resolution alone is not replacement safety.
+Private Git/loopback API tests prove parser/installed behavior, not public authenticity.
 
-## Internal exact origin review (UP-17 second checkpoint)
+## Exact origin review and consent
 
 `manager_review.prepare` accepts only a strict exact release tag, not caller-supplied classifier,
 tool or cache facts. It rejects unsupported installer/network environment, freshly classifies the
@@ -156,7 +235,7 @@ directories bind identity/ownership/mode, not timestamps, so unrelated cache/log
 not invalidate a review. Special/uncontrolled/cyclic paths and bounded-inventory overflow refuse.
 This is a dated change detector for these observations, **not code authentication or an immutable
 inventory of every installed or external lazy-loaded file**. External tools/site code remain
-trusted local code; the future independent execution validator must re-establish its prerequisites.
+trusted local code; the independent execution validator re-establishes its prerequisites.
 
 The initial supported network policy is **public defaults only**. Existing nonempty pip/Git/uv/
 Python/loader, proxy/CA, SSH agent/askpass and related installer configuration variables refuse
@@ -167,30 +246,27 @@ requires manual preservation without reading contents, deletion or repair. No cu
 are silently dropped to make review succeed. This intentionally conservative support is additional
 to local pipx classification; a recognized install can still require manual update. The form
 explains direct GitHub/PyPI/build-dependency downloads and trusted package/build code running on
-the host as this user, not sandboxed by Docker. A later executor must separately implement and
-prove the effective public-default network policy (including its Git/pip/config/credential
-behavior), rather than assume these presence observations enforce it. No installer environment,
-argv, new Git tool assessment or network-policy execution is introduced here.
+the host as this user, not sandboxed by Docker. Effective policy is separately checked by the
+independent executor, including actual shared-pip configuration and unsuppressed/fixed Git keys.
+Presence observations alone do not enforce network policy; this review module executes no installer.
 
-`ManagerReviewScreen` has no product action/key/button/command/environment entry point. It displays
-only an already prepared immutable review in a read-only scrollable TextArea, bounded plain release
+`ManagerReviewScreen` displays an already prepared immutable review in a read-only scrollable TextArea, bounded plain release
 notes and a visible impact/identity review. Cancel is initially focused; confirmation is disabled
 until the exact target/public-network policy is explicitly accepted. Escape/Cancel returns no
 receipt. Confirm returns an in-memory Approval holding that exact Review, **not a bool, executable
 capability, serialization format or durable grant**. It performs no preparation, revalidation,
 staging, helper launch/arming, worker cancellation or installation itself. Opening the modal still
-blocks the existing dashboard handoff gate. A future public consumer must retain all active-body/
-session/consent refusals and revalidate after consent; the receipt alone is never idle/exclusion proof.
+blocks the dashboard handoff gate. The public consumer retains active-body/session/consent checks
+and revalidates afterward; the default non-mutating fixture remains separately testable. A receipt
+alone is never idle/exclusion proof.
 
 `revalidate` requires the same origin PID/canonical installation and compares fresh local snapshots
 and the same freshly revalidated source, with another local inspection after the source reads.
 Changed installation/version/records/launcher/routes, observed tools/settings/context, network or
 source refuse and require a new review. It keeps usage held and does not acquire exclusive access.
-This is origin-side proof only. The frozen helper, terminal handoff, verifier and lease protocols
-are unchanged; no review is passed into them and no updater/recovery payload exists. Independent
-post-origin-death exclusive installation/tool/source/network revalidation, enforced network policy,
-actual replacement/expected installed source/commit/version/launcher/basic CLI and failure recovery
-remain separate UP-17 gates. Manager Update stays disabled.
+This is origin-side proof only. Staging serializes bounded observations, not a durable receipt or
+execution grant. Independent post-death exclusive tool/source/policy/installation revalidation,
+expected-result checks and recovery remain separate mandatory gates in the implemented executor.
 
 Test-only installed-console injection exercises the actual launcher/bootstrap and all identity,
 tool/source/file checks with an owned private Git/loopback API, real dashboard/terminal/consent and
@@ -199,8 +275,9 @@ sizes, default Cancel, explicit approval, an owned changed-launcher fault, custo
 and credential-file presence refusal without reading contents. No source/classification/lock/terminal
 reply is mocked. This is automated installed/private-transport evidence, not public-release
 authentication, human observation, actual replacement or an independent exclusive/recovery proof.
+The final native updater/recovery evidence is separately recorded in BASELINE.
 
-## Frozen approved-local-observation replay (UP-17 third checkpoint)
+## Frozen approved-local-observation replay
 
 Origin-side revalidation cannot run after origin death: it imports the application and owns a
 shared usage lease. The new `manager_observations` module contains only stdlib critical-record
@@ -210,7 +287,7 @@ policy or UI. This is a scoped extraction, not an independent copy of the review
 
 `manager_handoff.prepare_review_fixture` accepts only an exact internal Approval receipt, freshly
 revalidates its review in the origin, and stages a source-identical helper plus private `review.json`
-outside the target. Nothing starts just by staging. The bounded format-1, fixture-only input carries
+outside the target. Nothing starts just by staging. The bounded format-1, validation-only input carries
 the reviewed target as opaque identity-bound data, original PID/prefix/version/review identity,
 bounded observation binding and only the reviewed HOME/PATH/XDG/recognized pipx context. It is
 not a raw environment/credential dump, executable capability, updater consent schema or recovery
@@ -227,7 +304,7 @@ reads are restricted to the approved own installation's known records; this is n
 file-read or command interface. Target/review hashes are dated identity agreement, not code or
 published-source authenticity. Cleanup recognizes only this staged fixture's exact owned inventory.
 
-The helper's only entry remains the bounded non-mutating process-exit fixture. The private request
+The bounded non-mutating process-exit fixture remains separate from replacement. Its private request
 adds only capsule digest/review identity/file identity, not commands, callbacks or normal startup
 flags. It still inherits exactly its control socket, origin pidfd and directory fd, no lease.
 Arming/EOF/main return/terminal restoration never substitute for actual origin termination. Only
@@ -261,11 +338,10 @@ call. Actual default/custom-space pipx packages test both sizes, non-daemon drai
 changed post-arming observations, exact child adoption/reaping and unavailable target startup.
 Host cases separately cover private-input faults, real kernel exclusion, other live usage and
 expiration. Private Git/API/synthetic host identities remain explicit fixtures, not public or
-installation-success proof. Manager Update stays disabled. Fresh independent tool/dependency/
-source/network validation and effective installer network policy, actual replacement/expected
-installed result and independent failure recovery remain the next gates.
+installation-success proof. Fresh tool/dependency/source/effective-client-policy checks, actual
+replacement/expected results and independent recovery are separately required by the update mode.
 
-## Early installation access (D-056, UP-16 first checkpoint)
+## Early installation access (D-056)
 
 The packaged console entry point is `opencode_sandbox.launcher:main`. It imports only stdlib and
 the stdlib-only `installation_locks` module before taking shared access; no Typer/core/TUI import
@@ -289,10 +365,10 @@ shared-to-exclusive upgrade or release/reacquire gap. Normal startup (help/versi
 refuses exclusive access with a static error/exit 2, before dispatch. A process-global mutex makes
 usage acquisition idempotent across callers/threads. The shared guard remains referenced until
 process exit, **not** main/dashboard return: non-daemon/thread-pool shutdown cannot leave a live
-worker operating after release. No production early-release API is provided at this checkpoint.
+worker operating after release. No production early-release API is provided.
 All directory/lock descriptors default to CLOEXEC; fork-only children close their copies without
 LOCK_UN, so they neither unlock the parent nor keep its lock after it exits. Entry in a forked
-child must acquire a new lease. The dedicated verifier receives only an unlocked read-only
+child must acquire a new lease. Dedicated read-only clients receive only an unlocked read-only
 witness, never a lease or exclusive descriptor. Process death releases the
 guard; persistent inodes remain.
 
@@ -305,17 +381,16 @@ work after a killed client do not honor this protocol; it is not a same-user sec
 or proof that orphaned work stopped. Provenance classification recognizes both standard old and
 bootstrap console templates, without claiming that an older installed program implements locks.
 
-This independently verified startup checkpoint is only part of UP-16. The internal non-mutating
-terminal handoff is described below; no replacement consumer, recovery record or automatic restart
-exists. Those remain separate gates; exclusive access alone never authorizes mutation.
-Manager Update remains disabled. Any future mutating handoff must preserve the actual process-exit
-boundary rather than close this lease while Textual workers could still be alive; no generic
-environment-variable/CLI bypass is present.
+Exclusive access alone never authorizes mutation. The implemented updater preserves actual process
+exit rather than closing usage while Textual workers could still be alive. Incomplete-operation
+startup blocking is an additional durable barrier after helper/lock loss, not a cache or a
+replacement for process-lifetime leasing. No generic environment/CLI bypass is present.
 
-### External-tool prerequisites (UP-16 second checkpoint)
+### External-tool prerequisites
 
 `manager_tools.assess()` consumes dated recognized local classification but never treats it as
-consent or a durable grant. No startup, CLI status, discovery or UI path calls it. It neither
+consent or a durable grant. Only explicit review/staging calls it, never startup, status, ordinary
+inventory or discovery. It neither
 holds installation-exclusive access nor changes installed code/configuration. A PATH candidate
 alone proves nothing: inspect a bounded standard pipx console script and literal Python shebang
 or exact pip shell trampoline as data, never shell-evaluate it. Reject ambiguous wrappers/env
@@ -353,28 +428,26 @@ route, and report the observed canonical endpoint separately. Do not canonicaliz
 dependencies or silently replace the selection. Refuse settings under the replaceable prefix
 and unknown PIPX settings rather than guess preservation. Children receive only these settings,
 HOME/PATH and fixed locale/no-bytecode controls; ambient Python, loader, pip/index/proxy/provider
-credentials are not forwarded, logged or persisted. Future installation network/environment
-consent is separate; this is not a promise to preserve arbitrary custom options or dependencies.
+credentials are not forwarded, logged or persisted. Installation policy/consent is a separate
+gate; this is not a promise to preserve arbitrary custom options or dependencies.
 
 Results are timestamped in-memory prerequisite facts, independent of release caches and recovery
 state. Probe output/import/metadata errors are not echoed, because they can contain secrets;
 unsupported cases receive static manual guidance. Cancellation propagates rather than publishing
-a late result. Successful assessment is still **execution unavailable**. Independent helper
-materialization/process-exit coordination and narrow runtime-verifier access are described below.
-The internal restored-terminal fixture is described below, followed separately by pending UP-17
-consent, source authentication/revalidation, replacement and success/failure recovery.
+a late result. Successful assessment alone still makes execution unavailable. Independent helper
+materialization/process-exit coordination, source/policy and expected-result/recovery gates are
+mandatory; narrow runtime access and retained non-mutating fixtures are described below.
 
-### Frozen helper/process-exit fixture (UP-16 third checkpoint)
+### Frozen helper/process-exit fixture
 
 `manager_handoff.prepare()` freshly reassesses the existing external tools, then freezes source
-copies of `manager_helper.py` (zipapp entry), `installation_locks.py`, `manager_tool_probe.py` and
-`manager_verifier.py`
+copies of the exact `manager_handoff.BUNDLE` stdlib inventory (`manager_helper.py` is the zipapp entry)
 under a unique own-UID/mode-0700 directory in an explicitly supplied, controlled parent outside
 the target. The zipapp and small inventory are private single-link mode-0600 files. Creation is
 exclusive, content deterministic and SHA-256-bound; neither discovery cache nor recovery state
-authorizes it. No process starts on preparation. The bundled diagnostic's only helper use is
-its stdlib path-route primitive; its optional pipx diagnostic main is not entered. No package,
-Typer, Textual, installed distribution or external pipx dependency is imported by the helper.
+authorizes it. No process starts on preparation. The helper uses shared stdlib path/launcher
+primitives; pipx/dependency diagnostics execute in separate external children, not its own runtime.
+No package, Typer, Textual, installed distribution or external pipx dependency is imported by the helper.
 This is local artifact identity, not code signing or public-source authentication.
 
 `start_fixture()` requires the originating installation identity, checks lock order, acquires/
@@ -389,7 +462,7 @@ spawn; every failed start/cancel reaps its exact child. No fallback to PID polli
 exists on kernels without usable pidfds. This is Linux process-lifetime coordination, not a new
 daemon or general process supervisor.
 
-The frozen entry accepts only the non-mutating fixture protocol. It validates peer UID/PID against
+The non-mutating entry accepts only its strict fixture protocol. It validates peer UID/PID against
 the inherited pidfd, request shape/bounds, isolated stdlib runtime/search/symlink routes, artifact
 hash/ownership/directory inode, and absence of inherited installation guards. Readiness and explicit
 fixture arming are separate. Before arming, lost origin/control means abandoned; after arming,
@@ -407,14 +480,13 @@ its remaining finite lifetime. Explicit artifact discard refuses a live child or
 files, ownership, inode, bytes or records. After origin exit the private artifact/result are retained
 for the caller/supervisor's evidence, never scavenged by generic cleanup. Test-only subreapers adopt
 and reap the exact orphaned fixture child without relying on PID 1 or signalling a reaped PID.
-No automatic dashboard restart, ordinary CLI bypass or install command exists. The fifth
-checkpoint's CLI/TUI fixture boundary below adds active-session/work refusal and independently
-observed terminal restoration; none of these fixtures is permission to mutate. Manager Update
-stays disabled until the independent UP-17 replacement and recovery gates pass.
+The fixture cannot install or automatically restart the dashboard and grants no normal CLI bypass.
+Its CLI/TUI boundary independently verifies work/session refusal and terminal restoration; the
+public updater preserves those boundaries and adds the separate mutation/recovery gates above.
 
-### Dedicated fresh runtime verifier (UP-16 fourth checkpoint)
+### Dedicated fresh runtime verifier
 
-Only the non-mutating helper fixture's explicit verification choice invokes this query, after
+Explicit fixture verification and expected-result verification invoke this same fixed query after
 actual origin exit and acquisition of the existing exclusive guard. `installation_locks._verification()`
 requires that process's matching exclusive guard and correct lock order; shared usage cannot issue
 it. It opens an **independent unlocked O_RDONLY witness** for the same private persistent inode,
@@ -453,23 +525,23 @@ The external owner validates shape/nonce/fields, retains the guard, waits for su
 process exit, and only then accepts these **runtime facts**, not replacement success. It reserves
 the process-group leader with WNOWAIT until group termination/reap to prevent PID-reuse signalling.
 The fixed read-only query has an eight-second/4096-byte message bound, further limited by the
-remaining fixture budget; neither changes build/install/session deadlines. Raw child streams and
+remaining caller budget; neither changes build/install/session deadlines. Raw child streams and
 environment are not published. Failure yields static unavailable facts, not success, cache/journal
 authority, source authentication or a health claim. No persistent process or automatic restart.
 
 This gate requires usable Linux pidfds, proc flock fdinfo and parent-death protection with no unsafe
-fallback. Ordinary manager startup does not gain a new prerequisite. Expected release/source/commit,
-actual exposed launcher, basic CLI health and post-replacement result/recovery verification remain
-UP-17 gates. Independent restored-terminal transfer/refusal proof uses the fifth checkpoint below,
-not inference from a runtime result. Manager Update remains disabled; no public verifier/helper command.
+fallback. Ordinary startup does not gain a verifier prerequisite or exemption. Exact source/commit/
+launcher checks, separate fixed CLI-help construction and quiescence/recovery are not inferred from
+this three-field runtime result. There is no normal installed-CLI verifier dispatcher; explicit
+recovery uses the separate external frozen helper.
 
-### Internal restored-terminal handoff (UP-16 fifth checkpoint)
+### Restored-terminal handoff
 
 Both implicit and explicit dashboards now use `cli._dashboard()`. Ordinary startup/quit does not
 prepare tools/artifacts, start a helper or request an installation. An internal-only dashboard
 method can accept one already prepared, unused own-installation artifact for the **non-mutating
 fixture**. There is no product key, button, command, flag, environment trigger or installation
-payload. Exact release/source consent and exposure of Manager Update remain UP-17.
+payload. Public Update shares this boundary after separate exact source/installation consent.
 
 The request must run on the live UI thread with no attached session, pending operation, approved
 mutation or open sub-screen/consent. Attached-session lifetime is now explicit through the entire
@@ -499,17 +571,17 @@ cancellation; the external fixture owns its bounded remainder. The shared usage 
 until actual process exit**, including residual non-daemon/executor shutdown; the pidfd, not the
 restored terminal or main return, permits the helper's one non-waiting exclusive attempt. A second
 supported live manager still yields busy, not a retry or bypass. The helper inherits no terminal
-or lease. No automatic dashboard restart, network/install/source executor, persistent recovery
-record or change to the frozen helper/verifier/installation-lock protocol is introduced. The
-30-second fixture lifetime is not a future updater deadline.
+or lease in fixture mode. That fixture executes no installer and writes no authoritative operation
+record. Public Update shares the same terminal/death boundary with the separate execution/recovery
+protocol above. The 30-second fixture lifetime is not an updater installation deadline.
 
 Test-only pty injection supplies a temporary F9 binding and an owned artifact without shipping a
 user action. Installed default/custom-space pipx packages exercise actual CLI/App/driver shutdown,
 fresh verifier, both terminal sizes, live shutdown draining, refused live/canceled lifecycle
 workers that subsequently complete real Debian/Arch starts, actual attached Docker shell clients,
 changed tty modes, and another actual installed dashboard. Loopback/private Git source transport
-remains a declared fixture, not public release authentication. UP-17 must keep all these boundaries
-when it adds exact source/target consent, replacement and independently verified recovery.
+remains a declared fixture, not public release authentication. Public source consent/replacement/
+recovery preserves these boundaries, with final automated native evidence recorded in BASELINE.
 
 ## Docker access and identity (D-003, D-004, D-052)
 
@@ -590,8 +662,8 @@ waiting for every source to finish.
 `UpdatesScreen` retains UP-10's `v` and one compact table
 shared by Manager/Bases/Environment subviews, stable selection, plain selected summaries and
 generic scrollable Details. Manager installed version is local; installation/release eligibility
-is not guessed. UP-14/UP-15 implement read-only manager evidence below; execution remains disabled.
-UP-11 binds Environment OpenCode actions; UP-12/UP-13 bind Base Images below.
+is not guessed. Explicit manager review/exit/handoff uses the independent pipeline above;
+Environment OpenCode and Base Images keep their distinct handlers below.
 
 Opening renders metadata and Docker-free `environment_history` first (explicitly identity-
 unverified), then independent bounded local base/environment inspection workers. The new
@@ -770,10 +842,9 @@ authoritative grant. `manager status [--check]` and the Manager Updates view exp
 local/discovery evidence without Docker or pipx execution. Opening runs only local classification,
 not network. Explicit Check starts independent owned workers, preserves version/prior evidence
 on either failure, and Cancel/Close rejects late results. Details includes bounded plain release
-notes/manual guidance, and manager Update stays disabled. UP-16's early installation usage/
-exclusion, independent helper, fixed runtime access and internal non-mutating terminal handoff/
-refusals are implemented above. UP-17's exact target/source consent/revalidation, actual replacement,
-expected installed-result verification and independent failure recovery remain pending.
+notes/manual guidance. Explicit Update separately performs exact source/installation/tool consent,
+restored-terminal handoff, independent fresh execution validation and expected-result/recovery
+checks above; discovery/classification never becomes a durable grant.
 
 Dashboard startup/explicit Refresh publishes complete base-image check results, including success.
 Daemon, resource-support and image advisories own their notification objects and share an explicit
@@ -786,7 +857,7 @@ resource and image advisories have that priority; clearing one reveals the remai
 Readiness waits retain worker ownership and their own notification, restore a remaining wait or
 advisory only when they owned the status, and cannot erase mutation progress/results. Operation
 guards are unchanged; metadata-only refresh stays Docker-free. No observations/discovery cache or
-Updates screen is introduced by this correction.
+Updates operation state is owned or cleared by advisory replacement.
 
 ## Data and Docker objects
 

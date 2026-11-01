@@ -15,64 +15,73 @@ verification, known issues and what is not verified. Update it whenever one of t
 
 ## Unpublished Updates work
 
-D-056 approves the Updates architecture and UX effort after the published 6.1.0 release.
-[TODO](../../TODO.md#active-updates-architecture-and-ux) is the entry point; the
-[working roadmap](updates/ROADMAP.md) contains tasks, acceptance criteria, evidence and handoff.
-UP-00 persisted the plan; UP-01 implements explicitly titled generic reports and the Agent
-Context heading/capitalization and inspection-fallback correction. UP-02 preserves independent
-local/registry version results, isolates failed rows and reports partial failure in both CLI and
-TUI. UP-03 implements daemon-wide base build/publication guards, cleanup/creation coordination
-and locked image revalidation. UP-04 adds alias-consolidated rollback inventory, explicit copy
-selection and immutable consent/revalidation. UP-05 bounds short host/network diagnostics and
-container probes, owns client/helper cleanup and prevents late canceled read-only UI results.
-UP-06 replaces/clears category-owned daemon/resource/image advisories and readiness notices,
-with explicit status ownership preserving active operations and cleanup-safe completion results.
-UP-07 + UP-08 add structured identity-bound runtime/image observations and disposable source
-caches, compatible stable npm discovery, explicit comparisons for Manual/Pinned, and exact target
-confirmation/revalidation. Stopped environments retain dated evidence or Unknown; failed checks
-never become readiness success. UP-10 replaces the Versions report with manual/cached-first
-Updates views, independent explicit checks and full Details; opening runs no network discovery,
-OpenCode binary or image helper. UP-09 completes the split package with optional default-off
-dashboard-only daily npm discovery, persisted attempt claims, cross-caller/process source
-coalescing and a quiet policy-filtered cached-availability indicator. No automatic runtime/image
-probe, start, install or service; explicit checks still work with scheduling off/unavailable and
-respect Retry-After. UP-11 binds explicit environment Start/Update/Policy/Rollback/Recover with
-immutable consent, locked revalidation and the existing handlers/journals. Recovery Center can
-also review interrupted OpenCode updates; failed restoration persists its actual successor journal
-and error. Approved mutations are app-owned and not canceled by Close/Cancel check. UP-12/UP-13
-add Base Images build/rollback, identity/target/definition/mode consent, cached versus explicit
-pull/no-cache refresh, retained copies and bounded app-owned build feedback. UP-14/UP-15 add
-read-only official manager release discovery/local pipx provenance classification and independent
-default-off daily GitHub metadata work. UP-16's first verified checkpoint adds early process-lifetime
-installation usage/internal exclusion and a stdlib-only console bootstrap. Its second verified
-checkpoint adds internal dated external-tool/runtime/settings assessment. Its third freezes an
-independent stdlib helper and proves a non-mutating process-exit/exclusion fixture, including
-worker shutdown and operation with the installed application absent. Its fourth adds a dedicated
-fixed read-only fresh runtime query under helper exclusion, using an unlocked witness and live
-peer fdinfo rather than inheriting a lease. Its fifth completes UP-16's internal non-mutating
-restored-terminal handoff with actual-work/session refusals and exact foreground tty/driver checks.
-UP-17's first checkpoint adds internal exact published release/tag/commit resolution and fresh
-same-target revalidation. Its second adds internal immutable origin review/explicit consent and
-fresh origin-side installation/tool/source/public-network revalidation. Its third adds frozen
-post-origin-death/exclusive replay of approved local file/route observations only. Subsequent
-checkpoints add the durable incomplete-operation startup barrier, separate fresh frozen external
-tool/dependency/published-source and effective pip/Git public-default diagnostics, and exact
-installed-record/launcher checks with separate fresh runtime and fixed CLI-help construction.
-The latter query never dispatches normal CLI or weakens startup leasing; the original three-field
-runtime query is unchanged. A subsequent internal checkpoint adds actual exact-tag pipx replacement,
-durable parked-child admission, independent result/quiescence checks and explicit frozen verify-only
-recovery, verified on isolated real pipx success and failed-target/manual-reinstall recovery.
-Public Cancel-first Updates consent and the foreground-terminal CLI handoff are implemented;
-final integration/regression and consolidated verification remain in progress. This is not a
-release-readiness recommendation.
-No image-definition, metadata/backup schema or manager-version change was made.
+D-056/D-057's approved UP-00..UP-18 and one-time PERF work is complete, locally and unpublished.
+Updates retains `v` and separates Manager, Base Images and Environment OpenCode. It preserves
+independent local/registry results, identity-bound history, default-off daily GitHub/npm discovery,
+exact consent and existing pins/journals/checkpoints. Environment actions, cached/full-refresh
+base rebuilds and identity-bound rollback use their own handlers, not a universal update engine.
 
-UP-01..UP-16 and the verified partial UP-17 checkpoints' verification is below; commands, failures and
-handoff are in the roadmap.
-Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
-No release preparation or publication is authorized by this effort.
-D-057 consolidates the remaining work into related packages with technical-only dependencies;
-it changes workflow, not delivered product behavior or the independent recovery verification gates.
+Manager Update and foreground-terminal `manager update --tag` now use Cancel-first exact review,
+actual process-lifetime leases/worker drain/terminal restoration, independent frozen execution
+gates, parked durable installer admission and exact pipx replacement. Fresh source/record/launcher/
+runtime/CLI-health checks and owned-process quiescence determine completion. Private state and
+verify-only recovery survive helper/venv loss; unknown hard-interruption quiescence stays blocked.
+No Update All, automatic installation/restart/rollback, host setup, implicit migration or ongoing
+user OpenCode configuration management is added. [Architecture](ARCHITECTURE.md#manager-update-and-independent-recovery)
+and [user instructions](../install.md#explicit-reviewed-manager-update) describe the exact limits.
+
+Manager remains **6.1.0**, metadata **2**, backup **3**; image definitions are unchanged. No version
+bump, merge, project tag, push, upload or publication occurred. The transient working record is
+retired under D-045; permanent evidence is below and earlier checkpoint details remain in Git.
+This completion does not authorize release preparation or the subsequent separate reviews/migration.
+
+## Updates final integration
+
+Final code checkpoint: public terminal integration, followed only by the narrow prerequisite/
+rendezvous fixes below and record consolidation. Evidence/source hashes/manifests: `.work/up18/`, `.work/up17g/` and
+`.work/logs/up18-final*`; earlier failed/pass evidence remains preserved. No test assertions or
+CI/release gates were removed, suppressed or weakened.
+
+| Layer | Executed result and scope |
+|---|---|
+| Complete unit/host/pilot regression | **2220 passed / 86 real opt-in skips** in each selected complete result; **2306 ordered test IDs/outcomes identical**. Python 3.11.18/current **374.60 s**, 3.11.18/lowest **365.27 s**, 3.14.8/current **387.19 s**, final 3.14.8/lowest **387.76 s**. Current Typer/Textual **0.27.3/8.2.8**; lowest **0.16.0/4.0.0**, pytest **9.2.0**. All four pip checks clean; two known lowest-Typer deprecations |
+| Final failure trail and scoped reruns | Initial 3.14/lowest complete run: **2216 passed / 4 failed / 86 skipped**, 403.78 s. One new interruption-fixture marker exposed a partial PID record; made readiness atomic and guaranteed owned-family cleanup. Three existing prerequisite exit-status assertions exposed a real base-plan bug: npm could time out before unusable-daemon refusal. Validate explicit versions locally, then verify daemon before latest discovery; existing assertions now also forbid npm. Minimal old/current order reproducer and actual isolated Docker-context refusal (exit **8**, no registry child) retained. **124 affected prerequisite/base/version/pilot/whole-update tests passed on all four endpoints**, 47.70/47.85/54.11/55.03 s. Repeated the failed complete run successfully; unchanged complete runs and positive real matrix were not mechanically repeated |
+| Real Docker/OpenCode/terminal/pipx | **31 tests / 1146 logged checks passed**, no skips/deselections, **1381.67 s**, `up18-final`. All prior 29 affected rows plus new manager updater rows: packaged/retained both-distribution base races, bounded probes, actual binary/lifecycle evidence, 80x24/larger Updates/daily discovery/environment recovery/base actions, separate cached/full-refresh package builds, installed pipx lifecycle/provenance, live sessions/exec exclusion, public manager CLI/TUI replacement and independent recovery |
+| New manager native combinations | Actual pipx **1.18.7** force between owned exact tagged sources, default/custom-space layouts, real Cancel-first public TUI/CLI and original terminal restoration before arming; non-daemon origin drain still leased/no prepared state. Expected target source/commit/version/launcher/runtime/CLI verified; actual broken CLI leaves startup blocked; explicit manual previous-tag reinstall plus frozen fresh recovery reopens it. Native handled interruption reaps an escaped descendant and verifies previous health; hard helper death retains pending state and refuses same-boot recovery even after the old group is empty. Lost pty still produces durable verified result. Clone-only Git and frozen loopback API transports are declared fixtures, not public-release authentication or a host build sandbox |
+| Packaging/static/contracts | Staged-input sdist + wheel build, strict twine and `check_dist` pass; all **63 product files** byte-identical in both artifacts, including the **18-module** frozen inventory and image assets. No test injector/local instructions shipped. Ruff/shellcheck are included in regression; actionlint clean, offline zizmor no findings (existing one ignored/one suppressed unchanged), Git and current tracked-tree gitleaks scans clean. Final record/link/CLI/language/package/static subset **83 passed**, 4.21 s. An initial contract run (**82 passed/1 failed**) found private commit identities and a forbidden internal-reference word newly copied into permanent prose; removed those references, not the contract assertion |
+
+The real command was the existing affected file set:
+`test_42_base_coordination.py`, `test_43_diagnostics.py`, `test_44_version_evidence.py`,
+`test_51_updates.py`, `test_52_discovery.py`, `test_53_environment_updates.py`,
+`test_54_base_updates.py`, `test_65_pipx.py`, `test_66_manager_inventory.py`,
+`test_67_installation_exclusion.py`, `test_67_manager_update.py`, with
+`OCS_TEST_DOCKER=1 OCS_TEST_RUN=up18-final`, absolute source PYTHONPATH and short external basetemp.
+Unit runs were serial foreground, real opt-in off, with separate `.work/up18/full-*.xml` results.
+
+Guarded campaign product cleanup and final read-only own-rootless reconciliation retain the
+original four full image IDs and leave no containers, volumes or active current-run script roots.
+Removed only **29 exact manifested completed pytest roots**, after preserving **1555 bounded
+unit/host operation evidence files** plus every failed/pass XML/source record. Native original
+frozen recovery paths (including the intentionally incomplete hard-kill record), shared build
+cache and persistent protocol lock inodes remain intact. Existing user installations, workspaces,
+configuration, credentials and daemon settings were not changed; nothing was uploaded.
+
+Earlier substantive continuation checkpoints remain scoped evidence: independent frozen tool/
+dependency/source/effective-policy checks, separate expected-file/runtime/help verification, then
+exact replacement/recovery. Actual private installed proofs
+were **2 passed** each for `up17e-proof2` (146.88 s), `up17f-proof2` (146.35 s), `up17g-proof`
+(109.49 s), then changed child-admission default-layout **1 passed**, 58.19 s. Public default
+terminal proof **1 passed**, 60.39 s. Initial ancestor-Git-config and undeclared-Click failures were
+fixed with regressions, not bypasses. Separate official HTTPS reads observed v6.1.0's exact
+annotated tag/commit, then independently reread that same graph; the full identities are in the
+private source evidence, not signed-code attestation or a public replacement claim.
+
+**Not executed or claimed:** privileged/service/socket-activation/reboot rows, actual post-reboot
+recovery, real credentials/paid model calls, human/manual observation, other host distributions,
+the complete release campaign or release readiness. Hard-kill unknown-quiescence recovery is
+intentionally conservative; no automatic reboot/reset or stale-PID signal is performed. Previous-tag
+reinstall does not restore identical dependencies or promise offline recovery. See
+[unverified behaviour](#unverified-behaviour) and [release matrix](CAMPAIGN.md).
 
 ## Supported environments
 
@@ -133,7 +142,7 @@ in `RELEASING.md` ("Verify").
 
 One-time investigation after UP-06, before UP-07/UP-08 (2026-10-30). No application, CI,
 dependency or release-gate changes. Commands/evidence:
-[working checkpoint](updates/ROADMAP.md#perf--2026-10-30--test-performance-investigation).
+the measurements and findings in this section (the transient working checkpoint is retired).
 
 ### Measurements and findings
 
@@ -240,6 +249,10 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+Current Updates completion is [above](#updates-final-integration). The dated development
+checkpoints below retain their original scoped evidence/failure trails; their then-pending stages
+and next-step/STOP notes are historical, not current implementation status or new work permission.
 
 ### Unpublished UP-17 second exact-origin review checkpoint — 2026-11-01
 
@@ -824,7 +837,7 @@ again has **1048541 free inodes**. No old evidence or persistent protocol locks 
 | Failure trail | Two initial automatic-daily tests failed before implementation. Focused iterations exposed import/lint errors and an aliased cached-snapshot regression (fixed, not weakened); reviewed subset **158 passed**, 48.39 s. Lowest focused run **1 failed/156 passed**: new test variable/prose used an existing forbidden internal-reference word; renamed without touching the gate. First new real terminal run: **1 teardown error, 3 failed/13 passed checks** because unescaped `(1)` was a regex group in the harness matcher. Corrected literal matching; four-case proof **4 passed/64 checks**, then the final 12-case affected real gate above |
 | Boundaries | Metadata-only optional npm scheduler, not GitHub or component mutation UI. Safe durable source storage required for automatic requests; manual bounded fallback cannot promise cross-process throttle without it. Cache clearing/corruption can reset disposable history, never installs/journals. Same retained Debian 12/revision 1 and Arch/revision 1 inputs; no fresh base build, full campaign/legacy broad TUI workflow, installed-manager/pipx, paid/provider, privileged/socket/service or manual-observation evidence. CI/release gates unchanged; not a release-readiness claim |
 
-Evidence/commands and next-package handoff are in the working roadmap; logs/XML are ignored
+Checkpoint commands remain in Git; logs/XML are ignored
 under `.work/up09/`, real manifests/logs under `.work/logs/up09-*`. All real attempts, failed or
 successful, used isolated product roots and guarded product cleanup. Ending verified own-rootless
 inventory: zero containers/volumes/run helpers and unchanged four original full tagged-image IDs.
@@ -1061,6 +1074,10 @@ test-isolation limitations of the host-process signal tests: `TODO.md` ("Optiona
   automated first-prompt rows use a fake OpenAI-compatible provider inside the container.
 - A host reboot (daemon restart, stop/start and a SIGKILL of the daemon unit were tested). Next
   step: reboot, then `opencode-sandbox start NAME` and `check NAME` on a test environment.
+- Actual post-reboot manager recovery after hard helper death (CAMPAIGN B15): same-boot unknown-
+  quiescence refusal is verified, but reboot was not authorized/executed and risk is not accepted.
+  Next step is the named disposable-operation reboot/frozen-verify continuation in CAMPAIGN;
+  never delete state/locks or treat a vanished old group/cache/exit status as completion.
 - Another user's real rootless dockerd (another user's socket and a real rootful dockerd were
   refused).
 - pipx versions other than 1.18.7; Python 3.12/3.13 separately; interpreters below 3.11
@@ -1086,10 +1103,10 @@ test-isolation limitations of the host-process signal tests: `TODO.md` ("Optiona
 | `CHANGELOG.md` | Changes per release |
 | `CONTRIBUTING.md`, `SECURITY.md` | Contribution rules and test layers; vulnerability reporting and scope |
 | `AGENTS.md` | Instructions and permission boundaries for coding agents |
-| `TODO.md` | Roadmap: active Updates effort, what 6.1.0 delivered, optional polish and deferred features |
+| `TODO.md` | Completed unpublished Updates scope, what 6.1.0 delivered, optional polish and deferred features |
 | `docs/engineering/BASELINE.md` | This file: current state |
 | `docs/engineering/ARCHITECTURE.md` | Current design and module map |
-| `docs/engineering/DECISIONS.md` | Decisions D-001..D-056 with rationale and implementation status |
+| `docs/engineering/DECISIONS.md` | Decisions D-001..D-057 with rationale and implementation status |
 | `docs/engineering/ISSUES.md` | Known issues and accepted limitations |
-| `docs/engineering/CAMPAIGN.md` | Release test matrix: 84 active rows, seven installer-only rows retired; historical evidence distinguished from the release tree's pending gates |
+| `docs/engineering/CAMPAIGN.md` | Release test matrix: 87 active rows, seven installer-only rows retired; historical evidence distinguished from pending release gates, including unapproved post-reboot manager recovery |
 | `docs/engineering/RELEASING.md` | Release checklist and tag procedure |
