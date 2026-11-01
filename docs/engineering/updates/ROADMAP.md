@@ -3117,6 +3117,43 @@ a materially different architecture, record the blocker and ask the owner before
   and independent recovery, with final consolidated records/report only when complete or a
   genuine blocker/context handoff is necessary.
 
+### Remaining-roadmap implementation — incomplete-operation startup barrier (work in progress)
+
+- Owner's immediate workflow correction above remains controlling: no per-item STOP or repeated
+  complete suites/campaigns; continue the entire approved roadmap, focused development and final
+  integration verification. The local-observation block is committed as `5adfc2b`; no final
+  roadmap verification or completion is claimed.
+- Added stdlib `installation_state.py` (format 1) and installation coordination protocol 2:
+  authoritative private operation state is in the canonical pipx home's
+  `.opencode-sandbox-updates/<prefix-hash>.json`, outside the replaceable venv, independent of
+  HOME/data/config overrides and durable across venv removal. Normal usage acquisition checks it
+  before dispatch; pending/unknown/corrupt/unsafe state fails closed and keeps process-lifetime
+  usage held. No automatic repair/reset or cache/journal inference. Only a real own-kernel
+  exclusive owner may advance strict operation/source/process identities and transitions;
+  completed records require a verified target/previous marker and remain retained. This is the
+  substrate only, **not the yet-unimplemented updater or complete recovery verification**.
+- Real minimal reproducer `.work/up17d/state-reproducer.json`: after the actual isolated writer
+  exits, old `5adfc2b` lock code permits normal startup despite pending update (exit 0); current
+  bootstrap refuses it (exit 2). Old source and named fixture remain manifested under `.work/up17d/`.
+  Focused primary state/leases/helper/verifier/package/static **221 passed**, 19.46 s. Broader
+  Python 3.14/lowest state/leases/observations/helper/verifier/terminal/CLI/package/static
+  **313 passed**, 61.64 s (two known Typer warnings). No complete suite replay after owner correction.
+- Meaningful changed-bootstrap real checkpoint `up17d-proof`: actual default/custom-space pipx,
+  all previous test-66 assertions plus frozen independent state writer/dead-owner startup blocking,
+  override resistance, no early dispatch/data creation, dedicated fixed previous-runtime query
+  under exclusion and explicit completed-state ordinary-startup reopening: **2 passed**, 121.27 s.
+  Private state survives test uninstall as manifested evidence; no installer or full recovery claim.
+  A later constant-only FORMAT extraction is covered by the focused compatibility run, not another
+  expensive real repeat. Frozen bundle/import whitelist/content requirements include the state module.
+- Next implementation must finish the **full** independent external tool/dependency/source/network
+  validator and effective installer policy, exact pipx replacement, expected version/source/commit/
+  exposed-launcher/basic-CLI verification, private pre/during/post result/recovery records and
+  interruption/failure recovery. Do not enable Manager Update before those independent gates pass.
+  Then connect the approved internal consent/terminal handoff, finish UP-18 and run final broad
+  verification/consolidated records/report. No release/tag/push/publication, branch migration or
+  unrelated documentation/test-suite audit. Current shared/startup changes require meaningful final
+  regression; the earlier full local-replay matrix is not final evidence for these newer changes.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use

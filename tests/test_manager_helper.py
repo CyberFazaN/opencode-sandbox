@@ -87,10 +87,10 @@ def test_staged_artifact_is_private_deterministic_and_contains_exact_standalone_
     raw = (directory / 'helper.pyz').read_bytes()
     assert raw == manager_handoff._bundle() and hashlib.sha256(raw).hexdigest() == artifact.sha256
     with zipfile.ZipFile(directory / 'helper.pyz') as archive:
-        assert archive.namelist() == ['__main__.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py', 'manager_observations.py']
+        assert archive.namelist() == ['__main__.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py', 'manager_observations.py', 'installation_state.py']
         for name, source in [('__main__.py', 'manager_helper.py'), ('installation_locks.py', 'installation_locks.py'),
                              ('manager_tool_probe.py', 'manager_tool_probe.py'), ('manager_verifier.py', 'manager_verifier.py'),
-                             ('manager_observations.py', 'manager_observations.py')]:
+                             ('manager_observations.py', 'manager_observations.py'), ('installation_state.py', 'installation_state.py')]:
             assert archive.read(name) == Path(manager_handoff.__file__).with_name(source).read_bytes()
             tree = ast.parse(archive.read(name))
             # The bundled path module's unused diagnostic main has local pipx imports, but
@@ -102,10 +102,13 @@ def test_staged_artifact_is_private_deterministic_and_contains_exact_standalone_
                     if name == 'manager_verifier.py' and node.level:
                         assert node.module is None and node.names[0].name in ('installation_locks', '__version__')
                         continue  # only the installed dedicated client imports its package
+                    if name == 'installation_locks.py' and node.level:
+                        assert node.module is None and node.names[0].name == 'installation_state'
+                        continue  # fixed stdlib bootstrap import, also frozen as a top-level module
                     assert not node.level
                     names = [node.module.split('.')[0]]
                 else: continue
-                assert all(item in sys.stdlib_module_names or item in ('installation_locks', 'manager_tool_probe', 'manager_verifier', 'manager_observations') for item in names), names
+                assert all(item in sys.stdlib_module_names or item in ('installation_locks', 'manager_tool_probe', 'manager_verifier', 'manager_observations', 'installation_state') for item in names), names
     assert not list(Path(artifact.prefix).iterdir()) and artifact.process is None
     artifact.discard()
     assert not directory.exists()

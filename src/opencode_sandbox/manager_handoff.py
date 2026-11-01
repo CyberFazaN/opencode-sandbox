@@ -116,7 +116,7 @@ def _bundle():
     with zipfile.ZipFile(content, 'w', compression=zipfile.ZIP_STORED) as archive:
         for source, name in [('manager_helper.py', '__main__.py'), ('installation_locks.py', 'installation_locks.py'),
                              ('manager_tool_probe.py', 'manager_tool_probe.py'), ('manager_verifier.py', 'manager_verifier.py'),
-                             ('manager_observations.py', 'manager_observations.py')]:
+                             ('manager_observations.py', 'manager_observations.py'), ('installation_state.py', 'installation_state.py')]:
             fd = os.open(Path(__file__).with_name(source), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
             with os.fdopen(fd, 'rb') as stream:
                 info = os.fstat(stream.fileno())

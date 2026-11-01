@@ -24,6 +24,7 @@ _MUTEX = threading.Lock()
 _LEASE = None
 _OPEN = set()
 _WITNESSES = set()
+PROTOCOL = 2  # process-lifetime leases plus independent incomplete-update startup barrier
 
 
 class Error(RuntimeError):
@@ -113,11 +114,49 @@ def acquire_usage():
             if _LEASE is not None:
                 if _LEASE.prefix != identity(): raise Error('Running installation identity changed')
                 _LEASE.check()
+                _check_operation(_LEASE.prefix)
                 return
             _ordered()
             _LEASE = _Guard(None, fcntl.LOCK_SH)
+            _check_operation(_LEASE.prefix)
         except OSError as exc:
             raise Error('Cannot safely open installation lock namespace; no paths were repaired') from exc
+
+
+def _operation_module():
+    try:
+        if __package__:
+            from . import installation_state
+        else:
+            import installation_state
+    except ImportError:
+        raise Error('Manager installation startup protection is unavailable; independent recovery is required') from None
+    return installation_state
+
+
+def _check_operation(prefix):
+    state = _operation_module()
+    try: state.check(prefix)
+    except state.Error as exc: raise Error(str(exc)) from None
+
+
+def operation_state(prefix=None):
+    """Atomic private read only, usable by an independent report helper even during exclusion."""
+    state = _operation_module()
+    try: return state.read(identity(prefix))
+    except state.Error as exc: raise Error(str(exc)) from None
+
+
+def record_operation(value, prefix=None):
+    """Only an actual own-process exclusive owner may advance authoritative operation state."""
+    state = _operation_module()
+    try:
+        with _verification(prefix) as (witness, owner_fd):
+            _verify_descriptor(witness, os.getpid(), owner_fd, prefix)
+            state.write(identity(prefix), value)
+    except state.Error as exc: raise Error(str(exc)) from None
+    except (OSError, ValueError, TypeError, KeyError, RecursionError):
+        raise Error('Cannot safely advance manager installation operation state; no repair attempted') from None
 
 
 @contextmanager
