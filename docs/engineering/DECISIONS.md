@@ -940,8 +940,9 @@ runtime/settings assessment. Its third freezes a stdlib helper and verifies a no
 process-exit fixture. The fourth adds a dedicated fixed read-only fresh runtime query under helper
 exclusion, not an ordinary CLI exemption. The fifth completes internal non-mutating restored-
 terminal handoff/refusals. UP-17's first checkpoint adds internal exact published-source observation
-and fresh same-target revalidation; installation consent, replacement and failure recovery remain
-pending. Update is disabled.
+and fresh same-target revalidation. Its second adds internal exact origin review/explicit consent
+and fresh origin-side revalidation; independent exclusive execution checks, replacement and
+failure recovery remain pending. Update is disabled.
 The grouped package is split at its approved verified UI checkpoint (D-057). Current behavior remains
 as described by the code and ARCHITECTURE until the corresponding tasks are verified.
 The active task/evidence/handoff record is [updates/ROADMAP.md](updates/ROADMAP.md), reached from

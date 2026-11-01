@@ -52,11 +52,13 @@ fixed read-only fresh runtime query under helper exclusion, using an unlocked wi
 peer fdinfo rather than inheriting a lease. Its fifth completes UP-16's internal non-mutating
 restored-terminal handoff with actual-work/session refusals and exact foreground tty/driver checks.
 UP-17's first checkpoint adds internal exact published release/tag/commit resolution and fresh
-same-target revalidation. Installation consent and replacement/recovery remain separate pending
-gates; Manager Update stays disabled.
+same-target revalidation. Its second adds internal immutable origin review/explicit consent and
+fresh origin-side installation/tool/source/public-network revalidation. Independent post-exit/
+exclusive validation, effective installer network policy and replacement/recovery remain pending;
+Manager Update stays disabled.
 No image-definition, metadata/backup schema or manager-version change was made.
 
-UP-01..UP-16 verification is below; commands, failures and
+UP-01..UP-16 and the verified partial UP-17 checkpoints' verification is below; commands, failures and
 handoff are in the roadmap.
 Release evidence remains historical evidence for 6.1.0, not verification of pending Updates work.
 No release preparation or publication is authorized by this effort.
@@ -229,6 +231,82 @@ xdist or session-scoped mutable fixtures: global watchdog counts, signals and fi
 races require isolation. Review any future parallelism/caching proposal separately.
 
 ## Verification
+
+### Unpublished UP-17 second exact-origin review checkpoint — 2026-11-01
+
+| Layer | Result |
+|---|---|
+| Complete unit/host/pilot/host-pty suites | **2038 passed, 84 opt-in skips each**, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and lowest 0.16.0/4.0.0. Four clean pip checks, serial foreground, inode preflight; **287.80/284.12/295.38/288.44 s**. All **2122 ordered IDs/outcomes identical**, only two known lowest-Typer warnings |
+| New default cases | **79 cases**: **66 exact-origin review cases**, **10 Textual pilot cases** at 80x24/larger, two required wheel/sdist module gates and one new UI error-reporting contract case. Fresh local/tool/source preparation, immutable critical-record/route/context binding, strict tags and own origin/version/installation, same-endpoint route changes, changed records/settings/source during/between reads, custom network/credential configuration refusal without value/content disclosure, special/cyclic/uncontrolled path refusal, unrelated cache creation, explicit policy approval/Cancel/keyboard focus/scrolling and open-consent handoff refusal |
+| Affected real Docker/OpenCode/pipx/pty | **29 tests/954 checks passed**, no skips/deselections, `up17b-final`, **1103.14 s**. All prior 29 rows/assertions retained. Both actual installed default/custom-space pipx layouts add six real console/terminal scenarios: 80x24/120x40 explicit target+policy consent and fresh origin revalidation, default Cancel, changed actual launcher after display, secret-bearing custom index environment and credential-file presence refusals. Original installed record/launcher bytes remain unchanged and operational after exact owned fault restoration |
+| Boundary | **UP-17 partial**, internal origin review/consent and fresh origin-side revalidation complete. No public action/entry, installer argv/environment, new Git assessment, helper payload, post-exit/exclusive validator, actual replacement/expected-result success or failure recovery. The in-memory receipt is not an executable capability or durable grant. Manager Update remains disabled |
+
+The new review never accepts caller-supplied classification/tool/cache evidence. It freshly
+reconciles actual running pipx provenance/launcher and external tools, retains canonical-prefix
+usage through process exit, hashes critical local installation records and observes selected
+executable/Python/location/module/configuration routes (including symlink and file identities).
+Directory timestamp changes alone do not invalidate review; unrelated cache/log/pyc creation is
+not replacement. A hashed HOME/PATH/XDG/pipx context, exact source/object chain and source notes
+hash are bound. Local inspection brackets fresh source reads. Origin revalidation requires the
+same PID/prefix/version and fresh same local/source observations; it never releases or converts
+usage, attempts exclusion or treats a receipt/cache/hash as authorization to install.
+
+Initial network support is deliberately conservative: public defaults only. Known nonempty
+pip/Git/uv/Python/loader/proxy/CA/SSH-agent/related environment and known system/user/XDG/shared/
+application pip/Git/credential-file presence require manual preservation with static reasons,
+without reading credential contents, echoing values or changing files. A recognized local install
+can therefore remain unsupported for this review. The form explicitly describes host-trusted
+package/build code and the no-backup/no-identical-dependency-recovery limits. A later executor
+must independently implement and prove the effective network policy and all execution prerequisites;
+presence observations/consent alone enforce nothing. The observed tool/file snapshot is not code
+authentication or a complete lazy-file inventory, and external/site code remains trusted local code.
+
+The internal modal has no product route. It displays an already prepared immutable review in
+plain read-only scrollable text, with Cancel focused and Confirm disabled until exact target/public-
+network acceptance. Cancel/Escape yields no receipt; explicit Confirm returns an Approval holding
+that exact Review. The form itself never prepares/revalidates/stages/arms/cancels/installs anything;
+open consent still blocks the existing internal dashboard handoff gate. No receipt is passed into
+the frozen helper or terminal fixture. Independent post-origin-death exclusive installation/tool/
+source/network validation, effective installer network policy, actual replacement/expected installed
+source/commit/version/launcher/basic CLI and independent failure recovery remain pending.
+
+Failure trail: missing API reproducer **1 failed**, .02 s. Three focused static import-format
+failures with **68/115/277 passing tests**, 13.54/30.10/33.55 s, corrected without runtime/assertion
+changes. Initial real `up17b-proof` **2 failed/2 teardown errors**, 129.96 s (**196 checks passed/
+2 failed**): the fixture observed the header before controls rendered and batched checkbox plus
+Tab/Enter before Textual enabled Confirm. It correctly did not approve. Preserved exact pty/state
+evidence, waited for rendered controls and separated policy processing from navigation; no
+assertion/budget dropped. Added keyboard-only pilots: lowest Python 3.14 review/UI/static **79
+passed**, 24.08 s. Corrected actual installed `up17b-proof2` **2 tests/330 checks passed**, 99.87 s.
+Final focused review/UI/package/docs/static **145 passed**, 25.03 s. Further route/strict-tag/version/
+credential/cache regressions preceded final source freeze; all four complete and full affected
+real gates above cover the final product/checker/test inputs, not just that initial proof.
+
+Evidence `.work/up17b/full-*.xml`, `real-final.xml`, `final-source-sha256.json`, failed/focused runs
+and `.work/logs/up17b-*`. Installed fixtures retain read-only Docker context-store access and use
+owned private Git/loopback API plus test-only installed site injection to call the internal form
+through actual console/bootstrap/identity/tools/source/driver/UI/revalidation. No identity/lock/
+terminal/Docker response is mocked; public-release authenticity and human observation are not
+claimed. Original version/schemas/assets/dependency bounds, CLI/dashboard public actions,
+classification/source/tool/lease/frozen helper/verifier/terminal mechanisms and CI/release workflows
+are unchanged. Package content validation additionally requires the two new review modules.
+No full campaign, privileged/socket/service/daemon change, real credential/paid API, actual manager
+replacement/failure recovery or release-readiness claim. No bump, merge, push, upload, remote
+change, project tag or publication.
+
+Final follow-up: no-isolation sdist/wheel, strict twine/content validation and **44 frozen product
+module/wheel byte comparisons pass**; no private local instructions/evidence in sdist. Document/
+CLI/quality follow-up **44 passed**, 3.35 s (`docs.xml`), separately focused. Own-rootless final
+inventory retains all four original full image IDs, no containers/volumes/test tags or owned
+manager/helper/verifier/terminal/review/HTTP/probe/guard/watchdog processes. Guarded removal of
+**14 exact manifested completed pytest roots**, own UID/inode and live process/socket/mount
+references checked; **388 host fixture records/artifacts** archived first. All actual installed
+review/source/helper/results/pty and failed/pass XML/logs/hashes/packages, prior evidence, shared
+build cache and persistent protocol inodes retained. `/tmp/opencode` empty, **1046221 free inodes**;
+prose-only scratch separately manifested/guarded. No product/checker/test input change after final
+complete/real gates. Commit locally and stop at the origin-consent boundary; Manager Update disabled.
+Final prose language/link/CLI follow-up **27 passed**, 1.98 s (`prose.xml`), separately scoped;
+final product/checker/test hashes remain intact.
 
 ### Unpublished UP-17 first exact-source checkpoint — 2026-11-01
 

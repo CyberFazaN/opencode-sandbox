@@ -88,9 +88,17 @@ release/ref/annotated-tag chain/commit and freshly revalidates the same target. 
 GitHub HTTPS evidence, not local records/cache, signed tags or installation consent. Source and
 discovery share rate limits without conflating success claims. Four complete suites (1959 passed/
 84 skips each) and the full 29-test affected real gate (888 checks) pass. No startup/status/UI/
-helper consumer or install path exists. Next: UP-17 installation/tool/network consent and exclusive
-revalidation, actual replacement/expected-result verification and independently verified failure
-recovery. Manager Update stays disabled. No version bump, release preparation,
+helper consumer or install path exists. UP-17's second checkpoint now adds internal immutable
+origin installation/tool/source/public-default network review and explicit scrollable consent,
+with Cancel focused first and fresh origin-side revalidation. Known custom installer/credential
+configuration receives manual fallback, never silent removal or value disclosure. Four complete
+suites (2038 passed/84 skips each, 2122 identical ordered outcomes) and the same 29-test affected
+real gate (954 checks) pass, including both actual installed pipx layouts and real terminal
+consent/cancel/changed-launcher/configuration refusals. No public entry, helper payload or install
+path exists; an in-memory receipt is not an executable capability. Next: independent post-exit/
+exclusive installation/tool/source/network validation and effective installer network policy,
+then actual replacement/expected-result and independent failure recovery. Manager Update stays
+disabled. No version bump, release preparation,
 merge, push or publication.
 The one-time test-performance checkpoint between UP-06 and that package is complete: two
 test-local improvements preserve all test IDs/results and reduce measured full wall time by

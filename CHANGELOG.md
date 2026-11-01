@@ -64,6 +64,12 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   publication or source instead of selecting another target. GitHub rate limits are shared with
   release discovery without turning cached availability into consent. This trusts GitHub HTTPS
   evidence, not signed-tag authentication; no public action, installation or recovery is enabled.
+- Internal exact manager review binds fresh local installation/tool facts, critical records and
+  observed symlink routes to the published source. Its scrollable consent fixture defaults to
+  Cancel and requires explicit public-default network acceptance; detected custom installer or
+  credential configuration receives manual fallback without value disclosure. Fresh origin-side
+  revalidation refuses changed evidence. No helper payload, replacement or recovery is enabled;
+  Manager Update remains disabled.
 
 ### Fixed
 

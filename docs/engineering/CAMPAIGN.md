@@ -239,6 +239,21 @@ no assertions relaxed. No original image/container/volume/owned-process leak; no
 manual/privileged/release-readiness claim. Commands, counts, failure trail and boundaries: BASELINE
 and Updates roadmap. No bump/merge/push/upload/remote change/project tag/publication.
 
+UP-17 second exact-origin review checkpoint (2026-11-01): four complete compatibility suites
+(**2038 passed/84 opt-in skips each**, **2122** ordered outcomes identical), **79 new default cases**
+(66 origin review, 10 pilots, two package gates, one UI error-report contract), and the unchanged
+**29 affected real tests/954 checks**, `up17b-final`, 1103.14 s. Both actual installed pipx layouts
+add six console/pty scenarios: explicit target/public-network consent and fresh origin revalidation
+at 80x24/120x40, default Cancel, changed actual launcher refusal, custom index environment and
+credential-file presence refusal without secret output. Original records/launcher bytes operational
+and unchanged after exact owned fault restoration. All prior source/helper/verifier/terminal/
+both-distro lifecycle/exclusion assertions retained. Initial input-batching fixture failure preserved;
+separate rendered/policy/navigation steps and keyboard-only pilot regressions, no assertions/budgets
+relaxed. **Origin-side only**: no independent post-exit/exclusive validator, effective installer
+network policy, helper payload, replacement/expected installed result or recovery. UP-17 partial,
+Manager Update disabled. Private Git/API/site injection is not public authenticity or human proof.
+No full campaign/privileged/release-readiness claim; no bump/merge/push/upload/project tag/publication.
+
 ## Legend
 
 - Priority (P): **P0** critical, **P1** high, **P2** medium.

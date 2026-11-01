@@ -21,8 +21,9 @@ second checkpoint adds independent external-tool/runtime prerequisite facts. Its
 an independent stdlib helper with a non-mutating process-exit fixture. Its fourth adds a dedicated
 fixed read-only fresh runtime query under helper exclusion. Its fifth adds an internal restored-
 terminal handoff/refusal fixture. UP-17's first checkpoint adds internal read-only exact published
-release/tag/commit resolution and fresh same-target revalidation. Installation consent, replacement
-and failure recovery remain pending; Manager Update is disabled.
+release/tag/commit resolution and fresh same-target revalidation. Its second adds internal exact
+origin review/consent and fresh origin-side revalidation; independent post-exit/exclusive checks,
+replacement and failure recovery remain pending. Manager Update is disabled.
 
 ## Boundaries
 
@@ -50,6 +51,7 @@ and failure recovery remain pending; Manager Update is disabled.
 | `build_output.py`, `base_updates_tui.py` | Scoped base-build output/phase feedback with a bounded tail, target/mode and explicit rollback-copy forms, immutable consent; no mutation cancellation or universal executor | D-056, D-057 |
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
 | `manager_targets.py` | Internal explicit exact published release/ref/peeled-commit observation and fresh same-target revalidation; fixed GitHub HTTPS authority, no cached target grant, install consent or executor | D-056, D-057 |
+| `manager_review.py`, `manager_review_tui.py` | Internal immutable exact origin installation/tool/source/public-default network review, explicit scrollable consent receipt and fresh origin-side revalidation; no public route, executor, independent exclusive check, durable grant or helper payload | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
@@ -116,13 +118,79 @@ throttling evidence but can never authorize installation or supply a target. No 
 held across an installation mutation.
 
 The helper bundle, verifier and terminal fixtures are unchanged: this module is not frozen into
-an updater or connected to handoff/exclusive execution yet. UP-17 still must bind exact target
-and installation/tool/network settings to human consent, revalidate under independent exclusion,
+an updater or connected to handoff/exclusive execution yet. Origin-side exact review/consent is
+described below; the future executor must independently revalidate the approved exact target and
+installation/tool/network settings under exclusion,
 perform exact-tag replacement, verify actual expected version/source/commit/exposed launcher/basic
 CLI, and independently prove external recovery records/instructions and interrupted/partial states.
 Remote tag movement between revalidation and pipx fetch remains a risk requiring installed-commit
 verification, not a claim that source resolution alone makes replacement safe. Manager Update
 stays disabled. Private Git/loopback API tests prove parser/installed behavior, not public authenticity.
+
+## Internal exact origin review (UP-17 second checkpoint)
+
+`manager_review.prepare` accepts only a strict exact release tag, not caller-supplied classifier,
+tool or cache facts. It rejects unsupported installer/network environment, freshly classifies the
+actual running official-tag pipx installation/launcher, and retains the originating installation's
+shared usage lease. It assesses the supported external pipx/Python runtime and recognized effective
+locations using the existing fixed version-only diagnostics, then freshly resolves published source.
+Local evidence is inspected again around the source reads; unexpected change refuses rather than
+mixing identities. No usage release, conversion or exclusive attempt occurs in this origin path.
+
+The frozen in-memory Review binds exact source, previous local release/commit/version, canonical
+installation and actual launcher, recognized settings, external tool/runtime facts and a hashed
+context of HOME/PATH/XDG/recognized pipx selections. It hashes bounded critical records (pipx,
+PEP 610, distribution metadata/entry points/raw RECORD, package version module, application script
+and pyvenv configuration) and observes every component of selected executable, Python, location,
+critical-record and observed external module routes, including symlink spelling/identity and
+absent configuration paths. File/symlink device/inode/owner/mode/size/mtime/ctime/link count are bound;
+directories bind identity/ownership/mode, not timestamps, so unrelated cache/log/pyc creation does
+not invalidate a review. Special/uncontrolled/cyclic paths and bounded-inventory overflow refuse.
+This is a dated change detector for these observations, **not code authentication or an immutable
+inventory of every installed or external lazy-loaded file**. External tools/site code remain
+trusted local code; the future independent execution validator must re-establish its prerequisites.
+
+The initial supported network policy is **public defaults only**. Existing nonempty pip/Git/uv/
+Python/loader, proxy/CA, SSH agent/askpass and related installer configuration variables refuse
+with a static manual-preservation reason, never their values. Known system/user/XDG Git/pip,
+credential files (including netrc/Git credential storage), application/shared/external pip runtime
+configuration paths must be absent; existence, including an unreadable file or dangling symlink,
+requires manual preservation without reading contents, deletion or repair. No custom settings
+are silently dropped to make review succeed. This intentionally conservative support is additional
+to local pipx classification; a recognized install can still require manual update. The form
+explains direct GitHub/PyPI/build-dependency downloads and trusted package/build code running on
+the host as this user, not sandboxed by Docker. A later executor must separately implement and
+prove the effective public-default network policy (including its Git/pip/config/credential
+behavior), rather than assume these presence observations enforce it. No installer environment,
+argv, new Git tool assessment or network-policy execution is introduced here.
+
+`ManagerReviewScreen` has no product action/key/button/command/environment entry point. It displays
+only an already prepared immutable review in a read-only scrollable TextArea, bounded plain release
+notes and a visible impact/identity review. Cancel is initially focused; confirmation is disabled
+until the exact target/public-network policy is explicitly accepted. Escape/Cancel returns no
+receipt. Confirm returns an in-memory Approval holding that exact Review, **not a bool, executable
+capability, serialization format or durable grant**. It performs no preparation, revalidation,
+staging, helper launch/arming, worker cancellation or installation itself. Opening the modal still
+blocks the existing dashboard handoff gate. A future public consumer must retain all active-body/
+session/consent refusals and revalidate after consent; the receipt alone is never idle/exclusion proof.
+
+`revalidate` requires the same origin PID/canonical installation and compares fresh local snapshots
+and the same freshly revalidated source, with another local inspection after the source reads.
+Changed installation/version/records/launcher/routes, observed tools/settings/context, network or
+source refuse and require a new review. It keeps usage held and does not acquire exclusive access.
+This is origin-side proof only. The frozen helper, terminal handoff, verifier and lease protocols
+are unchanged; no review is passed into them and no updater/recovery payload exists. Independent
+post-origin-death exclusive installation/tool/source/network revalidation, enforced network policy,
+actual replacement/expected installed source/commit/version/launcher/basic CLI and failure recovery
+remain separate UP-17 gates. Manager Update stays disabled.
+
+Test-only installed-console injection exercises the actual launcher/bootstrap and all identity,
+tool/source/file checks with an owned private Git/loopback API, real dashboard/terminal/consent and
+fresh origin revalidation. Six scenarios per actual default/custom-space pipx layout cover both
+sizes, default Cancel, explicit approval, an owned changed-launcher fault, custom index environment
+and credential-file presence refusal without reading contents. No source/classification/lock/terminal
+reply is mocked. This is automated installed/private-transport evidence, not public-release
+authentication, human observation, actual replacement or an independent exclusive/recovery proof.
 
 ## Early installation access (D-056, UP-16 first checkpoint)
 

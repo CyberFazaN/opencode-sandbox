@@ -86,6 +86,12 @@ An internal-only read-only source resolver now observes an exact published relea
 and revalidates it without relying on discovery caches. This is not installation consent or
 signed-tag verification. It is not run by ordinary startup, status, discovery or the dashboard;
 Manager Update remains disabled until replacement and independent failure recovery are verified.
+An internal consent fixture can now review the exact source, installation, existing Python,
+external tools, locations and impact at 80x24 or larger. It accepts only a public-default network
+policy; detected custom pip/Git/proxy/index/credential configuration requires manual preservation
+and is never silently removed or printed. The form has no public entry point and does not install
+anything. Its in-memory receipt and fresh origin-side check are not independent exclusive
+revalidation, installation authorization or a recovery record; those gates remain pending.
 
 ## Prepare Docker
 

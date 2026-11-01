@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-16 and PERF complete. UP-17 partial: first read-only exact published release/tag/commit resolution and fresh same-target revalidation checkpoint verified. Installation consent, replacement and independent failure recovery remain pending. Manager Update stays disabled.**
+- **UP-00..UP-16 and PERF complete. UP-17 partial: source gate and internal exact origin review/consent/origin-side revalidation checkpoints verified. Independent post-exit/exclusive validation, effective installer network policy, replacement and failure recovery remain pending. Manager Update stays disabled.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -304,8 +304,9 @@ in isolated integration tests, not through assumptions about a successful return
 
 UP-00..UP-16 and the one-time PERF checkpoint are complete. UP-16 has verified startup/exclusion,
 external tools, frozen helper/lifetime, dedicated runtime verifier and restored-terminal fixture/refusals;
-UP-17's first read-only source checkpoint is verified; installation consent, replacement/
-failure recovery and UP-18 remain pending. D-057 consolidates closely related remaining
+UP-17's source and internal origin review/consent checkpoints are verified; independent exclusive
+execution validation, effective installer network policy, replacement/failure recovery and UP-18
+remain pending. D-057 consolidates closely related remaining
 tasks into work packages without renumbering IDs or dropping acceptance criteria. Dependencies
 are technical prerequisites, not a forced serial order or a STOP/Continue requirement. Complete
 tightly related subtasks in one cycle when manageable; use separate focused commits and tested
@@ -344,7 +345,7 @@ packaged-definition gate was retried successfully during UP-04; evidence is reco
 | UP-12 + UP-13 | DONE: base actions and explicit cached/full-refresh rebuild | UP-03, UP-04, UP-07 + UP-08; UP-10 for TUI binding only; **no UP-11 dependency** | Build/Rebuild/Check/Rollback, identity/target/definition/mode consent, candidate-ID verification/guarded publication, retained copies and explicit multi-copy selection; cached versus pull/no-cache refresh, no prune/migration. Four complete suites (1525 passed/80 skips each), 24 affected real tests/581 checks, both distributions including separate cached/full-refresh package builds, concurrency/pinned creation, failed candidates, retained layers and 80x24/larger terminal ownership. Evidence below |
 | UP-14 + UP-15 | DONE: read-only manager discovery/local installation classification | UP-05; UP-07 + UP-08 for shared cache; UP-10 for TUI binding only; **no UP-13 dependency** | Official published-full-release provider, strict tags/numeric comparison/no downgrade, independent failures and local evidence, separate daily GitHub source/claims. Local actual package/VCS/pipx/Python/options/invocation/launcher/custom-location agreement; manual guidance for foreign/editable/shadowed/ambiguous/unsupported settings. 86 new default cases, four full suites (1611 passed/82 skips each), 26 affected real tests/637 checks including default/custom-space pipx and real manager terminals. Local provenance is not public commit authentication or an execution grant; Update disabled. Evidence below |
 | UP-16 | DONE: independently verified non-mutating handoff/exclusion/access boundary | UP-14 + UP-15, UP-05 | Startup/process-lifetime usage/exclusion (`2e6d2d0`), independent existing tools/full routes/raw RECORD/source-Python (`462d8fe`), frozen stdlib helper/actual origin exit with target absent (`35c035a`), dedicated runtime query/unlocked witness/live owner proof/parent-death safety (`14112de`), then internal restored-terminal fixture/refusals. Actual-body tracking survives task cancellation, sessions/operations/open consent refuse, full Linux driver shutdown and exact original foreground tty checked before arming; origin still leased until actual death. Four complete suites (1861 passed/84 skips each, 1945 identical ordered outcomes), 29 affected real tests/872 checks, installed pipx/real tty/both-distro mutation/session/other-manager evidence. No public trigger, updater, source/target consent or replacement/recovery exposed; Manager Update stays disabled |
-| UP-17 | PARTIAL: exact published-source checkpoint verified; consent/replacement/recovery pending | UP-16 | First internal read-only exact release/ref/peeled-commit resolution/fresh same-target revalidation, source/discovery rate-limit separation, 98 new default cases, four complete suites (1959 passed/84 skips each, 2043 identical ordered outcomes), full affected 29 real tests/888 checks. Still requires installation/tool/network consent and exclusive revalidation, actual replacement and fresh expected source/version/commit/launcher/basic-CLI verification, no automatic restart. Independently verify (1) replacement/success and (2) failure/interruption states, private recovery record and instructions before/during/after install. Separate focused checkpoints; isolated pipx and real terminal evidence, never inferred backup/rollback safety |
+| UP-17 | PARTIAL: exact source and internal origin review/consent checkpoints verified; exclusive validator/replacement/recovery pending | UP-16 | Exact release/ref/peeled-commit/fresh same-target observation and separate source/discovery claims, then immutable origin installation/tool/source/public-network review, explicit 80x24/larger consent and fresh origin-side revalidation. Second gate: 79 new default cases, four complete suites (2038 passed/84 skips each, 2122 identical ordered outcomes), same affected 29 real tests/954 checks with both installed pipx layouts/real pty/refusals. Still requires independent post-exit/exclusive installation/tool/source/network validation, effective installer network policy, actual replacement and expected source/version/commit/launcher/basic-CLI verification. Independent failure/interruption/private recovery record/instructions gate; no automatic restart or inferred backup/rollback safety |
 | UP-18 | Cross-layer verification and record consolidation | UP-01..UP-17 | Run affected/full regressions, required real combinations, dependency endpoints, docs/CLI/packaging checks; record evidence/limits, promote durable facts and retire the effort record when complete; no release work |
 
 ### Consolidation rationale and safe checkpoints
@@ -2935,6 +2936,120 @@ a materially different architecture, record the blocker and ask the owner before
   final complete/real product/checker/test hashes intact. Commit locally and stop; no further
   implementation or release action in this cycle.
 
+### UP-17 second exact-origin review checkpoint — 2026-11-01 — verified origin-consent boundary
+
+- Resumed clean `work/updates` at `7e4865c`; own-rootless inventory matches the original four full
+  image IDs, no containers/volumes. Read source/tool/classification/handoff/terminal/lock ownership
+  before design. Reproducer for absent exact-review API **1 failed**, .02 s (`up17b/repro.xml`).
+  Scope: origin review/explicit internal consent/fresh origin revalidation, not independently
+  exclusive post-exit validation, installer network execution, replacement or failure recovery.
+- New `manager_review` prepares only a strict exact tag from fresh own runtime classification,
+  canonical-prefix process-lifetime usage, actual exposed launcher and external pipx/Python facts,
+  recognized locations, critical record hashes and complete observed executable/Python/module/
+  location/config routes. Preserve symlink spelling/identity, inode/owner/mode and file metadata,
+  hash HOME/PATH/XDG/pipx selection context. Directory timestamps excluded so unrelated cache/pyc/
+  log creation is not replacement. Re-inspect local facts around exact published-source reads;
+  no cached classification/Target construction/receipt is an installation capability. Reject
+  special/cyclic/uncontrolled/oversized paths. Not code authenticity or a full lazy-file inventory.
+- Initial policy: public defaults only. Nonempty known pip/Git/uv/Python/loader/proxy/CA/SSH-agent/
+  related environment and known system/user/XDG/shared/application Git/pip/credential config
+  presence require manual preservation; never read credential contents, echo values, modify/delete
+  settings, or silently drop them to pass. Only a future independently tested executor can enforce
+  effective public-default network behavior; this review does not construct an installer argv/env
+  or assess new Git execution. Explain exact source/downloads and host package/build-code trust,
+  no Python switch, user-data/config preservation, existing-instance boundaries, no automatic
+  restart, force-not-backup and previous-tag recovery-not-identical-dependencies limits.
+- Internal `ManagerReviewScreen` has no public entry or enabled Manager Update path. Scrollable
+  read-only plain text at 80x24/larger, Cancel default, explicit exact target/network checkbox
+  before Confirm. Escape/Cancel yields no receipt; Confirm yields an in-memory Approval for that
+  exact immutable review, not a bool/durable grant/serialized capability. No helper preparation/
+  launch/arming, revalidation or mutation happens from the form. Open consent refuses existing
+  terminal handoff. Origin `revalidate` requires own PID/prefix/version, same fresh local binding
+  around the same fresh source. No usage release/conversion/exclusive attempt; helper/verifier/
+  driver/locks unchanged and no review payload is passed to the frozen fixture.
+- Early focused **1 import-style failure/68 passed**, 13.54 s, then lowest Python 3.14 source/
+  review/terminal/static **1 import-style failure/115 passed**, 30.10 s. Primary broader source/
+  review/package/static **1 import-style failure/277 passed**, 33.55 s. Corrected formatting only;
+  explicit Ruff **all checks passed**. No runtime assertion suppressed or weakened.
+- First actual installed proof `up17b-proof` **2 failed/2 teardown errors**, 129.96 s: the real
+  fixture observed the header before controls rendered and sent policy selection plus Tab/Enter
+  in one input batch before Textual's Changed message enabled Confirm. The form correctly did
+  not approve. Captured exact pty/state evidence; split key steps after rendered controls/policy
+  processing, retained all assertions/budgets and added keyboard-only pilot regressions. Lowest
+  Python 3.14 review/UI/static **79 passed**, 24.08 s. Corrected `up17b-proof2` **2 passed**, 99.87 s,
+  both actual installed pipx layouts, all prior helper/source/terminal/lifecycle assertions retained.
+- Six installed terminal scenarios per layout: implicit actual console/bootstrap/identity/tool/
+  source preparation and review, 80x24/120x40 explicit target+policy approval and fresh origin
+  revalidation; default Cancel without another source call; owned changed actual launcher after
+  display refuses before another source request; custom secret-bearing index environment and
+  credential-file presence refuse without secret output or source request. All exit normally/
+  restore terminal with no helper/automatic restart. Private Git/API and owned site injection
+  only, not public authentication or expected-build/install/exclusive-revalidation evidence.
+- Final review added special-path/strict-tag/version guard, broader explicit credential-environment
+  refusal, credential storage presence and unrelated directory-cache regression before final
+  source freeze. Next: all four complete compatibility suites, the same full 29-row affected real
+  gate with new review assertions, packaging/docs/static/resource review, exact manifested scratch
+  cleanup, local commit and stop at the origin-consent boundary. Keep all evidence/cache/lock
+  inodes, no version/schema/image change, bump/merge/push/upload/remote change/project tag/release.
+  UP-17 partial; Manager Update disabled. Independent post-exit/exclusive validator, actual
+  installer network policy/replacement/expected-result and failure recovery still require proofs.
+- Final focused origin/UI/package/docs/static **145 passed**, 25.03 s (`final-focused.xml`). Final
+  complete matrix **2038 passed/84 opt-in skips each**: Python 3.11/current **287.80 s**, 3.11/lowest
+  **284.12 s**, 3.14/current **295.38 s**, 3.14/lowest **288.44 s**. Four clean pip checks/inode
+  preflight, serial foreground, Python 3.11.18/3.14.8 × current Typer 0.27.3/Textual 8.2.8 and
+  lowest 0.16.0/4.0.0. All **2122 ordered IDs/outcomes identical**, only two known lowest-Typer
+  warnings. No new skips. Commands: `env PYTHONPATH="$PWD/src" .work/<venv>/bin/python -m pytest -q
+  --tb=short --junitxml=.work/up17b/full-<label>.xml --basetemp=/tmp/opencode/u17b-<label>`;
+  venv/label pairs `venv311/311`, `venv311low/311low`, `venv314/314`, `venv314low/314low`. All final
+  product/checker/test inputs frozen in `.work/up17b/final-source-sha256.json`; no change after
+  these complete and real gates. No full-suite failure in this checkpoint.
+- **79 new default cases**: 66 origin review/refusal/host route/critical-file/environment/context/
+  source-change cases (synthetic own-runtime identity with actual synthetic external version-only
+  diagnostics/real HTTP children, not actual pipx installation proof), 10 current/lowest Textual
+  pilot cases at both sizes including keyboard-only approval, two required-module package gates,
+  one new UI error-reporting contract case. All earlier source/helper/verifier/lease/terminal/body/
+  session/ownership/recovery/both-distribution assertions retained. No cache grants or UI-only
+  inference replaces actual file/process/HTTP and installed real evidence.
+- Final affected real command: `env PYTHONPATH="$PWD/src" OCS_TEST_DOCKER=1 OCS_TEST_RUN=up17b-final
+  .work/venv311/bin/python -m pytest -q -rA --tb=short tests/integration/test_42_base_coordination.py
+  tests/integration/test_43_diagnostics.py tests/integration/test_44_version_evidence.py
+  tests/integration/test_51_updates.py tests/integration/test_52_discovery.py
+  tests/integration/test_53_environment_updates.py tests/integration/test_54_base_updates.py
+  tests/integration/test_65_pipx.py tests/integration/test_66_manager_inventory.py
+  tests/integration/test_67_installation_exclusion.py --junitxml=.work/up17b/real-final.xml
+  --basetemp=/tmp/opencode/u17b-real`: **29 passed/954 checks**, no skips/deselections,
+  **1103.14 s**, all previous 29 rows/assertions retained. Actual installed default/custom-space
+  pipx packages each run six new console/pty review scenarios above; no product identity/terminal/
+  lock/Docker response mocked. Initial failed installed proof logged **196 passing/2 failed
+  checks** plus two main failures/two teardown errors; corrected focused installed proof logged
+  **330 passing checks**, final full real **954**. No failure suppressed or assertion weakened.
+- Final own-rootless inventory matches all four original full image IDs, no containers/volumes/
+  test tags or owned manager/helper/verifier/terminal/review/HTTP/probe/guard/watchdog Python
+  processes remain. No source/tool/classification/cache/lease/helper/verifier/driver/public UI/
+  version/schema/image/dependency/workflow change. Only new internal review modules/fixtures and
+  required-package-module contract; no helper payload, installer argv/env or Git execution added.
+  Finish packaging/docs/static/guarded scratch cleanup, preserve all evidence/cache/persistent
+  protocol inodes, commit locally and STOP. UP-17 remains partial; Manager Update disabled.
+  Next independent post-exit/exclusive validator/effective installer network policy, followed
+  separately by replacement/expected installed result and failure recovery. No public-source/
+  signed-tag/human/manual/full-campaign/privileged/provider/paid-API/release-readiness claim.
+- Final package/docs/resource follow-up: no-isolation sdist/wheel, strict twine/content validation
+  and **44 frozen product module/wheel byte comparisons pass**, private instructions/evidence
+  absent from sdist. Artifacts `.work/up17b/package/`. Document/CLI/quality **44 passed**, 3.35 s
+  (`docs.xml`), focused rather than another complete replay. Own-rootless inventory retains all
+  original four full image IDs, no owned process/container/volume/test-tag leaks. Guarded removal
+  of **14 exact manifested completed pytest roots**, own UID/inode and live process/socket/mount
+  references checked; **388 host fixture records/artifacts** archived first. All actual installed
+  review/source/helper/results/pty records, failed/pass evidence/hashes/packages, prior evidence,
+  shared build cache and persistent protocol inodes preserved. `/tmp/opencode` empty/**1046221
+  free inodes**; prose-only scratch separately manifested/guarded. No final product/checker/test
+  input change. Review/stage intended diff, commit locally and STOP. Independent post-exit/
+  exclusive validator/effective installer network policy, replacement/expected installed result
+  and failure recovery remain the next separate verified gates. Manager Update stays disabled.
+- Final prose-only language/link/CLI follow-up **27 passed**, 1.98 s (`prose.xml`), not complete
+  regression. Final product/checker/test hashes intact. Commit locally on `work/updates` and stop;
+  no independent second task, public updater enablement or release action in this cycle.
+
 ## Resume and context-compaction handoff
 
 1. Read repository/local instructions, TODO, BASELINE, D-056/D-057 and this entire record. Use
@@ -2946,7 +3061,7 @@ a materially different architecture, record the blocker and ask the owner before
    UP-12/UP-13 `997a7d8`, UP-14/UP-15 `f1cb9ce`, UP-16 startup/exclusion `2e6d2d0`, then the second
    UP-16 external-tool prerequisite `462d8fe`, frozen helper/lifetime `35c035a`, then the fourth
      dedicated runtime-access `14112de`, restored-terminal/refusal `6b99ccd`, then UP-17's first
-     exact-source read-only checkpoint.
+     exact-source read-only `7e4865c` and second exact-origin review/consent checkpoint.
    Recover PERF's measured verification cadence from
    BASELINE; it does not reduce the shared/high-risk or real gates for the next package.
     Shared base guards, immutable explicit rollback, short diagnostic/probe bounds/ownership and
@@ -2962,15 +3077,17 @@ a materially different architecture, record the blocker and ask the owner before
    Resolve actual Git state; later evidence takes precedence. Shared private lock files are
    persistent protocol state, not stale files to delete. Retained bases are unchanged. The
    packaged-definition DNS gate is resolved by UP-04 evidence, not still blocked.
-3. Continue **UP-17**, exact installation/tool/network consent and actual replacement/expected-result
-   verification, with independently verified failure recovery. **UP-16 is DONE for non-mutating
+3. Continue **UP-17**, independent post-origin-death/exclusive installation/tool/source/network
+   validation and effective installer network policy, then actual replacement/expected-result
+   verification and independently verified failure recovery. **UP-16 is DONE for non-mutating
    handoff only**, not install authority. Keep Manager Update disabled until all UP-17 gates pass.
    The first UP-17 source boundary is now independently verified: `manager_targets.resolve`
    observes the exact published full release/ref/bounded annotated-tag chain/commit from fixed
    GitHub HTTPS authority, and `revalidate` fetches that same target afresh. It is not signed-tag
    authentication, a remote lock/atomic snapshot, installation identity or consent, build/version
-   proof, expected installed result or an execution grant. It has no startup/status/discovery/
-   UI/helper consumer and no install payload. Source records contain no durable target/consent;
+   proof, expected installed result or an execution grant. It has no public startup/status/
+   discovery/update/helper consumer and no install payload. The internal
+   origin review below is now its sole consumer. Source records contain no durable target/consent;
    only independent disposable attempts/rate claims share the GitHub source guard with discovery.
    Do not promote cache success/local classification/Target construction to authorization. Keep
    strict newer targets, complete OID chain and full bounded notes hash, canonical official URLs,
@@ -2978,6 +3095,24 @@ a materially different architecture, record the blocker and ask the owner before
    the future executor's exclusive guard without holding a source guard across mutation. A tag
    can move after any read: installed expected-commit verification is still essential. Source
    minimal-environment diagnostics are not consent to discard installer proxy/index settings.
+   The second UP-17 checkpoint now independently verifies origin review and explicit internal
+   consent: `manager_review.prepare` takes an exact tag, obtains fresh own classification/tools/
+   source, retains usage and binds critical records/observed full routes/context around source
+   reads. `ManagerReviewScreen` displays an immutable review, Cancel default, explicit target/public-
+   network acknowledgement before Confirm; returns only an in-memory exact Approval receipt.
+   It has no public entry and performs no preparation/revalidation/staging/arming/install itself.
+   `manager_review.revalidate` requires same origin PID/prefix/version and fresh same local/source
+   binding. No release/upgrade/exclusive attempt or helper payload. The receipt is not a durable
+   grant, serialization contract or executable capability. An open consent blocks the existing
+   terminal gate; future consumers must retain actual-body/session/refusal boundaries rather than
+   infer idle/exclusion from consent. Known custom installer/credential environment/configuration
+   requires manual preservation without reading file contents, value disclosure, silent removal or
+   repair. The conservative public-default policy is **reviewed, not executed/enforced** here;
+   independently implement/verify effective pip/Git/network/credential behavior before enabling
+   any installer. Observed tool/file/route hashes are dated change detection, not code authenticity
+   or a complete lazy-file inventory. External/site code remains trusted local code. A future
+   frozen independent validator must re-establish installation/tool/source/policy facts after
+   actual origin death under exclusive ownership, without importing the replaced application.
    Inspect actual bootstrap/CLI/TUI/
    session ownership and lock order, new local provenance evidence, current pipx behavior/defaults
    and the frozen helper/verifier plus restored-terminal boundary before adding any updater payload.

@@ -247,6 +247,10 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
         source_exercise(camp, ck, prefix, helper_env, repo, base)
         ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager exact source: source/revalidation/rate failures leave original installed records/executable unchanged')
         ck(json.loads(run().stdout)['installation']['verified'], 'Manager exact source: original launcher remains operational, Manager Update still disabled')
+        from manager_reviews import exercise as review_exercise
+        review_exercise(camp, ck, prefix, launcher, env, repo, base)
+        ck(before == {str(path): path.read_bytes() for path in paths}, 'Manager review: origin consent/revalidation/refusals preserve original installed records/executable bytes')
+        ck(json.loads(run().stdout)['installation']['verified'], 'Manager review: original launcher operational; no replacement or automatic restart')
         # This external guard runs from the test venv, not from the guarded application. It
         # exercises the real fixed namespace/prefix key without patching the installed package.
         hold = subprocess.Popen([sys.executable, '-B', '-c',
