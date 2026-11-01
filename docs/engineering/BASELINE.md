@@ -59,8 +59,10 @@ checkpoints add the durable incomplete-operation startup barrier, separate fresh
 tool/dependency/published-source and effective pip/Git public-default diagnostics, and exact
 installed-record/launcher checks with separate fresh runtime and fixed CLI-help construction.
 The latter query never dispatches normal CLI or weakens startup leasing; the original three-field
-runtime query is unchanged. These internal non-mutating gates do not implement replacement,
-interruption/failure recovery or the public updater, which remain pending;
+runtime query is unchanged. A subsequent internal checkpoint adds actual exact-tag pipx replacement,
+durable parked-child admission, independent result/quiescence checks and explicit frozen verify-only
+recovery, verified on isolated real pipx success and failed-target/manual-reinstall recovery.
+Public consent/terminal connection and final integration remain pending;
 Manager Update stays disabled.
 No image-definition, metadata/backup schema or manager-version change was made.
 

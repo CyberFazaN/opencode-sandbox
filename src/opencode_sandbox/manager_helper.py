@@ -1,15 +1,16 @@
-"""Staged stdlib-only, NON-MUTATING process-exit fixture; no installer/normal CLI dispatch.
+"""Frozen stdlib-only fixture, exact updater, parked child and explicit verify-only recovery.
 
 Executed only as the frozen zipapp's __main__ under external Python -I -B -S. Local imports are
-bundled source copies, not imports from the replaceable package. Optional fixed read-only runtime
-and independent tool/policy/published-source diagnostics never install, dispatch normal CLI or
-grant access to another process. No shell, Docker, installer or normal-manager bypass.
+bundled source copies, not imports from the replaceable package. Mutation requires authenticated
+live-origin intent, actual pidfd death, own exclusion and independent fresh gates. Fixture and
+recovery modes never install. No shell command, Docker, automatic restart or normal-CLI bypass.
 """
 import hashlib
 import json
 import os
 import re
 import selectors
+import signal
 import socket
 import stat
 import struct
@@ -70,9 +71,17 @@ def _wait(control, pidfd, deadline, *, armed):
 
 
 def main():
-    # The only accepted mode is this bounded, non-mutating fixture. No environment flag or CLI
-    # argument can grant ordinary manager access while another process owns exclusion.
-    if len(sys.argv) != 5 or sys.argv[1] != 'quiescence-fixture': raise Refused('Invalid helper invocation')
+    if len(sys.argv) == 4 and sys.argv[1] == 'installer-child':
+        from manager_installer import child
+        return child()
+    if len(sys.argv) == 3 and sys.argv[1] == 'recover':
+        from manager_update import recover
+        result = recover(Path(sys.argv[2]))
+        return 0 if result['result'] in ('target-verified', 'previous-verified') else 2
+    # Mutation uses its separate live-origin handoff mode. Neither mode dispatches normal CLI,
+    # converts a usage lease or turns a durable file into installation consent.
+    if len(sys.argv) != 5 or sys.argv[1] not in ('quiescence-fixture', 'manager-update'): raise Refused('Invalid helper invocation')
+    updating = sys.argv[1] == 'manager-update'
     control_fd, pidfd, directory = map(int, sys.argv[2:])
     if min(control_fd, pidfd, directory) < 3 or len({control_fd, pidfd, directory}) != 3:
         raise Refused('Invalid helper descriptors')
@@ -90,10 +99,11 @@ def main():
         if not isinstance(request, dict) or not required <= set(request) or set(request) - required - {'verify', 'local_review', 'execution_validate'} \
                 or ('verify' in request and request['verify'] is not True) \
                 or ('execution_validate' in request and (request['execution_validate'] is not True or 'local_review' not in request)) \
-                or type(request['protocol']) is not int or request['protocol'] != 1 or isinstance(request['budget'], bool) \
+                or type(request['protocol']) is not int or request['protocol'] != (2 if updating else 1) or isinstance(request['budget'], bool) \
                 or not isinstance(request['budget'], (float, int)) \
                 or not 0 < request['budget'] <= BUDGET:
             raise Refused('Invalid helper request')
+        if updating and (set(request) != required | {'local_review'}): raise Refused('Invalid manager replacement request')
         if 'local_review' in request:
             value = request['local_review']
             if not isinstance(value, dict) or set(value) != {'sha256', 'identity', 'file_identity'} \
@@ -121,6 +131,16 @@ def main():
             if info.st_size > 262144: raise Refused('Oversized helper artifact')
             digest = hashlib.sha256(stream.read(262145)).hexdigest()
         if digest != request['sha256']: raise Refused('Helper artifact changed')
+        if updating:
+            # artifact.json has its own bounded inventory shape, not an operation/recovery grant.
+            from manager_observations import parse
+            fd = os.open('artifact.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=directory)
+            with os.fdopen(fd, 'rb') as stream:
+                _private(os.fstat(stream.fileno()))
+                raw = stream.read(4097)
+            if len(raw) > 4096 or parse(raw) != {'protocol': 1, 'fixture': False, 'sha256': digest,
+                    'review_sha256': request['local_review']['sha256'], 'review_identity': request['local_review']['identity']}:
+                raise Refused('Manager update artifact inventory changed')
         # Never inherit the origin's process-lifetime shared lease or an exclusive guard.
         for item in Path('/proc/self/fd').iterdir():
             try: name = os.readlink(item)
@@ -134,6 +154,19 @@ def main():
         if outcome == 'quiescent':
             try:
                 with locks.exclusive(target):
+                    if updating:
+                        from manager_update import execute, notice
+                        def interrupted(signum, frame): raise InterruptedError('Manager updater interrupted')
+                        for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM): signal.signal(signum, interrupted)
+                        result = {'protocol': 2, 'fixture': False, 'outcome': 'update-failed',
+                                  'origin': origin, 'helper': os.getpid(), 'sha256': digest}
+                        try:
+                            observed = execute(locks, directory, request['local_review'], prefix=target, origin=origin, helper_sha256=digest)
+                            result.update(outcome=observed.pop('result'), **observed)
+                        except (OSError, ValueError, TypeError, KeyError, RuntimeError, ImportError, AttributeError, RecursionError):
+                            notice('Manager update failed or refused. Inspect its private operation record; do not delete state or locks.')
+                        _result(directory, result)
+                        return 0 if result['outcome'] == 'target-verified' and result.get('installer_exit') == 0 else 2
                     result = {'protocol': 1, 'fixture': True, 'outcome': outcome,
                                'origin': origin, 'helper': os.getpid(), 'sha256': digest}
                     if 'local_review' in request:
@@ -170,13 +203,18 @@ def main():
                     _result(directory, result)
                 return
             except locks.Error: outcome = 'busy'
-        _result(directory, {'protocol': 1, 'fixture': True, 'outcome': outcome,
-                            'origin': origin, 'helper': os.getpid(), 'sha256': digest})
+        _result(directory, {'protocol': 2 if updating else 1, 'fixture': not updating, 'outcome': outcome,
+                             'origin': origin, 'helper': os.getpid(), 'sha256': digest})
+        if updating:
+            print('Manager update handoff did not acquire quiescent exclusive access; no replacement was started.', flush=True)
+            return 2
 
 
 if __name__ == '__main__':
-    try: main()
+    try: raise SystemExit(main())
     except (OSError, ValueError, TypeError, KeyError, RuntimeError):
         # Never echo untrusted requests, paths, imported diagnostics or environment values.
-        print('Non-mutating helper fixture refused; no installation was changed.', file=sys.stderr)
+        if sys.argv[1:2] in (['manager-update'], ['recover'], ['installer-child']):
+            print('Manager helper refused; inspect its private operation record if present. No state was repaired.', file=sys.stderr)
+        else: print('Non-mutating helper fixture refused; no installation was changed.', file=sys.stderr)
         raise SystemExit(2) from None

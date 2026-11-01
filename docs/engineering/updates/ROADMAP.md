@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-16 and PERF complete. UP-17 partial: source/origin-consent, frozen post-exit/exclusive local replay, durable startup barrier, independent tool/dependency/source/effective public-default client-policy diagnostics, and separate expected-file/runtime/CLI-health primitives verified. Actual replacement, post-replacement results and failure/interruption recovery remain pending. Manager Update stays disabled.**
+- **UP-00..UP-16 and PERF complete. UP-17 partial: independent gates, actual isolated pipx replacement, expected-result checks and explicit failure/manual-reinstall recovery verified internally. Public consent/terminal connection and final integration remain pending. Manager Update stays disabled in the public UI.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -3266,6 +3266,47 @@ a materially different architecture, record the blocker and ask the owner before
   and failure/interruption gates pass. Finish UP-18 and one final consolidated report afterward.
   Owner's autonomous workflow correction remains controlling; no routine milestone approval,
   version bump, branch migration, unrelated audit, merge/tag/push/upload/publication is authorized.
+
+### Remaining-roadmap implementation — actual frozen replacement and recovery
+
+- Implemented private immutable `manager_operation` inputs (format 1, identity hashes all
+  non-secret locations/source/tool inputs plus nonce), `manager_installer` and `manager_update`.
+  A parked isolated child sets parent-death protection before external/site code; it independently
+  opens/closes an unlocked witness to prove the live parent's exact kernel exclusion, then checks
+  its own durably recorded pid/start/group and immutable operation before exec. No exclusive/usage
+  descriptor is inherited, exported or borrowed. Exact argv uses existing pipx/source Python and
+  the reviewed official tag; no installation deadline, implicit next target or automatic rollback.
+- Authoritative prepared/installing/verifying/manual/complete state brackets the real operation.
+  The reserved leader/group and own adopted descendants are cleaned/reaped with pidfd ownership
+  proof. Separate file/runtime/CLI checks classify target verified, previous operational, target
+  unverified or unavailable, independently of pipx status. A private final quiescence phase is
+  durable before completion; it never substitutes for fresh verification. Explicit frozen recover
+  only verifies; it never reinstalls, restarts, repairs unknown records or deletes locks/state.
+- Hard-killed owners with unconfirmed descendants remain blocked in the same boot, even when the
+  original group is empty. A later boot independently proves old descendants gone; actual reboot
+  verification is **not executed/authorized** here. Handled failures and manual previous-tag
+  reinstall can recover in the same boot using the exact prior owner's quiescence phase plus
+  fresh full verification. Recovery instructions precede mutation and remain outside the venv.
+- Focused original boundary checks initially had 13 failures solely because the generic error
+  text lost the non-mutating fixture's accurate no-change statement; restored its scoped message,
+  without making that claim for update/recovery errors. Initial whole host simulation had four
+  failures: its synthetic installer published commit b while the fixture API approved c. The
+  product correctly refused all mismatches; corrected the fixture graph, not the verifier.
+  Grouped core/frozen/operation/package tests **124 passed**, 32.77 s before the additional child
+  self-admission proof. Final new core/whole host cases **30 passed**, 28.68 s, including refused
+  unpersisted GO/wrong owner-fd, escaped descendants, handled and hard interruption, real venv/
+  source/version/launcher/CLI checks, manual repair and fresh previous/target recovery.
+- Meaningful real `up17g-proof`: actual pipx 1.18.7 force between owned 6.1.0/6.2.0 tags and actual
+  broken-CLI 6.2.1 target, both default/custom-space layouts: **2 passed**, 109.49 s. Successful
+  source/commit/version/launcher/health completion, failed target startup barrier, explicit manual
+  previous-tag reinstall and independent frozen recovery all pass. Added child-side durable/kernel/
+  immutable admission proof was then rechecked against actual default-layout pipx success/failure/
+  recovery: `up17g-admission-proof` **1 passed**, 58.19 s. Git clone-only and frozen HTTP transports
+  are explicitly local fixtures, not public-release authentication or a host build sandbox.
+- Continue directly into public Updates/CLI consent and restored-terminal connection, additional
+  final real interruption/public-terminal combinations, then UP-18 final complete regression and
+  consolidated records. Public Manager Update is still disabled at this internal executor
+  checkpoint. No routine STOP/approval, full-suite replay, release/tag/push/publication or bump.
 
 ## Resume and context-compaction handoff
 

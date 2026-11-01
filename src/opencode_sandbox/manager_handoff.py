@@ -1,8 +1,8 @@
-"""Internal helper materialization/process-exit fixture, not manager-update authorization.
+"""Private frozen helper staging and actual-origin-exit/restored-terminal handoff.
 
-An internal CLI/TUI restored-terminal fixture exists, with no public action/command/startup
-trigger, normal-CLI bypass or installation execution. The fixture is separate from consent/
-recovery; supported tools grant neither. Private artifacts/results are not disposable caches.
+The non-mutating fixture stays separate from exact update approval. Actual replacement requires
+all fresh independent helper gates under own exclusion; tools/artifacts never grant normal CLI
+access. Private update artifacts/results survive venv loss and are not disposable caches.
 """
 import hashlib
 import io
@@ -29,7 +29,8 @@ REVIEW = 'review.json'
 BUNDLE = ('manager_helper.py', 'installation_locks.py', 'manager_tool_probe.py', 'manager_verifier.py',
           'manager_observations.py', 'installation_state.py', 'manager_source.py', 'manager_process.py',
           'manager_network.py', 'manager_pip_probe.py', 'manager_execution.py', 'http_probe.py',
-          'manager_records.py', 'manager_result.py', 'manager_health.py')
+          'manager_records.py', 'manager_result.py', 'manager_health.py', 'manager_operation.py',
+          'manager_installer.py', 'manager_update.py')
 
 
 @dataclass(frozen=True)
@@ -77,7 +78,7 @@ def complete_terminal_fixture(request, terminal):
     residual non-daemon/executor shutdown. The originating usage lease is never released here.
     """
     if type(request) is not TerminalRequest or type(terminal) is not Terminal \
-            or type(request.artifact) is not Artifact or type(request.verify) is not bool:
+            or type(request.artifact) is not Artifact or type(request.verify) is not bool or request.artifact.update:
         raise c.SandboxError('Restored-terminal handoff is unavailable; no fixture was armed')
     terminal.check()
     try:
@@ -89,6 +90,33 @@ def complete_terminal_fixture(request, terminal):
             fixture.control.close()  # armed ownership transfer, NOT cancel or proof of origin death
         except BaseException:
             fixture.close()
+            raise
+    finally: terminal.used = True
+
+
+def complete_terminal_update(request, terminal):
+    """Arm an explicitly approved update only after actual driver/terminal restoration.
+
+    The origin retains its shared lease through actual death. Printed recovery paths precede
+    arming; the helper separately validates everything under own exclusion before preparing state.
+    """
+    if type(request) is not TerminalRequest or type(terminal) is not Terminal \
+            or type(request.artifact) is not Artifact or request.artifact.update is not True or request.verify:
+        raise c.SandboxError('Restored-terminal manager update is unavailable; no handoff armed')
+    terminal.check()
+    try:
+        print('Sandbox Manager update handoff: terminal restored. Wait for the independent result; no automatic restart.', flush=True)
+        print('Private recovery inputs will be at: ' + str(request.artifact.directory / 'operation.json'), flush=True)
+        import shlex
+        print('Independent recovery command: ' + shlex.join([request.artifact.python, '-I', '-B', '-S',
+              str(request.artifact.directory / FILES[0]), 'recover', str(request.artifact.directory / 'operation.json')]), flush=True)
+        pending = start_update(request.artifact)
+        try:
+            terminal.check()
+            pending.arm()
+            pending.control.close()
+        except BaseException:
+            pending.close()
             raise
     finally: terminal.used = True
 
@@ -149,6 +177,8 @@ class Artifact:
     review_identity: str = ''
     review_file_identity: tuple = ()
     execution: bool = False
+    update: bool = False
+    approval: object = field(default=None, repr=False)
 
     def check(self):
         if self.owner != os.getpid(): raise c.SandboxError('External helper artifact belongs to another process')
@@ -172,6 +202,7 @@ class Artifact:
     def discard(self):
         """Explicit exact-artifact cleanup only after our child is reaped; never on live transfer."""
         self.check()
+        if self.update: raise c.SandboxError('Manager update artifacts are durable evidence; no automatic discard')
         if self.process is not None and self.process.poll() is None:
             raise c.SandboxError('External helper is still alive; preserve its artifact')
         names = {path.name for path in self.directory.iterdir()}
@@ -260,7 +291,45 @@ def prepare_review_fixture(approval, parent):
     return _prepare(manager_installation.classify(), parent, (raw, review.identity))
 
 
-def _prepare(installation, parent, local_review):
+def prepare_update(approval):
+    """Freeze explicit origin consent and observations in the canonical pipx home's private store.
+
+    This stages no authoritative operation and starts no child. Fresh helper-side gates, durable
+    inputs/state and parked-installer admission remain mandatory after actual origin death.
+    """
+    from dataclasses import asdict
+
+    from . import (
+        installation_state,
+        manager_installation,
+        manager_observations,
+        manager_operation,
+        manager_review,
+    )
+    if type(approval) is not manager_review.Approval: raise c.SandboxError('An explicit exact manager review receipt is required')
+    review = manager_review.revalidate(approval.review)
+    prefix = Path(review.prefix)
+    root = prefix.parent.parent / installation_state.DIRECTORY
+    parent = root / 'operations'
+    # Do not repair unfamiliar mode, ownership, symlinks or data of another protocol/schema.
+    try:
+        for path in (root, parent):
+            try: path.mkdir(mode=0o700)
+            except FileExistsError: pass
+            fd = manager_operation.directory(path)
+            try: os.fsync(fd)
+            finally: os.close(fd)
+        raw = manager_observations.capsule(origin=os.getpid(), prefix=review.prefix, version=review.version,
+            identity=review.identity, binding=review.binding, target=asdict(review.target),
+            context={name: os.environ.get(name) for name in manager_observations.CONTEXT})
+        result = _prepare(manager_installation.classify(), parent, (raw, review.identity), update=True)
+        if result['supported']: result['artifact'].approval = approval
+        return result
+    except (OSError, ValueError, RuntimeError):
+        raise c.SandboxError('Private manager update staging unavailable; no installation was changed') from None
+
+
+def _prepare(installation, parent, local_review, *, update=False):
     facts = tools.assess(installation)
     if not facts['supported']: return {'supported': False, 'reason': facts['reason']}
     directory = None
@@ -269,10 +338,10 @@ def _prepare(installation, parent, local_review):
         parent = Path(paths.outside(str(parent), prefix))
         if not parent.is_dir(): raise c.SandboxError('External helper staging parent must already exist')
         raw = _bundle()
-        directory = Path(tempfile.mkdtemp(prefix='ocs-test-helper-', dir=parent))
+        directory = Path(tempfile.mkdtemp(prefix='operation-' if update else 'ocs-test-helper-', dir=parent))
         digest = hashlib.sha256(raw).hexdigest()
         _write(directory, FILES[0], raw)
-        inventory = {'protocol': 1, 'fixture': True, 'sha256': digest}
+        inventory = {'protocol': 1, 'fixture': not update, 'sha256': digest}
         review_digest = review_identity = ''
         if local_review is not None:
             review_raw, review_identity = local_review
@@ -287,21 +356,22 @@ def _prepare(installation, parent, local_review):
                              _private(directory, directory=True), _private(directory / FILES[0]),
                              tuple(facts['evidence']['python_identity']), review_sha256=review_digest,
                              review_identity=review_identity,
-                             review_file_identity=_private(directory / REVIEW) if review_digest else ())
+                             review_file_identity=_private(directory / REVIEW) if review_digest else (), update=update)
         artifact.check()
-        return {'supported': True, 'reason': 'Non-mutating helper fixture staged; no handoff or installation grant', 'artifact': artifact}
+        return {'supported': True, 'reason': 'Private manager handoff staged; independent execution gates remain mandatory' if update
+                else 'Non-mutating helper fixture staged; no handoff or installation grant', 'artifact': artifact}
     except (OSError, ValueError, RuntimeError):
         # Preserve partial artifacts as named evidence; never repair/unlink unfamiliar paths.
         return {'supported': False, 'reason': 'External helper staging refused; no installation was changed',
                 'preserved': str(directory) if directory is not None else None}
 
 
-class Fixture:
+class _Handoff:
     def __init__(self, artifact, control, process):
         self.artifact, self.control, self.process = artifact, control, process
 
     def arm(self):
-        """Arm ONLY the non-mutating fixture. EOF/main return is never process-exit evidence."""
+        """Live-origin intent only. EOF/main return is never process-exit evidence."""
         self.control.sendall(b'arm')
         if self.control.recv(4096) != b'armed': raise c.SandboxError('External helper did not acknowledge fixture arming')
 
@@ -324,6 +394,21 @@ def start_fixture(artifact, *, budget=30.0, verify=False, execution=False):
     artifact evidence. It never inherits usage leases or executes replacement. Optional fresh
     verification is one fixed read-only query, never normal CLI dispatch or a target/source grant.
     """
+    if artifact.update: raise c.SandboxError('An update artifact cannot run as a non-mutating fixture')
+    return _start(artifact, budget=budget, verify=verify, execution=execution)
+
+
+def start_update(artifact):
+    """Live-origin intent only, never a durable file/argument execution grant or startup bypass."""
+    from . import manager_review
+    if type(artifact) is not Artifact or artifact.update is not True or type(artifact.approval) is not manager_review.Approval \
+            or artifact.approval.review.identity != artifact.review_identity:
+        raise c.SandboxError('A fresh exact origin approval is required before manager handoff')
+    manager_review.revalidate(artifact.approval.review)
+    return _start(artifact, budget=30.0, verify=False, execution=False)
+
+
+def _start(artifact, *, budget, verify, execution):
     artifact.check()
     # This is an originating-manager fixture, not an external shortcut around usage leasing.
     # Retain that lease unchanged until actual process exit, including all worker shutdown.
@@ -347,15 +432,16 @@ def start_fixture(artifact, *, budget=30.0, verify=False, execution=False):
         artifact.check()
         with c._session_launch_signals():
             process = subprocess.Popen([artifact.python, '-I', '-B', '-S', str(artifact.directory / FILES[0]),
-                                        'quiescence-fixture', str(child.fileno()), str(pidfd), str(directory)],
+                                        'manager-update' if artifact.update else 'quiescence-fixture', str(child.fileno()), str(pidfd), str(directory)],
                                        pass_fds=(child.fileno(), pidfd, directory), close_fds=True, start_new_session=True,
-                                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       stdin=subprocess.DEVNULL, stdout=sys.__stdout__ if artifact.update else subprocess.DEVNULL,
+                                       stderr=sys.__stderr__ if artifact.update else subprocess.DEVNULL,
                                        cwd=artifact.directory, env={'HOME': str(Path.home()), 'PATH': os.defpath, 'LANG': 'C.UTF-8'})
             artifact.process, artifact.used, artifact.verify, artifact.execution = process, True, verify, execution
-            fixture = Fixture(artifact, control, process)
+            fixture = _Handoff(artifact, control, process)
         child.close()
         control.settimeout(8)
-        request = {'protocol': 1, 'prefix': artifact.prefix, 'sha256': artifact.sha256, 'budget': budget}
+        request = {'protocol': 2 if artifact.update else 1, 'prefix': artifact.prefix, 'sha256': artifact.sha256, 'budget': budget}
         if verify: request['verify'] = True
         if execution: request['execution_validate'] = True
         if artifact.review_sha256:
