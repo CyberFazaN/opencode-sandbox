@@ -4,6 +4,8 @@ The owned .pth installs only this dashboard subclass. Actual CLI bootstrap/invoc
 classification, tool diagnostics, file/routes, UI and revalidation remain real. No helper/executor.
 """
 import json
+import threading
+import time
 from pathlib import Path
 
 from opencode_sandbox import core as c
@@ -30,6 +32,13 @@ def install(options):
         partial = state.with_suffix('.partial')
         partial.write_text(json.dumps(values))
         partial.replace(state)
+    if options.get('local_validate'):
+        from opencode_sandbox import manager_handoff
+        complete = manager_handoff.complete_terminal_fixture
+        def completed(request, terminal):
+            complete(request, terminal)  # observe ONLY after the real checks/start/arm completed
+            report(helper=request.artifact.process.pid, armed=True)
+        manager_handoff.complete_terminal_fixture = completed
     class Dashboard(tui.Dashboard):
         BINDINGS: ClassVar = tui.Dashboard.BINDINGS
 
@@ -39,6 +48,14 @@ def install(options):
             self.set_interval(.1, self.when_idle)
 
         def when_idle(self):
+            if hasattr(self, 'pending_artifact') and not any(not worker.is_finished for worker in self.workers):
+                with self._handoff_activity._mutex:
+                    idle = not self._handoff_activity._running
+                if idle:
+                    artifact = self.pending_artifact
+                    del self.pending_artifact
+                    self._request_manager_fixture(artifact)
+                return
             if not self.requested and not any(not worker.is_finished for worker in self.workers):
                 self.requested = True
                 self.prepare_review()
@@ -64,13 +81,31 @@ def install(options):
                 return
             assert type(receipt) is manager_review.Approval
             report(approved=receipt.review.identity)
-            self.check_review(receipt.review)
+            self.check_review(receipt)
 
         @work(thread=True, group='owned-manager-review')
-        def check_review(self, prepared):
+        def check_review(self, receipt):
+            prepared = receipt.review
             try:
                 assert manager_review.revalidate(prepared) is prepared
                 report(revalidated=True)
+                if options.get('local_validate'):
+                    from opencode_sandbox import manager_handoff
+                    staged = manager_handoff.prepare_review_fixture(receipt, Path(options['staging']))
+                    assert staged['supported'], staged
+                    artifact = staged['artifact']
+                    report(staged=True, directory=str(artifact.directory), local_identity=artifact.review_identity)
+                    self.call_from_thread(self.queue_handoff, artifact)
+                    return
             except c.SandboxError as exc: report(refused=str(exc))
             self.call_from_thread(self.exit)
+
+        def queue_handoff(self, artifact):
+            def drain():
+                deadline = time.monotonic() + 20
+                while not state.with_suffix('.release').exists():
+                    if time.monotonic() >= deadline: raise RuntimeError('Owned local replay drain expired')
+                    time.sleep(.01)
+            threading.Thread(target=drain, name='owned-local-review-drain').start()
+            self.pending_artifact = artifact
     tui.Dashboard = Dashboard

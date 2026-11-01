@@ -8,19 +8,19 @@ failure recovery are still absent. Normal installation usage is never released o
 import hashlib
 import json
 import os
-import stat
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import core as c
 from . import installation_locks as locks
 from . import manager_installation as installation
+from . import manager_observations as observations
 from . import manager_releases as releases
 from . import manager_targets as targets
 from . import manager_tools as tools
 
 SYSTEM_CONFIGS = ('/etc/gitconfig', '/usr/etc/gitconfig', '/etc/pip.conf')
-CONTEXT = ('HOME', 'PATH', 'XDG_CONFIG_HOME', 'XDG_CONFIG_DIRS', 'XDG_DATA_HOME', *sorted(tools.KNOWN))
+CONTEXT = observations.CONTEXT
 NETWORK = 'public-defaults'
 
 
@@ -57,46 +57,15 @@ def _configurations(evidence, facts):
 
 
 def _route(value):
-    """Bind every observed symlink-route node, not just the canonical binary endpoint.
-
-    Directory timestamps are intentionally excluded: unrelated cache/pyc/log creation is not a
-    replacement. File/symlink ctime, identity, ownership and mode are retained. Missing config
-    routes are evidence too. This is a dated race detector, not protection from trusted local code.
-    """
-    path = tools._path(str(value))
-    pending, current, rows, links = list(path.parts[1:]), Path('/'), [], 0
-    while True:
-        try: info = current.lstat()
-        except FileNotFoundError:
-            rows.append((str(current), 'missing', tuple(pending)))
-            return rows
-        kind = stat.S_IFMT(info.st_mode)
-        if kind not in (stat.S_IFDIR, stat.S_IFREG, stat.S_IFLNK):
-            raise c.SandboxError('Manager review encountered a special path; manual review required')
-        if info.st_uid not in (0, os.getuid()) or (not stat.S_ISLNK(info.st_mode) and info.st_mode & 0o022
-                and not (stat.S_ISDIR(info.st_mode) and info.st_uid == 0 and info.st_mode & stat.S_ISVTX)):
-            raise c.SandboxError('Manager review paths are not controlled; manual review required')
-        extra = () if stat.S_ISDIR(info.st_mode) else (info.st_size, info.st_mtime_ns, info.st_ctime_ns, info.st_nlink)
-        link = os.readlink(current) if stat.S_ISLNK(info.st_mode) else None
-        rows.append((str(current), kind, info.st_dev, info.st_ino, info.st_uid, info.st_mode, extra, link))
-        if link is not None:
-            links += 1
-            if links > 40: raise c.SandboxError('Manager review has a cyclic or excessive symlink route')
-            target = Path(link)
-            pending = list(target.parts[1:] if target.is_absolute() else target.parts) + pending
-            current = Path('/') if target.is_absolute() else current.parent
-            continue
-        if not pending: return rows
-        part = pending.pop(0)
-        current = current.parent if part == '..' else current / part
+    """The same stdlib route implementation is frozen for independent local replay."""
+    try: return observations.route(value)
+    except observations.Refused as exc: raise c.SandboxError(str(exc)) from None
 
 
 def _snapshot(local, facts):
     evidence = local['evidence']
-    prefix, dist = Path(evidence['venv']), Path(evidence['distribution'])
-    records = [prefix / 'pipx_metadata.json', prefix / 'pyvenv.cfg', Path(evidence['module']), prefix / 'bin/opencode-sandbox',
-               *(dist / name for name in ('direct_url.json', 'METADATA', 'entry_points.txt', 'RECORD'))]
-    hashes = {str(path): hashlib.sha256(installation._read(path)).hexdigest() for path in records}
+    records = observations.critical(evidence)
+    hashes = {str(path): hashlib.sha256(observations.read_record(path)).hexdigest() for path in records}
     paths = [*records, evidence['launcher'], evidence['python'], evidence['source_python'], facts['pipx'], facts['python'],
              *facts['settings'].values(), *facts['pipx_runtime']['origins'], *_configurations(evidence, facts)]
     # Preserve lexical routes of explicit locations as well as their reconciled effective paths.
@@ -150,7 +119,7 @@ def prepare(tag):
         target = targets.resolve(tag, local['version'])
         if _inspect()[1] != binding: raise c.SandboxError('Manager installation/tools/settings changed during review; review again')
         return Review(target, local['version'], local['evidence']['venv'], binding)
-    except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError, locks.Error):
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError, locks.Error, observations.Refused):
         raise c.SandboxError('Manager review evidence unavailable; no installation was changed') from None
 
 
@@ -165,7 +134,7 @@ def revalidate(review):
         targets.revalidate(review.target, review.version)
         if _inspect()[1] != review.binding: raise c.SandboxError('Manager installation/tools/settings changed; review again')
         return review
-    except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError, locks.Error):
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError, locks.Error, observations.Refused):
         raise c.SandboxError('Manager review evidence unavailable; no installation was changed') from None
 
 

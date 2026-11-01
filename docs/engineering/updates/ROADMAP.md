@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-- **UP-00..UP-16 and PERF complete. UP-17 partial: source gate and internal exact origin review/consent/origin-side revalidation checkpoints verified. Independent post-exit/exclusive validation, effective installer network policy, replacement and failure recovery remain pending. Manager Update stays disabled.**
+- **UP-00..UP-16 and PERF complete. UP-17 partial: source/origin-consent gates verified; frozen post-exit/exclusive approved-local-observation replay in verification. Fresh independent tool/dependency/source/network execution validation, effective installer network policy, replacement and recovery remain pending. Manager Update stays disabled.**
   PERF measures/optimizes test-local repeated work, not product behavior or verification gates.
   UP-00 persisted the plan; UP-01 fixes report
   subjects/Agent Context presentation; UP-02 preserves independent local/registry inventory
@@ -3049,6 +3049,73 @@ a materially different architecture, record the blocker and ask the owner before
 - Final prose-only language/link/CLI follow-up **27 passed**, 1.98 s (`prose.xml`), not complete
   regression. Final product/checker/test hashes intact. Commit locally on `work/updates` and stop;
   no independent second task, public updater enablement or release action in this cycle.
+
+### UP-17 third local-observation replay checkpoint — 2026-11-01 — verification in progress
+
+- Resumed clean `work/updates` at `9a01a01`; own-rootless inventory matches all four original
+  full image IDs, no containers/volumes. Investigation: origin revalidation imports the target
+  application and assumes a living origin/shared lease, so it cannot be reused after death under
+  helper exclusion. Split this gate at **approved local observations**, not fresh tools/source/
+  network or installation authority. Missing stdlib validator reproducer **1 failed**, .02 s.
+- Extracted one stdlib `manager_observations` critical-record/route implementation shared by
+  origin and source-identical frozen helper. No target/package import in replay. Explicit internal
+  `prepare_review_fixture` requires an exact Approval, fresh origin revalidation, private outside-
+  target helper/input, digest/review identity/inode inventory. No automatic consumer, ordinary CLI
+  bypass, installer argv/env, fresh tool/source/network process or recovery state. The private
+  format-1 input is bounded fixture data, not a durable grant: reviewed PID/prefix/version/source/
+  observation identity and selected HOME/PATH/XDG/pipx context only, never raw credentials/provider
+  environment; context is not applied as an execution environment. 1 MiB input/512 KiB binding/
+  128 KiB critical record/2048 route bounds, strict JSON/shape/known record boundaries.
+- Preserve actual pidfd origin-death proof, one non-waiting exclusive attempt, three inherited
+  descriptors, all lease/fork/exec/witness/driver/admission semantics and 30-second fixture bound.
+  Only under helper-owned exclusion, prove the own exact kernel flock with an unlocked witness,
+  validate private input, compare routes, hash exact approved critical records, compare routes
+  again. No child/target code runs. Fail static `review-failed`, never follow failed local replay
+  with a runtime query. Existing optional fixed verifier remains independent, unchanged in meaning.
+  Directory timestamps ignored, complete observed symlink routes/file metadata/absence bound.
+  Unknown/corrupt/unfamiliar artifacts preserved; no repair/unlink of persistent protocol inodes.
+- First primary observation/review/helper/static **171 passed**, 42.31 s. Lowest Python 3.14 broad
+  helper/observation/review/UI/verifier/terminal/package/static **1 failed/302 passed**, 78.98 s:
+  test supervisor tried to reap an expired helper while its originating parent was still alive.
+  Correct ownership: observe expiration/no replay while origin lives, have that exact origin reap
+  its child and report PID/status before it exits. Busy/quiescent paths still adopt/reap after
+  actual origin death. Cleanup checks unreaped child ownership before signals, never signals a
+  reaped/reused PID. No product assertion/budget weakened. Subsequent primary broad focused
+  **308 passed**, 75.53 s (`final-focused.xml`). Initial Ruff unused-name findings fixed before
+  focused runtime gates; current Ruff all checks pass.
+- Actual installed proof `up17c-proof`: **2 passed**, 118.96 s, both default/custom-space layouts,
+  all prior rows/assertions retained. Adds three actual console/consent/admission/terminal/handoff
+  local-replay scenarios per layout, 80x24/larger, post-main non-daemon drain still leased/no helper
+  result, actual death and independent own exclusion, unchanged success, changed post-arming real
+  launcher refusal, and an owned late site hook causing target Python to exit 73 while local replay
+  still succeeds. Exact hook/fault restoration, child adoption/reaping, no extra network or target
+  runtime/verifier execution; no installation-health or fresh-tool/source/network conclusion.
+- Host tests separately use explicit synthetic local identity/actual synthetic version probes
+  and real HTTP/frozen processes, not real pipx authenticity. Cover strict input/context/identity/
+  prefix/version/JSON, known critical read boundaries, real exclusion requirement, private staging/
+  discard preservation, actual shutdown drain and post-death replay, record/launcher/route/config
+  changes, input bytes/mode/inode/symlink/hardlink/FIFO faults, another supported lease and origin-
+  alive expiration. Existing frozen-source byte equality/import-whitelist gate includes the new
+  stdlib module; previous rows/assertions retained, not replaced by this local proof.
+- Next: freeze final inputs, run four complete compatibility suites and same full 29 affected
+  real rows with added replay checks, packaging/docs/static/resource review, exact manifested
+  scratch cleanup, local commit and STOP. UP-17 partial; Manager Update disabled. No actual
+  replacement/expected installed result, fresh independent tool/dependency/source/network execution
+  or effective installer network-policy/failure-recovery proof. No full campaign/manual/privileged/
+  public-authenticity/provider/paid-API/release-readiness claim. Preserve all evidence/cache/
+  persistent locks; no bump/merge/push/upload/remote change/project tag/publication.
+- Owner workflow correction arrived after the four local-replay compatibility runs: continue
+  autonomously through the whole approved roadmap, no per-item/commit STOP, focused development
+  checks and meaningful risk-based real checkpoints; final complete regression after remaining
+  implementation. Do not repeat the unchanged 29-row campaign for this minor boundary. Keep
+  all assertions/CI/release gates; no release/push/tag/publication, branch migration or unrelated
+  documentation/test-suite audits. Current local-replay evidence: **2076 passed/84 opt-in skips
+  each**, four serial full suites **315.85/309.31/325.18/318.64 s**, clean pip checks, fixed final
+  `.work/up17c/final-source-sha256.json`; installed focused proof **2 passed**, 118.96 s. These
+  are current-block evidence, **not final roadmap verification**. Stage/commit this coherent
+  local-replay block, then continue tool/source/network validation, replacement/expected-result
+  and independent recovery, with final consolidated records/report only when complete or a
+  genuine blocker/context handoff is necessary.
 
 ## Resume and context-compaction handoff
 

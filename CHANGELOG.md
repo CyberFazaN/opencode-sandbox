@@ -70,6 +70,11 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   credential configuration receives manual fallback without value disclosure. Fresh origin-side
   revalidation refuses changed evidence. No helper payload, replacement or recovery is enabled;
   Manager Update remains disabled.
+- Internal approved-local-observation replay freezes shared stdlib file/route checks outside the
+  manager installation. A private bounded fixture input binds the exact review; actual origin
+  death and helper-owned non-waiting exclusion precede replay. Changed input/records/routes
+  refuse. No target application, fresh external-tool/source/network validation, installer or
+  recovery is inferred; Manager Update stays disabled.
 
 ### Fixed
 

@@ -53,8 +53,10 @@ peer fdinfo rather than inheriting a lease. Its fifth completes UP-16's internal
 restored-terminal handoff with actual-work/session refusals and exact foreground tty/driver checks.
 UP-17's first checkpoint adds internal exact published release/tag/commit resolution and fresh
 same-target revalidation. Its second adds internal immutable origin review/explicit consent and
-fresh origin-side installation/tool/source/public-network revalidation. Independent post-exit/
-exclusive validation, effective installer network policy and replacement/recovery remain pending;
+fresh origin-side installation/tool/source/public-network revalidation. Its third adds frozen
+post-origin-death/exclusive replay of approved local file/route observations only; fresh independent
+tool/dependency/source/network execution validation, effective installer network policy and
+replacement/recovery remain pending;
 Manager Update stays disabled.
 No image-definition, metadata/backup schema or manager-version change was made.
 

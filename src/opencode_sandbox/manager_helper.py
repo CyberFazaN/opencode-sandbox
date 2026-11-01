@@ -7,6 +7,7 @@ read-only verifier is launched; no shell, pipx, Docker, network or normal-manage
 import hashlib
 import json
 import os
+import re
 import selectors
 import socket
 import stat
@@ -85,12 +86,19 @@ def main():
         started = time.monotonic()
         request = json.loads(_receive(control, started + 8.0))
         required = {'protocol', 'prefix', 'sha256', 'budget'}
-        if not isinstance(request, dict) or set(request) not in (required, required | {'verify'}) \
+        if not isinstance(request, dict) or not required <= set(request) or set(request) - required - {'verify', 'local_review'} \
                 or ('verify' in request and request['verify'] is not True) \
                 or type(request['protocol']) is not int or request['protocol'] != 1 or isinstance(request['budget'], bool) \
                 or not isinstance(request['budget'], (float, int)) \
                 or not 0 < request['budget'] <= BUDGET:
             raise Refused('Invalid helper request')
+        if 'local_review' in request:
+            value = request['local_review']
+            if not isinstance(value, dict) or set(value) != {'sha256', 'identity', 'file_identity'} \
+                    or any(not isinstance(value[key], str) or not re.fullmatch('[0-9a-f]{64}', value[key]) for key in ('sha256', 'identity')) \
+                    or not isinstance(value['file_identity'], list) or len(value['file_identity']) != 2 \
+                    or any(type(item) is not int or item < 0 for item in value['file_identity']):
+                raise Refused('Invalid local observation request')
         deadline = started + request['budget']
         import installation_locks as locks
         from manager_tool_probe import outside
@@ -125,7 +133,18 @@ def main():
             try:
                 with locks.exclusive(target):
                     result = {'protocol': 1, 'fixture': True, 'outcome': outcome,
-                              'origin': origin, 'helper': os.getpid(), 'sha256': digest}
+                               'origin': origin, 'helper': os.getpid(), 'sha256': digest}
+                    if 'local_review' in request:
+                        try:
+                            from manager_observations import validate
+                            result['review'] = validate(locks, directory, request['local_review'], prefix=str(target),
+                                                        origin=origin, deadline=deadline)
+                        except (OSError, ValueError, TypeError, KeyError, RuntimeError, RecursionError):
+                            result['outcome'] = 'review-failed'
+                            result['review'] = {'ok': False, 'identity': request['local_review']['identity'],
+                                               'reason': 'Approved local manager observations changed or unavailable; no installation was changed'}
+                            _result(directory, result)
+                            return
                     if request.get('verify'):
                         try:
                             from manager_verifier import run

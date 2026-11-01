@@ -25,6 +25,7 @@ from . import manager_tool_probe as paths
 from . import manager_tools as tools
 
 FILES = ('helper.pyz', 'artifact.json', 'result.json')
+REVIEW = 'review.json'
 
 
 @dataclass(frozen=True)
@@ -114,7 +115,8 @@ def _bundle():
     content = io.BytesIO()
     with zipfile.ZipFile(content, 'w', compression=zipfile.ZIP_STORED) as archive:
         for source, name in [('manager_helper.py', '__main__.py'), ('installation_locks.py', 'installation_locks.py'),
-                             ('manager_tool_probe.py', 'manager_tool_probe.py'), ('manager_verifier.py', 'manager_verifier.py')]:
+                             ('manager_tool_probe.py', 'manager_tool_probe.py'), ('manager_verifier.py', 'manager_verifier.py'),
+                             ('manager_observations.py', 'manager_observations.py')]:
             fd = os.open(Path(__file__).with_name(source), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
             with os.fdopen(fd, 'rb') as stream:
                 info = os.fstat(stream.fileno())
@@ -140,6 +142,9 @@ class Artifact:
     process: object = field(default=None, repr=False)
     used: bool = False
     verify: bool = False
+    review_sha256: str = ''
+    review_identity: str = ''
+    review_file_identity: tuple = ()
 
     def check(self):
         if self.owner != os.getpid(): raise c.SandboxError('External helper artifact belongs to another process')
@@ -151,6 +156,14 @@ class Artifact:
         with os.fdopen(fd, 'rb') as stream: raw = stream.read(262145)
         if len(raw) > 262144 or hashlib.sha256(raw).hexdigest() != self.sha256:
             raise c.SandboxError('External helper artifact content changed')
+        if self.review_sha256:
+            from . import manager_observations as observations
+            if _private(self.directory / REVIEW) != self.review_file_identity:
+                raise c.SandboxError('Approved local observation file identity changed; preserved')
+            fd = os.open(self.directory / REVIEW, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+            with os.fdopen(fd, 'rb') as stream: raw = stream.read(observations.LIMIT + 1)
+            if len(raw) > observations.LIMIT or hashlib.sha256(raw).hexdigest() != self.review_sha256:
+                raise c.SandboxError('Approved local observation content changed; preserved')
 
     def discard(self):
         """Explicit exact-artifact cleanup only after our child is reaped; never on live transfer."""
@@ -158,18 +171,32 @@ class Artifact:
         if self.process is not None and self.process.poll() is None:
             raise c.SandboxError('External helper is still alive; preserve its artifact')
         names = {path.name for path in self.directory.iterdir()}
-        if not names <= set(FILES): raise c.SandboxError('External helper directory has unfamiliar files; preserved')
+        if not names <= set(FILES) | ({REVIEW} if self.review_sha256 else set()):
+            raise c.SandboxError('External helper directory has unfamiliar files; preserved')
         for name in names: _private(self.directory / name)
-        if _record(self.directory / FILES[1]) != {'protocol': 1, 'fixture': True, 'sha256': self.sha256}:
+        inventory = {'protocol': 1, 'fixture': True, 'sha256': self.sha256}
+        if self.review_sha256: inventory.update(review_sha256=self.review_sha256, review_identity=self.review_identity)
+        if _record(self.directory / FILES[1]) != inventory:
             raise c.SandboxError('External helper inventory changed; preserved')
         if FILES[2] in names:
             value = _record(self.directory / FILES[2])
             base = {'protocol', 'fixture', 'sha256', 'origin', 'helper', 'outcome'}
-            if self.process is None or not isinstance(value, dict) or set(value) not in (base, base | {'verifier'}) \
+            if self.process is None or not isinstance(value, dict) or set(value) not in (base, base | {'verifier'}, base | {'review'}, base | {'review', 'verifier'}) \
                     or value['protocol'] != 1 or value['fixture'] is not True or value['sha256'] != self.sha256 \
                     or value['origin'] != self.owner or value['helper'] != self.process.pid \
-                    or value['outcome'] not in ('quiescent', 'busy', 'cancelled', 'abandoned', 'expired', 'verification-failed'):
+                    or value['outcome'] not in ('quiescent', 'busy', 'cancelled', 'abandoned', 'expired', 'verification-failed', 'review-failed'):
                 raise c.SandboxError('External helper result is unfamiliar; preserved')
+            if 'review' in value:
+                review = value['review']
+                if not self.review_sha256 or not isinstance(review, dict) or type(review.get('ok')) is not bool \
+                        or review.get('identity') != self.review_identity \
+                        or set(review) != ({'ok', 'identity'} if review['ok'] else {'ok', 'identity', 'reason'}) \
+                        or (not review['ok'] and (value['outcome'] != 'review-failed' or 'verifier' in value
+                            or review['reason'] != 'Approved local manager observations changed or unavailable; no installation was changed')) \
+                        or (review['ok'] and value['outcome'] not in ('quiescent', 'verification-failed')):
+                    raise c.SandboxError('External helper local observation result is unfamiliar; preserved')
+            elif value['outcome'] == 'review-failed' or self.review_sha256 and value['outcome'] in ('quiescent', 'verification-failed'):
+                raise c.SandboxError('External helper local observation result is missing; preserved')
             if 'verifier' in value and (not self.verify or not isinstance(value['verifier'], dict)
                                         or type(value['verifier'].get('ok')) is not bool):
                 raise c.SandboxError('External helper verifier result is unfamiliar; preserved')
@@ -195,6 +222,32 @@ def prepare(installation, parent):
 
     Results never authorize a mutation. No helper is started just by preparing an artifact.
     """
+    return _prepare(installation, parent, None)
+
+
+def prepare_review_fixture(approval, parent):
+    """Stage approved LOCAL observations only; no independent fresh tool/source/install grant.
+
+    Ordinary startup/UI has no consumer. The explicit internal caller must separately finish
+    the existing terminal/admission gate. Source/critical facts are fresh in the living origin;
+    after death only the frozen bounded local observations are replayed. Never a recovery record.
+    """
+    from dataclasses import asdict
+
+    from . import manager_installation, manager_observations, manager_review
+    if type(approval) is not manager_review.Approval:
+        raise c.SandboxError('An exact internal review receipt is required for the local observation fixture')
+    review = manager_review.revalidate(approval.review)
+    try:
+        raw = manager_observations.capsule(origin=os.getpid(), prefix=review.prefix, version=review.version,
+            identity=review.identity, binding=review.binding, target=asdict(review.target),
+            context={name: os.environ.get(name) for name in manager_observations.CONTEXT})
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError):
+        raise c.SandboxError('Approved local observation input refused; no fixture was staged') from None
+    return _prepare(manager_installation.classify(), parent, (raw, review.identity))
+
+
+def _prepare(installation, parent, local_review):
     facts = tools.assess(installation)
     if not facts['supported']: return {'supported': False, 'reason': facts['reason']}
     directory = None
@@ -206,13 +259,22 @@ def prepare(installation, parent):
         directory = Path(tempfile.mkdtemp(prefix='ocs-test-helper-', dir=parent))
         digest = hashlib.sha256(raw).hexdigest()
         _write(directory, FILES[0], raw)
-        _write(directory, FILES[1], (json.dumps({'protocol': 1, 'fixture': True, 'sha256': digest}, sort_keys=True) + '\n').encode())
+        inventory = {'protocol': 1, 'fixture': True, 'sha256': digest}
+        review_digest = review_identity = ''
+        if local_review is not None:
+            review_raw, review_identity = local_review
+            _write(directory, REVIEW, review_raw)
+            review_digest = hashlib.sha256(review_raw).hexdigest()
+            inventory.update(review_sha256=review_digest, review_identity=review_identity)
+        _write(directory, FILES[1], (json.dumps(inventory, sort_keys=True) + '\n').encode())
         fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
         try: os.fsync(fd)
         finally: os.close(fd)
         artifact = Artifact(directory, str(prefix), facts['evidence']['python'], digest,
-                            _private(directory, directory=True), _private(directory / FILES[0]),
-                            tuple(facts['evidence']['python_identity']))
+                             _private(directory, directory=True), _private(directory / FILES[0]),
+                             tuple(facts['evidence']['python_identity']), review_sha256=review_digest,
+                             review_identity=review_identity,
+                             review_file_identity=_private(directory / REVIEW) if review_digest else ())
         artifact.check()
         return {'supported': True, 'reason': 'Non-mutating helper fixture staged; no handoff or installation grant', 'artifact': artifact}
     except (OSError, ValueError, RuntimeError):
@@ -280,6 +342,9 @@ def start_fixture(artifact, *, budget=30.0, verify=False):
         control.settimeout(8)
         request = {'protocol': 1, 'prefix': artifact.prefix, 'sha256': artifact.sha256, 'budget': budget}
         if verify: request['verify'] = True
+        if artifact.review_sha256:
+            request['local_review'] = {'sha256': artifact.review_sha256, 'identity': artifact.review_identity,
+                                       'file_identity': list(artifact.review_file_identity)}
         control.sendall(json.dumps(request).encode())
         if control.recv(4096) != b'ready': raise c.SandboxError('External helper fixture readiness refused')
         return fixture

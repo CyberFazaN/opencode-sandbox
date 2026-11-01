@@ -22,8 +22,9 @@ an independent stdlib helper with a non-mutating process-exit fixture. Its fourt
 fixed read-only fresh runtime query under helper exclusion. Its fifth adds an internal restored-
 terminal handoff/refusal fixture. UP-17's first checkpoint adds internal read-only exact published
 release/tag/commit resolution and fresh same-target revalidation. Its second adds internal exact
-origin review/consent and fresh origin-side revalidation; independent post-exit/exclusive checks,
-replacement and failure recovery remain pending. Manager Update is disabled.
+origin review/consent and fresh origin-side revalidation. Its third adds frozen post-exit/exclusive
+replay of approved local file/route observations only; fresh independent tool/dependency/source/
+network execution gates, replacement and failure recovery remain pending. Manager Update is disabled.
 
 ## Boundaries
 
@@ -52,6 +53,7 @@ replacement and failure recovery remain pending. Manager Update is disabled.
 | `manager_releases.py`, `manager_installation.py` | Independent published-full-release discovery/claims and local-only conservative pipx provenance/settings reconciliation; no pipx execution or installation authorization | D-056, D-057 |
 | `manager_targets.py` | Internal explicit exact published release/ref/peeled-commit observation and fresh same-target revalidation; fixed GitHub HTTPS authority, no cached target grant, install consent or executor | D-056, D-057 |
 | `manager_review.py`, `manager_review_tui.py` | Internal immutable exact origin installation/tool/source/public-default network review, explicit scrollable consent receipt and fresh origin-side revalidation; no public route, executor, independent exclusive check, durable grant or helper payload | D-056, D-057 |
+| `manager_observations.py` | Shared stdlib bounded critical-record/route primitives and frozen approved-local-observation replay under real helper-owned exclusion; no target import, fresh tool/source/network execution, installer or recovery authority | D-056, D-057 |
 | `diagnostics.py`, `http_probe.py`, `probes.py` | Bounded captured host diagnostics, isolated stdlib HTTP child, container-side probe limits and invocation-owned image-helper cleanup; not long-mutation/session executors | D-056 |
 | `distros.py` + `assets/images/` | Registry of managed distributions (Debian 13 default/revision 2, Arch Linux with `paru`/`ocs-aur`), Dockerfiles, validated image provenance, OpenCode install script | D-005, D-006, D-016, D-017, D-051 |
 | `opencode_versions.py` | Registry lookup without host npm, policies (notify/manual/pinned; OpenCode 2.x only), journalled base and environment updates, rollback | D-007, D-019, D-033 |
@@ -191,6 +193,71 @@ sizes, default Cancel, explicit approval, an owned changed-launcher fault, custo
 and credential-file presence refusal without reading contents. No source/classification/lock/terminal
 reply is mocked. This is automated installed/private-transport evidence, not public-release
 authentication, human observation, actual replacement or an independent exclusive/recovery proof.
+
+## Frozen approved-local-observation replay (UP-17 third checkpoint)
+
+Origin-side revalidation cannot run after origin death: it imports the application and owns a
+shared usage lease. The new `manager_observations` module contains only stdlib critical-record
+and complete observed-route primitives shared by the origin and the frozen helper. Origin review
+wraps its static refusal reasons without changing public classification, source/tool discovery,
+policy or UI. This is a scoped extraction, not an independent copy of the review's checks.
+
+`manager_handoff.prepare_review_fixture` accepts only an exact internal Approval receipt, freshly
+revalidates its review in the origin, and stages a source-identical helper plus private `review.json`
+outside the target. Nothing starts just by staging. The bounded format-1, fixture-only input carries
+the reviewed target as opaque identity-bound data, original PID/prefix/version/review identity,
+bounded observation binding and only the reviewed HOME/PATH/XDG/recognized pipx context. It is
+not a raw environment/credential dump, executable capability, updater consent schema or recovery
+record. Context is **data only**, never an applied execution environment. Input size is at most
+1 MiB; the original binding remains at most 512 KiB, each critical record 128 KiB, routes at most
+2048 with bounded symlink traversal. No metadata/backup schema or migration is introduced.
+
+Artifact inventory binds input digest/identity and own private single-link file inode; tampered
+permissions/content/inode, symlink/hardlink/special input and unfamiliar extra files refuse or are
+preserved rather than repaired/deleted. Descriptor-relative helper reads use the original private
+directory fd. Capsule parsing rejects unknown format/top-level fields, duplicate/non-finite JSON,
+origin/prefix/version/context/identity mismatch and non-exact critical-record inventories. Critical
+reads are restricted to the approved own installation's known records; this is not an arbitrary
+file-read or command interface. Target/review hashes are dated identity agreement, not code or
+published-source authenticity. Cleanup recognizes only this staged fixture's exact owned inventory.
+
+The helper's only entry remains the bounded non-mutating process-exit fixture. The private request
+adds only capsule digest/review identity/file identity, not commands, callbacks or normal startup
+flags. It still inherits exactly its control socket, origin pidfd and directory fd, no lease.
+Arming/EOF/main return/terminal restoration never substitute for actual origin termination. Only
+pidfd-proven death permits the existing **one non-waiting exclusive attempt**. A live supported
+participant returns busy, expiration while the origin lives returns expired, and neither replays
+the approved input. No shared-to-exclusive conversion or early usage release exists.
+
+Under exclusion, replay independently checks its own exact live kernel flock using an independent
+unlocked witness, never exporting a guard or starting a child. It validates the private capsule,
+compares all approved observed routes, hashes the exact critical records, then compares routes
+again. Directory timestamps remain excluded; file/symlink identities/ownership/modes/metadata,
+complete observed symlink spelling and absent configuration paths remain bound. A static success
+records only `ok` plus review identity. Failure is `review-failed` with a static non-secret reason;
+no late runtime query follows a failed local replay. The optional existing dedicated runtime query
+can still run after successful replay, but remains a separate fixed observation, not expected-result
+verification. All prior no-review fixture semantics and strict result/discard checks are retained.
+
+This deliberately limited result is **not fresh independent classification, tool/dependency graph,
+published-source or installer-network-policy validation**, runtime/launcher/basic-CLI health or
+permission to install. No target package/runtime, tool, network, shell or installer is executed by
+local replay. Its 30-second lifetime is still a fixture budget, not a future install deadline;
+bounded byte/route counts and between-operation deadline checks do not preempt an unresponsive
+filesystem. It is not a complete lazy-file inventory. A real test deliberately adds an owned late
+startup hook that makes target Python exit 73: local replay still succeeds because the approved
+observations did not change and no target code is run. The hook is then removed. This proves both
+independence and why replay alone cannot enable Manager Update.
+
+Test-only installed-console injection extends the actual origin consent/worker/admission/driver/
+terminal boundary before arming; an observer records helper identity only after the real completion
+call. Actual default/custom-space pipx packages test both sizes, non-daemon drain, unchanged and
+changed post-arming observations, exact child adoption/reaping and unavailable target startup.
+Host cases separately cover private-input faults, real kernel exclusion, other live usage and
+expiration. Private Git/API/synthetic host identities remain explicit fixtures, not public or
+installation-success proof. Manager Update stays disabled. Fresh independent tool/dependency/
+source/network validation and effective installer network policy, actual replacement/expected
+installed result and independent failure recovery remain the next gates.
 
 ## Early installation access (D-056, UP-16 first checkpoint)
 

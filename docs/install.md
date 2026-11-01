@@ -92,6 +92,12 @@ policy; detected custom pip/Git/proxy/index/credential configuration requires ma
 and is never silently removed or printed. The form has no public entry point and does not install
 anything. Its in-memory receipt and fresh origin-side check are not independent exclusive
 revalidation, installation authorization or a recovery record; those gates remain pending.
+The frozen helper can now replay approved **local file/route observations** after actual origin
+exit under its own exclusive guard. The private input is fixture data, not a durable grant or
+recovery record. Replay does not import the target application or freshly execute external tools,
+source discovery or installer network policy; it can pass while target startup is unavailable.
+It is not runtime health, full execution revalidation or replacement success. Those independent
+gates, effective installer network policy and failure recovery remain pending.
 
 ## Prepare Docker
 
