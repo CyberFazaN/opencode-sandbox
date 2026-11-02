@@ -36,8 +36,9 @@ Acceptance is not a post-reboot PASS. Next step: on an authorized
 disposable VM, retain a named hard-interrupted operation, reboot, perform an explicit manual repair
 only if needed, then run its original frozen verification command and check normal startup/data
 retention. No automatic reboot, reset, stale-PID signal or cache-based reopening is allowed.
-No real paid-provider or manual-observation result was renewed. The protected release PR/review
-and required hosted checks remain gates; I06's final release decision is pending.
+No real paid-provider or manual-observation result was renewed. The owner approved publication;
+all ten initial release-PR jobs passed. I06's reviewed decision is READY WITH ACCEPTED RISKS.
+The protected final-tree PR, `main` and tag checks remain mandatory; no safeguard is bypassed.
 
 ## Legend
 
@@ -168,7 +169,7 @@ and required hosted checks remain gates; I06's final release decision is pending
 | I03 | P1 | Performance baseline | Median durations per command from the campaign log (every command is logged with its duration); small test workspaces; no targets defined | PASS (real; durations recorded in the run log, no targets) |
 | I04 | P0 | Full regression at the release revision | The whole current real campaign, both distributions and packaged image build; retained privileged rows with consent; campaign through a pipx installation of a test tag. Evidence: `BASELINE.md` | PASS (6.2.0 `r62b`: complete installed private-tag campaign, both packaged images and cached/full-refresh builds, authorized privileged/C10 rows and retained Debian 12 fixture; 86 tests/1643 checks, 0 failures/errors/skips. Additional 3.11 installed-manager floor: 7 tests/563 checks; no real paid-provider call, BASELINE) |
 | I05 | P0 | Documentation matches the code: every command and option named in the product, `README.md` and `docs/` exists; relative links and anchors resolve; code blocks fit 80 columns; the install commands name the release tag; active documents are English; new instructions in the guides were measured | `tests/test_cli_structure.py`, `tests/test_user_docs.py`, `tests/test_language.py`, `tests/test_disclosure.py`; review of `README.md`, `CHANGELOG.md` and the guides against the code and `--help` | PASS (review, unit) |
-| I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | NOT TESTED (final 6.2.0 publication decision pending protected release PR/review and required hosted checks under RELEASING; local qualification passes with B15's explicit accepted risk) |
+| I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | PASS (6.2.0 review: READY WITH ACCEPTED RISKS. All other P0/P1 rows PASS or B15 BLOCKED with explicit owner acceptance and a reproducible next step; complete local qualification and ten initial release-PR jobs passed. Owner authorized publication; final-tree PR/main/tag checks and draft review remain enforced, not waived) |
 
 ## J, K, L. Readiness and cleanup, distributions, direct workspaces
 
@@ -199,10 +200,10 @@ installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 
 | Priority | Rows | PASS | PASS in part | BLOCKED | NOT TESTED | FAIL |
 |---|---|---|---|---|---|---|
-| P0 | 48 | 47 | 0 | 0 | 1 | 0 |
+| P0 | 48 | 48 | 0 | 0 | 0 | 0 |
 | P1 | 34 | 33 | 0 | 1 | 0 | 0 |
 | P2 | 5 | 4 | 1 | 0 | 0 | 0 |
-| All | 87 | 84 | 1 | 1 | 1 | 0 |
+| All | 87 | 85 | 1 | 1 | 0 | 0 |
 
 - PASS in part: D09 (the host reboot is BLOCKED with accepted risk and a next step).
 - B15 is BLOCKED with owner-accepted risk for 6.2.0; its post-reboot path is not renewed by same-boot
@@ -210,7 +211,8 @@ installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 - C10 was re-established on the 6.2.0 candidate through the installed manager and actual isolated
   inherited listener, not just host sockets or warmed direct Docker.
 - I04 passed on the 6.2.0 candidate (`r62b`: 86 tests/1643 checks, no failures/errors/skips).
-  I06 remains pending the protected release workflow, not waived by local tests or B15 acceptance.
+  I06's reviewed decision is READY WITH ACCEPTED RISKS; the protected release workflow still
+  requires final-tree PR/main/tag checks and automated draft review before publication.
 - H05: an intermittent session-test failure was traced to a launch-ownership race and fixed
   (D-054); the first real run also found a terminal-restoration defect, retained as failing
   evidence and fixed before the successful scoped rerun.

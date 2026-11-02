@@ -76,9 +76,13 @@ directory were removed. Persistent protocol locks and original frozen hard-inter
 inputs remain. No reboot, real credential or paid-provider call was performed; the earlier real
 OpenRouter observation is retained evidence only, not a new candidate result.
 
-This is **local qualification**, not publication authorization or completed hosted release CI.
-Hosted `develop` CI passed all ten jobs on the approved pre-preparation tree; the protected release
-PR/review and `main`/tag checks still belong to RELEASING. CAMPAIGN I06's final decision is pending.
+Hosted qualification supplements these local results: all ten jobs passed on the approved
+`develop` tree and on [release PR #3](https://github.com/CyberFazaN/opencode-sandbox/pull/3)
+([candidate CI](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41468038565)).
+The owner authorized the protected merge, annotated tag and publication. CAMPAIGN I06's reviewed
+decision is **READY WITH ACCEPTED RISKS**, retaining B15 as BLOCKED, not PASS. Evidence-only edits
+do not change the qualified product/test bytes. Required final-tree PR, `main` and tag checks and
+automated draft review remain mandatory under RELEASING; this is not a production-readiness claim.
 
 ### Test-quality checkpoint before 6.2.0 preparation
 
