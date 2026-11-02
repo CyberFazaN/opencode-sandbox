@@ -54,6 +54,10 @@ def test_ubuntu_tests_copy_the_complete_python_runtime_without_changing_the_host
     assert 'echo "pythonLocation=$private_python"' in section
     assert 'echo "LD_LIBRARY_PATH=$private_python/lib"' in section
     assert '} >> "$GITHUB_ENV"' in section
+    assert r'patchelf --set-rpath "\$ORIGIN/../lib"' in section
+    assert 'cp -a "$GITHUB_WORKSPACE/." "$private_project/"' in section
+    assert 'chmod -R go-w "$private_project"' in section
+    assert section.count('working-directory: ${{ env.OCS_CI_PROJECT }}') == 2
     assert "sudo" not in section and "/opt/hostedtoolcache" not in section
 
 
@@ -67,7 +71,7 @@ def test_arch_editable_source_has_owned_ancestors_and_controlled_modes():
     assert 'chown -R ci: "$GITHUB_WORKSPACE"' not in section
 
 
-def test_private_runtime_step_preserves_source_bytes_routes_and_permissions(tmp_path):
+def test_private_runtime_step_relocates_only_owned_copies_and_preserves_sources(tmp_path):
     text = (ROOT / ".github/workflows/ci.yml").read_text()
     section = text.split('      - name: Private controlled Python runtime\n', 1)[1].split('      - name: Install\n', 1)[0]
     script = '\n'.join(line[10:] for line in section.split('        run: |\n', 1)[1].splitlines())
@@ -83,25 +87,47 @@ def test_private_runtime_step_preserves_source_bytes_routes_and_permissions(tmp_
     unrelated.write_bytes(b'not part of this runtime')
     unrelated.chmod(0o666)
     (source / 'outside-alias').symlink_to(unrelated)
+    workspace = tmp_path / 'hosted checkout'
+    workspace.mkdir()
+    document = workspace / 'README.md'
+    document.write_bytes(b'owned checkout fixture')
+    workspace.chmod(0o777)
+    document.chmod(0o666)
     for path in (source, source / 'bin', source / 'lib', binary):
         path.chmod(0o777)
     library.chmod(0o666)
-    before = {path: (path.read_bytes(), path.stat().st_mode) for path in (binary, library, unrelated)}
+    before = {path: (path.read_bytes(), path.stat().st_mode) for path in (binary, library, unrelated, document)}
+    commands = tmp_path / 'commands'; commands.mkdir()
+    arguments = tmp_path / 'patchelf-arguments'
+    patchelf = commands / 'patchelf'
+    # This shell-step contract uses data files, not a Python/ELF runtime. The actual hosted
+    # Python's sanitized child startup is exercised separately; never mock a product guard.
+    patchelf.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$CI_PATCHELF_ARGS"\n'
+                        'printf "\\nowned relocation\\n" >> "$3"\n')
+    patchelf.chmod(0o700)
     paths, environment = tmp_path / 'github-path', tmp_path / 'github-env'
     subprocess.run(['bash', '-eu', '-c', script], check=True, capture_output=True, text=True,
                    env={**os.environ, 'HOME': str(home), 'pythonLocation': str(source),
-                        'GITHUB_PATH': str(paths), 'GITHUB_ENV': str(environment)})
+                        'GITHUB_PATH': str(paths), 'GITHUB_ENV': str(environment),
+                        'GITHUB_WORKSPACE': str(workspace), 'CI_PATCHELF_ARGS': str(arguments),
+                        'PATH': str(commands) + os.pathsep + os.environ.get('PATH', os.defpath)})
     exports = dict(line.split('=', 1) for line in environment.read_text().splitlines())
     private = Path(exports['pythonLocation'])
     assert private.parent == home and private != source
+    project = Path(exports['OCS_CI_PROJECT'])
+    assert project.parent == home and project != workspace and project != private
     assert exports == {'pythonLocation': str(private), 'LD_LIBRARY_PATH': str(private / 'lib'),
                        'PKG_CONFIG_PATH': str(private / 'lib/pkgconfig'),
+                       'OCS_CI_PROJECT': str(project),
                        **{name: str(private) for name in ('Python_ROOT_DIR', 'Python2_ROOT_DIR', 'Python3_ROOT_DIR')}}
     assert paths.read_text().splitlines() == [str(private / 'bin')]
     for path in (private, private / 'bin', private / 'lib', private / 'bin/python3', private / 'lib/stdlib.py'):
         assert path.stat().st_uid == os.getuid() and not path.stat().st_mode & 0o022
-    assert (private / 'bin/python3').read_bytes() == binary.read_bytes()
+    assert arguments.read_text().splitlines() == ['--set-rpath', '$ORIGIN/../lib', str(private / 'bin/python3')]
+    assert (private / 'bin/python3').read_bytes() == binary.read_bytes() + b'\nowned relocation\n'
     assert (private / 'lib/stdlib.py').read_bytes() == library.read_bytes()
     assert (private / 'bin/python').is_symlink() and (private / 'bin/python').readlink() == Path('python3')
     assert (private / 'outside-alias').is_symlink() and (private / 'outside-alias').readlink() == unrelated
+    assert (project / 'README.md').read_bytes() == document.read_bytes()
+    assert not project.stat().st_mode & 0o022 and not (project / 'README.md').stat().st_mode & 0o022
     assert before == {path: (path.read_bytes(), path.stat().st_mode) for path in before}

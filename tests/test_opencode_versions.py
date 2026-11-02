@@ -46,6 +46,9 @@ def registry(monkeypatch):
             import time
             state["requests"].append((self.path, self.headers.get("Accept")))
             state['request_headers'].append(dict(self.headers))
+            gate = state.get('response_gate')
+            if gate is not None:
+                assert gate.wait(5), 'registry response rendezvous expired'
             time.sleep(state["delay"])
             self.send_response(state["status"])
             for key, value in state["headers"].items(): self.send_header(key, value)

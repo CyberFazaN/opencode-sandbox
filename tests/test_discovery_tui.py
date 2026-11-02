@@ -1,6 +1,7 @@
 """Default-off dashboard scheduling: real files/HTTP, Textual pilots and no runtime work."""
 import json
 import threading
+from contextlib import contextmanager
 
 import pytest
 import test_opencode_versions
@@ -118,23 +119,47 @@ def test_indicator_is_single_quiet_policy_filtered_and_never_operation_status(me
     assert app._discovery_status["success"]["value"] == "2.2.0"
 
 
-def test_background_and_explicit_updates_check_share_one_real_request(metadata_sources, registry, monkeypatch):
+@pytest.mark.parametrize('slow_ui', [False, True])
+def test_background_and_explicit_updates_check_share_one_real_request(metadata_sources, registry, monkeypatch, slow_ui):
     preferences.write({**preferences.DEFAULTS, "daily_discovery": True})
-    registry["delay"] = .8
+    release, joined = threading.Event(), threading.Event()
+    registry['response_gate'] = release
+    original_guard, entries = cache.source_lock, []
+
+    @contextmanager
+    def observed_guard(key, **kwargs):
+        if key == v._registry_key():
+            # latest() has already read its previous attempt before entering this guard.
+            # Hold the real HTTP response until the explicit caller actually joins it.
+            entries.append(key)
+            if len(entries) == 2: joined.set()
+        with original_guard(key, **kwargs) as waited:
+            yield waited
+
+    monkeypatch.setattr(cache, 'source_lock', observed_guard)
     # Empty environment view ensures the explicit Check has no runtime object to probe.
     from opencode_sandbox import updates
     monkeypatch.setattr(updates, "base_inventory", lambda *a, **k: {"state": "not built", "eligible": False})
     async def test(app, pilot):
-        await until(pilot, lambda: len(registry["requests"]) == 1)
-        await pilot.press("v", "3", "c")
-        screen = app.screen
-        await until(pilot, lambda: not screen._active and app._discovery_status is not None)
-        assert "npm: 2.2.0" in screen.discovery_text()
-        assert screen.remote["success"] == v.discovery()["success"]  # never retimestamp shared evidence
-        assert len(registry["requests"]) == 1 and not metadata_sources
-        await pilot.press("d")
-        assert "enabled (GitHub + npm, independent sources)" in app.screen.report
-    run(test, (80, 24))
+        try:
+            await until(pilot, lambda: len(registry["requests"]) == 1)
+            if slow_ui: await pilot.pause(1.2)  # exceeds the old response-delay assumption
+            await pilot.press("v", "3", "c")
+            screen = app.screen
+            await until(pilot, joined.is_set)
+            release.set()
+            await until(pilot, lambda: not screen._active and app._discovery_status is not None)
+            assert "npm: 2.2.0" in screen.discovery_text()
+            assert screen.remote["success"] == v.discovery()["success"]  # never retimestamp shared evidence
+            assert len(registry["requests"]) == 1 and not metadata_sources
+            await pilot.press("d")
+            assert "enabled (GitHub + npm, independent sources)" in app.screen.report
+        finally:
+            release.set()
+    try:
+        run(test, (80, 24))
+    finally:
+        release.set()
 
 
 def test_background_results_reach_an_already_open_updates_view(metadata_sources, registry, monkeypatch):

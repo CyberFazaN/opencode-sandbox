@@ -44,9 +44,16 @@ jobs:
           private_python="$(mktemp -d "$HOME/ocs-ci-python.XXXXXX")"
           cp -a "$pythonLocation/." "$private_python/"
           chmod -R go-w "$private_python"
+          # Isolated helper children discard LD_LIBRARY_PATH. Relocate only the copied ELF;
+          # otherwise GitHub's compiled RUNPATH still loads Python from the original toolcache.
+          patchelf --set-rpath "\$ORIGIN/../lib" "$(readlink -f "$private_python/bin/python")"
+          private_project="$(mktemp -d "$HOME/ocs-ci-project.XXXXXX")"
+          cp -a "$GITHUB_WORKSPACE/." "$private_project/"
+          chmod -R go-w "$private_project"
           echo "$private_python/bin" >> "$GITHUB_PATH"
           {
             echo "pythonLocation=$private_python"
+            echo "OCS_CI_PROJECT=$private_project"
             # setup-python also exports loader/build paths; none should retain the writable cache.
             echo "LD_LIBRARY_PATH=$private_python/lib"
             echo "PKG_CONFIG_PATH=$private_python/lib/pkgconfig"
@@ -55,6 +62,7 @@ jobs:
             done
           } >> "$GITHUB_ENV"
       - name: Install
+        working-directory: ${{ env.OCS_CI_PROJECT }}
         env:
           DEPENDENCIES: ${{ matrix.dependencies }}
         run: |
@@ -64,6 +72,7 @@ jobs:
           python -m pip check
           python -m pip list | grep -iE '^(typer|textual|click|rich) '
       - name: Unit, host and Textual pilot tests (ruff and shellcheck included)
+        working-directory: ${{ env.OCS_CI_PROJECT }}
         run: python -m pytest -q -rs -p no:cacheprovider
 
   arch:
