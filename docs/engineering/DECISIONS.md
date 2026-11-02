@@ -351,11 +351,12 @@ duplicates refused). Still refused: NUL and backslash in link targets, special f
 hardlinks, non-canonical names. Change bundles keep refusing links leaving the repository
 (D-028). Verified: `tests/test_backup_hardening.py`, `tests/test_archive_paths.py`, rows E01, E03.
 
-## D-023 Engineering records are current-state documents — accepted, partly superseded by D-045
+## D-023 Engineering records are current-state documents — accepted, partly superseded by D-045/D-059
 
 The maintainer records in `docs/engineering/` describe the current state and are kept true when
 the code changes: `BASELINE.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `ISSUES.md`, `CAMPAIGN.md`,
-`RELEASING.md`. `TODO.md` and `.work/` keep their D-014 roles. Location rules: D-045.
+`RELEASING.md`. `TODO.md` and `.work/` keep their D-014 roles. Location rules: D-045;
+proportionate update cadence and ownership: D-059 and CONTRIBUTING.
 
 ## D-024 Records of a multi-cycle effort — superseded by D-045
 
@@ -664,13 +665,14 @@ Supersedes the host scope of D-038.
   controller delegation or user-namespace policy. Portability work: `TODO.md`.
 - Documented: `README.md`, `docs/install.md`. Limitations: `ISSUES.md`.
 
-## D-047 Stabilization priorities and upstream-owned host setup — accepted
+## D-047 Stabilization priorities and upstream-owned host setup — accepted, execution rhythm superseded by D-059
 
 Owner direction, 2026-10-29: prepare a dependable stable release through compatibility,
 reliability, data safety, recovery, installation simplicity, UX and documentation, not feature
 expansion. The classified backlog is `TODO.md`; the active multi-cycle plan and progress live
-in a working-record subdirectory of `docs/engineering/` (D-045; removed by D-055). Continue one verified task per cycle and retain
-all Git and publication permissions. No stable status or version is claimed by the plan.
+in a working-record subdirectory of `docs/engineering/` (D-045; removed by D-055). That effort's
+one-verified-task-per-cycle rhythm is retired by D-059; all Git and publication permissions remain.
+No stable status or version is claimed by the plan.
 
 - Supersedes the hand-maintained host setup documentation approach of D-046: link Docker's
   official rootless guide and the distribution's official documentation, with the ArchWiki for
@@ -914,8 +916,9 @@ Owner decision, 2026-10-30, after an independent review of every change since 6.
 
 ## D-056 Updates architecture and execution order — accepted for implementation
 
-Workflow/stage dependencies are partially superseded by D-057; the architecture/safety contract
-below is unchanged.
+Workflow/stage dependencies are partially superseded by D-057; D-059 retires the execution/STOP
+rhythm. The architecture/safety contract below is unchanged. Stage descriptions are implementation
+history, not a new roadmap to execute.
 
 Owner approval after the 6.1.0 release: improve discovery, version evidence, notifications,
 execution and recovery without replacing working lifecycle mechanisms. **Implementation is
@@ -1002,10 +1005,11 @@ the original approved plan and checkpoint details remain in Git, not a second pe
   record outside the installation. Distinguish old operational, target verification failed, and
   unavailable installation/launcher. No automatic restart, elaborate rollback or interpreter
   installation/switching. Previous-tag reinstall is recovery, not exact dependency restoration.
-- Stage order: correctness -> observations/discovery -> Updates UI/existing operations -> base
-  refresh -> manager discovery/self-update. Each coherent task requires regressions, appropriate
-  real evidence, documentation, a local commit and STOP. Do not claim earlier release PASS for
-  unexecuted changed paths. No version bump, release preparation, tag, push or publication.
+- Original stage order was correctness -> observations/discovery -> Updates UI/existing operations
+  -> base refresh -> manager discovery/self-update, with a local commit/STOP per coherent task.
+  D-057 relaxed the stage grouping and D-059 retires that standing STOP/commit rhythm. Regressions
+  and appropriate real evidence remain necessary for affected risks; earlier release PASS does not
+  verify changed paths. This decision grants no release preparation or publication permission.
 
 On implementation, this supersedes D-005/D-019's automatic newest-built rollback selection,
 D-019's suppression of explicit Manual comparisons and discovery limited to npm latest, and
@@ -1016,6 +1020,9 @@ remain accepted. Detailed alternatives, dependencies and test gates are in the w
 implemented facts must be promoted to the current-state records before that record is retired.
 
 ## D-057 Consolidated Updates work packages and technical dependencies — accepted
+
+Completed-effort grouping history; its execution/checkpoint cadence is superseded by D-059,
+not its architecture or independent safety/recovery proof requirements.
 
 Owner approval during unpublished D-056 development: reduce unnecessary STOP/Continue cycles,
 not implementation scope or safety evidence. This supersedes only D-056's strictly serial stage
@@ -1029,10 +1036,9 @@ order and one-ID/local-commit/STOP rhythm, not its architecture or acceptance cr
   is optional to the UI; base refresh does not use environment recovery; read-only GitHub/pipx
   discovery does not use base refresh. Distinguish actual data/UI integration dependencies from
   preferred work order. Manager execution remains later and must not delay earlier workflows.
-- A coherent cycle may include tightly related subtasks and separate focused commits, each with
-  tests, review and current records. Stop at a work-package boundary, a safety/context boundary
-  or a blocker; split an oversized package without weakening correctness or tests. This owner
-  approval supersedes older one-task-per-cycle instructions for this effort only.
+- That effort allowed related subtasks/focused commits within a cycle, with tests/review/records
+  and stops at package, safety/context or blocking boundaries. D-059 replaces this effort-only
+  exception with the general proportional workflow; a package boundary need not end a session.
 - Environment recovery (UP-11), installation exclusion/terminal handoff (UP-16), and replacement/
   failure recovery (UP-17) remain separate from adjacent packages. Replacement success and failure
   recovery have independent verification gates and checkpoints, not an inferred rollback claim.
@@ -1068,3 +1074,30 @@ bookkeeping of RELEASING; all existing safety, review and release verification g
 - Preserve the original 32 Updates/stabilization commits intact, with a local safety reference;
   do not publish private ignored evidence/local instructions. `main` already equals public
   `origin/main`, so no reset or history rewrite is needed. Keep that stable reference unchanged.
+
+## D-059 Proportional task execution and verification — accepted
+
+Owner-authorized workflow simplification, 2026-11-02; documentation only. Supersedes the standing
+one-task/cycle/STOP rhythm in D-047/D-056/D-057, per-commit record interpretation of D-023 and the
+BASELINE/CONTRIBUTING full-suite-per-code-package rule. D-045 record locations/history retention,
+D-058 branches, product/security boundaries, CI and release gates are unchanged.
+
+The previous cadence combined local mandatory rereads/STOPs, roadmap checkpoints and full-suite
+completion gates. Recent records show repeated four-environment suites and overlapping real-test
+blocks at adjacent implementation checkpoints, plus repeated prose/evidence checks. Distinct
+dependency environments and independent safety/recovery proofs remain valuable; neither every
+subtask nor every record update warrants replaying all of them.
+
+`AGENTS.md` is the concise entry point/product/permission contract; CONTRIBUTING owns execution,
+risk-based verification, document ownership and resumption. Small work completes continuously;
+related work shares meaningful integration checkpoints. Focused feedback is not full correctness.
+High-risk changes receive broader compatibility/adversarial/real verification when needed, without
+waiting for a generic checkpoint. Unchanged applicable evidence may be reused with honest scope;
+changed inputs and release gates still need their required checks.
+
+Routine tasks need no persistent progress record. Substantial ongoing work uses one handoff and
+links evidence without duplicating logs; reference documents change only when their facts do.
+Historical checkpoint/STOP prose is not current policy. Explicit STOPs in individual assignments,
+approval for dangerous operations, blocker/decision handoffs, failing-test investigation and honest
+verification gaps remain mandatory. No application/test/CI changes, new tooling, dependency or
+result-cache framework are introduced.

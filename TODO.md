@@ -1,12 +1,12 @@
 # Roadmap and backlog
 
 OpenCode Sandbox is Beta. The priorities remain dependable existing workflows, data safety,
-recovery, compatibility and usable diagnostics, not feature expansion. Work proceeds one
-coherent task per cycle: investigate, implement, verify, document, commit on a topic branch based
-on `develop`, merge into `develop` when reviewed and verified, then stop. `main` is the
-published stable line; release candidates and urgent hotfix back-integration follow
-[the contributor workflow](CONTRIBUTING.md#branch-workflow) and
-[RELEASING](docs/engineering/RELEASING.md), with separate publication authorization (D-058).
+recovery, compatibility and usable diagnostics, not feature expansion. Follow
+[task execution](CONTRIBUTING.md#task-execution) and [risk-based verification](CONTRIBUTING.md#verification-policy):
+group related work, use meaningful checkpoints, and respect assignment-specific STOPs (D-059).
+Ordinary work belongs on `develop`; `main` is published stable source/docs. Release integration
+and separate publication authorization follow [the branch workflow](CONTRIBUTING.md#branch-workflow)
+and [RELEASING](docs/engineering/RELEASING.md) (D-058). This backlog is not work authorization.
 
 ## Completed: Updates architecture and UX (unreleased)
 
@@ -36,8 +36,8 @@ Manager remains **6.1.0**; environment metadata **2**, backup **3**, image defin
 The D-058 branch migration preserves this work on `develop` without changing stable `main` or
 creating a release. Publishing the development branch is not stable publication or release
 readiness. No version bump, release, project tag or remote `main` change is part of the migration.
-The subsequent broader user-documentation and test-suite reviews remain separate tasks, not begun
-by this workflow change. The optional/deferred backlog below is not new implementation permission.
+The broader user-documentation and test-suite reviews remain separate from this instruction-only
+workflow improvement. The optional/deferred backlog below is not new implementation permission.
 
 ## Delivered in 6.1.0
 
@@ -63,8 +63,8 @@ Useful when a concrete usability problem or maintenance saving justifies a small
 reason to postpone the required objectives:
 
 - Recovery Center buttons for the remaining journals that name a working CLI recovery command
-  (container recreation, restore resume/rollback and delete). OpenCode update recovery belongs
-  to the active Updates effort. Share existing handlers, not a parallel recovery mechanism.
+  (container recreation, restore resume/rollback and delete). OpenCode update recovery is already
+  delivered by Updates. Share existing handlers, not a parallel recovery mechanism.
 - A warning before starting a second managed OpenCode session, after reproducing the UX problem.
 - A real campaign on another Linux host (for example Debian, Ubuntu or Fedora), if a disposable
   host is available. Record it before calling that host tested; Arch remains the only real-tested

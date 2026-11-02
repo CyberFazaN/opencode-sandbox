@@ -1,8 +1,14 @@
 # Baseline — OpenCode Sandbox 6.1.0
 
-The current state of the project: version, supported environments, how to test, the latest
-verification, known issues and what is not verified. Update it whenever one of these changes
-(`AGENTS.md`, D-045).
+Current state, supported environments, scoped verification evidence and unverified limits.
+Update changed state and meaningful verification checkpoints, not every action or commit (D-059).
+Task execution and test selection live only in [CONTRIBUTING.md](../../CONTRIBUTING.md#task-execution).
+Read the relevant sections, not this whole evidence record on every task or resumption.
+
+Quick references: [version](#version), [supported environments](#supported-environments),
+[latest code verification](#migration-verification--2026-11-02),
+[Updates integration](#updates-final-integration), [unverified behaviour](#unverified-behaviour).
+Older dated checkpoints below are evidence of earlier inputs, not current instructions or gates.
 
 ## Version
 
@@ -165,27 +171,10 @@ reinstall does not restore identical dependencies or promise offline recovery. S
 
 ## Commands
 
-```sh
-# development venv and unit/host/Textual-pilot tests (fake Docker; no daemon contacted)
-python -m venv .venv && .venv/bin/pip install -e '.[test]'
-.venv/bin/pip install ruff shellcheck-py pyte   # optional: quality gates and real-terminal tests
-.venv/bin/python -m pytest -q                   # includes ruff and shellcheck (skipped if missing)
-.venv/bin/python tests/dashboard_screenshot.py  # regenerate docs/images/dashboard.svg (fake data)
-
-# package (sdist + wheel) and metadata check; packaging validation only, nothing is uploaded (D-042)
-.venv/bin/pip install build twine
-.venv/bin/python -m build --outdir dist . && .venv/bin/twine check --strict dist/*
-
-# real campaign: real rootless Docker, OpenCode, terminals, fault injection (about 10 minutes);
-# only on a disposable machine; needs both base images, network and pyte
-OCS_TEST_DOCKER=1 .venv/bin/python -m pytest -rA tests/integration
-# plus the rows that use sudo -n and restart/SIGKILL the user's daemon (read the docstring first)
-OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 .venv/bin/python -m pytest -rA tests/integration
-# the pipx rows (test_65) need pipx in the venv; OCS_TEST_PIPX_BUILD=1 adds an image build
-# from the installed package (downloads the base image); OCS_TEST_MANAGER=<launcher> runs the
-# campaign against an installed manager, e.g. a pipx installation of a local test tag
-.venv/bin/pip install pipx
-```
+Development setup, layer commands, harness constraints and opt-ins:
+[CONTRIBUTING.md](../../CONTRIBUTING.md#test-layers). Complete package/compatibility/installed-pipx
+and release-campaign procedure: [RELEASING.md](RELEASING.md#2-verify). These command references
+are not a requirement to run all layers for routine changes.
 
 The campaign works in `.work/<run-id>/` with `ocs-test-*` names, writes
 `.work/logs/<run-id>.log` (every command and PASS/FAIL check) and a manifest, and ends with the
@@ -193,19 +182,15 @@ product's cleanup behind a guard and a leak check. `OCS_TEST_DISTROS` selects di
 `test_30`/`test_40` expect OpenCode 2.2.0 in the base images; `test_10`/`test_80` use the local
 image `ubuntu:24.04` for the custom-image rows. Variables: `CONTRIBUTING.md`.
 
-Run the unit suites serially, in the foreground, with a short `--basetemp` outside the
-checkout (for example under `/tmp/opencode/`, created by and owned by that run): a temp
-directory under `.work/` is a hidden path inside a Git repository, which the direct-workspace
-and import guards rightly refuse, and deep paths exceed the 108-byte Unix socket limit. Use an
-absolute `PYTHONPATH` so test subprocesses import the checkout. The retained-OS row, the
-test-only image namespace for new base images and the socket-activation opt-in are described
-in `RELEASING.md` ("Verify").
+The retained-OS row, test-only image namespace and socket-activation opt-in are described in
+RELEASING ("Verify"). Manifests and guarded cleanup remain mandatory for real test resources.
 
 ## Test performance and local verification
 
-One-time investigation after UP-06, before UP-07/UP-08 (2026-10-30). No application, CI,
-dependency or release-gate changes. Commands/evidence:
-the measurements and findings in this section (the transient working checkpoint is retired).
+Historical measurements from the one-time investigation after UP-06, before UP-07/UP-08
+(2026-10-30); not the runtime of today's larger suite. No application, CI, dependency or release-gate
+changes. Measurements/findings remain here as evidence; the transient working checkpoint is retired.
+Current execution/test-selection policy is in CONTRIBUTING, not in the historical recommendations.
 
 ### Measurements and findings
 
@@ -244,9 +229,9 @@ Priorities, benefits and risks:
    0.004–0.007 s. The real HTTP/error/body checks, 0.3 s client deadline and 1.5 s delayed response
    are unchanged; the timeout case still takes 1.22 s in teardown. No real verification became a mock.
 3. **Workflow, greatest potential benefit:** avoid replaying identical full checks after each
-   subtask/prose edit; use the cadence below. UP-06's four full combinations consumed 420.82 s
-   of recorded pytest time, plus focused/document repeats. Different dependency combinations are
-   distinct evidence, not duplicates, but need not be four feedback loops per small edit.
+   subtask/prose edit; see the verification policy in CONTRIBUTING. UP-06's four full combinations
+   consumed 420.82 s of recorded pytest time, plus focused/document repeats. Different dependency
+   combinations are distinct evidence, not duplicates, but need not be four feedback loops per small edit.
 4. **Deferred:** the 50-test TUI module makes 39 `settle` calls: 12.7 s explicit delay, 14.86 s
    including pilot pauses. Replace only individually proven unnecessary waits with bounded
    worker/condition completion. Timers/unchanged-state intervals/negative observations must remain.
@@ -272,44 +257,10 @@ not be added as wall time. Diagnostic instrumentation is separate from baseline 
 
 ### Recommended development-time cadence
 
-This applies the existing risk-appropriate verification contract, not a substitute for full
-regression. CI and [release verification](RELEASING.md#2-verify) stay unchanged.
-
-| Point / change | Verification and reporting |
-|---|---|
-| Fast feedback | Reproducer/new test, then its whole module and direct consumers. Name selected paths/IDs; never describe a focused or last-failed run as the complete suite |
-| Completed code package | At least one complete default suite on final code plus focused regressions; review changes since that run. Related subtask commits need not replay identical full runs mechanically |
-| Prose/evidence-only follow-up | Language/links/CLI checks; quality checks for changed code/scripts. Cite prior full code verification and label the new run focused; no unchanged UI/process or package replay solely for prose |
-| UI presentation / test-local helper | Affected pilots/helpers/CLI consumers at 80x24/larger and relevant current/lowest Textual/Typer endpoints; complete primary suite at code-package completion. Common workers/fixtures/action routing need broader verification |
-| Shared/high-risk code or infrastructure | Complete Python 3.11/3.14 × current/lowest suites at integration checkpoints, not just endpoint samples; adversarial/concurrency/fault/recovery tests and affected real scenarios separately |
-| Before release | Full final regression/compatibility matrix, package/installed-pipx checks and real campaign/P0/P1 evidence or accepted blockers under RELEASING/CAMPAIGN; no focused/mock/historical substitute |
-
-Broader gates must cover security/ownership/daemon identity and diagnostics, lock ordering/
-concurrency, host filesystem/Git safety, profiles/credentials, backup/archive/restore, cleanup,
-lifecycle/journals, rollback and recovery. Observation/version changes affecting identity, pins or
-update eligibility, including UP-07/UP-08, belong here. Run affected disposable real-Docker/
-OpenCode paths on both distributions, and pipx/terminal handoff/fault paths for installation
-changes, under existing permissions/manifests/cleanup rules. Full default-suite PASS is not real
-integration evidence. Preserve negative cases, real processes/files and both-distribution evidence.
-
-Representative test families (paths under `tests/`; not an exhaustive automatic selector):
-
-| Category | Existing coverage to retain together when affected |
-|---|---|
-| Identity, security, diagnostics | `test_runtime_identity.py`, `test_docker_readiness.py`, `test_diagnostics.py`, `test_hardening.py`, profile safety/mount tests; real sockets/processes are not live-daemon proof |
-| Concurrency, lifecycle, rollback/recovery | Base lock/coordination/rollback, lifecycle, config-plan, journals, recreate faults/consistency, transactions, recovery, OpenCode lifecycle and session-signal/hangup tests |
-| Filesystem/Git/data boundaries | Direct/unreadable/untrusted workspace, Git boundary/roundtrip/review, archive/home-archive paths, backup hardening/completeness, staged restore/resume/settings and cleanup tests |
-| CLI and UI consumers | CLI structure/robustness, TUI/text/advisory/diagnostic pilots, readiness, version inventory, Agent Context and affected management screens |
-| Static/package/contracts | Quality, language, user docs, package metadata, installation, release scripts and Python/CI structure tests; these do not replace runtime or installed-package checks |
-| Real opt-in integration | `integration/`: identity/prerequisites, both-distribution lifecycle/security/direct access, faults, OpenCode, base races/probes, TUI terminals, pipx, privileged and combination rows; permissions and manifests still apply |
-
-Reuse unchanged editable venvs after version/`pip check` verification, not container/fixture state.
-Record source checkpoint, commands, selected scope, dependencies, counts, skips, failures/reruns
-and unexecuted layers. Ruff/shellcheck/docs checks already passed in a full run need not be
-replayed on identical inputs; changed inputs must be checked again. Package/workflow checks
-remain required for affected inputs and final checkpoints. No automatic broad deselection,
-xdist or session-scoped mutable fixtures: global watchdog counts, signals and filesystem/kernel
-races require isolation. Review any future parallelism/caching proposal separately.
+Consolidated into [CONTRIBUTING — Verification policy](../../CONTRIBUTING.md#verification-policy)
+(D-059). The old blanket full-suite-per-code-package gate is retired, not another policy to apply
+alongside it. Full suites belong at meaningful integration/risk checkpoints and releases; CI and
+[release verification](RELEASING.md#2-verify) are unchanged. This heading remains for existing links.
 
 ## Verification
 
@@ -1169,7 +1120,7 @@ test-isolation limitations of the host-process signal tests: `TODO.md` ("Optiona
 | `TODO.md` | Completed unpublished Updates scope, what 6.1.0 delivered, optional polish and deferred features |
 | `docs/engineering/BASELINE.md` | This file: current state |
 | `docs/engineering/ARCHITECTURE.md` | Current design and module map |
-| `docs/engineering/DECISIONS.md` | Decisions D-001..D-057 with rationale and implementation status |
+| `docs/engineering/DECISIONS.md` | Decisions D-001..D-059 with rationale and implementation status |
 | `docs/engineering/ISSUES.md` | Known issues and accepted limitations |
 | `docs/engineering/CAMPAIGN.md` | Release test matrix: 87 active rows, seven installer-only rows retired; historical evidence distinguished from pending release gates, including unapproved post-reboot manager recovery |
 | `docs/engineering/RELEASING.md` | Release checklist and tag procedure |
