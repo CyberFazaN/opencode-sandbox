@@ -16,7 +16,7 @@ import sysconfig
 from pathlib import Path
 
 import pytest
-from manager_policy_fixture import system_paths, system_source
+from manager_policy_fixture import git_wrapper, system_paths, system_source
 from manager_source_fixture import graph, serve
 from test_manager_helper import result_at, subreaper, wait_helper
 from test_manager_installer import wait_marker
@@ -28,6 +28,7 @@ from opencode_sandbox import manager_installer
 tools = external_tools
 EXTERNAL = sys.executable
 SITE = sysconfig.get_path('purelib')
+GIT = shutil.which('git')
 ROOT = Path(__file__).resolve().parents[1]
 PUBLISH = '''
 import json,os,shutil,sys,time,subprocess
@@ -76,7 +77,9 @@ def installed(tools, tmp_path, monkeypatch):
     site = next(prefix.glob('lib/python*/site-packages'))
     shutil.copytree(ROOT / 'src/opencode_sandbox', site / 'opencode_sandbox', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     network = site / 'opencode_sandbox/manager_network.py'
-    network.write_bytes(system_source(network.read_bytes(), system_paths(tmp_path / 'system-configs')))
+    system = system_paths(tmp_path / 'system-configs')
+    network.write_bytes(system_source(network.read_bytes(), system))
+    git_wrapper(Path(shutil.which('pipx')).parent / 'git', EXTERNAL, GIT, system[0])
     # Evaluate test-owned fixture source only, never a source/control file supplied to the product.
     publisher = tmp_path / 'publisher.py'; publisher.write_text(PUBLISH)
     namespace = runpy.run_path(str(publisher))

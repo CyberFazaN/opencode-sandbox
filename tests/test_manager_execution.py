@@ -1,6 +1,7 @@
 """Independent subprocess/source/policy gates, not a pipx replacement or public authenticity proof.
 
 System config filenames are fixture-owned; presence checks and effective Git/pip probes stay real.
+The Git wrapper only redirects the system-config filename, never its keys or query results.
 """
 import dataclasses
 import json
@@ -15,7 +16,7 @@ from functools import partial
 from pathlib import Path
 
 import pytest
-from manager_policy_fixture import system_paths
+from manager_policy_fixture import git_wrapper, system_paths
 from manager_source_fixture import graph, serve
 from test_manager_helper import result_at, subreaper, wait_helper
 from test_manager_observations import spawn_origin
@@ -46,8 +47,8 @@ def setup(origin, tmp_path, monkeypatch):
     site = next(shared.glob('lib/python*/site-packages'))
     (site / 'ocs_test_external_pip.pth').write_text(SITE + '\n')
     commands = Path(shutil.which('pipx')).parent
-    (commands / 'git').symlink_to(GIT)
     system = system_paths(tmp_path / 'system-configs')
+    git_wrapper(commands / 'git', EXTERNAL, GIT, system[0])
     monkeypatch.setattr(policy, 'configurations', partial(policy.configurations, system=system))
     monkeypatch.setattr(manager_review, 'SYSTEM_CONFIGS', system)
     cwd = tmp_path / 'independent-work'; cwd.mkdir(mode=0o700)
@@ -225,11 +226,9 @@ def test_unsuppressed_client_keys_reveal_nonstandard_system_git_configuration_wi
     evidence, tool, context = facts(setup)
     command = Path(shutil.which('git'))
     command.unlink()
-    command.write_text(f'#!{EXTERNAL}\nimport os,sys\n'
-                       'if sys.argv[1:]==["config","--null","--list","--name-only"]:\n'
-                       ' print("dummy-secret-scoped-config-key");raise SystemExit(0)\n'
-                       f'os.execve({GIT!r},[{GIT!r},*sys.argv[1:]],dict(os.environ))\n')
-    command.chmod(0o700)
+    nonstandard = setup[1] / 'nonstandard-system-gitconfig'
+    nonstandard.write_text('[fixture]\n key = dummy-secret-scoped-config-value\n')
+    git_wrapper(command, EXTERNAL, GIT, nonstandard)
     with pytest.raises(execution.Refused, match='manual preservation') as caught:
         execution.installer_policy(Path(evidence['venv']), evidence, tool, context, setup[1], time.monotonic() + 8)
     assert 'dummy-secret' not in str(caught.value)

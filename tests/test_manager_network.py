@@ -1,11 +1,17 @@
 """Real configuration-presence refusals, including test-owned frozen system paths."""
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-from manager_policy_fixture import SYSTEM_CONFIGS, system_paths, system_source
+from manager_policy_fixture import (
+    SYSTEM_CONFIGS,
+    git_wrapper,
+    system_paths,
+    system_source,
+)
 
 from opencode_sandbox import manager_network as policy
 
@@ -30,6 +36,30 @@ def test_production_system_paths_and_default_refusal_are_not_changed_by_fixture_
             policy.configurations(*args)
     else:
         assert set(map(Path, SYSTEM_CONFIGS)) <= set(policy.configurations(*args))
+
+
+def test_real_git_fixture_namespace_hides_host_config_but_preserves_own_keys_and_explicit_policy(tmp_path):
+    git = shutil.which('git')
+    assert git is not None
+    host_config, own_config = tmp_path / 'host-config', tmp_path / 'owned-config'
+    host_config.write_text('[ci-host]\n key = dummy-secret-host-value\n')
+    configured_git, isolated_git = tmp_path / 'host-git', tmp_path / 'owned-git'
+    git_wrapper(configured_git, sys.executable, git, host_config)
+    git_wrapper(isolated_git, sys.executable, configured_git, own_config)
+    environment = {'HOME': str(tmp_path / 'home'), 'XDG_CONFIG_HOME': str(tmp_path / 'xdg'), 'PATH': os.defpath}
+
+    def keys(command, **extra):
+        p = subprocess.run([str(command), 'config', '--null', '--list', '--name-only'],
+                           cwd=tmp_path, env={**environment, **extra}, capture_output=True, check=True, timeout=5)
+        assert b'dummy-secret' not in p.stdout + p.stderr
+        return p.stdout.split(b'\0')
+
+    assert keys(configured_git) == [b'ci-host.key', b'']
+    assert keys(isolated_git) == [b'']
+    own_config.write_text('[ci-owned]\n key = dummy-secret-owned-value\n')
+    assert keys(isolated_git) == [b'ci-owned.key', b'']
+    assert keys(isolated_git, GIT_CONFIG_SYSTEM=os.devnull) == [b'']
+    assert host_config.read_text() == '[ci-host]\n key = dummy-secret-host-value\n'
 
 
 @pytest.mark.parametrize('index', range(3))
