@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 import pytest
+from manager_policy_fixture import system_source
 from test_manager_helper import result_at, subreaper, wait_helper
 from test_manager_review import installation as local_installation
 from test_manager_review import origin as review_origin
@@ -124,12 +125,16 @@ def test_changed_or_unfamiliar_local_input_is_preserved_not_repaired_or_discarde
     assert before == {path.name for path in artifact.directory.iterdir()} and artifact.process is None
 
 
-def spawn_origin(origin, tmp_path, *, budget=30, execution=False, frozen_transport=None):
+def spawn_origin(origin, tmp_path, *, budget=30, execution=False, frozen_transport=None, system_configs=None):
     prefix, launcher = origin[0][3:]
     external = Path(shutil.which('pipx')).resolve().read_text().splitlines()[0][2:]
     dist = next(prefix.glob('lib/python*/site-packages/*.dist-info'))
     stage = tmp_path / 'staging'; stage.mkdir()
     from opencode_sandbox import manager_targets
+    network_source = None
+    if system_configs is not None:
+        from opencode_sandbox import manager_network
+        network_source = system_source(Path(manager_network.__file__).read_bytes(), system_configs)
     code = ('import json,os,sys,threading\nfrom pathlib import Path\n'
         f'sys.path.insert(0,{str(Path(r.__file__).parents[1])!r})\n'
         f'sys.prefix={str(prefix)!r}\nsys.executable={str(prefix / "bin/python")!r}\nsys.argv=[{str(launcher)!r}]\n'
@@ -138,7 +143,7 @@ def spawn_origin(origin, tmp_path, *, budget=30, execution=False, frozen_transpo
         'from opencode_sandbox import manager_review as r,manager_handoff as h\n'
         f'c.BASE=Path({str(c.BASE)!r});c.CONFIG=Path({str(c.CONFIG)!r})\n'
         f'i._running_distribution=lambda:(Path({str(dist.parent / "opencode_sandbox/__init__.py")!r}),Path({str(dist)!r}))\n'
-        'r.SYSTEM_CONFIGS=()\n'
+        f'r.SYSTEM_CONFIGS={system_configs or ()!r}\n'
         f't.ENDPOINT={manager_targets.ENDPOINT!r};releases.API=t.ENDPOINT+"/releases?per_page=100"\n'
         + (('import io,zipfile\noriginal_bundle=h._bundle\n'
             'def transport_bundle():\n'
@@ -146,8 +151,9 @@ def spawn_origin(origin, tmp_path, *, budget=30, execution=False, frozen_transpo
             ' with zipfile.ZipFile(io.BytesIO(original_bundle())) as old,zipfile.ZipFile(buffer,"w") as new:\n'
             '  for name in old.namelist():\n'
             '   raw=old.read(name)\n'
-            f'   if name=="manager_execution.py": raw=raw.replace(b"SOURCE_API = source.API",{("SOURCE_API = " + repr(frozen_transport)).encode()!r})\n'
-            '   new.writestr(name,raw)\n'
+             f'   if name=="manager_execution.py": raw=raw.replace(b"SOURCE_API = source.API",{("SOURCE_API = " + repr(frozen_transport)).encode()!r})\n'
+             + (f'   if name=="manager_network.py": raw={network_source!r}\n' if network_source is not None else '') +
+             '   new.writestr(name,raw)\n'
             ' return buffer.getvalue()\n'
             'h._bundle=transport_bundle\n') if frozen_transport else '') +
         f'prepared=r.prepare("v6.2.0")\nstaged=h.prepare_review_fixture(r.Approval(prepared),Path({str(stage)!r}))\n'

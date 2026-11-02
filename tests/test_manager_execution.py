@@ -1,4 +1,7 @@
-"""Independent subprocess/source/policy gates, not a pipx replacement or public authenticity proof."""
+"""Independent subprocess/source/policy gates, not a pipx replacement or public authenticity proof.
+
+System config filenames are fixture-owned; presence checks and effective Git/pip probes stay real.
+"""
 import dataclasses
 import json
 import os
@@ -8,9 +11,11 @@ import subprocess
 import sys
 import sysconfig
 import time
+from functools import partial
 from pathlib import Path
 
 import pytest
+from manager_policy_fixture import system_paths
 from manager_source_fixture import graph, serve
 from test_manager_helper import result_at, subreaper, wait_helper
 from test_manager_observations import spawn_origin
@@ -21,8 +26,8 @@ from test_manager_review import tools as local_tools
 from opencode_sandbox import manager_execution as execution
 from opencode_sandbox import manager_network as policy
 from opencode_sandbox import manager_process as processes
+from opencode_sandbox import manager_review, manager_tools
 from opencode_sandbox import manager_targets as targets
-from opencode_sandbox import manager_tools
 
 EXTERNAL = sys.executable
 SITE = sysconfig.get_path('purelib')
@@ -33,7 +38,7 @@ tools = local_tools
 
 
 @pytest.fixture
-def setup(origin, tmp_path):
+def setup(origin, tmp_path, monkeypatch):
     # Real shared Python/pip policy, synthetic pipx runtime. No install or network bootstrap.
     prefix = origin[0][3]
     shared = prefix.parent.parent / 'shared'
@@ -42,8 +47,11 @@ def setup(origin, tmp_path):
     (site / 'ocs_test_external_pip.pth').write_text(SITE + '\n')
     commands = Path(shutil.which('pipx')).parent
     (commands / 'git').symlink_to(GIT)
+    system = system_paths(tmp_path / 'system-configs')
+    monkeypatch.setattr(policy, 'configurations', partial(policy.configurations, system=system))
+    monkeypatch.setattr(manager_review, 'SYSTEM_CONFIGS', system)
     cwd = tmp_path / 'independent-work'; cwd.mkdir(mode=0o700)
-    return origin, cwd
+    return origin, cwd, system
 
 
 def facts(setup):
@@ -69,11 +77,14 @@ def test_effective_public_policy_uses_actual_git_and_external_shared_pip(setup):
     assert result['git_identity'] and result['remote_identity']
 
 
-@pytest.mark.parametrize('kind', ['shared-config', 'home-config', 'credential-link', 'missing-git', 'shared-through-target'])
+@pytest.mark.parametrize('kind', ['system-config', 'shared-config', 'home-config', 'credential-link', 'missing-git', 'shared-through-target'])
 def test_custom_or_dependent_effective_policy_fails_without_secret_disclosure_or_repair(setup, kind, tmp_path):
     evidence, tool, context = facts(setup)
     prefix = Path(evidence['venv'])
     path = None
+    if kind == 'system-config':
+        path = Path(setup[2][-1]); path.parent.mkdir(parents=True)
+        path.write_text('dummy-secret-system-config'); path.chmod(0)
     if kind in ('shared-config', 'home-config', 'credential-link'):
         path = Path(evidence['locations']['shared_libs']) / 'pip.conf' if kind == 'shared-config' else Path.home() / ('.gitconfig' if kind == 'home-config' else '.netrc')
         if kind == 'credential-link': path.symlink_to(tmp_path / 'unreadable-dummy-secret')
@@ -122,12 +133,12 @@ def test_independent_source_fetch_matches_full_published_graph_not_just_version(
 
 @pytest.mark.parametrize('fault', ['none', 'lazy-record', 'policy', 'published'])
 def test_frozen_independent_validation_waits_for_actual_origin_death_and_rechecks_runtime_policy_source(setup, tmp_path, fault):
-    origin, _ = setup
+    origin, _, system = setup
     prefix = origin[0][3]
     helper = child = None
     with subreaper():
         try:
-            child, value = spawn_origin(origin, tmp_path, execution=True, frozen_transport=targets.ENDPOINT)
+            child, value = spawn_origin(origin, tmp_path, execution=True, frozen_transport=targets.ENDPOINT, system_configs=system)
             helper = value['helper']; directory = Path(value['directory'])
             assert child.poll() is None and not (directory / 'result.json').exists()
             if fault == 'lazy-record':

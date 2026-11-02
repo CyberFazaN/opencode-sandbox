@@ -1,7 +1,8 @@
 """Whole frozen handoff with actual venv/files/runtime and a synthetic pipx implementation.
 
-This is host/process behavior, NOT real pipx replacement or public release authenticity. Only
-the frozen HTTP transport is substituted; production independent checks and state remain real.
+This is host/process behavior, NOT real pipx replacement or public release authenticity. The
+frozen HTTP transport and system-config filenames in the fixture-owned package are substituted;
+production independent checks and state remain real. No host system configuration is changed.
 """
 import json
 import os
@@ -15,6 +16,7 @@ import sysconfig
 from pathlib import Path
 
 import pytest
+from manager_policy_fixture import system_paths, system_source
 from manager_source_fixture import graph, serve
 from test_manager_helper import result_at, subreaper, wait_helper
 from test_manager_installer import wait_marker
@@ -73,11 +75,14 @@ def installed(tools, tmp_path, monkeypatch):
         (site / 'ocs_test_dependencies.pth').write_text(str(dependencies) + '\n')
     site = next(prefix.glob('lib/python*/site-packages'))
     shutil.copytree(ROOT / 'src/opencode_sandbox', site / 'opencode_sandbox', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    network = site / 'opencode_sandbox/manager_network.py'
+    network.write_bytes(system_source(network.read_bytes(), system_paths(tmp_path / 'system-configs')))
     # Evaluate test-owned fixture source only, never a source/control file supplied to the product.
     publisher = tmp_path / 'publisher.py'; publisher.write_text(PUBLISH)
     namespace = runpy.run_path(str(publisher))
     namespace['publish'](prefix, '6.1.0', 'a' * 40, bindir, EXTERNAL)
     environment = {'HOME': str(home), 'PATH': str(bindir) + ':' + os.environ['PATH'] + ':/usr/bin:/bin',
+                   'XDG_CONFIG_HOME': str(home / '.config'), 'XDG_CONFIG_DIRS': str(tmp_path / 'system-xdg'),
                    'PIPX_HOME': str(prefix.parent.parent), 'PIPX_BIN_DIR': str(bindir), 'PIPX_DEFAULT_PYTHON': EXTERNAL,
                    'OPENCODE_SANDBOX_HOME': str(tmp_path / 'data'), 'OPENCODE_SANDBOX_CONFIG': str(tmp_path / 'config'),
                    'GITHUB_TOKEN': 'dummy-not-forwarded'}
