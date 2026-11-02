@@ -5,15 +5,24 @@ A release is a version tag `vX.Y.Z` on `main` and a GitHub Release whose notes a
 `pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@vX.Y.Z` (D-042); nothing is
 uploaded to a package index, and no wheels are attached. Only the maintainer creates tags.
 
+`main` is the published stable line; `develop` holds unreleased work (D-058). Ordinary development
+and its documentation never land directly on `main`. Verify the current branch and clean/preserved
+worktree before edits or commits; do not switch branches over work at risk. The procedure below
+requires separate explicit owner authorization for pushes, tags and publication, and must respect
+the `main` pull-request ruleset. It is not standing permission to perform those operations.
+
 ## 1. Prepare the release branch
 
-1. Branch `release/X.Y.Z` from `main`.
+1. Select approved work on `develop` and branch a temporary `release/X.Y.Z` from that candidate.
+   Do not include unapproved later development. An urgent stable hotfix may instead branch from
+   `main`; its fix and release bookkeeping must subsequently be integrated back into `develop`.
 2. Set `__version__` in `src/opencode_sandbox/__init__.py` (the single source, D-001).
 3. In `CHANGELOG.md`, rename "Unreleased" to `X.Y.Z — YYYY-MM-DD` and check the entries.
 4. Replace the release tag in the install commands of `README.md` and `docs/install.md`
    (`@vX.Y.Z`); `tests/test_user_docs.py` fails until they name the new version.
 5. Update the tested versions in `README.md` ("Tested environment") and `BASELINE.md`
-   ("Supported environments") if the test platform changed.
+   ("Supported environments") if the test platform changed. Review the user guides against the
+   approved candidate so the source and documentation integrated into `main` match the release.
 6. If an image definition changed in a way that needs a rebuild (`image-revision` in
    `src/opencode_sandbox/distros.py`), say so in the CHANGELOG: existing base images are not
    rebuilt by an upgrade (`opencode-sandbox build`). Verify the shared `doctor`/dashboard
@@ -85,7 +94,11 @@ rootlesskit's `10.0.2.2` and `example.invalid`/`example.org` addresses are expec
    `main` ruleset first; otherwise the pull request waits for checks that no longer report.
    The checks are the expanded matrix job names (for example `Unit tests (Python 3.11, current
    dependencies)`); take them from the release pull request's first run.
-   Merge the release branch into `main` with a merge commit; push `main` and wait for CI.
+   Review and validate the candidate before integrating the approved `develop` work through the
+   release pull request into `main` with a merge commit. With explicit owner authorization,
+   publish that integration through the protected workflow and wait for CI on `main`. Do not
+   bypass safeguards or include unreviewed development. No ordinary `develop` push creates a
+   release: `.github/workflows/release.yml` accepts pushed version tags only.
 2. Create and push an annotated tag on that merge commit:
 
    ```sh
@@ -107,7 +120,9 @@ rootlesskit's `10.0.2.2` and `example.invalid`/`example.org` addresses are expec
    "$PIPX_BIN_DIR/opencode-sandbox" doctor
    ```
 
-6. Add a new "Unreleased" section to `CHANGELOG.md` on `main`.
+6. After publication, integrate the release preparation and any stable hotfix back into `develop`
+   through review, preserving subsequent development. Add the next "Unreleased" section there,
+   not on `main`; keep stable source and documentation together on `main`.
 
 ## A bad release
 

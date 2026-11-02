@@ -2,12 +2,15 @@
 
 OpenCode Sandbox is Beta. The priorities remain dependable existing workflows, data safety,
 recovery, compatibility and usable diagnostics, not feature expansion. Work proceeds one
-coherent task per cycle: investigate, implement, verify, document, commit on a topic branch,
-merge when verified, then stop.
+coherent task per cycle: investigate, implement, verify, document, commit on a topic branch based
+on `develop`, merge into `develop` when reviewed and verified, then stop. `main` is the
+published stable line; release candidates and urgent hotfix back-integration follow
+[the contributor workflow](CONTRIBUTING.md#branch-workflow) and
+[RELEASING](docs/engineering/RELEASING.md), with separate publication authorization (D-058).
 
-## Completed: Updates architecture and UX (unpublished)
+## Completed: Updates architecture and UX (unreleased)
 
-The approved D-056/D-057 roadmap **UP-00..UP-18 and PERF is complete locally**, after the
+The approved D-056/D-057 roadmap **UP-00..UP-18 and PERF is complete on develop**, after the
 published 6.1.0 release. Its transient working record is retired under D-045. Durable behavior,
 verification, failure trails and explicit limits are consolidated in
 [ARCHITECTURE](docs/engineering/ARCHITECTURE.md#manager-update-and-independent-recovery),
@@ -30,9 +33,11 @@ verification, failure trails and explicit limits are consolidated in
   layers are explicit in BASELINE; this is not a release-readiness recommendation.
 
 Manager remains **6.1.0**; environment metadata **2**, backup **3**, image definitions unchanged.
-No merge, version bump, release, project tag, push, upload or publication is authorized or performed.
-The subsequent branch migration, documentation review and test-suite review are separate tasks and
-were not begun. The optional/deferred backlog below is not new implementation permission.
+The D-058 branch migration preserves this work on `develop` without changing stable `main` or
+creating a release. Publishing the development branch is not stable publication or release
+readiness. No version bump, release, project tag or remote `main` change is part of the migration.
+The subsequent broader user-documentation and test-suite reviews remain separate tasks, not begun
+by this workflow change. The optional/deferred backlog below is not new implementation permission.
 
 ## Delivered in 6.1.0
 

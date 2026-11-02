@@ -506,11 +506,11 @@ The checks are a snapshot at start time. Verified: `tests/test_direct_restart.py
   catches are limited to the errors they expect, so a defect surfaces instead of looking like an
   invalid backup or an empty selection.
 
-## D-035 Repository layout and branches — superseded by D-045
+## D-035 Repository layout and branches — superseded by D-045 and D-058
 
 Governed the repository layout after the release preparation (which records were in force and
-where earlier ones were kept). Still valid: `main` is the only long-lived branch; work happens on
-short-lived topic branches merged into `main` with a merge commit after review.
+where earlier ones were kept). D-045 replaced the layout rules; D-058 replaces the former
+single-long-lived-branch policy with stable `main` and development `develop`.
 
 ## D-036 Licence and identity — accepted, partly superseded by D-042 and D-048
 
@@ -1042,3 +1042,29 @@ order and one-ID/local-commit/STOP rhythm, not its architecture or acceptance cr
   dependency/acceptance table remains in Git; completed evidence is consolidated in
   [BASELINE](BASELINE.md#updates-final-integration) and implementation boundaries in ARCHITECTURE.
   No version bump, merge, release work, push, tag, upload or publication is authorized.
+
+## D-058 Stable main and ongoing develop — accepted
+
+Owner-approved workflow migration, separate from Updates implementation and release preparation.
+Supersedes D-035's single-long-lived-branch rule and the release preparation source/post-release
+bookkeeping of RELEASING; all existing safety, review and release verification gates remain.
+
+- `main` represents the latest published stable source and corresponding documentation.
+  `develop` holds all unreleased features, fixes, refactoring and future-release documentation;
+  temporary topic branches start there and ordinary pull requests target it.
+- Verify branch and worktree before modifying files or committing. Never silently switch branches
+  across work at risk. Remote pushes, tags, releases and remote configuration changes still need
+  explicit owner authorization; never bypass protection or rewrite published history.
+- Review and validate release candidates before merging approved work from `develop` into `main`
+  through the protected release workflow, then create the annotated version tag and reviewed
+  GitHub Release. Temporary release branches are optional preparation, not another permanent line.
+  Urgent stable hotfixes may start from `main` but return to `develop` after validation/publication.
+  Next-release bookkeeping belongs on `develop`.
+- CI covers pushes and pull requests targeting `main` and `develop`, with unchanged least-privilege
+  jobs. Release automation remains version-tag-only; weekly/on-demand image checks publish nothing.
+  Stable-tag installation remains the user recommendation. Guides evolve with their branch's
+  source; stable guides remain on `main` and version tags. Release status belongs in CHANGELOG
+  and engineering records, not temporary notices throughout user guides.
+- Preserve the original 32 Updates/stabilization commits intact, with a local safety reference;
+  do not publish private ignored evidence/local instructions. `main` already equals public
+  `origin/main`, so no reset or history rewrite is needed. Keep that stable reference unchanged.

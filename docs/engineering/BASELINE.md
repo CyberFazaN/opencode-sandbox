@@ -10,12 +10,12 @@ verification, known issues and what is not verified. Update it whenever one of t
 |---|---|
 | Manager version | `6.1.0` (single source: `src/opencode_sandbox/__init__.py`), Beta (D-055); 6.0.0 was the initial public version |
 | Distribution | `opencode-sandbox`, installed with pipx from the GitHub repository at a version tag (D-042, D-044); MIT (`LICENSE`), owner CyberFazaN (D-036) |
-| Branch | `main`; topic branches are merged with merge commits; releases are annotated tags `vX.Y.Z` (`RELEASING.md`) |
+| Branches | `main`: published stable source/docs; `develop`: unreleased work and topic-branch integration (D-058); reviewed/validated release candidates merge into `main` before annotated tags `vX.Y.Z` (`RELEASING.md`) |
 | Schemas | environment metadata 2, backup 3; other schema versions are not migrated (D-002) |
 
-## Unpublished Updates work
+## Unreleased Updates work
 
-D-056/D-057's approved UP-00..UP-18 and one-time PERF work is complete, locally and unpublished.
+D-056/D-057's approved UP-00..UP-18 and one-time PERF work is complete on `develop`, not released.
 Updates retains `v` and separates Manager, Base Images and Environment OpenCode. It preserves
 independent local/registry results, identity-bound history, default-off daily GitHub/npm discovery,
 exact consent and existing pins/journals/checkpoints. Environment actions, cached/full-refresh
@@ -31,9 +31,72 @@ user OpenCode configuration management is added. [Architecture](ARCHITECTURE.md#
 and [user instructions](../install.md#explicit-reviewed-manager-update) describe the exact limits.
 
 Manager remains **6.1.0**, metadata **2**, backup **3**; image definitions are unchanged. No version
-bump, merge, project tag, push, upload or publication occurred. The transient working record is
-retired under D-045; permanent evidence is below and earlier checkpoint details remain in Git.
-This completion does not authorize release preparation or the subsequent separate reviews/migration.
+bump, merge, project tag, push, upload or publication occurred during implementation. The transient
+working record is retired under D-045; permanent evidence is below and earlier checkpoint details
+remain in Git.
+This completion does not authorize release preparation or the subsequent separate reviews.
+
+## Branch workflow migration
+
+D-058 establishes stable `main` and ongoing `develop`; ordinary work and next-release bookkeeping
+belong on `develop` or temporary branches based on it. Verify branch/status before edits/commits.
+Release candidates need review and validation before protected integration into `main` and the
+separately authorized tagged release workflow; stable hotfixes return to `develop`.
+
+Inspection found clean `work/updates`, not unpublished local `main`: 32 linear Updates/stabilization
+commits above freshly fetched `origin/main`, no existing local/remote `develop`, and local `main`
+already identical to the public stable branch. `safety/pre-develop-20261101` and `work/updates`
+retain the original HEAD; `develop` started at that exact commit with identical files and ancestry.
+No reset, squash, history rewrite, safety-reference deletion or remote `main` change is needed.
+Ignored local instructions, venvs and verification/recovery evidence stay private and untouched.
+
+Migration changes are limited to branch/contributor/release instructions, CI branch filters and
+their regression tests. User guides on `develop` evolve with the next release; stable guides stay
+on `main` and version tags, without temporary release-specific notices in user guides.
+CI covers pushes/PRs for both branches; release triggers, job permissions, pinned actions and image
+automation are unchanged. Installation
+examples remain stable-tag-only. See CONTRIBUTING and RELEASING for authorization boundaries.
+
+### Migration verification — 2026-11-02
+
+Final migration scope is eight workflow/instruction/record/test files. Application source, package
+definition, assets, user guides and all pre-existing tests are byte-identical to the preserved
+Updates HEAD. The only new tests cover both CI branch filters and the tag-only release trigger.
+No application fix, version/schema/image revision change or release preparation was performed.
+
+| Layer | Executed result |
+|---|---|
+| Complete default suite, Python 3.11.18/current | **2223 passed / 86 real opt-in skips**, **360.61 s** |
+| Complete default suite, Python 3.14.8/current | **2223 passed / 86 real opt-in skips**, **373.72 s**; all **2309 ordered test IDs/outcomes identical** to 3.11 |
+| Focused current/lowest contracts | Current draft follow-up **98 passed** before the owner removed temporary guide notices and their draft tests. Final banner-free lowest-dependency workflow/release/docs/language/CLI/quality subset: **91 passed** on each endpoint, **4.07/3.26 s**, two known Typer deprecations each. These focused runs are not full lowest-dependency regression |
+| Real Docker and installed pipx | `tests/integration/test_65_pipx.py`: **1 passed / 21 logged checks**, **40.92 s**, no skips. Isolated local-tag install, launcher/assets/doctor, actual container create/start/exec, tag-preserving upgrade/reinstall, explicit version change/back, data retention, foreign-launcher safety and uninstall. Product cleanup guard passed; no labeled containers/volumes/images left; all four original full image IDs unchanged |
+| Packaging, both Python endpoints | Tracked-only staged input, `build --no-isolation`, strict twine and `check_dist.py` pass. All **63 product files byte-identical** to source in each sdist/wheel; no private local instructions or test injector shipped |
+| Static/workflow/security | Ruff/shellcheck included in complete and focused runs; `actionlint` clean, offline `zizmor` no findings (existing one ignored/one suppressed unchanged). `gitleaks git --redact --log-opts='--all'` and tracked-only directory scans clean; `git diff --check` clean; all four dependency `pip check` results clean |
+
+Commands: complete suites used `.work/venv311/bin/python -m pytest -q -rs` and the corresponding
+`venv314` interpreter, absolute source PYTHONPATH, serial foreground execution, fresh short
+`--basetemp` paths and separate `--junitxml` records. Focused lowest runs used `venv311low` and
+`venv314low` with `test_python_ci.py`, `test_release_scripts.py`, `test_user_docs.py`,
+`test_language.py`, `test_cli_structure.py` and `test_quality.py`. The real command used
+`OCS_TEST_DOCKER=1 OCS_TEST_RUN=branch-migration-pipx-20261102` and only `test_65_pipx.py`, without
+the image-build opt-in. Packaging used `python -m build --no-isolation`,
+`python -m twine check --strict` and `.github/scripts/check_dist.py` against separate artifacts.
+
+Feedback/failure trail: the initial CI regressions reproduced both missing development branch
+filters. Draft user-guide notices and their associated draft tests were withdrawn at the owner's
+direction, restoring all user guides exactly. An initial complete invocation was interrupted before
+a result; the two complete runs above are fresh successful results. Initial 3.14 packaging lacked
+the build backend in that test venv; installed setuptools from explicit public PyPI into the ignored
+venv only, rechecked dependencies, and rebuilt/validated both final packages successfully. No
+product code or safety assertion was weakened to obtain the final results.
+
+Evidence/manifests: `.work/branch-migration-20261101/` and
+`.work/logs/branch-migration-pipx-20261102*`. The earlier real Updates results below are historical,
+not newly executed migration checks. **Not rerun:** the full lowest-dependency suites, full real
+release campaign, real OpenCode/model sessions, real Docker dashboard terminals, privileged/
+socket-activation/service/reboot rows or manual observation. The user authorized only publishing
+`develop` after these checks, not remote `main`, tags, a release or protection changes; the final
+remote commit and available hosted CI status belong in the migration completion report.
 
 ## Updates final integration
 

@@ -15,8 +15,9 @@ discuss a larger change or a new feature before writing it; deferred ideas are c
 ## Development setup
 
 ```sh
-git clone https://github.com/CyberFazaN/opencode-sandbox.git
+git clone --branch develop https://github.com/CyberFazaN/opencode-sandbox.git
 cd opencode-sandbox
+git status --short --branch
 python -m venv .venv
 .venv/bin/pip install -e '.[test]'
 .venv/bin/pip install ruff shellcheck-py pyte   # quality gates, terminal tests
@@ -27,6 +28,35 @@ Python 3.11 or newer is required. Run your checkout with `.venv/bin/opencode-san
 editable venv is for development only. For normal application installation, use pipx from a
 GitHub release tag ([docs/install.md](docs/install.md#install-the-application)). There is no
 host/application setup script or replacement wizard in the repository.
+
+## Branch workflow
+
+- `main` represents the latest published stable release, including its matching source and
+  documentation. Do not use it for ordinary development.
+- Develop all new features, fixes, refactoring and documentation for future releases on `develop`
+  or short-lived topic branches based on it. Open ordinary pull requests against `develop`;
+  reviewed topic branches are integrated with merge commits. There is no additional permanent
+  release branch.
+- Before editing project files or creating commits, check `git branch --show-current` and
+  `git status --short --branch`. Never silently switch branches if uncommitted work is at risk;
+  preserve it and agree on a safe next step instead.
+- Review and validate a release candidate from `develop` before integrating the approved work
+  into `main`. Stable publication then uses an annotated version tag through the existing
+  [release workflow](docs/engineering/RELEASING.md). A temporary `release/X.Y.Z` branch may hold
+  candidate preparation; it is not another development line.
+- Urgent stable-release hotfixes may use a temporary branch from `main`. Review and validate the
+  fix through the same release gates, then integrate it back into `develop` so it is not lost.
+- CI validates pushes and pull requests targeting both long-lived branches. Ordinary branch
+  pushes do not trigger release automation; that workflow accepts version tags only. The weekly
+  image workflow continues to use the repository's default branch and publishes no images.
+- Agents need explicit human authorization for remote pushes, remote changes, tags and releases
+  (`AGENTS.md`). Only the maintainer creates release tags. Do not bypass branch protection or use
+  force pushes; the branch model itself grants no publication permission.
+
+User guides on `develop` evolve with the next release; the matching stable guides remain on
+`main` and version tags. Keep release status in `CHANGELOG.md` and engineering records, not
+temporary per-release banners throughout user guides. Keep normal installation guidance pinned
+to stable version tags, without recommending development installs to ordinary users.
 
 CI runs the unit/host/Textual-pilot/local-process suite with current and lowest direct
 dependencies on Python 3.11 and 3.14, plus the current rolling Arch Python as an unprivileged

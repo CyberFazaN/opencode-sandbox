@@ -53,8 +53,16 @@ implementation permission. User documentation: `README.md` and `docs/`.
    code, `--help` and this contract, and flag conflicts.
 2. For every defect: minimal reproducer -> root cause -> narrowly scoped patch -> regression test
    -> rerun. Prefer simple maintainable solutions; avoid speculative rewrites and feature creep.
-3. Work on a topic branch with focused commits; never rewrite published history, force-push,
-   push, tag, publish releases or change remote repositories without the human's permission.
+3. Before modifying project files or creating commits, verify the current branch and worktree
+   status. Ordinary features, fixes, refactoring and future-release documentation belong on
+   `develop` or a temporary topic branch based on it, with focused commits. `main` holds the latest
+   published stable source and corresponding documentation, not ordinary development. Never
+   silently switch branches when uncommitted work could be at risk; preserve it and ask if unsafe.
+   Review and validate release candidates before merging approved `develop` work into `main`,
+   then follow `docs/engineering/RELEASING.md` for the versioned release tag. Urgent stable hotfixes
+   may branch from `main`, but must also be integrated back into `develop`. Never rewrite published
+   history, force-push, push, tag, publish releases or change remote repositories without the
+   human's explicit permission for that operation. Branch policy is not push/release authorization.
 4. Run operations in increasing risk order: static and unit tests -> isolated data and
    configuration directories -> disposable rootless containers and volumes -> destructive fault
    injection on named test resources -> dashboard and end-to-end OpenCode.
