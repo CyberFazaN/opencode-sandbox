@@ -39,24 +39,20 @@ class UpdatesScreen(Screen):
     UpdatesScreen ToastRack {height: 0; max-height: 0; margin: 0; overflow: hidden;}
     #updates-panel {width: 100%; max-width: 120; height: 1fr; border: round $accent; padding: 0 1;}
     #updates-title {height: 1; text-style: bold;}
-    #updates-tabs {height: 3; background: $boost;}
-    #updates-tabs Tab {padding: 0 2; margin: 0 1;}
-    #updates-tabs Tab.-active {background: $accent; text-style: bold;}
+    #updates-tabs Tab.-active {color: $accent; text-style: bold;}
     #updates-discovery {height: 2; text-wrap: nowrap; text-overflow: ellipsis;}
     #updates-table {height: 1fr; min-height: 3;}
     #updates-manager {height: 1fr; min-height: 3; padding: 1 2; border: round $foreground 20%;}
     #updates-selected {height: 3; text-wrap: nowrap; text-overflow: ellipsis;}
-    #updates-list-tools {height: 1;} #updates-hint {width: 1fr; color: $text-muted;}
-    #updates-check-all {width: 12; min-width: 12;}
+    #updates-list-tools {height: 1;} #updates-hint {width: 1fr; color: $text-muted; background: $background;}
+    #updates-check-all {width: 13; min-width: 13;}
     #updates-progress {height: 2;} #updates-spinner {width: 4; height: 1;}
     #updates-reason {width: 1fr; height: 2; text-wrap: nowrap; text-overflow: ellipsis;}
     #updates-reason.running {color: $warning;} #updates-reason.failed {color: $error;}
     #updates-reason.succeeded {color: $success;}
-    #updates-buttons {height: auto;}
-    #updates-buttons Button {min-width: 10; width: 1fr;}
-    #updates-environment-buttons {height: auto;}
-    #updates-environment-buttons Button {min-width: 10; width: 1fr;}
-    #updates-base-buttons {height: auto;} #updates-base-buttons Button {min-width: 10;}
+    #updates-buttons, #updates-environment-buttons, #updates-base-buttons {height: auto;}
+    #updates-buttons Button, #updates-environment-buttons Button, #updates-base-buttons Button {width: 16; min-width: 10;}
+    #updates-close {dock: right;}
     """
     BINDINGS = [Binding("escape", "close", "Close"), Binding("c", "check", "Check"),
                 Binding('C', 'check_all', 'Check all'), Binding("d", "details", "Details"),
@@ -101,7 +97,7 @@ class UpdatesScreen(Screen):
             yield Tabs(Tab("1 Manager", id="manager"), Tab("2 Base Images", id="bases"),
                        Tab("3 Environments", id="environments"), id="updates-tabs")
             yield Static("", id="updates-discovery", markup=False)
-            with Horizontal(id='updates-list-tools'):
+            with Horizontal(id='updates-list-tools', classes='bar'):
                 yield Static('', id='updates-hint', markup=False)
                 yield Button('Check All', id='updates-check-all', compact=True)
             yield Static('', id='updates-manager', markup=False)
@@ -110,15 +106,15 @@ class UpdatesScreen(Screen):
             with Horizontal(id='updates-progress'):
                 yield LoadingIndicator(id='updates-spinner')
                 yield Static("", id="updates-reason", markup=False)
-            with Horizontal(id="updates-buttons"):
+            with Horizontal(id="updates-buttons", classes="bar"):
                 yield Button("Check", id="updates-check", compact=True)
                 yield Button("Details", id="updates-details", compact=True)
                 yield Button("Update", id="updates-update", compact=True, disabled=True)
                 yield Button("Close", id="updates-close", compact=True)
-            with Horizontal(id="updates-environment-buttons"):
+            with Horizontal(id="updates-environment-buttons", classes="bar"):
                 for label, action in (("Policy", "policy"), ("Rollback", "rollback"), ("Recover", "recover")):
                     yield Button(label, id="updates-" + action, compact=True)
-            with Horizontal(id="updates-base-buttons"):
+            with Horizontal(id="updates-base-buttons", classes="bar"):
                 yield Button('Rollback', id='updates-base-rollback', compact=True)
         footer = Footer(show_command_palette=False)
         footer.compact = True

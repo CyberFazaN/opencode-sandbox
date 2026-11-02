@@ -176,12 +176,18 @@ class Dashboard(App):
 
     TITLE = "OpenCode Sandbox"
     # Compact, wrapping button rows: at 80x24 the old layout left one table row and
-    # hid 11 of 20 buttons off-screen.
+    # hid 11 of 20 buttons off-screen. Bar buttons stay unfilled on one strip: filled one-line
+    # buttons merge into tiles across wrapped rows, and borders are unavailable on compact buttons.
     CSS = """
     Screen {layout: vertical;}
     #search {width: 1fr;}
-    .bar {height: auto; grid-gutter: 0 0;}
-    .bar Button {width: 1fr; border-right: solid $foreground 20%;}
+    .bar {height: auto; grid-gutter: 0 1; background: $panel;}
+    .bar Button {width: 1fr; background: transparent; color: $foreground; text-style: none;}
+    .bar Button:hover {background: $boost; text-style: underline;}
+    .bar Button:focus {background: $primary; color: $text; text-style: bold;}
+    .bar Button:disabled {background: transparent; color: $text-disabled; text-style: none;}
+    .bar Button.-error {background: transparent; color: $error; text-style: bold;}
+    .bar Button.-error:focus {background: $error; color: $text;}
     #envs {height: 1fr; min-height: 3;}
     #details {height: 9; border: round $accent; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
     #status, #metrics {height: 1; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}

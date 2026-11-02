@@ -8,7 +8,7 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ### Changed
 
-- Cleaner Updates views with a Manager summary, styled tabs, consistent shortcut footer, visible
+- Cleaner Updates views with a Manager summary, consistent shortcut footer, visible
   operation results and Check All. Cancel Check controls are removed; closing still cleans up checks.
 - Explicit environment version checks temporarily start existing stopped containers, then restore
   their stopped state under lifecycle locks, including independent cleanup after manager death.
@@ -20,8 +20,11 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   `--update-system-packages` forces fresh indexes/upgrades without pulling the upstream image;
   `--refresh` includes package upgrades. Debian/Arch image definitions advance to revisions 3/2.
 - Manager Settings adds opt-in selected-text copying with accurate native/OSC 52 feedback.
-  Editable inputs are excluded. Keys toggles with `?` and supports Esc/Close; menu separators
-  and compact-terminal focus/feedback are more consistent.
+  Editable inputs are excluded. Keys toggles with `?` and supports Esc/Close; compact-terminal
+  feedback is more consistent.
+- Dashboard and Updates button rows use one menu strip per row: unfilled, separated labels, a
+  full-width selection-colored focus, underline on hover and red-text Delete. Wrapped rows no
+  longer merge into tiles; Updates tabs use the default underline with an accent active label.
 
 ## 6.2.0 — 2026-11-02
 
