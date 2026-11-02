@@ -131,3 +131,42 @@ def test_private_runtime_step_relocates_only_owned_copies_and_preserves_sources(
     assert (project / 'README.md').read_bytes() == document.read_bytes()
     assert not project.stat().st_mode & 0o022 and not (project / 'README.md').stat().st_mode & 0o022
     assert before == {path: (path.read_bytes(), path.stat().st_mode) for path in before}
+
+
+@pytest.mark.parametrize('dependencies', ['current', 'lowest direct'])
+def test_install_controls_new_metadata_after_the_last_pip_call_without_changing_host_files(tmp_path, dependencies):
+    from opencode_sandbox.manager_tool_probe import outside
+
+    text = (ROOT / '.github/workflows/ci.yml').read_text()
+    section = text.split('      - name: Install\n', 1)[1].split('      - name: External runtime prerequisite\n', 1)[0]
+    script = '\n'.join(line[10:] for line in section.split('        run: |\n', 1)[1].splitlines())
+    runtime, project, commands = (tmp_path / name for name in ('private runtime', 'private project', 'commands'))
+    for path in (runtime, project, commands): path.mkdir()
+    host = tmp_path / 'original host cache'
+    host.write_bytes(b'host cache must not change')
+    host.chmod(0o777)
+    before = (host.read_bytes(), host.stat().st_mode)
+    installer = commands / 'python'
+    installer.write_text('''#!/bin/sh
+set -eu
+case "$3" in
+install)
+  mkdir -p "$pythonLocation/lib/python3/site-packages/packaging-26.3.dist-info" "$OCS_CI_PROJECT/src/product.egg-info"
+  chmod 777 "$pythonLocation/lib/python3/site-packages/packaging-26.3.dist-info" "$OCS_CI_PROJECT/src/product.egg-info"
+  echo 777 >> "$CI_INSTALL_RECORD"
+  ;;
+list) echo "typer 0.27.3" ;;
+esac
+''')
+    installer.chmod(0o700)
+    record = tmp_path / 'install-record'
+    subprocess.run(['bash', '-eu', '-c', script], check=True, capture_output=True, text=True,
+                   env={**os.environ, 'pythonLocation': str(runtime), 'OCS_CI_PROJECT': str(project),
+                        'GITHUB_WORKSPACE': str(host), 'DEPENDENCIES': dependencies,
+                        'CI_INSTALL_RECORD': str(record), 'PATH': str(commands) + os.pathsep + os.defpath})
+    assert record.read_text().splitlines() == ['777'] * (3 if dependencies == 'lowest direct' else 2)
+    target = tmp_path / 'application-home/venvs/opencode-sandbox'
+    for metadata in (runtime / 'lib/python3/site-packages/packaging-26.3.dist-info', project / 'src/product.egg-info'):
+        assert outside(str(metadata), target) == str(metadata)
+        assert not metadata.stat().st_mode & 0o022
+    assert (host.read_bytes(), host.stat().st_mode) == before
