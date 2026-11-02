@@ -27,6 +27,8 @@ def installed(tmp_path, monkeypatch):
     site = next(prefix.glob('lib/python*/site-packages'))
     (site / 'ocs_test_dependencies.pth').write_text(SITE + '\n')
     shutil.copytree(Path(handoff.__file__).parent, site / 'opencode_sandbox', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    # The owned result records below describe a synthetic 6.1.0 installation at any release.
+    (site / 'opencode_sandbox/__init__.py').write_text('__version__ = "6.1.0"\n')
     archive = tmp_path / 'helper.pyz'; archive.write_bytes(handoff._bundle()); archive.chmod(0o600)
     environment = {'HOME': str(tmp_path), 'PATH': os.defpath}
     return prefix, site, archive, environment

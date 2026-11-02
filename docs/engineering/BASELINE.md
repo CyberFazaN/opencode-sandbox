@@ -1,4 +1,4 @@
-# Baseline — OpenCode Sandbox 6.1.0
+# Baseline — OpenCode Sandbox 6.2.0
 
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
@@ -9,17 +9,18 @@ The current checkpoint below records fresh verification; older sections retain t
 
 | Item | Current state |
 |---|---|
-| Manager | `6.1.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.2.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
 | Images | Debian 13/default (`node:24-trixie`, revision 2); Arch rolling (`archlinux:base-devel`, revision 1) |
 
-The checkout includes unreleased component Updates views, optional default-off daily discovery,
+The release includes component Updates views, optional default-off daily discovery,
 environment/base actions and independent manager update/recovery. These are implemented, not a
-pending roadmap. Manager version, schemas and image definitions have not changed. Availability,
+pending roadmap. Schemas and image definitions have not changed. Availability,
 consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
-No release recommendation follows: B15's post-reboot recovery risk is not accepted.
+The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
+declined a reboot. Acceptance is not verification; original frozen recovery inputs remain retained.
 
 ## Supported environments
 
@@ -38,11 +39,78 @@ No release recommendation follows: B15's post-reboot recovery risk is not accept
 
 ## Verification
 
-### Current code checkpoint — 2026-11-02
+### Published 6.2.0
 
-Application source, dependency declarations and image assets are unchanged. The test-quality
-checkpoint strengthens behavioral/security oracles and fixture isolation, consolidates duplicate
-coverage, and keeps the complete CI/release selections. Local policy is in CONTRIBUTING; current
+[6.2.0](https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.2.0) was published on
+2026-11-02 as the latest stable GitHub release (not a draft or prerelease, no binary assets).
+Annotated `v6.2.0` targets protected [PR #3](https://github.com/CyberFazaN/opencode-sandbox/pull/3)
+merge commit `e343e35c1aff2d7d6e2754427abc960f3821bb47`; its product/test bytes match the
+qualification below. All ten [final PR checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41470002579)
+and ten [main checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41471779232)
+passed. All 14 [release-workflow jobs](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41473435213)
+passed, including both Python tag installations, before review/publication of the automated draft.
+Published notes match CHANGELOG; no package-index or container-image upload was performed.
+
+Fresh **public GitHub-tag** pipx installations on Python 3.11.18 and 3.14.8 passed version/help,
+installed-asset and missing-context checks, and actual rootless `doctor` (exit 0). PEP 610 records
+identify the official source/tag/merge commit; all **63 installed product files** match the tag,
+with no test hooks. Doctor verified the user's own rootless daemon and reported the expected older
+retained Debian-base revision warning; neither existing base was rebuilt. This is installation
+proof, not real public-network manager self-replacement, reboot recovery or a production-readiness
+claim. B15 remains BLOCKED with the owner's accepted risk.
+
+### 6.2.0 candidate qualification
+
+Local candidate qualification on 2026-11-02, from the approved `develop` tree. Detailed commands,
+input hashes, failed/pass XML, package comparisons and scan reviews are under ignored
+`.work/agents/release-6.2.0/`; real manifests/logs are `.work/logs/r62a*`, `r62b*` and `r62c*`.
+
+| Layer | Executed result and scope |
+|---|---|
+| Complete default suite, Python 3.11/lowest direct | **2205 passed / 86 real opt-in skips**, 331.12 s |
+| Complete default suite, Python 3.11/current | **2205 passed / 86 real opt-in skips**, 342.55 s |
+| Complete default suite, Python 3.14/lowest direct | **2205 passed / 86 real opt-in skips**, 352.74 s |
+| Complete default suite, Python 3.14/current | **2205 passed / 86 real opt-in skips**, 358.18 s |
+| Packaging and installed pipx | Both endpoints: isolated sdist/wheel build, strict twine/content checks, fresh private-tag pipx install/help/version/doctor; all **63 product files** match the candidate source |
+| Complete real installed-manager campaign | `r62b`: **86 tests / 1643 checks passed**, 0 failures/errors/skips, 2115.33 s; both distributions, retained Debian 12, packaged/cached/full-refresh builds, real OpenCode/fake-provider first prompts, terminals, native manager replacement/recovery, privileged and isolated socket-activation rows |
+| Python 3.11 installed-manager floor | `r62c`: **7 tests / 563 checks passed**, 0 failures/errors/skips, 337.96 s; actual pipx lifecycle, both-layout native manager update/recovery and both-distribution session exclusion, not a second complete campaign |
+| Static and privacy | Ruff/shellcheck and four dependency checks pass; actionlint/offline zizmor pass with existing exceptions. Gitleaks history/tree: 0 findings; offline detect-secrets: 11 reviewed deliberate test fixtures, no real secret identified; personal-data candidates reviewed |
+
+The matrix uses the selected existing endpoint venvs, not a claim of four fresh resolutions.
+Fresh pipx installations resolved Typer 0.27.3/Textual 8.2.8, matching the current matrix. Lowest
+Typer emits two known Click deprecations. The Python 3.14 real harness emits 91 multi-threaded
+`forkpty` deprecation warnings; these were not suppressed or treated as application failures.
+
+Version preparation exposed synthetic fixtures tied to the checkout's 6.1.0 version; they now use
+explicit consistent old/new identities or genuinely newer targets. The initial complete real run
+`r62a` recorded 86 completed bodies but four teardown errors from six failed checks: one negative
+source fixture advertised the wrong tag, and session exclusion checked the runner's prefix rather
+than the separate installed manager. Only fixtures were corrected, with an additional unrelated-
+installation control; the fresh complete `r62b` run passed. No application safeguard was weakened.
+The four default matrices/package checks precede those two integration-only corrections; their
+production/unit inputs are unchanged. Later evidence-only edits receive focused document checks.
+
+Guarded cleanup and final inventory checks restored the original four image tags/full IDs, with
+no container/volume leaks. Only five manifested test tags and the created empty runtime unit
+directory were removed. Persistent protocol locks and original frozen hard-interruption recovery
+inputs remain. No reboot, real credential or paid-provider call was performed; the earlier real
+OpenRouter observation is retained evidence only, not a new candidate result.
+
+Hosted qualification supplements these local results: all ten jobs passed on the approved
+`develop` tree and on [release PR #3](https://github.com/CyberFazaN/opencode-sandbox/pull/3)
+([candidate CI](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41468038565)).
+The owner authorized the protected merge, annotated tag and publication. CAMPAIGN I06's reviewed
+decision is **READY WITH ACCEPTED RISKS**, retaining B15 as BLOCKED, not PASS. Evidence-only edits
+do not change the qualified product/test bytes. The required final-tree PR, `main` and tag checks
+and automated draft review subsequently passed as recorded above; this is not a
+production-readiness claim.
+
+### Test-quality checkpoint before 6.2.0 preparation
+
+At this earlier checkpoint, application source, dependency declarations and image assets were
+unchanged. The test-quality checkpoint strengthens behavioral/security oracles and fixture
+isolation, consolidates duplicate coverage, and keeps the complete CI/release selections.
+Local policy is in CONTRIBUTING; current
 and minimum direct dependencies are resolved together with the project in CI, not a later downgrade.
 Evidence: versions, final four XMLs, timing profile, mutation controls and removal-to-retained-test
 rationale under ignored `.work/agents/`; real resource manifests and logs under `.work/logs/`.
@@ -139,7 +207,9 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 
 ## Unverified behaviour
 
-- **B15 post-reboot manager recovery:** actual execution is unverified and risk is **not accepted**.
+- **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
+  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized. Same-boot hard-interruption
+  refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
   On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
   original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
   verifier and confirm startup/data retention. Never delete state/locks or infer success from an
@@ -155,8 +225,8 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 - pipx versions other than 1.18.7, Python 3.12/3.13/3.15 separately, Textual 4.0 in a real terminal,
   other terminal emulators, other real model providers and a real provider on Arch. Execute the
   corresponding installed/terminal/provider checks; mocks/pilots are not a substitute.
-- Actual post-change full release campaign, real public-network manager replacement, human
-  observation, a kill inside `docker commit`, and scheduled GitHub image-build execution.
+- Real public-network manager replacement, human observation, a kill inside `docker commit`,
+  and scheduled GitHub image-build execution.
   Each needs fresh evidence; no passed development subset closes these gaps.
 - Typer 0.16.0/Click 8.5 emits deprecations for helpers removed in Click 9. Keep the lowest-bound
   CI check; re-evaluate bounds when that version resolves, not by suppressing warnings/assertions.

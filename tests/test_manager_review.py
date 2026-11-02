@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from manager_source_fixture import serve
-from test_manager_installation import installation as local_installation
+from test_manager_installation import make_installation
 from test_manager_tools import tools as tools_fixture
 
 from opencode_sandbox import core as c
@@ -15,6 +15,12 @@ from opencode_sandbox import installation_locks as locks
 from opencode_sandbox import manager_handoff as handoff
 from opencode_sandbox import manager_releases as releases
 from opencode_sandbox import manager_targets as targets
+
+
+@pytest.fixture
+def installation(tmp_path, monkeypatch):
+    # This owned review scenario is 6.1.0 -> 6.2.0, not the checkout's next release.
+    return make_installation(tmp_path, monkeypatch, version='6.1.0')
 
 
 @pytest.fixture
@@ -54,7 +60,6 @@ def prepared(origin):
 
 # Register existing fixtures, but origin explicitly resolves the external tool before replacing
 # the synthetic running interpreter identity. Never mistake this for actual installed-pipx proof.
-installation = local_installation
 tools = tools_fixture
 
 
