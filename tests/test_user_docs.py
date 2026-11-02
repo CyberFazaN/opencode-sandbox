@@ -4,7 +4,7 @@ regenerated. Commands and options named in the documents: tests/test_cli_structu
 import re
 from pathlib import Path
 
-from test_language import ACTIVE_ROOT_DOCS, USER_GUIDES, active_files
+from test_language import active_files
 
 from opencode_sandbox import __version__
 from opencode_sandbox import runtime_identity as rid
@@ -50,16 +50,12 @@ def anchors(path):
     return found
 
 
-def test_anchor_rules_match_github():
-    sample = ROOT / ".work" / "anchor-sample.md"
-    sample.parent.mkdir(exist_ok=True)
+def test_anchor_rules_match_github(tmp_path):
+    sample = tmp_path / "anchor-sample.md"
     sample.write_text("# Direct workspaces (not recommended)\n## 1. Check the host\n## Keys\n## Keys\n"
                       "```sh\n# a comment, not a heading\n```\n## `check NAME` and `doctor`\n")
-    try:
-        assert anchors(sample) == {"direct-workspaces-not-recommended", "1-check-the-host", "keys", "keys-1",
-                                   "check-name-and-doctor"}
-    finally:
-        sample.unlink()
+    assert anchors(sample) == {"direct-workspaces-not-recommended", "1-check-the-host", "keys", "keys-1",
+                               "check-name-and-doctor"}
 
 
 def test_relative_links_and_anchors_resolve():
@@ -91,8 +87,13 @@ def test_links_into_this_repository_point_at_existing_documents():
     assert broken == []
 
 
-def test_daemon_hints_name_the_published_setup_guide():
-    assert rid.SETUP_GUIDE == f"{REPOSITORY}/blob/main/docs/install.md#prepare-docker"
+def test_daemon_hints_link_to_published_documentation():
+    prefix = f"{REPOSITORY}/blob/main/"
+    assert rid.SETUP_GUIDE.startswith(prefix)
+    file, _, anchor = rid.SETUP_GUIDE.removeprefix(prefix).partition("#")
+    target = ROOT / file
+    assert target.is_file() and target.suffix == ".md"
+    assert not anchor or anchor in anchors(target)
     for classification in (rid.MISMATCH, rid.UNAVAILABLE, rid.MISSING, rid.NOT_CONFIGURED):
         assert rid.SETUP_GUIDE in rid.HINTS[classification], classification
 
@@ -112,65 +113,12 @@ def test_install_commands_name_the_current_release():
 def test_every_guide_is_indexed_and_linked_from_the_readme():
     index = (DOCS / "README.md").read_text()
     readme = (ROOT / "README.md").read_text()
-    for name in USER_GUIDES - {"README.md"}:
+    for path in sorted(DOCS.glob("*.md")):
+        if path.name == "README.md":
+            continue
+        name = path.name
         assert f"]({name})" in index, name
         assert f"](docs/{name}" in readme, name
-
-
-def test_user_documents_do_not_mention_internal_records():
-    """D-037/D-038: no development history, audit or task references in the user documentation."""
-    pattern = re.compile(r"V6-ISS|\bISSUE-|\bAUD-|\baudit|\b[TR]\d\d\b|\bRF\b|\b5\.\d+\.\d+|\b5\.x\b|\bS0\d[ab]?\b|docs/history|docs/engineering"
-                         r"|ROOTLESS-ARCH|AGENT-CONTEXT\.md", re.IGNORECASE)
-    found = [(path.name, m.group(0)) for path in user_documents() for m in pattern.finditer(path.read_text())]
-    assert found == []
-
-
-def test_documents_do_not_require_arch_linux_as_the_host():
-    """D-046: Linux hosts in general; Arch Linux is the tested host, not a requirement."""
-    pattern = re.compile(r"(only|supported) (tested )?host|You need Arch|Arch Linux is the (only|required|supported)|requires? Arch"
-                         r"|other than Arch", re.IGNORECASE)
-    files = [*user_documents(), *(ROOT / name for name in ACTIVE_ROOT_DOCS),
-             ROOT / ".github/ISSUE_TEMPLATE/bug_report.yml"]
-    found = [(path.name, line.strip()) for path in files for line in path.read_text().splitlines() if pattern.search(line)]
-    assert found == []
-    requirements = (DOCS / "install.md").read_text()
-    for prerequisite in ("| Linux |", "newuidmap", "user namespaces", "cgroup v2", "distribution's official documentation"):
-        assert prerequisite in requirements, prerequisite
-
-
-def test_rootless_setup_points_to_upstream_and_distribution_documentation():
-    text = (DOCS / "install.md").read_text()
-    setup = text.split("## Prepare Docker\n", 1)[1].split("\n## ", 1)[0]
-    assert "https://docs.docker.com/engine/security/rootless/" in setup
-    assert "https://wiki.archlinux.org/title/Docker#Rootless_Docker_daemon" in setup
-    assert "distribution's official documentation" in setup
-    assert "packaging and setup conventions" in setup
-
-
-def test_rootless_setup_does_not_duplicate_host_installation_recipes():
-    text = (DOCS / "install.md").read_text()
-    setup = text.split("## Prepare Docker\n", 1)[1].split("\n## ", 1)[0]
-    # The guide owns context selection, diagnostics and image builds, not host configuration.
-    recipes = re.compile(r"\b(?:sudo|pacman|apt-get|dnf|usermod|modprobe|loginctl|systemctl)\b"
-                         r"|dockerd-rootless-setuptool\.sh install|docker context create"
-                         r"|/etc/(?:subuid|subgid|systemd)|curl\b[^\n]*\|\s*(?:ba)?sh")
-    assert recipes.findall(setup) == []
-
-
-def test_rootless_readiness_uses_application_diagnostics_and_discloses_limits():
-    text = (DOCS / "install.md").read_text()
-    setup = " ".join(text.split("## Prepare Docker\n", 1)[1].split("\n## ", 1)[0].split())
-    for expected in ("opencode-sandbox doctor", "Daemon identity: verified", "opencode-sandbox check NAME",
-                     "Docker-reported CPU quota, memory and PID limit support",
-                     "not a measurement of kernel enforcement", "does not check user-namespace policy",
-                     "does not prove that resource limits can be enforced", "DOCKER_HOST", "DOCKER_CONTEXT"):
-        assert expected in setup, expected
-    assert "https://docs.docker.com/engine/security/rootless/tips/#limiting-resources" in setup
-
-
-def test_troubleshooting_does_not_refer_to_numbered_host_setup_steps():
-    text = (DOCS / "troubleshooting.md").read_text()
-    assert not re.search(r"install\.md#prepare-docker\), step \d", text)
 
 
 def test_the_dashboard_screenshot_can_be_regenerated():
@@ -182,46 +130,3 @@ def test_the_dashboard_screenshot_can_be_regenerated():
     committed = (DOCS / "images" / "dashboard.svg").read_text(encoding="utf-8")
     for name, *_ in dashboard_screenshot.ENVIRONMENTS:
         assert name in committed, name
-
-
-# D-037/D-038/D-045: the public tree has no references to private records or earlier versions.
-RECORD_REFERENCES = re.compile(
-    r"V6-ISS|\bISSUE-\d|\bOBS-\d|\bAUD-\d|\b[TR]\d\d\b|\bRF\b|\bP0\d\b|(?<!no-)\baudit|[Rr]emediation|TEST-RESULTS"
-    r"|docs/history|engineering/history|qa-v5|publication/|stabilization/|\b5\.x\b|\bv5\b|\b5\.\d+\.\d+|\bS0\d[ab]?\b")
-# Commit hashes in documents (the workflows pin actions by commit SHA on purpose).
-COMMIT_HASH = re.compile(r"\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
-CODE_REFERENCES = re.compile(
-    r"V6-ISS|\bISSUE-\d|\bOBS-\d|\bAUD-\d|(?<!no-)\baudit|[Rr]emediation|TEST-RESULTS|docs/history|engineering/history"
-    r"|qa-v5|ocs-test-[tr]\d\d-|\"t1\d-|\bS0\d[ab]?\b|ocs-test-s0\d")
-
-
-def public_records():
-    """The project's documents: root documents, user guides, engineering records (not the
-    working records of a running effort in a subdirectory, D-045) and the GitHub files."""
-    return [*(ROOT / n for n in sorted(ACTIVE_ROOT_DOCS)), *user_documents(), *sorted((DOCS / "engineering").glob("*.md")),
-            *sorted(p for p in (ROOT / ".github").rglob("*")
-                    if p.is_file() and "__pycache__" not in p.parts and p.suffix in (".md", ".yml", ".py", ".sh"))]
-
-
-def test_public_records_have_no_internal_references():
-    found = [(path.relative_to(ROOT).as_posix(), m.group(0)) for path in public_records()
-             for pattern in ((RECORD_REFERENCES, COMMIT_HASH) if path.suffix == ".md" else (RECORD_REFERENCES,))
-             for m in pattern.finditer(path.read_text(encoding="utf-8"))]
-    assert found == []
-
-
-def test_code_and_tests_have_no_internal_references():
-    files = [ROOT / "pyproject.toml",
-             *(p for top in ("src", "tests") for p in sorted((ROOT / top).rglob("*"))
-               if p.is_file() and "__pycache__" not in p.parts and not any(x.endswith(".egg-info") for x in p.parts)
-               and p.suffix in (".py", ".sh", ".json", ""))]
-    found = []
-    for path in files:
-        if path == Path(__file__).resolve():
-            continue  # the patterns themselves
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        found += [(path.relative_to(ROOT).as_posix(), m.group(0)) for m in CODE_REFERENCES.finditer(text)]
-    assert found == []

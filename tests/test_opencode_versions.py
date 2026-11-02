@@ -9,6 +9,8 @@ import pytest
 from opencode_sandbox import core as c
 from opencode_sandbox import opencode_versions as v
 
+OLD, NEW = "sha256:" + "a" * 64, "sha256:" + "b" * 64
+
 
 @pytest.mark.parametrize("a,b,expected", [
     ("1.10.0", "1.9.9", 1),            # string comparison gets this wrong
@@ -27,13 +29,14 @@ def test_semver_compare(a, b, expected):
 def test_describe_never_offers_a_downgrade():
     assert v.describe("2.1.4", "2.1.4") == "current"
     assert v.describe("2.9.0", "2.10.0").startswith("update available")
-    assert v.describe("2.10.0", "2.9.0").startswith("newer than npm latest")
+    assert v.describe("2.10.0", "2.9.0").startswith("newer than latest supported stable")
 
 
 @pytest.fixture
 def registry(monkeypatch):
     """Real HTTP over loopback; each test sets the response."""
-    state = {"status": 200, "body": b"{}", "delay": 0}
+    state = {"status": 200, "body": b"{}", "delay": 0, "headers": {}, "requests": []}
+    state['request_headers'] = []
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -41,20 +44,33 @@ def registry(monkeypatch):
 
         def do_GET(self):
             import time
+            state["requests"].append((self.path, self.headers.get("Accept")))
+            state['request_headers'].append(dict(self.headers))
+            gate = state.get('response_gate')
+            if gate is not None:
+                assert gate.wait(5), 'registry response rendezvous expired'
             time.sleep(state["delay"])
             self.send_response(state["status"])
+            for key, value in state["headers"].items(): self.send_header(key, value)
             self.end_headers()
             self.wfile.write(state["body"])
 
     srv = HTTPServer(("127.0.0.1", 0), H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    monkeypatch.setattr(v, "REGISTRY", f"http://127.0.0.1:{srv.server_port}/@opencode%2fcli/latest")
-    yield state
-    srv.shutdown()
+    # Only shutdown polling is shorter; response delays and client deadlines are unchanged.
+    thread = threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
+    thread.start()
+    monkeypatch.setattr(v, "REGISTRY", f"http://127.0.0.1:{srv.server_port}/@opencode%2fcli")
+    try:
+        yield state
+    finally:
+        srv.shutdown()
+        thread.join(timeout=2)
+        srv.server_close()
+        assert not thread.is_alive(), "registry fixture did not stop its server thread"
 
 
 def test_latest_reads_registry(registry):
-    registry["body"] = json.dumps({"version": "2.1.4"}).encode()
+    registry["body"] = json.dumps({"versions": {"2.1.4": {"version": "2.1.4"}}}).encode()
     assert v.latest() == "2.1.4"
 
 
@@ -91,15 +107,26 @@ def test_versions_survive_one_invalid_policy(monkeypatch):
     assert rows["bad"]["state"].startswith("error")
 
 
-def fake_docker(calls, installed="2.1.4", same=False, os_release='ID=debian\nVERSION_ID="13"', problems=""):
+def fake_docker(calls, installed="2.1.4", same=False, os_release='ID=debian\nVERSION_ID="13"', problems="", previous_tags=()):
+    built = set()
     def docker(*a, **k):
         calls.append(a)
+        if a[0] == "build":
+            built.add(a[a.index("-t") + 1])
         if a[0] == "run":  # verify_image: os-release line, then `opencode --version`
             facts = "".join(f"ocs-os: {line}\n" for line in os_release.splitlines())
             return SimpleNamespace(returncode=0, stdout=f"{facts}{problems}opencode v{installed}\n", stderr="")
         if a[:2] == ("image", "inspect"):
-            new = "-candidate-" in a[-1] and not same
-            return SimpleNamespace(returncode=0, stdout=("layers:new" if new else "layers:old") + "\n", stderr="")
+            if ("-candidate-" in a[-1] and a[-1] not in built) or ("-previous-" in a[-1] and a[-1] not in previous_tags):
+                return SimpleNamespace(returncode=1, stdout="[]", stderr="No such image: " + a[-1])
+            new = ("-candidate-" in a[-1] or a[-1] == NEW) and not same
+            if "--format" in a:
+                out = ((NEW if new else OLD) + "|{}") if a[3] == "{{.Id}}|{{json .Config.Labels}}" else ("layers:new" if new else "layers:old")
+            else:
+                d = c.distros.get("arch" if "arch" in a[-1] else c.distros.DEFAULT)
+                out = json.dumps([{"Id": NEW if new else OLD, "Config": {"Labels": {
+                    **d.image_labels(), "org.opencode-sandbox.managed": "true"}}}])
+            return SimpleNamespace(returncode=0, stdout=out + "\n", stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     return docker
 
@@ -119,8 +146,8 @@ def test_update_base_latest_builds_explicit_version(monkeypatch):
                   "opencode-package=@opencode/cli", "managed=true"):
         assert "org.opencode-sandbox." + label in build
     assert build[-3:] == ("-f", str(c.distros.IMAGES / "debian" / "Dockerfile"), str(c.distros.IMAGES))
-    assert ("tag", "layers:old", result["previous_image"]) in calls
-    assert ("image", "rm", "layers:old") not in calls  # kept as the rollback copy
+    assert ("tag", OLD, result["previous_image"]) in calls
+    assert ("image", "rm", OLD) not in calls  # kept as the rollback copy
     assert any(a[:2] == ("image", "rm") for a in calls)  # candidate removed
 
 
@@ -132,13 +159,14 @@ def test_build_refuses_image_whose_os_differs_from_the_registry(monkeypatch):
         v.update_base("2.1.4")
     assert not any(a[0] == "tag" for a in calls)
     run = next(a for a in calls if a[0] == "run")
-    assert ("--security-opt", "no-new-privileges:true") == run[4:6]
+    index = run.index("--security-opt")
+    assert run[index:index+2] == ("--security-opt", "no-new-privileges:true")
 
 
 def test_base_rollback_refuses_an_old_os_without_moving_or_removing_its_tag(monkeypatch):
     calls = []
     previous = c.distros.previous_tag(c.distros.get(c.distros.DEFAULT), "0" * 12)
-    fallback = fake_docker(calls, installed="2.2.0", os_release='ID=debian\nVERSION_ID="12"')
+    fallback = fake_docker(calls, installed="2.2.0", os_release='ID=debian\nVERSION_ID="12"', previous_tags=(previous,))
     def docker(*args, **kwargs):
         if args[:2] == ("image", "ls"):
             return SimpleNamespace(returncode=0, stdout=previous + "\n", stderr="")
@@ -205,8 +233,8 @@ def test_build_resolves_latest_and_keeps_no_rollback_copy(monkeypatch):
     result = c.build()
     assert result == {"version": "2.1.4", "previous_image": None, "image": "opencode-sandbox:debian"}
     assert "OPENCODE_VERSION=2.1.4" in next(a for a in calls if a[0] == "build")
-    assert [a for a in calls if a[0] == "tag"] == [("tag", next(a for a in calls if a[0] == "build")[-4], "opencode-sandbox:debian")]
-    assert ("image", "rm", "layers:old") in calls  # the replaced image is not left behind untagged
+    assert [a for a in calls if a[0] == "tag"] == [("tag", NEW, "opencode-sandbox:debian")]
+    assert ("image", "rm", OLD) in calls  # the replaced image is not left behind untagged
 
 
 def test_build_without_registry_access_is_an_error(monkeypatch):
@@ -225,6 +253,8 @@ def test_build_without_registry_access_is_an_error(monkeypatch):
 def test_pinned_environment_refuses_other_versions(monkeypatch):
     m = c.create("pin", "scratch")
     v.set_policy(m, "pinned", "2.1.3")
+    m = c.resolve(m["id"])  # set_policy writes a freshly resolved record, not this stale object
+    monkeypatch.setattr(v, "latest", lambda: pytest.fail("a pinned latest request must not query npm"))
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
     monkeypatch.setattr(c, "docker", lambda *a, **k: pytest.fail("docker must not be called"))
     for target in ("latest", "2.1.4"):
@@ -253,7 +283,11 @@ def test_npm_install_is_bounded(monkeypatch):
     versions = iter(["2.1.2\n", "2.1.3\n"])
     def docker(*a, **k):
         calls.append(a)
-        if a[:3] == ("exec", c.cname(m), "opencode"):
+        if a[:2] == ("container", "inspect"):
+            return SimpleNamespace(returncode=0, stdout="a" * 64 + "|sha256:" + "b" * 64 + "|" + m["id"], stderr="")
+        if a[:2] == ("volume", "inspect"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps([{"Labels": {"org.opencode-sandbox.id": m["id"]}}]), stderr="")
+        if a[0] == "exec" and a[-2:] == ("opencode", "--version"):
             return SimpleNamespace(returncode=0, stdout=next(versions), stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
@@ -285,7 +319,7 @@ def test_v2_version_output_is_normalized(raw, expected):
 
 @pytest.mark.parametrize("bad", ["1.19.4", "0.0.0-dev-84", "opencode v1.19.3"])
 def test_v1_and_dev_versions_are_not_installable(bad):
-    with pytest.raises(c.SandboxError, match="not supported; this manager installs OpenCode 2.x only"):
+    with pytest.raises(c.SandboxError, match="not supported; this manager installs OpenCode 2.x only|exact semantic version"):
         v.supported(bad)
     with pytest.raises(c.SandboxError):
         v.policy({"opencode_policy": "pinned", "opencode_pin": bad})

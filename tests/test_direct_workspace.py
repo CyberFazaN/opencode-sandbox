@@ -133,17 +133,18 @@ def test_check_direct_refuses_ancestor_writable_by_others(project):
         project.parent.chmod(0o755)
 
 
-def test_check_direct_refuses_sockets_and_nested_mounts(project):
+def test_check_direct_refuses_sockets_and_nested_mounts(project, monkeypatch):
     (project / "sub").mkdir()
     sock = socket.socket(socket.AF_UNIX)
     path = project / "sub" / "agent.sock"
+    monkeypatch.chdir(project)  # bind relative to the owned directory, independent of checkout depth
     try:
-        sock.bind(str(path))
+        sock.bind("sub/agent.sock")
         with pytest.raises(c.SandboxError, match=r"contains sub/agent.sock \(socket\)"):
             ws.check_direct(project)
     finally:
         sock.close()
-        path.unlink()
+        path.unlink(missing_ok=True)
     assert ws.check_direct(project) == project
     with pytest.raises(c.SandboxError, match=r"sub \(another mounted filesystem\)"):
         ws._scan(project, device=-1)
@@ -317,8 +318,9 @@ def test_config_plan_rechecks_the_directory_before_recreating(monkeypatch, proje
     project.chmod(0o755)
     (project / "s").mkdir()
     sock = socket.socket(socket.AF_UNIX)
-    sock.bind(str(project / "s" / "x.sock"))
+    monkeypatch.chdir(project)
     try:
+        sock.bind("s/x.sock")
         assert "could not mount the direct workspace" in cp.plan(m, {"network": "none"}).blockers[0]
         assert cp.plan(m, {"cpus": 1}).blockers == ()  # docker update keeps the existing mount
     finally:

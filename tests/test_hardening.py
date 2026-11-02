@@ -2,8 +2,10 @@
 links below the top level of `.git`, data-directory permissions, container capabilities, the pin
 check versus a base-image swap, `ocs-aur` option parsing, output inside a workspace, a journal's
 image removed outside the manager and the Agent Context refresh after provisioning. Docker is mocked."""
+import json
 import os
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 from test_arch_image import aur
@@ -63,6 +65,9 @@ def test_report_names_an_unsupported_latest_major():
 
 def test_version_probe_runs_without_new_privileges(monkeypatch):
     fake = Docker(monkeypatch, {("run",): (0, "opencode v2.2.0\n")})
+    real = c.docker
+    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=0, stdout="sha256:" + "a" * 64 + "|{}", stderr="")
+                        if a[:2] == ("image", "inspect") else real(*a, **k))
     assert v.image_version("opencode-sandbox:debian") == "2.2.0"
     run = next(a for a in fake.calls if a[0] == "run")
     assert "no-new-privileges:true" in run
@@ -169,7 +174,8 @@ def first_start(monkeypatch):
     held = {}
 
     def run_answer(args):
-        probe = c.BASE / "locks" / "base-tag-debian.lock"
+        from opencode_sandbox import base_locks
+        probe = next((base_locks._TMP / f"opencode-sandbox-locks-{os.getuid()}").glob("*-publication.lock"), c.BASE / "absent")
         held["base-tag"] = False
         if probe.exists():
             import fcntl
@@ -208,18 +214,38 @@ def test_pin_check_and_container_creation_hold_the_base_tag_lock(first_start):
 
 def test_base_tag_swap_holds_the_base_tag_lock(monkeypatch):
     seen = []
-    real = c.lock
+    real = c.base_lock
 
-    def lock(key, timeout=30.0):
-        seen.append(key)
-        return real(key, timeout)
-    monkeypatch.setattr(c, "lock", lock)
-    monkeypatch.setattr(c, "build_image", lambda d, version, tag: None)
+    def lock(distro, phase, *, timeout=30.0):
+        seen.append((distro, phase))
+        return real(distro, phase, timeout=timeout)
+    monkeypatch.setattr(c, "base_lock", lock)
+    built = set()
+    def build(d, version, tag, *, verify):
+        assert verify is False  # update_base verifies the returned immutable candidate separately
+        built.add(tag)
+        return 'sha256:' + 'b' * 64
+    monkeypatch.setattr(c, "build_image", build)
+    monkeypatch.setattr(c, "verify_image", lambda d, ref, version: None)
     monkeypatch.setattr(c, "require_docker_space", lambda what: None)
-    Docker(monkeypatch, {("image", "inspect"): (0, "sha256:1")})
+    def answer(args):
+        if ("candidate" in args[-1] and args[-1] not in built) or "previous" in args[-1]:
+            # This mock returns no stderr, so provide the safe missing response below.
+            return 1, ""
+        iid = "sha256:" + ("b" if "candidate" in args[-1] else "a") * 64
+        return 0, json.dumps([{"Id": iid, "Config": {"Labels": {
+            **c.distros.get("debian").image_labels(), "org.opencode-sandbox.managed": "true"}}}])
+    fake = Docker(monkeypatch, {("image", "inspect"): answer})
+    def docker(*args, **kwargs):
+        result = fake(*args, **kwargs)
+        if result.returncode:
+            result.stderr = "No such image: " + args[-1]
+        return result
+    monkeypatch.setattr(c, "docker", docker)
     monkeypatch.setattr(v, "_content", lambda image: image)
     v.update_base("2.2.0", "debian")
-    assert "base-tag-debian" in seen
+    assert seen == [("debian", "build"), ("debian", "publication"),
+                    ("debian", "publication"), ("debian", "publication")]
 
 
 # --- ocs-aur option parsing -----------------------------------------------------------------------
@@ -319,4 +345,3 @@ def test_a_failed_refresh_after_provisioning_still_marks_running(first_start, mo
     c.start(m)
     now = c.resolve(m["id"])
     assert (now["status"], now.get("operation")) == ("running", None) and len(refreshes) == 2
-

@@ -3,7 +3,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-from textual.widgets import Button
+from textual.widgets import Button, TextArea
 
 from opencode_sandbox import core as c
 from opencode_sandbox import tui
@@ -222,20 +222,34 @@ def test_confirm_dialog_buttons_are_normal_size():
     run(t, (80, 24))
 
 
-def test_no_registry_call_until_requested(monkeypatch, fake_runtime):
+@pytest.mark.parametrize("failed", [False, True])
+def test_no_registry_call_until_requested(monkeypatch, fake_runtime, failed):
     """G09: no background network call or update at startup; only on explicit request."""
     from opencode_sandbox import opencode_versions as v
-    c.create("ocs-qa-g09", "scratch")
+    m = c.create("ocs-qa-g09", "scratch")
     looked_up = []
-    monkeypatch.setattr(v, "latest", lambda timeout=8: looked_up.append(1) or "2.1.4")
+    def latest(timeout=8):
+        looked_up.append(1)
+        if failed:
+            raise c.SandboxError("Registry unavailable [test]")
+        return "2.1.4"
+    monkeypatch.setattr(v, "latest", latest)
     async def t(app, pilot):
         await settle(pilot, 0.5)
         assert looked_up == [] and not any(a[0] in ("exec", "run", "build") for a in fake_runtime)
         await pilot.press("v")
         await settle(pilot, 0.5)
-        assert looked_up == [1] and type(app.screen).__name__ == "OpenCodeVersionsScreen"
+        assert looked_up == []  # opening Updates is local/cached-only, including failures
+        await pilot.press("3", "c")
+        await settle(pilot, 0.5)
+        assert looked_up == [1]
+        if failed:
+            assert "Registry unavailable [test]" in str(app.screen.query_one("#updates-discovery").render())
+        else:
+            assert "2.1.4" in str(app.screen.query_one("#updates-discovery").render())
+        assert str(app.screen.query_one("#updates-table").get_row(m["id"])[0]) == m["name"]
         assert not any(a[0] in ("build", "commit") for a in fake_runtime)
-    run(t)
+    run(t, (80, 24))
 
 
 def test_status_line_shows_backup_name_on_one_line(monkeypatch, tmp_path):
@@ -326,8 +340,9 @@ def test_dashboard_refreshes_after_external_cli_change(monkeypatch):
     run(t)
 
 
+@pytest.mark.parametrize("size", [(80, 24), (100, 30)])
 @pytest.mark.parametrize("observed", ["missing", "unreachable"])
-def test_agent_context_preview(monkeypatch, observed):
+def test_agent_context_preview(monkeypatch, observed, size, fake_runtime):
     """The preview renders through guidance_inputs; Docker failures fall back to the configuration."""
     c.create("ocs-qa-acprev", "scratch")
     if observed == "unreachable":
@@ -338,11 +353,125 @@ def test_agent_context_preview(monkeypatch, observed):
     async def t(app, pilot):
         await pilot.press("a")
         await settle(pilot)
-        assert stack(app)[-1] == "OpenCodeVersionsScreen"
+        assert isinstance(app.screen, tui.ReportScreen)
+        assert str(app.screen.query_one("#report-title").render()) == "Agent Context — ocs-qa-acprev"
         report = app.screen.report
-        assert "Agent context: ocs-qa-acprev" in report and "## Network and resources" in report
-        assert "Networking mode: bridge" in report and "On-disk: missing/outdated" in report
-    run(t)
+        assert "Agent Context: ocs-qa-acprev" in report and "## Network and resources" in report
+        assert "Networking mode: bridge" in report
+        if observed == "unreachable":
+            assert "On-disk: not verified" in report and "configured settings" in report
+            assert "Docker is not reachable" in report and "missing/outdated" not in report
+        else:
+            assert "On-disk: missing/outdated" in report and "inspection unavailable" not in report
+        assert not any(a[0] in ("start", "run", "exec") for a in fake_runtime)
+        await pilot.press("escape")
+        assert stack(app) == ["Screen"]
+    run(t, size)
+
+
+def test_agent_context_preview_does_not_mark_unobserved_guidance_outdated(monkeypatch):
+    from opencode_sandbox import agent_context as ac
+    from opencode_sandbox import distros
+    m = c.create("ocs-qa-acoffline", "scratch")
+    inputs = {**c.guidance_inputs(m, observe=False), "observed": {**c.runtime_settings(m), "network": "none"},
+              "definition": distros.ImageDefinition("debian", "12", 1)}
+    path = ac.refresh(m, c.env_dir, **inputs)
+    saved = path.read_bytes()
+
+    def fail(m):
+        raise c.SandboxError("Docker is not reachable [test]")
+    monkeypatch.setattr(c, "observed_runtime", fail)
+
+    async def t(app, pilot):
+        await pilot.press("a")
+        await settle(pilot)
+        report = app.screen.report
+        assert "On-disk: not verified" in report
+        assert "missing/outdated" not in report
+        assert "Docker is not reachable [test]" in report and "configured settings" in report
+        assert "Networking mode: bridge" in report and "base OS version and installed tools are unknown" in report
+        assert path.read_bytes() == saved  # preview is read-only
+    run(t, (80, 24))
+
+
+@pytest.mark.parametrize("current", [False, True])
+def test_agent_context_preview_compares_observed_guidance_without_writing(monkeypatch, current):
+    from opencode_sandbox import agent_context as ac
+    from opencode_sandbox import distros
+    m = c.create("ocs-qa-acobserved", "scratch")
+    observed = {**c.runtime_settings(m), "network": "none"}
+    monkeypatch.setattr(c, "observed_runtime", lambda m: observed)
+    monkeypatch.setattr(c, "image_definition", lambda m, **k: distros.ImageDefinition("debian", "12", 1))
+    path = ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
+    if not current:
+        path.write_text("Old guidance\n")
+    saved = path.read_bytes()
+
+    async def t(app, pilot):
+        await pilot.press("a")
+        await settle(pilot)
+        report = app.screen.report
+        assert f"On-disk: {'current' if current else 'missing/outdated'}" in report
+        assert "Networking mode: none" in report and "Operating system (Debian 12)" in report
+        assert "inspection unavailable" not in report
+        assert path.read_bytes() == saved
+    run(t, (80, 24))
+
+
+def test_report_requires_an_explicit_title():
+    with pytest.raises(TypeError, match="title"):
+        tui.ReportScreen("Report without a title")
+
+
+@pytest.mark.parametrize("size", [(80, 24), (120, 40)])
+@pytest.mark.parametrize("close", ["escape", "button"])
+def test_report_is_plain_read_only_scrollable_and_closable(size, close):
+    c.create("ocs-qa-report", "scratch")  # a hidden selection must not receive dashboard keys
+    title = "Agent Context — " + "n" * 63 + " [red]literal[/red]"
+    report = "[red]literal[/red]\n" + "\n".join(f"line {i}: [link=example.invalid]text[/link]" for i in range(80))
+
+    async def t(app, pilot):
+        app.push_screen(tui.ReportScreen(report, title=title))
+        await pilot.pause()
+        screen = app.screen
+        heading = screen.query_one("#report-title")
+        area = screen.query_one("#report-text", TextArea)
+        button = screen.query_one("#report-close", Button)
+        assert str(heading.render()) == title  # markup-looking text stays literal
+        assert area.text == report and area.read_only and app.focused is area
+        for widget in (heading, area, button):
+            r = widget.region
+            assert r.width > 0 and r.height > 0 and r.right <= size[0] and r.bottom <= size[1]
+            assert screen.query_one("#report-panel").content_region.contains_region(r)
+        assert area.region.height >= 5
+        await pilot.press("x")  # neither edits the read-only report nor invokes dashboard Delete
+        assert app.screen is screen and area.text == report
+        await pilot.press("pagedown", "pagedown")
+        await pilot.pause()
+        assert area.scroll_y > 0
+        if close == "button":
+            await pilot.press("tab")
+            assert app.focused is button
+            await pilot.press("enter")
+        else:
+            await pilot.press("escape")
+        assert stack(app) == ["Screen"]
+    run(t, size)
+
+
+@pytest.mark.parametrize("method, title, notice", [
+    ("_show_check", "Readiness check (read-only; nothing was started or changed)", "Some checks failed"),
+    ("_show_cleanup", "Cleanup result", "Some objects were not removed"),
+])
+def test_failed_reports_keep_their_subject_and_error_text(method, title, notice):
+    async def t(app, pilot):
+        getattr(app, method)("Operation failed [test]", True)
+        await pilot.pause()
+        assert isinstance(app.screen, tui.ReportScreen)
+        assert str(app.screen.query_one("#report-title").render()) == title
+        assert app.screen.query_one("#report-text", TextArea).text == "Operation failed [test]"
+        assert any(n.message == notice for n in app._notifications)
+    run(t, (80, 24))
 
 
 def test_container_settings_show_the_plan_and_apply_it(monkeypatch):
@@ -446,11 +575,12 @@ def test_bars_separate_global_and_environment_actions_with_cli_terms():
     async def t(app, pilot):
         top = [str(b.label) for b in app.query_one("#toolbar").query(Button)]
         bottom = [str(b.label) for b in app.query_one("#actions").query(Button)]
-        assert top == ["New", "This folder", "Backups", "Providers", "Preferences", "Versions", "Recovery", "Disk"]
-        assert bottom == ["OpenCode", "Shell", "Start", "Stop", "Check", "Settings", "Usage", "Agent context",
+        assert top == ["New", "This folder", "Backups", "Providers", "Preferences", "Updates", "Recovery", "Disk"]
+        assert bottom == ["OpenCode", "Shell", "Start", "Stop", "Check", "Settings", "Usage", "Agent Context",
                           "Changes", "Export", "Backup", "Repair", "Promote", "Delete"]
         descriptions = {b.key: b.description for b in app.BINDINGS}
         assert descriptions["t"] == "Settings" and descriptions["d"] == "Changes" and descriptions["g"] == "Preferences"
+        assert descriptions["a"] == "Agent Context"
     run(t, (80, 24))
 
 

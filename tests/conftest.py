@@ -1,6 +1,7 @@
 import pytest
 import typer.rich_utils
 
+from opencode_sandbox import base_locks, installation_locks
 from opencode_sandbox import core as c
 from opencode_sandbox import runtime_identity as rid
 
@@ -12,6 +13,19 @@ def _isolated_manager_paths(tmp_path, monkeypatch):
     """No test may touch the real user's data/config directories."""
     monkeypatch.setattr(c, "BASE", tmp_path / "ocs-data")
     monkeypatch.setattr(c, "CONFIG", tmp_path / "ocs-config")
+    # Unit tests exercise real host locks, but never the user's shared namespace.
+    monkeypatch.setattr(base_locks, "_TMP", tmp_path)
+    monkeypatch.setattr(installation_locks, '_TMP', tmp_path)
+    # main() is process-lifetime in production. In-process entry-point tests must not retain a
+    # lease to a completed test's private inode; never release a real user's lease here.
+    assert installation_locks._LEASE is None
+    assert not installation_locks._WITNESSES
+    yield
+    with installation_locks._MUTEX:
+        if installation_locks._LEASE is not None:
+            installation_locks._LEASE.close()
+            installation_locks._LEASE = None
+    assert not installation_locks._WITNESSES
 
 
 @pytest.fixture(autouse=True)
@@ -23,9 +37,9 @@ def _plain_cli_errors(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_real_daemon_identity(request, monkeypatch):
-    """Unit tests never verify the real daemon; tests of the verifier opt out with `real_identity`."""
+    """Unit tests use fake identity; verifier tests and the real campaign explicitly opt out."""
     monkeypatch.setattr(c, "_ENDPOINT", None)
-    if request.node.get_closest_marker("real_identity"):
+    if request.node.get_closest_marker("real_identity") or request.node.get_closest_marker("docker"):
         return
     monkeypatch.setattr(rid, "verify", lambda context=None, **k: rid.Identity(
         rid.VERIFIED, context or "rootless", k.get("endpoint") or FAKE_ENDPOINT, FAKE_ENDPOINT[7:]))
@@ -36,23 +50,31 @@ def _no_host_docker_cli(request, monkeypatch):
     """A Docker CLI call that no test double intercepts behaves as on a host without the CLI
     (the hosted Arch Linux job), so results never depend on whether this host has one. Tests
     that mock subprocess.run themselves replace this; `real_session` tests use a fake binary."""
-    if request.node.get_closest_marker("real_session"):
+    if request.node.get_closest_marker("real_session") or request.node.get_closest_marker("docker"):
         return
     real = c.subprocess.run
+    real_popen = c.subprocess.Popen
 
     def run(argv, *args, **kwargs):
         if isinstance(argv, (list, tuple)) and argv and str(argv[0]) == "docker":
             raise FileNotFoundError(2, "No such file or directory", "docker")
         return real(argv, *args, **kwargs)
     monkeypatch.setattr(c.subprocess, "run", run)
+    def popen(argv, *args, **kwargs):
+        if isinstance(argv, (list, tuple)) and argv and str(argv[0]) == "docker":
+            raise FileNotFoundError(2, "No such file or directory", "docker")
+        return real_popen(argv, *args, **kwargs)
+    monkeypatch.setattr(c.subprocess, "Popen", popen)
 
 
 @pytest.fixture(autouse=True)
-def _no_real_resource_probe(monkeypatch):
+def _no_real_resource_probe(request, monkeypatch):
     """Unit/pilot runs use explicit healthy daemon evidence, never an installed host Docker CLI.
 
     Tests of the actual query keep its pre-fixture callable and mock only its transport.
     """
+    if request.node.get_closest_marker("docker"):
+        return
     monkeypatch.setattr(c, "docker_info", lambda: {"CgroupVersion": "2", "CgroupDriver": "systemd",
         "MemoryLimit": True, "CpuCfsQuota": True, "CpuCfsPeriod": True, "PidsLimit": True})
 
@@ -61,7 +83,7 @@ def _no_real_resource_probe(monkeypatch):
 def _no_real_session_processes(request, monkeypatch):
     """Interactive sessions go through the mocked `c.docker`; no watchdog process is started.
     Tests of the real processes opt out with `real_session`."""
-    if request.node.get_closest_marker("real_session"):
+    if request.node.get_closest_marker("real_session") or request.node.get_closest_marker("docker"):
         return
     monkeypatch.setattr(c, "session_watchdog", lambda m, token: None)
 

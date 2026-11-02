@@ -24,7 +24,7 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import distros, runtime_identity
+from . import build_output, diagnostics, distros, runtime_identity
 
 APP = "opencode-sandbox"
 BASE = Path(os.getenv("OPENCODE_SANDBOX_HOME", Path.home()/".local/share"/APP)).expanduser()
@@ -96,9 +96,24 @@ def run_program(argv, *, check=False, **kwargs):
     except FileNotFoundError as exc:
         raise missing_program(os.path.basename(str(argv[0]))) from exc
 
-def call(argv, *, capture=False, check=True, cwd=None, env=None):
+def call(argv, *, capture=False, check=True, cwd=None, env=None, timeout=None, max_output=diagnostics.MAX_OUTPUT, build_stream=False):
     try:
-        p = subprocess.run([str(x) for x in argv], cwd=cwd, env=env, text=True, capture_output=capture, check=False)
+        if build_stream:
+            p = build_output.run([str(x) for x in argv], env=env, launch_guard=_session_launch_signals)
+        elif timeout is None:
+            p = subprocess.run([str(x) for x in argv], cwd=cwd, env=env, text=True, capture_output=capture, check=False)
+        else:
+            feedback = _RUNTIME_FEEDBACK.get() or {}
+            p = diagnostics.run(argv, timeout=timeout, cancelled=feedback.get("cancelled"),
+                                max_output=max_output, cwd=cwd, env=env, launch_guard=_session_launch_signals)
+            if not capture:
+                print(p.stdout, end="")
+                print(p.stderr, end="", file=sys.stderr)
+    except diagnostics.Cancelled:
+        raise runtime_identity.Cancelled() from None
+    except diagnostics.Failure as exc:
+        # Never include argv/output here: diagnostics can inspect secret-bearing configuration.
+        raise SandboxError(str(exc)) from exc
     except FileNotFoundError as exc:
         raise missing_program(os.path.basename(str(argv[0]))) from exc
     except OSError as exc:
@@ -161,8 +176,26 @@ def docker_endpoint():
     if _ENDPOINT is None: verify_runtime()
     return _ENDPOINT
 
+_DIAGNOSTIC_TIMEOUT = ContextVar("diagnostic_timeout", default=None)
+
+@contextmanager
+def diagnostic_timeout(timeout):
+    """Explicitly scope one owned probe/cleanup call, not an enclosing build/update operation."""
+    token = _DIAGNOSTIC_TIMEOUT.set(timeout)
+    try: yield
+    finally: _DIAGNOSTIC_TIMEOUT.reset(token)
+
 def docker(*args, capture=False, check=True):
-    return call(["docker", "-H", docker_endpoint(), *args], capture=capture, check=check, env=runtime_identity.docker_env())
+    # Only known finite read-only CLI operations get automatic diagnostic bounds. In particular,
+    # never infer that an arbitrary exec/run or a mutation is short from capture=True.
+    read_only = args[:2] in (("image", "inspect"), ("image", "ls"), ("container", "inspect"),
+                            ("container", "ls"), ("volume", "inspect"), ("volume", "ls"), ("system", "df")) \
+                or args[:1] in (("ps",), ("info",)) or (args[:1] == ("stats",) and "--no-stream" in args)
+    timeout = _DIAGNOSTIC_TIMEOUT.get()
+    if timeout is None and read_only: timeout = diagnostics.TIMEOUT
+    stream = args[:1] == ("build",) and build_output.current() is not None
+    return call(["docker", "-H", docker_endpoint(), *args], capture=capture or stream, check=check,
+                env=runtime_identity.docker_env(), timeout=timeout, **({"build_stream": True} if stream else {}))
 
 def docker_info():
     """Fresh read-only daemon evidence on the pinned endpoint; bounded/cancellable, no replay.
@@ -223,9 +256,17 @@ def init_dirs():
         p.mkdir(parents=True,exist_ok=True)
         p.chmod(0o700)
 
+_DATA_LOCKS = ContextVar('data_guards', default=())
+
+def locks_held():
+    return bool(_DATA_LOCKS.get())
+
 @contextmanager
 def lock(key, timeout=30.0):
     """Cross-process advisory lock with bounded waiting; all mutations use it."""
+    from . import base_locks
+    if base_locks.held():
+        raise SandboxError("Lock order violation: data/environment locks must precede base guards")
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", key):
         raise SandboxError("Invalid lock key")
     init_dirs()
@@ -239,8 +280,11 @@ def lock(key, timeout=30.0):
                 if time.monotonic() >= deadline:
                     raise SandboxError(f"Environment busy: {key} (lock timeout)")
                 time.sleep(0.05)
+        token = _DATA_LOCKS.set((*_DATA_LOCKS.get(), key))
         try: yield
-        finally: fcntl.flock(f,fcntl.LOCK_UN)
+        finally:
+            _DATA_LOCKS.reset(token)
+            fcntl.flock(f,fcntl.LOCK_UN)
 
 def now(): return datetime.now(UTC).isoformat()
 
@@ -470,7 +514,7 @@ def reconfigure_runtime(m, settings, profile=None):
     # Do not auto-start: preserves the user's stopped state.
     return {"image":tag,"recreated":True}
 
-def recover_runtime_reconfigure(m):
+def recover_runtime_reconfigure(m, *, precondition=None):
     """Complete a durable runtime-recreate intent, never removing an unowned container.
 
     The committed image and requested settings were saved before container removal.
@@ -479,6 +523,7 @@ def recover_runtime_reconfigure(m):
     ensure_runtime(False)
     with lock(m["id"]):
         m=resolve(m["id"])
+        if precondition is not None: precondition(m)
         if m.get("operation") != "runtime-recreate":
             raise SandboxError("No interrupted runtime reconfiguration")
         if not m.get("image") or m.get("image") != m.get("last_snapshot"):
@@ -821,8 +866,35 @@ def base_tag_lock(m):
     Derived and custom images are not affected."""
     if m.get("image") or m.get("distro") is None:
         yield; return
-    with lock(f"base-tag-{m['distro']}"):
+    with base_lock(m["distro"], "publication"):
         yield
+
+def base_lock(distro, phase, *, timeout=30.0):
+    from . import base_locks
+    return base_locks.lock(distro, phase, timeout=timeout)
+
+def inspect_base_image(distro, ref, *, missing=False):
+    """Identity/ownership evidence, re-read under base guards before mutation.
+
+    Only a known missing-image response permits a first build; failed/invalid inspection must
+    not authorize replacement. Old definition revisions are allowed, foreign named images not.
+    """
+    p = docker("image", "inspect", ref, capture=True, check=False)
+    if p.returncode:
+        if missing and "no such image:" in (p.stderr or "").lower(): return None
+        raise SandboxError(f"Cannot inspect base image {ref}; no image was authorized for replacement/removal")
+    try:
+        (info,) = json.loads(p.stdout)
+        labels = info["Config"]["Labels"]
+        image_id = info["Id"]
+        if not isinstance(image_id, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
+            raise ValueError("invalid image identity")
+        if distros.image_definition(distro.id, labels) is None or labels.get(DATA_LABEL) \
+                or labels.get("org.opencode-sandbox.id"):
+            raise SandboxError(f"Refusing unmanaged/foreign base image {ref}; its name is not ownership proof")
+    except (ValueError, KeyError, TypeError) as exc:
+        raise SandboxError(f"Invalid base image inspection for {ref}") from exc
+    return info
 
 def missing_image(m, image, command):
     """The refusal when an image a journal or the next container needs was removed outside the
@@ -843,10 +915,11 @@ def recheck_mount(m):
     if workspaces.is_direct(m):
         workspaces.recheck(m)
 
-def start(m, *, _resume_recreate=False):
+def start(m, *, _resume_recreate=False, precondition=None):
     ensure_runtime(None if m.get("image") else env_distro(m))
     with lock(m["id"]):
         m=resolve(m["id"])
+        if precondition is not None: precondition(m)
         if m.get("operation")=="delete" or m.get("status")=="deleting":
             raise SandboxError("Environment deletion pending; retry delete --yes")
         if m.get("operation") in ("runtime-recreate","config-update","restore","opencode-update") \
@@ -865,7 +938,7 @@ def start(m, *, _resume_recreate=False):
                 image=env_image(m)
                 pull=image==m.get("custom_image")  # a custom image is pulled like docker run would (D-026)
                 if not pull and docker("image","inspect",image,capture=True,check=False).returncode:
-                    if image.split(":",1)[0] in MANAGER_IMAGE_KINDS:
+                    if image.split(":",1)[0] in MANAGER_IMAGE_KINDS or image.startswith("sha256:"):
                         raise missing_image(m, image, "opencode-sandbox container recreate-recover {name}" if _resume_recreate
                                             else "opencode-sandbox start {name}")
                     raise SandboxError(f"Base image {image} is missing; build it: opencode-sandbox build --distro {m.get('distro')}")
@@ -1485,15 +1558,21 @@ def promote(m,kind,name=None):
         m["kind"]=kind
         save(m)
 
-def build_image(distro, version, tag):
+def build_image(distro, version, tag, *, refresh=False, verify=True):
     """Build a registry image with OpenCode `version` (concrete) as `tag`, then verify it."""
     from . import opencode_versions as v
     meta={**distro.image_labels(), distros.LABEL+"opencode-package": v.PACKAGE,
           distros.LABEL+"opencode-version": version}
-    docker("build","--build-arg",f"OPENCODE_VERSION={version}",*labels(scoped=False),
+    docker("build",*(("--pull","--no-cache") if refresh else ()),
+           "--build-arg",f"OPENCODE_VERSION={version}",*labels(scoped=False),
            *(arg for key,value in meta.items() for arg in ("--label",f"{key}={value}")),
            "-t",tag,"-f",str(distro.dockerfile),str(distros.IMAGES))
-    verify_image(distro, tag, version)
+    with base_lock(distro.id, "publication"):
+        image_id = inspect_base_image(distro, tag)["Id"]
+    if verify:
+        build_output.phase("Verifying candidate OS, tools and exact OpenCode binary")
+        verify_image(distro, image_id, version)
+    return image_id
 
 def _image_facts(distro):
     """Shell script printing os-release entries, missing tools, failed smoke commands, then
@@ -1511,9 +1590,9 @@ def _image_facts(distro):
 def verify_image(distro, tag, version):
     """Refuse a built image whose OS, tools or OpenCode version differ from the registry."""
     from . import opencode_versions as v
+    from . import probes
     # Same hardening as an environment's container (start()).
-    p=docker("run","--rm","--network","none","--security-opt","no-new-privileges:true",*helper_labels("image-verify"),
-             "--entrypoint","sh",tag,"-c",_image_facts(distro),capture=True)
+    p=probes.image(tag,"sh","-c",_image_facts(distro))
     lines=p.stdout.splitlines()
     reported=dict(line[len("ocs-os: "):].partition("=")[::2] for line in lines if line.startswith("ocs-os: "))
     reported={key:value.strip().strip('"\'') for key,value in reported.items()}
@@ -1527,10 +1606,10 @@ def verify_image(distro, tag, version):
     installed=v.normalize(p.stdout)
     if installed!=version: raise SandboxError(f"Built OpenCode {installed}, expected {version}")
 
-def build(distro=None, version=None):
+def build(distro=None, version=None, *, refresh=False, plan=None):
     """Build (or rebuild) a distribution's base image; no rollback copy (see update-base)."""
     from . import opencode_versions as v
-    return v.update_base(version or "latest", distro, keep_previous=False)
+    return v.update_base(version or "latest", distro, keep_previous=False, refresh=refresh, plan=plan)
 
 TRANSIENT_STATES = frozenset({"creating", "starting", "stopping", "recreating", "deleting", "error"})
 

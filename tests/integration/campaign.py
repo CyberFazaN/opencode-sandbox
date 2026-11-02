@@ -7,6 +7,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tarfile
 import time
 from pathlib import Path
 
@@ -19,6 +20,32 @@ DISTROS = os.environ.get("OCS_TEST_DISTROS", "debian arch").split()
 # the commands run the installed package. Helper snippets still import the test venv's package.
 INSTALLED = os.environ.get("OCS_TEST_MANAGER")
 MANAGER = shlex.split(INSTALLED) if INSTALLED else [sys.executable, "-m", "opencode_sandbox.cli"]
+
+
+def backup_profile_leaks(backup, value):
+    """Inspect manifest and actual workspace/home payloads, not their compressed representation.
+
+    Returns only component/member names; never print the dummy profile value. System-image
+    layer formats are not decoded here. Files deliberately saved by users may contain secrets.
+    """
+    assert value
+    backup = Path(backup)
+    found = ["manifest.json"] if value in (backup / "manifest.json").read_bytes() else []
+    for name in ("workspace.tar.gz", "home.tar.gz"):
+        if not (backup / name).exists():
+            continue
+        with tarfile.open(backup / name, "r:gz") as archive:
+            for member in archive:
+                if not member.isfile():
+                    continue
+                with archive.extractfile(member) as stream:
+                    tail = b""
+                    while chunk := stream.read(65536):
+                        if value in tail + chunk:
+                            found.append(f"{name}:{member.name.removeprefix('./')}")
+                            break
+                        tail = (tail + chunk)[-len(value):]
+    return found
 
 
 class Campaign:

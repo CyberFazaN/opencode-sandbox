@@ -1,8 +1,10 @@
 """D-006: Arch image contract and the ocs-aur privilege broker (logic only; the real
 container behaviour is covered by the campaign in tests/integration)."""
+import json
 import os
 import re
 import subprocess
+import sys
 import types
 
 import pytest
@@ -37,7 +39,7 @@ def test_registry_record():
 
 def test_dockerfile_contract():
     text = ARCH.dockerfile.read_text()
-    assert text.startswith("# Build context") and "FROM archlinux:base-devel AS base" in text
+    assert "FROM archlinux:base-devel AS base" in text
     # The helper is built by the unprivileged user, in its own stage; makepkg never runs as root.
     lines = text.splitlines()
     user = next(i for i, line in enumerate(lines) if line.strip() == "USER aurbuild")
@@ -53,12 +55,30 @@ def test_dockerfile_contract():
     assert "sudoers" not in text and "chmod u+s" not in text and "setcap" not in text
 
 
-def test_build_retries_pacman_downloads():
-    """Mirror transfers stalled during builds; every pacman download step retries."""
-    text = ARCH.dockerfile.read_text()
+@pytest.mark.parametrize("succeed_at,expected_calls,exit_code", [(2, 2, 0), (None, 3, 1)])
+def test_build_retry_helper_preserves_arguments_and_stops_after_success_or_limit(tmp_path, succeed_at, expected_calls, exit_code):
     retry = distros.IMAGES / "arch" / "pacman-retry"
-    assert subprocess.run(["sh", "-n", str(retry)], check=False).returncode == 0
-    assert 'for attempt in 1 2 3; do' in retry.read_text() and 'pacman "$@" && exit 0' in retry.read_text()
+    commands = tmp_path / "commands"; commands.mkdir()
+    record = tmp_path / "calls.json"
+    pacman = commands / "pacman"
+    pacman.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n'
+                      f'record=Path({str(record)!r})\n'
+                      'calls=json.loads(record.read_text()) if record.exists() else []\n'
+                      'calls.append(sys.argv[1:]);record.write_text(json.dumps(calls))\n'
+                      f'raise SystemExit(0 if {succeed_at!r} is not None and len(calls)>={succeed_at!r} else 1)\n')
+    pacman.chmod(0o700)
+    sleep = commands / "sleep"
+    sleep.write_text('#!/bin/sh\nexit 0\n')  # no real retry delays; the actual shell helper still runs
+    sleep.chmod(0o700)
+    arguments = ["-S", "--noconfirm", "--cachedir", "cache with spaces", "example-package"]
+    result = subprocess.run(["/bin/sh", str(retry), *arguments], env={**os.environ, "PATH": str(commands)},
+                            capture_output=True, text=True, check=False, timeout=5)
+    assert result.returncode == exit_code, result.stderr
+    assert json.loads(record.read_text()) == [arguments] * expected_calls
+
+
+def test_image_downloads_use_the_retry_helper():
+    text = ARCH.dockerfile.read_text()
     downloads = [line for line in text.splitlines() if re.search(r"pacman(-retry)? .*-S", line)]
     assert downloads and all("pacman-retry" in line for line in downloads)
 

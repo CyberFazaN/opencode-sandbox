@@ -1,6 +1,7 @@
 """The documented installation (D-042): pipx from the Git repository at a version tag, without a
-source checkout (campaign rows B09–B12). A disposable clone of this repository's HEAD gets two
-test tags (the current version and the next patch version; the tags exist only in the clone), and
+source checkout (campaign rows B09–B12). A disposable no-tags clone, overlaid with the current
+working package and committed only inside that fixture, gets two test tags (the current version
+and the next patch version; the tags exist only in the clone), and
 pipx runs with its own PIPX_HOME and a private HOME, so neither the user's pipx nor their
 launchers are touched; Docker is the user's rootless daemon through the unchanged Docker context.
 
@@ -18,7 +19,10 @@ import shutil
 import sys
 from pathlib import Path
 
+import pytest
 from campaign import ROOT
+
+pytestmark = [pytest.mark.real_session, pytest.mark.real_identity]
 
 NAME = "ocs-test-pipx"
 
@@ -39,18 +43,26 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
     base = camp.tmp("pipx")
     repo, home, pipx_home = base / "repo", base / "home", base / "pipx-home"
     bindir = home / ".local" / "bin"
-    camp._run(["git", "clone", "--quiet", "--no-local", str(ROOT), str(repo)], check=True)
+    camp._run(["git", "clone", "--quiet", "--no-local", "--no-tags", str(ROOT), str(repo)], check=True)
     head = camp._run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True).stdout.strip()
     init = repo / "src" / "opencode_sandbox" / "__init__.py"
     v1 = init.read_text().split('"')[1]
     major_minor, patch = v1.rsplit(".", 1)
     v2 = f"{major_minor}.{int(patch) + 1}"
     git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+    # Test the package being reviewed, not merely the last committed implementation. Published
+    # tags in the source repository are neither imported nor rewritten in this private fixture.
+    for source in ('pyproject.toml', 'README.md', 'LICENSE'):
+        shutil.copy2(ROOT / source, repo / source)
+    shutil.copytree(ROOT / 'src/opencode_sandbox', repo / 'src/opencode_sandbox', dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    camp._run([*git, 'add', 'pyproject.toml', 'README.md', 'LICENSE', 'src/opencode_sandbox'], check=True)
+    camp._run([*git, 'commit', '--quiet', '--allow-empty', '-m', 'run-owned current package fixture'], check=True)
     camp._run([*git, "tag", "-a", f"v{v1}", "-m", "test tag"], check=True)
     init.write_text(init.read_text().replace(f'"{v1}"', f'"{v2}"'))
     camp._run([*git, "commit", "-qam", f"test: {v2}"], check=True)
     camp._run([*git, "tag", "-a", f"v{v2}", "-m", "test tag"], check=True)
-    camp.note(f"pipx clone {repo} of {head} with test tags v{v1}, v{v2}; PIPX_HOME {pipx_home}")
+    camp.note(f"pipx no-tags clone {repo} of {head}, current working package overlay, with private test tags v{v1}, v{v2}; PIPX_HOME {pipx_home}")
     url = f"git+file://{repo}"
 
     env = {k: v for k, v in camp.env.items() if k not in ("PYTHONPATH", "VIRTUAL_ENV")}

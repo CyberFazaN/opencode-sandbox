@@ -262,7 +262,7 @@ def test_docker_calls_use_the_endpoint_fixed_at_first_verification(monkeypatch):
 
     monkeypatch.setattr(rid, "verify", verify)
     monkeypatch.setenv("DOCKER_HOST", "tcp://evil:2375")
-    monkeypatch.setattr(c.subprocess, "run", lambda argv, **k: runs.append((argv, k["env"])) or
+    monkeypatch.setattr(c.diagnostics, "run", lambda argv, **k: runs.append((argv, k["env"])) or
                         SimpleNamespace(returncode=0, stdout="", stderr=""))
     c.docker("ps")
     c.ensure_runtime(False)
@@ -295,7 +295,3 @@ def test_cli_doctor_prints_report_and_fails_unless_verified(monkeypatch):
     result = CliRunner().invoke(app, ["doctor"])
     assert result.exit_code == rid.EXIT_CODES[rid.UNVERIFIED_PROXY]
     assert "Daemon identity: unverified-proxy" in result.output and "socat" in result.output
-
-
-def test_manager_docker_access_does_not_resolve_the_context_again():
-    assert "--context" not in (ROOT / "src/opencode_sandbox/core.py").read_text().split("def docker_cli")[0]

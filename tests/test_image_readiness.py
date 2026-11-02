@@ -178,3 +178,19 @@ def test_advisory_does_not_replace_an_operation_status_or_change_its_guard(image
         app._show_image_checks([check])
         assert app._operation_pending and str(app.query_one("#status").render()) == "Starting an existing environment"
     run(test)
+
+
+@pytest.mark.parametrize("size", [(80, 24), (100, 30)])
+def test_successful_refresh_clears_the_previous_base_warning(images, size):
+    distro, replies, _ = images
+    replies[distro.image] = response(stderr="No such image: " + distro.image, rc=1)
+
+    async def test(app, pilot):
+        await settle(pilot)
+        assert any(n.title == "Base images need attention" for n in app._notifications)
+        replies[distro.image] = response(json.dumps({LABEL + "managed": "true", **distro.image_labels()}))
+        app.action_refresh_readiness()
+        await settle(pilot)
+        assert not any(n.title == "Base images need attention" for n in app._notifications)
+        assert str(app.query_one("#status").render()) == "Ready"
+    run(test, size)

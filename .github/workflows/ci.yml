@@ -5,8 +5,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
+    branches: [main, develop]
   workflow_dispatch:
   workflow_call:
 
@@ -35,17 +36,61 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
+      - name: Private controlled Python runtime
+        # Hosted toolcache files/ancestors are world-writable. Success fixtures must meet the
+        # updater's real ownership/mode checks, not bypass them or change the shared host cache.
+        # Copy the whole installation: a venv or copied binary still uses the original stdlib.
+        run: |
+          private_python="$(mktemp -d "$HOME/ocs-ci-python.XXXXXX")"
+          cp -a "$pythonLocation/." "$private_python/"
+          chmod -R go-w "$private_python"
+          # Isolated helper children discard LD_LIBRARY_PATH. Relocate only the copied ELF;
+          # otherwise GitHub's compiled RUNPATH still loads Python from the original toolcache.
+          patchelf --set-rpath "\$ORIGIN/../lib" "$(readlink -f "$private_python/bin/python")"
+          private_project="$(mktemp -d "$HOME/ocs-ci-project.XXXXXX")"
+          cp -a "$GITHUB_WORKSPACE/." "$private_project/"
+          chmod -R go-w "$private_project"
+          echo "$private_python/bin" >> "$GITHUB_PATH"
+          {
+            echo "pythonLocation=$private_python"
+            echo "OCS_CI_PROJECT=$private_project"
+            # setup-python also exports loader/build paths; none should retain the writable cache.
+            echo "LD_LIBRARY_PATH=$private_python/lib"
+            echo "PKG_CONFIG_PATH=$private_python/lib/pkgconfig"
+            for name in Python_ROOT_DIR Python2_ROOT_DIR Python3_ROOT_DIR; do
+              echo "$name=$private_python"
+            done
+          } >> "$GITHUB_ENV"
       - name: Install
+        working-directory: ${{ env.OCS_CI_PROJECT }}
         env:
           DEPENDENCIES: ${{ matrix.dependencies }}
         run: |
+          umask 022
           python -m pip install --upgrade pip
-          python -m pip install -e '.[test]' ruff shellcheck-py pyte
-          if [ "$DEPENDENCIES" = "lowest direct" ]; then python -m pip install typer==0.16.0 textual==4.0.0; fi
+          if [ "$DEPENDENCIES" = "lowest direct" ]; then
+            python -m pip install -e '.[test]' typer==0.16.0 textual==4.0.0 ruff shellcheck-py pyte
+          else
+            python -m pip install -e '.[test]' ruff shellcheck-py pyte
+          fi
+          # Installation can recreate writable metadata after the initial copy was controlled.
+          # Normalize only these private copies, after the final dependency installation.
+          chmod -R go-w "$pythonLocation" "$OCS_CI_PROJECT"
           python -m pip check
           python -m pip list | grep -iE '^(typer|textual|click|rich) '
+      - name: External runtime prerequisite
+        working-directory: ${{ env.OCS_CI_PROJECT }}
+        run: |
+          umask 022
+          python -m pytest -q \
+            tests/test_manager_tools.py::test_observed_external_runtime_and_locations_are_independent_without_installing \
+            tests/test_manager_execution.py::test_effective_public_policy_uses_actual_git_and_external_shared_pip \
+            'tests/test_manager_update.py::test_real_origin_death_exclusive_frozen_execution_and_independent_outcome_classification[none]'
       - name: Unit, host and Textual pilot tests (ruff and shellcheck included)
-        run: python -m pytest -q -rs -p no:cacheprovider
+        working-directory: ${{ env.OCS_CI_PROJECT }}
+        run: |
+          umask 022
+          python -m pytest -q -rs -p no:cacheprovider
 
   arch:
     name: Unit tests (Arch Linux userland)
@@ -63,14 +108,16 @@ jobs:
           persist-credentials: false
       - name: Unit tests as an unprivileged user
         # Several tests check user ownership and permissions: run as a normal user,
-        # with the usual umask (a container step may inherit 0000; the direct-workspace checks
-        # then rightly refuse the world-writable test directories).
+        # with the usual umask. The editable source's entire ancestor route must also be owned
+        # and controlled; chown of only the mounted workspace leaves foreign-owned ancestors.
         run: |
+          umask 022
           useradd --create-home ci
-          chown -R ci: "$GITHUB_WORKSPACE"
-          # shellcheck disable=SC2016  # the inner shell started by su expands $0
-          su ci -c 'umask 022 && cd "$0" && python -m venv /home/ci/venv && /home/ci/venv/bin/pip install -q -e ".[test]" ruff pyte \
-            && /home/ci/venv/bin/python -m pytest -q -rs -p no:cacheprovider' "$GITHUB_WORKSPACE"
+          cp -a "$GITHUB_WORKSPACE" /home/ci/project
+          chown -R ci: /home/ci/project
+          chmod -R go-w /home/ci/project
+          su ci -c 'umask 022 && cd /home/ci/project && python -m venv /home/ci/venv && /home/ci/venv/bin/pip install -q -e ".[test]" ruff pyte \
+            && /home/ci/venv/bin/python -m pytest -q -rs -p no:cacheprovider'
 
   package:
     name: Package build and content (Python ${{ matrix.python }})

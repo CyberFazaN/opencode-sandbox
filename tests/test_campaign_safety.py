@@ -1,7 +1,11 @@
 """The real campaign must not race auto-restarts or certify failed inventory probes."""
 import importlib
+import inspect
+import io
+import runpy
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -85,3 +89,35 @@ def test_cleanup_guard_refuses_inventory_errors_even_when_no_objects_were_listed
             "cleanup.inventory=lambda: SimpleNamespace(errors=['daemon unavailable'], eligible=lambda *a: [])\n")
     result = subprocess.run([sys.executable, "-c", stub + code], capture_output=True, text=True, check=False, timeout=10)
     assert result.returncode != 0 and "inventory unavailable; refusing cleanup" in result.stdout
+
+
+@pytest.mark.parametrize("component", ["manifest.json", "workspace.tar.gz", "home.tar.gz"])
+def test_backup_profile_check_detects_actual_contents_including_chunk_boundaries(harness, tmp_path, component):
+    campaign, _ = harness
+    value = b"dummy-profile-secret"
+    (tmp_path / "manifest.json").write_bytes(b"{}")
+    for name in ("workspace.tar.gz", "home.tar.gz"):
+        payload = b"x" * 65530 + (value if name == component else b"ordinary user contents")
+        with tarfile.open(tmp_path / name, "w:gz") as archive:
+            member = tarfile.TarInfo("data")
+            member.size = len(payload)
+            archive.addfile(member, io.BytesIO(payload))
+        assert value not in (tmp_path / name).read_bytes(), "control: raw compressed-byte search would miss the leak"
+    if component == "manifest.json":
+        (tmp_path / component).write_bytes(b'{"unexpected": "' + value + b'"}')
+    assert campaign.backup_profile_leaks(tmp_path, value) == [component + (":data" if component.endswith(".gz") else "")]
+    assert campaign.backup_profile_leaks(tmp_path, b"absent-profile-value") == []
+
+
+@pytest.mark.parametrize("real_campaign", [False, True])
+def test_only_campaign_items_opt_out_of_unit_identity_transport_resource_and_session_fakes(real_campaign):
+    """Exercise the actual fixture bodies without enabling Docker or running a host command."""
+    fixtures = runpy.run_path(str(Path(__file__).with_name("conftest.py")))
+    request = SimpleNamespace(node=SimpleNamespace(get_closest_marker=lambda name: real_campaign and name == "docker"))
+    changes = []
+    observer = SimpleNamespace(setattr=lambda obj, name, value: changes.append(name))
+    for name in ("_no_real_daemon_identity", "_no_host_docker_cli", "_no_real_resource_probe", "_no_real_session_processes"):
+        inspect.unwrap(fixtures[name])(request, observer)
+    protected = set(changes) - {"_ENDPOINT"}  # endpoint isolation is retained in both layers
+    assert protected == (set() if real_campaign else
+                         {"verify", "run", "Popen", "docker_info", "session_watchdog", "docker_attached"})

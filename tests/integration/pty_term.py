@@ -29,6 +29,7 @@ class Term:
             os.execvpe(argv[0], argv, environ)
         fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
         self.pid, self.fd, self.alive = pid, fd, True
+        self._reaped = False
 
     def pump(self, seconds):
         end = time.time() + seconds
@@ -72,8 +73,10 @@ class Term:
             try:
                 wpid, status = os.waitpid(self.pid, os.WNOHANG)
             except ChildProcessError:
+                self._reaped = True
                 return "?"
             if wpid:
+                self._reaped = True
                 return os.waitstatus_to_exitcode(status)
         self.close()
         return "killed (still running)"
@@ -83,12 +86,18 @@ class Term:
         return b"?1049l" in tail and b"?25h" in tail
 
     def close(self):
-        try:
-            os.kill(self.pid, signal.SIGKILL)
-            os.waitpid(self.pid, 0)
-        except (ProcessLookupError, ChildProcessError):
-            pass
-        try:
-            os.close(self.fd)
-        except OSError:
-            pass
+        if not self._reaped:
+            try:
+                # Confirm/reserve actual child ownership before any signal. exit_code() may
+                # already have reaped it while a detached updater still writes to this pty.
+                pid, _ = os.waitpid(self.pid, os.WNOHANG)
+                if not pid:
+                    os.kill(self.pid, signal.SIGKILL)
+                    os.waitpid(self.pid, 0)
+            except (ProcessLookupError, ChildProcessError): pass
+            self._reaped = True
+        self.alive = False
+        if self.fd is not None:
+            try: os.close(self.fd)
+            except OSError: pass
+            self.fd = None

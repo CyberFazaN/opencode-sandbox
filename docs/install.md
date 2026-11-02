@@ -7,8 +7,8 @@ Installing OpenCode Sandbox has two separate parts:
    `~/.local/bin/opencode-sandbox`.
 2. **Docker**: your own rootless Docker daemon and the base images the environments start from.
    You set up the daemon yourself. The manager checks it before every use, but it never
-   installs or configures anything on the host: no packages, services, `/etc` files, firewall
-   rules or Docker contexts.
+   installs or configures Docker or host OS packages/services, `/etc` files, firewall rules or
+   Docker contexts. Explicit application updates affect only its own user-level pipx installation.
 
 You can install the application first and prepare Docker afterwards: `opencode-sandbox doctor`
 tells you what is still missing.
@@ -31,7 +31,7 @@ either one on any host; they are independent of the distribution your host runs.
 ## Install the application
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.2.0
 opencode-sandbox --version
 ```
 
@@ -45,10 +45,40 @@ needed:
 
 ```sh
 pipx install --python python3.11 \
-  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
+  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.2.0
 ```
 
 `opencode-sandbox --help`, `--version` and `doctor` work without Docker.
+
+### Startup coordination
+
+Supported manager CLI/dashboard processes hold shared installation access for their entire
+lifetime, including attached sessions and worker shutdown. The packaged launcher takes this
+lease before importing the CLI; existing wrappers invoking the current CLI also take it before
+dispatch. Other normal instances may run together. Internal exclusive installation access refuses
+while any supported instance is alive, even with different data/configuration overrides. A normal
+startup during exclusive access reports **Manager installation busy** (exit 2), including help
+and version commands; close the other instance or wait for its operation to finish, then retry.
+
+Coordination uses private persistent files in `/tmp/opencode-sandbox-locks-<UID>/`, keyed by the
+canonical application Python environment path, not by HOME, TMPDIR, XDG or product overrides.
+Unsafe/unwritable lock paths fail closed without repairs or a fallback. **Never delete a lock
+file because it appears stale:** a live process may hold that inode; process exit releases the
+lock without removing the file. The protocol is advisory, not protection against another process
+with the same user's access. Older manager versions, direct Python library use and arbitrary
+external pipx/Docker commands do not honor it. Stop other manager instances/sessions before a
+manual pipx replacement; these locks cannot make an external replacement safe automatically.
+
+An approved manager update waits for **actual process exit**, not just dashboard return or a
+restored terminal, before one non-waiting exclusive attempt. Other supported instances prevent
+replacement. An independent frozen helper revalidates the installation, existing external tools,
+exact published source and effective installer policy; normal startup never gains a bypass.
+
+An incomplete update also blocks startup **after the helper dies**, even if its lock was released.
+Private authoritative state and recovery inputs live below the canonical pipx home's
+`.opencode-sandbox-updates/`, outside the replaceable venv and independent of HOME/product
+overrides. Pending, unknown or unsafe records are preserved without repair or migration. Only
+explicit independently verified completion/recovery may reopen startup; never delete these files.
 
 ## Prepare Docker
 
@@ -139,6 +169,76 @@ OS. No metadata migration is needed.
 Continue with [getting-started.md](getting-started.md).
 
 ## Upgrade or change the version
+
+Read-only evidence is available without Docker or running pipx:
+
+```sh
+opencode-sandbox manager status          # local provenance and cached releases
+opencode-sandbox manager status --check  # query official GitHub releases
+```
+
+The dashboard's [Manager view](dashboard.md#manager-release-and-installation-checks) exposes the
+same evidence with independent errors. These commands never replace the installation, touch a
+launcher, convert an editable/foreign install, install/switch Python or start unsolicited discovery.
+A verified official-tag pipx classification means local records agree, not public commit
+authentication or permission to update.
+For unrecognized options, injections, pins, suffixes or ambiguous/shadowed launchers, inspect your
+existing configuration and follow the matching manual workflow; do not assume a generic force
+command preserves custom settings. A missing/unrecognized record is not permission to repair it.
+
+### Explicit reviewed manager update
+
+In **Updates → Sandbox Manager**, Check releases, then Update to prepare a fresh exact source/
+installation/tool review. At 80x24 or larger, read the scrollable impact, release notes and exact
+tag/commit, accept the public-default policy, then choose **Update & close**. Cancel is focused
+first. Active operations/sessions must finish; approved staging closes the dashboard only when
+actual worker bodies finish and the local Linux terminal driver/foreground tty are restored.
+
+The equivalent explicit CLI entry requires a real foreground terminal and defaults to Cancel:
+
+```sh
+opencode-sandbox manager update --tag vX.Y.Z
+```
+
+Choose a strictly newer published full release. Discovery/cached availability never authorizes an
+install; the same target is resolved and revalidated afresh through the official GitHub HTTPS API.
+This is not signed-tag authentication. Only recognized official-tag pipx installations with default
+options and the inspected external **pipx 1.18.7** are supported. Existing source Python and explicit
+pipx locations are preserved; no tool/Python is installed, switched or converted. Detected custom
+pip/Git/proxy/index/credential configuration requires manual preservation, without reading secrets
+or silently discarding settings. The initial managed policy uses public GitHub/PyPI defaults.
+
+The independent helper uses exact-tag pipx force replacement. **Source/build code runs on the
+host as your user, not inside a sandbox.** Force is not a backup. After installation it separately
+checks expected version/source/commit, records/options, launcher, fresh runtime and fixed CLI-help
+construction; Docker readiness is not an installation-success requirement. No image rebuild,
+environment migration, configuration reapplication, automatic rollback or automatic restart occurs.
+
+The initiating command exits after handoff, not as proof of installation success. **Wait for the
+helper's final result before restarting**. It prints private recovery paths before mutation, and
+retains records even if the terminal disappears. Do not run another external installer meanwhile.
+
+### Failed or interrupted manager update
+
+The result distinguishes a verified target, an operational verified previous installation, target
+records with failed verification, and an unavailable/unverified installation/launcher. The last two
+retain the startup barrier. An external frozen **verify-only** command printed with the private
+operation record works independently of the application launcher and venv; it never installs or
+automatically rolls back. Locate the operation through `.opencode-sandbox-updates/` in the pipx
+home if the terminal output was lost, and use the recorded external Python/helper paths.
+
+For an unavailable installation, the record includes a manually reviewed previous-tag pipx
+reinstall command retaining the recognized locations/source Python. This is recovery guidance,
+**not identical dependency restoration or guaranteed offline recovery**. Finish that external
+command, then explicitly run the frozen verifier; a cache, successful exit or deleting a record
+cannot reopen startup. Custom settings still need manual preservation.
+
+A handled interruption cleans/reaps owned installer descendants before verification. A hard-killed
+helper cannot prove escaped descendants stopped: unconfirmed same-boot state stays blocked, even
+if the original process group is empty. A reboot supplies independent old-process quiescence before
+explicit frozen verification. No reboot, signal to an old PID, reset or repair is performed for you.
+
+### Manual version change
 
 Install the other release tag with `--force`; this is also how you go back to an older release:
 

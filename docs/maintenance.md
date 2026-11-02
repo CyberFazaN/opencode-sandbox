@@ -20,6 +20,22 @@ Each result of `check` is `passed`, `warning`, `failed`, `not checked` (with the
 example a stopped container) or `not applicable`; the exit status is 1 if any check failed. The
 report is cached: `status NAME` and the dashboard show its summary without asking Docker again.
 
+Short Docker inventory/inspect/stats and host-version diagnostics have finite per-call deadlines
+and output limits; a timeout is reported, never interpreted as object absence. Existing daemon
+identity/resource-support budgets remain separate. Container readiness probes have a ten-second
+container-side limit (OpenCode version: five seconds) and three seconds of client transport grace.
+They require compatible timeout tooling; unavailable tooling is `not checked`/unavailable, not
+permission to retry unbounded. No stopped environment is started for a check.
+
+Dashboard read-only workers cooperatively cancel their owned diagnostic clients and ignore late
+results after cancellation or shutdown. Killing a Docker client alone does not stop a container's
+exec command: its container-side timer remains responsible for the bounded ordinary process group.
+Image probes use disposable named helpers and label-checked cleanup, not an environment stop.
+If Docker is unavailable, removal may be unconfirmed and the error names the leftover helper;
+retry normal labelled cleanup after it stops. This is not a security boundary against deliberately
+modified container tools/processes or a guarantee while the daemon/container cannot run. Builds,
+installs, commits and user sessions do not inherit these short diagnostic deadlines.
+
 ### Resource-limit support
 
 `doctor`, `check NAME` and the dashboard share a read-only daemon support
@@ -118,15 +134,20 @@ candidate left by an interrupted build, and unfinished `.backup-*` directories.
 `--superseded` adds update checkpoints and runtime images that existing environments no longer
 use, base image rollback copies and replaced untagged base images.
 
-- Every object is checked again just before its removal, under the lock of its owner; busy
-  objects and objects that changed meanwhile are reported as `Skipped:`, and only `Not removed:`
-  makes the command fail. A removal is never forced; an interrupted cleanup can simply run again.
+- Every object is checked again just before removal under its relevant guards. Base candidates,
+  rollback copies and identifiable untagged replaced bases take the shared build and publication
+  guards without waiting. Busy objects are left alone with a reason (`Not removed:`, nonzero
+  exit); entries no longer eligible are `Skipped:`. Revalidation checks base identity, labels and
+  current references. Unverifiable base ownership/distribution is not removal permission.
+  A removal is never forced; an interrupted cleanup can simply run again.
 - Never removed: environments (use `delete`), snapshots of existing environments, base images,
   direct workspaces, exports, backups, anything of another data directory.
 - Exception: base images, their rollback copies and replaced untagged base images are shared by
   every data directory on the daemon, so `--superseded` in one data directory can remove a
-  rollback copy that another one would use for `opencode rollback-base` (Docker refuses only while
-  a container uses it).
+  rollback copy that another one would use in a future `opencode rollback-base`. Shared guards
+  protect participating active builds, rollback and creation, not another directory's future
+  intentions or uncoordinated older managers/manual Docker. Docker also refuses an image removal
+  while a container uses it.
 
 ## The Docker build cache
 

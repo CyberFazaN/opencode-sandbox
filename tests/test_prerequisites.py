@@ -28,7 +28,7 @@ def daemon(monkeypatch, classification, reason="reason"):
 def host(monkeypatch, missing=()):
     """Hermetic host: which programs exist, their --version, and a Docker that answers nothing."""
     monkeypatch.setattr(shutil, "which", lambda name: None if name in missing else f"/usr/bin/{name}")
-    monkeypatch.setattr(c, "run_program", lambda argv, **k: SimpleNamespace(returncode=0, stdout=f"{argv[0]} version 1\n"))
+    monkeypatch.setattr(c, "call", lambda argv, **k: SimpleNamespace(returncode=0, stdout=f"{argv[0]} version 1\n"))
     monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="no"))
 
 
@@ -110,7 +110,9 @@ def test_doctor_help_documents_the_exit_status():
 
 @pytest.mark.parametrize("classification", [rid.MISSING, rid.NOT_CONFIGURED, rid.UNAVAILABLE])
 def test_an_operation_without_a_usable_daemon_exits_with_its_code(monkeypatch, classification, capsys):
+    from opencode_sandbox import opencode_versions as versions
     daemon(monkeypatch, classification)
+    monkeypatch.setattr(versions, 'latest', lambda: pytest.fail('An unusable daemon must refuse before npm discovery'))
     monkeypatch.setattr(sys, "argv", ["opencode-sandbox", "build"])
     with pytest.raises(SystemExit) as e:
         cli.main()

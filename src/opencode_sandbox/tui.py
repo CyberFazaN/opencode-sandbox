@@ -7,6 +7,7 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, Vertical
+from textual.notifications import Notification
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -23,7 +24,7 @@ from textual.widgets import (
 from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
 from . import core as c
-from .tui_runtime import work
+from .tui_runtime import publish, work
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -140,6 +141,14 @@ class CreateScreen(ModalScreen[dict | None]):
 
 
 class Dashboard(App):
+    def __init__(self, *args, **kwargs):
+        from .tui_runtime import Activity
+        super().__init__(*args, **kwargs)
+        self._handoff_activity = Activity()
+        self._manager_fixture = None
+        self._manager_update_intent = None
+        self._session_active = False
+
     TITLE = "OpenCode Sandbox"
     # Compact, wrapping button rows: at 80x24 the old layout left one table row and
     # hid 11 of 20 buttons off-screen.
@@ -162,7 +171,7 @@ class Dashboard(App):
                 Binding("r", "refresh_readiness", "Refresh", show=False), Binding("c", "current_folder", "This folder", show=False),
                 Binding("p", "providers", "Provider profiles", show=False), Binding("g", "settings", "Preferences", show=False),
                 Binding("t", "runtime", "Settings", show=False), Binding("u", "usage", "Usage", show=False),
-                Binding("v", "opencode_versions", "OpenCode versions", show=False), Binding("a", "agent_context", "Agent context", show=False),
+                Binding("v", "updates", "Updates", show=False), Binding("a", "agent_context", "Agent Context", show=False),
                 Binding("f8", "recovery", "Recovery", show=False), Binding("R", "repair_selected", "Repair", show=False),
                 Binding("e", "export_selected", "Export changes", show=False), Binding("b", "backup_selected", "Backup", show=False),
                 Binding("B", "backups", "Backups", show=False), Binding("d", "git_review", "Changes", show=False),
@@ -180,7 +189,8 @@ class Dashboard(App):
 
     def check_action(self, action: str, parameters) -> bool | None:
         # Dashboard keys must not act on a hidden selection behind sub-screens.
-        return not (action in self._DASHBOARD_ACTIONS and len(self.screen_stack) > 1)
+        return self._manager_fixture is None and self._manager_update_intent is None \
+            and not (action in self._DASHBOARD_ACTIONS and len(self.screen_stack) > 1)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -188,7 +198,7 @@ class Dashboard(App):
         # Top bar: not about the selected environment. Bottom bar: the selected environment.
         with ItemGrid(id="toolbar", classes="bar", min_column_width=16):
             for label, bid in (("New", "new"), ("This folder", "current"), ("Backups", "backups"),
-                               ("Providers", "providers"), ("Preferences", "settings"), ("Versions", "ocversions"),
+                               ("Providers", "providers"), ("Preferences", "settings"), ("Updates", "ocversions"),
                                ("Recovery", "recovery"), ("Disk", "disk")):
                 yield Button(label, id=bid, compact=True)
         yield DataTable(id="envs", cursor_type="row")
@@ -196,7 +206,7 @@ class Dashboard(App):
         with ItemGrid(id="actions", classes="bar", min_column_width=15):
             for label, bid in (("OpenCode", "open"), ("Shell", "shell"), ("Start", "start"), ("Stop", "stop"),
                                ("Check", "check"), ("Settings", "runtime"), ("Usage", "usage"),
-                               ("Agent context", "agentcontext"), ("Changes", "changes"), ("Export", "export"),
+                               ("Agent Context", "agentcontext"), ("Changes", "changes"), ("Export", "export"),
                                ("Backup", "backup"), ("Repair", "repair"), ("Promote", "keep")):
                 yield Button(label, id=bid, compact=True)
             yield Button("Delete", id="delete", variant="error", compact=True)
@@ -206,7 +216,15 @@ class Dashboard(App):
 
     def on_mount(self) -> None:
         self._operation_pending = False
-        self._runtime_waiters = set()
+        self._runtime_waiters = {}
+        self._runtime_notification = None
+        self._advisories = {}
+        self._status_owner = None
+        self._discovery_worker_ref = None
+        self._discovery_status = None
+        self._manager_discovery_worker_ref = None
+        self._manager_discovery_status = None
+        self._discovery_enabled = False
         self.query_one("#envs", DataTable).add_columns("Name", "Kind", "State", "Profile", "Source", "ID")
         self.action_refresh()
         # CLI changes made while the dashboard is open (H08); only metadata file stats are read.
@@ -224,6 +242,68 @@ class Dashboard(App):
         except Exception as exc:
             self.notify(c.error_text(exc), severity="error")
         self._prerequisites_worker()
+        self.set_interval(60, self.refresh_discovery_preferences)
+        self.refresh_discovery_preferences()
+
+    def refresh_discovery_preferences(self):
+        if self._manager_update_intent is not None: return
+        from . import preferences
+        try: enabled = preferences.read()["daily_discovery"]
+        except (c.SandboxError, OSError, ValueError): enabled = False
+        self._discovery_enabled = enabled
+        if not enabled:
+            if self._discovery_worker_ref: self._discovery_worker_ref.cancel()
+            if self._manager_discovery_worker_ref: self._manager_discovery_worker_ref.cancel()
+        elif self._discovery_worker_ref is None or self._discovery_worker_ref.is_finished:
+            self._discovery_worker_ref = self._daily_discovery_worker()
+        if enabled and (self._manager_discovery_worker_ref is None or self._manager_discovery_worker_ref.is_finished):
+            self._manager_discovery_worker_ref = self._daily_manager_discovery_worker()
+        self._refresh_update_indicator()
+
+    @work(thread=True, group="daily-discovery")
+    def _daily_discovery_worker(self):
+        from . import update_discovery
+        try: result = update_discovery.check()
+        except Exception as exc: result = {"scheduling_error": c.error_text(exc)}
+        publish(self, self._daily_discovery_received, result)
+
+    def _daily_discovery_received(self, result):
+        if not self._discovery_enabled: return
+        self._discovery_status = result
+        self._refresh_update_indicator()
+
+    @work(thread=True, group='daily-manager-discovery')
+    def _daily_manager_discovery_worker(self):
+        from . import update_discovery
+        try: result = update_discovery.manager_check()
+        except Exception as exc: result = {'scheduling_error': c.error_text(exc)}
+        publish(self, self._daily_manager_discovery_received, result)
+
+    def _daily_manager_discovery_received(self, result):
+        if not self._discovery_enabled: return
+        self._manager_discovery_status = result
+        self._refresh_update_indicator()
+
+    def _refresh_update_indicator(self):
+        from . import opencode_versions as v
+        from . import update_cache as cache
+        from . import update_discovery
+        count = manager_count = 0
+        if self._discovery_enabled:
+            try: count = update_discovery.available()
+            except (c.SandboxError, OSError, ValueError): pass  # optional cached indicator, not operation status
+            try: manager_count = update_discovery.manager_available()
+            except (c.SandboxError, OSError, ValueError): pass  # independent optional source
+        total = count + manager_count
+        button = self.query_one("#ocversions", Button)
+        button.label = f"Updates ({total})" if total else "Updates"
+        if total:
+            remote = v.discovery()
+            success = remote["success"]
+            button.tooltip = (f"{manager_count} manager release(s); {count} notify-policy environment(s): newer than local/dated evidence. "
+                              + (f"npm checked {cache.when(success['at'])}; " if success else "")
+                               + 'GitHub/npm may be stale; dates/errors in Updates Details. No installation is automatic.')
+        else: button.tooltip = "Local/cached Updates; Check explicitly refreshes the selected component's source"
 
     @work(thread=True, exclusive=True, group="prerequisites")
     def _prerequisites_worker(self) -> None:
@@ -234,71 +314,103 @@ class Dashboard(App):
         from . import readiness
         try:
             check = readiness.daemon_check()
-            if check.status != readiness.PASSED:
-                self.call_from_thread(self._show_prerequisites, check.detail)
-                return
-            self.call_from_thread(self._prerequisites_ready)
-            support = readiness.resource_support_check()
-            self.call_from_thread(self._show_resource_support, support)
-            images = [item for item in readiness.image_checks() if item.status != readiness.PASSED]
-            if images:
-                self.call_from_thread(self._show_image_checks, images)
         except Exception as exc:
-            self.call_from_thread(self._show_prerequisites, c.error_text(exc))
+            publish(self, self._show_prerequisites, c.error_text(exc))
             return
+        if check.status != readiness.PASSED:
+            publish(self, self._show_prerequisites, check.detail)
+            return
+        publish(self, self._prerequisites_ready)
+        try:
+            support = readiness.resource_support_check()
+        except Exception as exc:
+            support = readiness.Check("resource-support", "Resource-limit support", readiness.NOT_CHECKED,
+                                      f"check could not run: {c.error_text(exc)}")
+        publish(self, self._show_resource_support, support)
+        try:
+            images = readiness.image_checks()
+        except Exception as exc:
+            images = [readiness.Check("images", "Base images", readiness.NOT_CHECKED,
+                                      f"check could not run: {c.error_text(exc)}")]
+        publish(self, self._show_image_checks, images)
+
+    def _replace_advisory(self, category, summary=None, *, title="", detail="") -> None:
+        """UI-thread replacement of just this category, including success with no new toast."""
+        previous = self._advisories.pop(category, None)
+        if previous is not None:
+            self._unnotify(previous[1], refresh=False)
+        if summary is not None:
+            note = Notification(detail, title=title, severity="warning", timeout=30, markup=False)
+            self._advisories[category] = (summary, note)
+            # Register synchronously, like Textual's notify handler: a queued warning must not
+            # arrive after a same-turn success. Own the object, not every notice with this title.
+            self._notifications.add(note)
+        self._refresh_notifications()
+        if not self._operation_pending and not self._runtime_waiters \
+                and (summary is not None or self._status_owner == "advisory"):
+            self._advisory_status()
+
+    def _advisory_status(self) -> None:
+        # A successful image check must not conceal an outstanding daemon/resource warning.
+        for category in ("daemon", "resources", "images"):
+            if category in self._advisories:
+                self.query_one("#status", Static).update(self._advisories[category][0])
+                self._status_owner = "advisory"
+                return
+        self.query_one("#status", Static).update("Ready")
+        self._status_owner = None
 
     def _show_resource_support(self, check) -> None:
         from . import readiness
-        for note in list(self._notifications):
-            if note.title == "Resource-limit support": self._unnotify(note)
-        status = self.query_one("#status", Static)
-        if check.status != readiness.PASSED:
-            if not self._operation_pending:
-                status.update("Resource-limit support needs attention. Details: opencode-sandbox doctor")
+        if check.status not in (readiness.PASSED, readiness.NOT_APPLICABLE):
+            state = "could not be verified" if check.status == readiness.NOT_CHECKED else "needs attention"
             text = "\n".join(readiness.format_report({"checks": [vars(check)]}))
-            self.notify(text, title="Resource-limit support", severity="warning", timeout=30)
-        elif not self._operation_pending and str(status.render()).startswith("Resource-limit support needs attention"):
-            status.update("Ready")
+            self._replace_advisory("resources", f"Resource-limit support {state}. Details: opencode-sandbox doctor",
+                                   title="Resource-limit support", detail=text)
+        else:
+            self._replace_advisory("resources")
 
     def _show_image_checks(self, checks) -> None:
         from . import readiness
-        if not self._operation_pending:
-            self.query_one("#status", Static).update("Base image checks need attention. Details: opencode-sandbox doctor")
-        self.notify("\n".join(readiness.format_report({"checks": [vars(item) for item in checks]})),
-                    title="Base images need attention", severity="warning", timeout=30)
+        checks = [item for item in checks if item.status not in (readiness.PASSED, readiness.NOT_APPLICABLE)]
+        if checks:
+            state = "could not be completed" if all(item.status == readiness.NOT_CHECKED for item in checks) else "need attention"
+            text = "\n".join(readiness.format_report({"checks": [vars(item) for item in checks]}))
+            self._replace_advisory("images", f"Base image checks {state}. Details: opencode-sandbox doctor",
+                                   title="Base images need attention", detail=text)
+        else:
+            self._replace_advisory("images")
 
     def _show_prerequisites(self, detail: str) -> None:
-        if not self._operation_pending:
-            self.query_one("#status", Static).update(
-                "Docker is not ready: environments cannot start. Details: opencode-sandbox doctor")
-        self.notify(f"{detail}\nDetails: opencode-sandbox doctor", title="Docker is not ready",
-                    severity="warning", timeout=30)
+        self._replace_advisory("daemon", "Docker is not ready: environments cannot start. Details: opencode-sandbox doctor",
+                               title="Docker is not ready", detail=f"{detail}\nDetails: opencode-sandbox doctor")
 
     def _prerequisites_ready(self) -> None:
-        for note in list(self._notifications):
-            if note.title == "Docker is not ready":
-                self._unnotify(note)
-        status = self.query_one("#status", Static)
-        if not self._operation_pending and str(status.render()).startswith("Docker is not ready"):
-            status.update("Ready")
+        self._replace_advisory("daemon")
 
     def _runtime_notice(self, message, worker) -> None:
         if not self.is_running or (message and worker.is_cancelled):
             return
         if message:
             first = not self._runtime_waiters
-            self._runtime_waiters.add(worker)
+            self._runtime_waiters[worker] = message
             if not self._operation_pending:
                 self.query_one("#status", Static).update(message)
-            if first: self.notify(message, title="Docker readiness", timeout=10)
+                self._status_owner = "runtime"
+            if first:
+                self._runtime_notification = Notification(message, title="Docker readiness", timeout=10, markup=False)
+                self._notifications.add(self._runtime_notification)
+                self._refresh_notifications()
         else:
-            self._runtime_waiters.discard(worker)
-            if not self._runtime_waiters:
-                for note in list(self._notifications):
-                    if note.title == "Docker readiness": self._unnotify(note)
-            status = self.query_one("#status", Static)
-            if not self._runtime_waiters and str(status.render()).startswith("Waiting for Docker readiness"):
-                status.update("Ready")
+            self._runtime_waiters.pop(worker, None)
+            if not self._runtime_waiters and self._runtime_notification is not None:
+                self._unnotify(self._runtime_notification)
+                self._runtime_notification = None
+            if not self._operation_pending and self._status_owner == "runtime":
+                if self._runtime_waiters:
+                    self.query_one("#status", Static).update(next(reversed(self._runtime_waiters.values())))
+                else:
+                    self._advisory_status()
 
     @staticmethod
     def _metadata_state():
@@ -310,7 +422,7 @@ class Dashboard(App):
         return sorted(state)
 
     def _refresh_if_changed(self) -> None:
-        if len(self.screen_stack) > 1:
+        if self._manager_update_intent is not None or len(self.screen_stack) > 1:
             return  # the table lives on the dashboard screen; picked up after the sub-screen closes
         if self._metadata_state() != self._metadata_seen:
             self.action_refresh()
@@ -338,6 +450,7 @@ class Dashboard(App):
             with contextlib.suppress(RowDoesNotExist):  # the selected environment is gone or filtered out
                 table.move_cursor(row=table.get_row_index(previous))
         self.update_details()
+        self._refresh_update_indicator()
 
     def action_refresh_readiness(self) -> None:
         """Explicit Refresh retries prerequisites; metadata auto-refresh stays Docker-free."""
@@ -410,22 +523,23 @@ class Dashboard(App):
             report = readiness.run(m)
             text = (f"Readiness of {m['name']} [{m['id']}]\nSummary: {readiness.summary(report)}\n\n"
                     + "\n".join(readiness.format_report(report)))
-            self.call_from_thread(self._show_check, text, readiness.failed(report))
+            publish(self, self._show_check, text, readiness.failed(report))
         except Exception as exc:
-            self.call_from_thread(self._show_check, f"Check failed: {c.error_text(exc)}", True)
+            publish(self, self._show_check, f"Check failed: {c.error_text(exc)}", True)
 
     def _show_check(self, text: str, failed: bool) -> None:
-        self.push_screen(OpenCodeVersionsScreen(text, title="Readiness check (read-only; nothing was started or changed)"))
+        self.push_screen(ReportScreen(text, title="Readiness check (read-only; nothing was started or changed)"))
         self.update_details()
         if failed:
             self.notify("Some checks failed", severity="error")
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        self.update_details()
+        if self.is_running and event.data_table.id == "envs" and event.data_table.is_mounted:
+            self.update_details()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         # Enter (or a click on the highlighted row); the table consumes Enter itself.
-        if event.data_table.id == "envs":
+        if self.is_running and event.data_table.id == "envs" and event.data_table.is_mounted:
             self.action_open_selected()
 
     def action_focus_search(self) -> None:
@@ -496,9 +610,9 @@ class Dashboard(App):
     def _usage_worker(self,m):
         try:
             result=c.runtime_usage(m)
-            self.app.call_from_thread(self._show_usage, m["name"], result)
+            publish(self.app, self._show_usage, m["name"], result)
         except Exception as exc:
-            self.app.call_from_thread(self._show_usage_error, c.error_text(exc))
+            publish(self.app, self._show_usage_error, c.error_text(exc))
 
     def _show_usage(self, name, data):
         if data.get("state") == "running":
@@ -527,9 +641,9 @@ class Dashboard(App):
         from . import cleanup
         try:
             inv = cleanup.inventory()
-            self.call_from_thread(self._show_disk, inv)
+            publish(self, self._show_disk, inv)
         except Exception as exc:
-            self.call_from_thread(self.notify, f"Disk usage failed: {c.error_text(exc)}", severity="error")
+            publish(self, self.notify, f"Disk usage failed: {c.error_text(exc)}", severity="error")
 
     def _show_disk(self, inv) -> None:
         self.push_screen(DiskScreen(inv), lambda superseded: self._confirm_cleanup(inv, superseded))
@@ -563,35 +677,14 @@ class Dashboard(App):
             self.call_from_thread(self._show_cleanup, f"Cleanup failed: {c.error_text(exc)}", True)
 
     def _show_cleanup(self, text: str, failed: bool) -> None:
-        self.push_screen(OpenCodeVersionsScreen(text, title="Cleanup result"))
+        self.push_screen(ReportScreen(text, title="Cleanup result"))
         if failed:
             self.notify("Some objects were not removed", severity="warning")
 
-    def action_opencode_versions(self) -> None:
-        """Check registry and running environments without starting stopped ones."""
-        self.notify("Checking OpenCode versions…")
-        self._opencode_versions_worker()
-
-    @work(thread=True, exclusive=True, group="opencode-version-check")
-    def _opencode_versions_worker(self):
-        from . import opencode_versions as v
-        try:
-            latest = v.latest()
-            rows = []
-            for item in v.versions():
-                try:
-                    rows.append(f"{item['name']}: {v.environment_line(item, latest)}")
-                except Exception as exc:
-                    rows.append(f"{item['name']}: check failed ({c.error_text(exc)})")
-            message = f"Latest OpenCode: {latest}\n" + "\n".join(rows)
-            self.call_from_thread(self._show_opencode_versions, message, False)
-        except Exception as exc:
-            self.call_from_thread(self._show_opencode_versions, c.error_text(exc), True)
-
-    def _show_opencode_versions(self, message: str, error: bool) -> None:
-        self.push_screen(OpenCodeVersionsScreen(message))
-        if error:
-            self.notify("Version check failed", severity="error")
+    def action_updates(self) -> None:
+        from .updates_tui import UpdatesScreen
+        m = self.selected()
+        self.push_screen(UpdatesScreen(environment_id=m["id"] if m else None))
 
     def action_agent_context(self) -> None:
         m = self.selected()
@@ -604,23 +697,31 @@ class Dashboard(App):
     def _agent_context_worker(self, m) -> None:
         from . import agent_context as ac
         try:
+            note = ""
             try:
                 inputs = c.guidance_inputs(m)
-            except c.SandboxError:
+            except c.SandboxError as exc:
                 inputs = c.guidance_inputs(m, observe=False)
+                note = f"Container inspection unavailable ({c.error_text(exc)}); preview uses configured settings.\n"
             content = ac.render(m, **inputs)
-            current = ac.verify(m, c.env_dir, **inputs)
-            self.call_from_thread(self.push_screen, OpenCodeVersionsScreen(
-                f"Agent context: {m['name']}\nOn-disk: {'current' if current else 'missing/outdated'}\n"
-                "Guidance is regenerated before every OpenCode launch.\n\n" + content))
+            # A configuration-only fallback cannot establish whether observed guidance is current.
+            if note:
+                on_disk = "not verified (container inspection unavailable)"
+            else:
+                on_disk = "current" if ac.verify(m, c.env_dir, **inputs) else "missing/outdated"
+            publish(self, self.push_screen, ReportScreen(
+                f"Agent Context: {m['name']}\n{note}On-disk: {on_disk}\n"
+                "Guidance is regenerated before every OpenCode launch.\n\n" + content,
+                title=f"Agent Context — {m['name']}"))
         except Exception as exc:
-            self.call_from_thread(self.notify, c.error_text(exc), severity="error")
+            publish(self, self.notify, c.error_text(exc), severity="error")
 
     def action_recovery(self) -> None:
         from .management_tui import RecoveryScreen
         self.push_screen(RecoveryScreen())
 
     def _set_busy(self, message: str) -> None:
+        self._status_owner = None  # operation progress/results are not advisory-owned text
         self.query_one("#status", Static).update(message)
 
     def _finished(self, message: str, error: bool = False) -> None:
@@ -628,6 +729,185 @@ class Dashboard(App):
         self._set_busy(message)
         self.notify(message, severity="error" if error else "information", timeout=10)
         self.action_refresh()
+
+    def action_quit(self) -> None:
+        if getattr(self, "_updates_mutation_active", False):
+            self.notify("An approved operation is running; wait before quitting. Killing the manager may leave unfinished work; review its result, candidates or journal.", severity="warning")
+            return
+        self.exit()
+
+    def _request_manager_fixture(self, artifact, *, verify=False):
+        """Internal ONLY: exit toward a non-mutating fixture, not an enabled Update action.
+
+        No helper starts/arms here and no usage lease is released. The CLI must independently
+        verify clean app return and real terminal restoration. No public action/flag/env binding.
+        """
+        return self._request_manager_handoff(artifact, verify=verify, update=False)
+
+    def _request_manager_handoff(self, artifact, *, verify=False, update=False):
+        import threading
+
+        from . import installation_locks, manager_handoff
+        if threading.get_ident() != self._thread_id or not self.is_running or self._exit:
+            raise c.SandboxError('Manager handoff requires the live dashboard UI thread')
+        if self._session_active:
+            raise c.SandboxError('An attached session is active; exit it before manager handoff')
+        if self._operation_pending or getattr(self, '_updates_mutation_active', False):
+            raise c.SandboxError('An operation is active; wait before manager handoff')
+        if len(self.screen_stack) != 1:
+            raise c.SandboxError('Close the current screen or consent before manager handoff')
+        if self._manager_fixture is not None: raise c.SandboxError('Manager handoff is already pending')
+        if type(artifact) is not manager_handoff.Artifact or type(verify) is not bool or artifact.update is not update:
+            raise c.SandboxError('Invalid non-mutating handoff fixture request')
+        artifact.check()
+        if artifact.used or artifact.prefix != installation_locks.identity():
+            raise c.SandboxError('Manager handoff artifact does not match this unused installation fixture')
+        installation_locks.acquire_usage()  # retained through actual process exit, never upgraded
+        self._handoff_activity.seal(self.workers)
+        self._manager_fixture = manager_handoff.TerminalRequest(artifact, verify)
+        self.exit(self._manager_fixture)
+
+    def run_manager_update(self, approval):
+        """App-owned approved staging; never cancel work or release usage to manufacture idle."""
+        from . import manager_review
+        if type(approval) is not manager_review.Approval: raise c.SandboxError('Exact manager review approval is required')
+        if self._session_active or self._operation_pending or self._manager_update_intent is not None:
+            self.notify('A session or operation is active; wait and review the manager update again.', severity='warning')
+            return
+        self._manager_update_intent = intent = object()
+        self._operation_pending = self._updates_mutation_active = True
+        self._set_busy('Staging approved manager handoff; dashboard will close only after work finishes...')
+        self._manager_stage_worker(intent, approval)
+
+    @work(thread=True, group='manager-stage')
+    def _manager_stage_worker(self, intent, approval):
+        from . import manager_handoff
+        try:
+            staged = manager_handoff.prepare_update(approval)
+            if not staged['supported']: raise c.SandboxError(staged['reason'])
+            artifact, error = staged['artifact'], None
+        except Exception as exc: artifact, error = None, c.error_text(exc)
+        publish(self, self._manager_staged, intent, artifact, error)
+
+    def _manager_staged(self, intent, artifact, error):
+        if self._manager_update_intent is not intent: return
+        if error:
+            self._manager_update_failed(error)
+            return
+        import time
+        self._manager_update_artifact = artifact
+        self._manager_update_deadline = time.monotonic() + 15
+        self._manager_update_timer = self.set_interval(.05, self._finish_manager_handoff)
+
+    def _manager_update_failed(self, error):
+        self._manager_update_intent = None
+        self._updates_mutation_active = False
+        self._finished('Manager handoff refused; no installer started. ' + error, True)
+
+    def _finish_manager_handoff(self):
+        import time
+        # The staging callback can arrive before its thread body exits. Observe actual bodies
+        # and queued workers; final seal is atomic and prevents later canceled-body admission.
+        with self._handoff_activity._mutex: running = self._handoff_activity._running
+        if running or any(not worker.is_finished for worker in self.workers):
+            if time.monotonic() < self._manager_update_deadline: return
+            self._manager_update_timer.stop()
+            self._manager_update_failed('Dashboard work is still running; wait before reviewing again.')
+            return
+        self._manager_update_timer.stop()
+        self._operation_pending = self._updates_mutation_active = False
+        try: self._request_manager_handoff(self._manager_update_artifact, update=True)
+        except c.SandboxError as exc: self._manager_update_failed(str(exc))
+
+    def run_environment_update_action(self, m, action, plan, callback):
+        """App-owned work survives closing Updates. Never replace/cancel an approved mutation."""
+        if self._operation_pending:
+            self.notify("Another operation is running", severity="warning")
+            return
+        self._operation_pending = self._updates_mutation_active = True
+        self._set_busy(f"{action.capitalize()} {m['name']}…")
+        self._environment_update_worker(m, action, plan, callback)
+
+    @work(thread=True, group="environment-operation")
+    def _environment_update_worker(self, m, action, plan, callback):
+        import json
+
+        from . import opencode_versions as v
+        feedback = c._RUNTIME_FEEDBACK.get() or {}
+        # Once approved, cancellation is not a rollback. Keep bounded diagnostics but do not
+        # propagate a UI worker cancellation into a partially applied lifecycle transaction.
+        with c.runtime_feedback(progress=feedback.get("progress"), cancelled=None):
+            try:
+                if action == "start":
+                    c.start(m, precondition=lambda current: v.recheck_environment_start(current, plan))
+                    result = "Started; remains running. Use Check for fresh version verification."
+                elif action == "update":
+                    outcome = v.update_environment(m, plan.target, plan=plan)
+                    result = "OpenCode update complete; stopped. " + json.dumps(outcome)
+                elif action == "policy":
+                    result = "OpenCode policy saved. " + json.dumps(v.set_policy(m, plan.mode, plan.version, plan=plan))
+                elif action == "rollback":
+                    result = "OpenCode rollback complete; explicit Start required. " + json.dumps(v.rollback_environment(m, plan=plan))
+                elif action == "recover":
+                    result = "OpenCode recovery complete; explicit Start required. " + json.dumps(v.update_recover(m, plan=plan))
+                else: raise ValueError(action)
+                failed = False
+            except Exception as exc:
+                result, failed = c.error_text(exc), True
+        if self.is_running:
+            try: self.call_from_thread(self._environment_update_finished, m["id"], result, failed, callback)
+            except RuntimeError:
+                if self.is_running: raise
+
+    def _environment_update_finished(self, key, result, failed, callback):
+        self._updates_mutation_active = False
+        self._finished(result, failed)
+        callback(key, result, failed)
+
+    def run_base_update_action(self, key, action, plan, callback):
+        """Base-only worker binding; no screen ownership or universal update executor."""
+        if self._operation_pending: return
+        self._operation_pending = self._updates_mutation_active = True
+        self._base_operation = {'distro': key, 'phase': 'Preparing base operation', 'output': '', 'result': None}
+        self._set_busy(f'{action.capitalize()} base {key}…')
+        self._base_update_worker(key, action, plan, callback)
+
+    @work(thread=True, group='base-operation')
+    def _base_update_worker(self, key, action, plan, callback):
+        import json
+
+        from . import build_output
+        from . import opencode_versions as v
+        def progress(phase, output):
+            if self.is_running:
+                try: self.call_from_thread(self._base_progress, phase, output)
+                except RuntimeError:
+                    if self.is_running: raise
+        with c.runtime_feedback(progress=None, cancelled=None), build_output.listen(progress):
+            try:
+                if action == 'build':
+                    outcome = v.update_base(plan.target, key, refresh=plan.refresh, plan=plan)
+                    result = ('Base verified unchanged; ' if outcome.get('unchanged') else 'Base build verified and published; ') + json.dumps(outcome)
+                else:
+                    outcome = v.rollback_base(key, plan=plan)
+                    result = ('Base rollback verified unchanged; ' if outcome.get('unchanged') else 'Base rollback verified and published; ') + json.dumps(outcome)
+                failed = False
+            except Exception as exc:
+                result, failed = c.error_text(exc), True
+        if self.is_running:
+            try: self.call_from_thread(self._base_finished, key, result, failed, callback)
+            except RuntimeError:
+                if self.is_running: raise
+
+    def _base_progress(self, phase, output):
+        self._base_operation.update(phase=c.printable(phase), output=c.printable(output))
+        self._set_busy('Base: ' + c.printable(phase))
+
+    def _base_finished(self, key, result, failed, callback):
+        self._base_operation.update(result=result, phase='Failed; inspect actual base/copies before retry' if failed else 'Complete')
+        self._updates_mutation_active = False
+        self._finished(result, failed)
+        callback(key, result, failed)
 
     @work(thread=True, exclusive=True, group="environment-operation")
     def _run_operation(self, action: str, environment: dict) -> None:
@@ -803,6 +1083,7 @@ class Dashboard(App):
 
     def _attach_ready(self, m, shell) -> None:
         self._operation_pending = False
+        self._session_active = True
         try:
             with self.suspend(), c.runtime_feedback():
                 c.interactive(m, shell=shell)
@@ -813,8 +1094,11 @@ class Dashboard(App):
                 self._set_busy("Session exited")
         except Exception as exc:
             self._finished(c.error_text(exc), True)
+        finally:
+            self._session_active = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if self._manager_fixture is not None or self._manager_update_intent is not None: return
         action = event.button.id
         if action == "new": self.action_create_environment()
         elif action == "current": self.action_current_folder()
@@ -823,7 +1107,7 @@ class Dashboard(App):
         elif action == "settings": self.action_settings()
         elif action == "runtime": self.action_runtime()
         elif action == "usage": self.action_usage()
-        elif action == "ocversions": self.action_opencode_versions()
+        elif action == "ocversions": self.action_updates()
         elif action == "agentcontext": self.action_agent_context()
         elif action == "recovery": self.action_recovery()
         elif action == "open": self.action_open_selected()
@@ -948,25 +1232,25 @@ class DiskScreen(ModalScreen[bool | None]):
         self.dismiss({"disk-cleanup": False, "disk-cleanup-all": True}.get(event.button.id))
 
 
-class OpenCodeVersionsScreen(ModalScreen[None]):
-    """Read-only version report. No automatic container updates."""
-    CSS = "OpenCodeVersionsScreen {align: center middle;} #versions-panel {width: 90%; height: 85%; border: round $accent; padding: 0 1; background: $surface;} #versions-report {height: 1fr;}"
+class ReportScreen(ModalScreen[None]):
+    """Read-only plain-text report; every caller must name its subject explicitly."""
+    CSS = "ReportScreen {align: center middle;} ReportScreen.updates-details ToastRack {height: 0; max-height: 0; overflow: hidden;} #report-panel {width: 90%; height: 85%; border: round $accent; padding: 0 1; background: $surface;} #report-text {height: 1fr;}"
     BINDINGS = [Binding("escape", "close", "Close")]
 
     def action_close(self) -> None:
         self.dismiss(None)
 
-    def __init__(self, report: str, title: str = "OpenCode versions (no automatic updates)"):
+    def __init__(self, report: str, *, title: str):
         super().__init__()
         self.report = report
         self.title_text = title
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="versions-panel"):
-            yield Static(self.title_text)
-            yield TextArea(self.report, read_only=True, id="versions-report")
-            yield Button("Close", id="close-versions")
+        with Vertical(id="report-panel"):
+            yield Static(self.title_text, markup=False, id="report-title")
+            yield TextArea(self.report, read_only=True, id="report-text")
+            yield Button("Close", id="report-close")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "close-versions":
+        if event.button.id == "report-close":
             self.dismiss(None)

@@ -29,6 +29,8 @@ def lab(owner=None, *, managed=True, data=True, **extra):
     out = {}
     if managed:
         out.update({cl.MANAGED: "true", cl.VERSION: "6.0.0"})
+    if not data and not owner and managed:
+        out.update(c.distros.get(c.distros.DEFAULT).image_labels())
     if data:
         out[c.DATA_LABEL] = c.data_id() if data is True else data
     if owner:
@@ -90,10 +92,11 @@ class Daemon:
             rows = [f"{i}\t{t}" for i, x in self.images.items() for t in (sorted(x["tags"]) or ["<none>:<none>"])]
             return ok("\n".join(rows))
         if a[:2] == ("image", "inspect"):
-            found = [self.images[x] for x in a[2:] if x in self.images]
+            found = [self.images[i] for x in a[2:] if (i := self.tag_of(x)) is not None]
             if "--format" in a:
                 return ok("") if found or a[-1] in {t for x in self.images.values() for t in x["tags"]} else fail("No such image")
-            return ok(json.dumps([{k: v for k, v in x.items() if k in ("Id", "Config")} for x in found]))
+            return ok(json.dumps([{**{k: v for k, v in x.items() if k in ("Id", "Config")},
+                                   "RepoTags": sorted(x["tags"])} for x in found]))
         if a[0] == "rm":
             x = self.containers.get(a[1])
             if x is None:
@@ -328,8 +331,11 @@ def test_another_data_directory_is_never_an_orphan_source(world, tmp_path, monke
 
 def test_candidate_needs_the_base_build_lock(world):
     key = "image:opencode-sandbox:debian-candidate-0123456789ab"
-    with c.lock("base-image-debian"):
-        assert cl.apply([key])[0][1].startswith("busy")
+    with c.base_lock("debian", "build"):
+        item = next(i for i in cl.inventory().eligible() if i.key == key)
+        # A separate caller, not recursive acquisition in this execution context.
+        import contextvars
+        assert contextvars.Context().run(cl._remove, item).startswith("busy")
     assert cl.apply([key])[0][1] is None
 
 
@@ -413,18 +419,21 @@ def test_tui_disk_screen_confirms_before_removing(world):
             await pilot.press("D")
             for _ in range(50):
                 await pilot.pause(); await asyncio.sleep(0.05)
-                if type(app.screen).__name__ == "DiskScreen":
+                if len(app.screen.query("#disk-cleanup")):
                     break
-            assert type(app.screen).__name__ == "DiskScreen" and "Removed by disk cleanup" in app.screen.report
+            report = app.screen.query_one("#disk-report")
+            assert report.read_only and f"ocs-{GONE}" in report.text
             app.screen.query_one("#disk-cleanup").press(); await pilot.pause()
-            assert type(app.screen).__name__ == "ConfirmScreen" and "Remove 9 object(s)" in app.screen.message
+            assert app.focused is app.screen.query_one("#cancel")
+            assert f"ocs-{GONE}" in app.screen.message
             assert f"ocs-{GONE}" in {x["Name"][1:] for x in d.containers.values()}  # nothing removed yet
             app.screen.query_one("#confirm").press()
             for _ in range(50):
                 await pilot.pause(); await asyncio.sleep(0.05)
-                if type(app.screen).__name__ == "OpenCodeVersionsScreen":
+                if len(app.screen.query("#report-text")):
                     break
-            assert "Removed: environment container" in app.screen.report
+            report = app.screen.query_one("#report-text")
+            assert report.read_only and f"Removed: environment container ocs-{GONE}" in report.text
     asyncio.run(main())
     assert f"ocs-{GONE}" not in {x["Name"][1:] for x in d.containers.values()}
     assert "pgdata" in d.volumes and f"ocs-home-{world.live['id']}" in d.volumes

@@ -145,13 +145,13 @@ def test_archive_entry_limit(tmp_path, monkeypatch):
 
 
 def test_restore_refuses_archive_larger_than_free_space(tmp_path, monkeypatch):
-    """Decompression bomb: tiny compressed archive, huge declared/extracted size."""
+    """Real compressed data: compressed size + reserve fits, expanded size + reserve does not."""
     import hashlib
     import io
     import tarfile
     from collections import namedtuple
     root = tmp_path / "bomb.ocsbackup"; root.mkdir()
-    big = 2**30
+    big = 4 * 2**20
     class Zeros(io.RawIOBase):
         def __init__(self): self.left = big
         def readable(self): return True
@@ -161,14 +161,33 @@ def test_restore_refuses_archive_larger_than_free_space(tmp_path, monkeypatch):
         info = tarfile.TarInfo("zeros"); info.size = big
         tf.addfile(info, io.BufferedReader(Zeros(), 1 << 20))
     data = (root / "workspace.tar.gz").read_bytes()
-    assert len(data) < 16 * 2**20
+    reserve, free = 2**20, 3 * 2**20
+    assert len(data) + reserve < free < big + reserve
     (root / "manifest.json").write_text(json.dumps({"format": "opencode-sandbox-backup", "schema": b.SCHEMA, "created": "x", "workspace": {"mode": "managed", "included": True},
         "environment": {"name": "b", "kind": "scratch", "distro": "debian"},
         "files": {"workspace.tar.gz": {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}}}))
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
     monkeypatch.setattr(c, "docker", lambda *a, **k: type("R", (), {"returncode": 1, "stdout": "", "stderr": ""})())
+    monkeypatch.setenv("OPENCODE_SANDBOX_BACKUP_RESERVE_BYTES", str(reserve))
     Usage = namedtuple("Usage", "total used free")
-    monkeypatch.setattr(b.shutil, "disk_usage", lambda p: Usage(10 * 2**30, 9 * 2**30, 256 * 2**20))
+    available = {"free": free}
+    monkeypatch.setattr(b.shutil, "disk_usage", lambda p: Usage(10 * 2**20, 10 * 2**20 - available["free"], available["free"]))
+    admitted = []
+    class AdmissionReached(Exception):
+        pass
+    def create(*args, **kwargs):
+        admitted.append(args)
+        raise AdmissionReached
+    monkeypatch.setattr(c, "create", create)
     with pytest.raises(c.SandboxError, match="Insufficient disk space"):
         b.restore(root, "ocs-qa-bomb")
-    assert c.all_envs() == []
+    assert not admitted and c.all_envs() == []
+    available["free"] = big + reserve - 1
+    with pytest.raises(c.SandboxError, match="Insufficient disk space"):
+        b.restore(root, "ocs-qa-bomb")
+    assert not admitted and c.all_envs() == []
+    # Positive boundary control: enough space must reach creation, not fail for another reason.
+    available["free"] = big + reserve
+    with pytest.raises(AdmissionReached):
+        b.restore(root, "ocs-qa-bomb")
+    assert len(admitted) == 1 and c.all_envs() == []

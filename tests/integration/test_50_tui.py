@@ -1,5 +1,5 @@
 """The dashboard in a real terminal against real Docker, keyboard only (campaign rows H01–H05,
-H08: direct workspace from the form, Settings, Backups and restore, Changes, Versions, Check, and
+H08: direct workspace from the form, Settings, Backups and restore, Changes, Updates, Check, and
 a dashboard killed while a session is open)."""
 import os
 import re
@@ -84,7 +84,7 @@ def test_dashboard_against_real_docker(campaign, checks):
         ck(t.wait_for(r"Started", 90), "H03 F5 starts it")
         ck(camp.sh(did, "cat /workspace/host-file.txt").stdout == "from the host\n", "H03 the container sees the host folder itself")
 
-        # H03 Check, Settings, Changes, Backup, Backups/restore, Versions on the Git project
+        # H03 Check, Settings, Changes, Backup, Backups/restore, Updates on the Git project
         ck(select(t, PLAIN), "H02 keyboard selection of the other environment")
         t.send(F5, 1)
         ck(t.wait_for(r"Started", 90), "F5 starts the project")
@@ -128,8 +128,10 @@ def test_dashboard_against_real_docker(campaign, checks):
         camp.adopt(RESTORED)
         t.send(ESC, 1)
         t.send("v", 2)
-        ck(t.wait_for(r"2\.2\.0", 60), "H03 v shows the OpenCode versions")
-        t.snap("versions")
+        ck(t.wait_for(r"Updates —", 15), "H03 v opens local/cached Updates")
+        t.send("3", 1)
+        ck(t.wait_for(r"2\.2\.0", 60), "H03 Updates shows the dated OpenCode versions")
+        t.snap("Updates")
         t.send(ESC, 1)
         ck(select(t, DIRECT), "H02 back to the direct environment")
         t.send("q", 1)

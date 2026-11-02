@@ -61,6 +61,8 @@ class FakeDocker:
             if not self.exists:
                 return fail("Error: No such container: " + a[-1])
             fmt = a[3]
+            if fmt.startswith("{{.Id}}|"):
+                return ok("a" * 64 + "|sha256:" + "b" * 64 + "|" + self.owner)
             if fmt == "{{json .State}}":
                 return ok(json.dumps({"Running": self.running, "Dead": self.dead, "Status": "running" if self.running else "exited"}))
             if "org.opencode-sandbox.id" in fmt:
@@ -83,6 +85,8 @@ class FakeDocker:
             return ok("[{}]") if a[-1] in self.images else fail("Error: No such image")
         if a[0] == "exec":
             argv = a[2:]
+            if argv[:2] == ("timeout", "--signal=KILL"):
+                argv = argv[3:]
             if argv[:2] == ("python3", "-c"):
                 if self.probe_rc:
                     return fail("exec: python3: not found", self.probe_rc)
@@ -471,15 +475,26 @@ def test_host_helpers(tmp_path):
 
 
 def test_probe_script_runs_and_classifies(tmp_path):
-    """The script the container executes, run here against loopback only."""
+    """Real loopback connections; DNS failure is injected without depending on the host resolver."""
     import subprocess
     import sys
-    listener = socket.socket(); listener.bind(("127.0.0.1", 0)); listener.listen(1)
-    closed = socket.socket(); closed.bind(("127.0.0.1", 0)); port_closed = closed.getsockname()[1]; closed.close()
-    spec = {"open": ["127.0.0.1", listener.getsockname()[1], "tok"], "closed": ["127.0.0.1", port_closed],
-            "dns": ["ocs-qa-no-such-host.invalid", 9]}
-    out = subprocess.run([sys.executable, "-c", r.PROBE, json.dumps(spec)], capture_output=True, text=True, timeout=30, check=True)
-    listener.close()
+    bootstrap = '''import socket
+getaddrinfo = socket.getaddrinfo
+def resolve(host, *args, **kwargs):
+    if host == "ocs-qa-no-such-host.invalid":
+        raise socket.gaierror(socket.EAI_NONAME, "test-owned DNS failure")
+    assert host == "127.0.0.1", "probe test must not contact external hosts"
+    return getaddrinfo(host, *args, **kwargs)
+socket.getaddrinfo = resolve
+'''
+    with socket.socket() as listener, socket.socket() as closed:
+        listener.bind(("127.0.0.1", 0)); listener.listen(1)
+        # Keep the non-listening port reserved so another process cannot acquire it mid-test.
+        closed.bind(("127.0.0.1", 0))
+        spec = {"open": ["127.0.0.1", listener.getsockname()[1], "tok"],
+                "closed": ["127.0.0.1", closed.getsockname()[1]], "dns": ["ocs-qa-no-such-host.invalid", 9]}
+        out = subprocess.run([sys.executable, "-I", "-B", "-c", bootstrap + r.PROBE, json.dumps(spec)],
+                             capture_output=True, text=True, timeout=5, check=True)
     assert json.loads(out.stdout) == {"open": "connected", "closed": "refused", "dns": "no-dns"}
 
 
@@ -492,15 +507,16 @@ def test_tui_check_key_shows_the_report_and_the_details_line(monkeypatch):
 
     async def main():
         app = tui.Dashboard()
-        async with app.run_test(size=(100, 30)) as pilot:
+        async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
             assert "Readiness: not checked yet" in str(app.query_one("#details").render())
             await pilot.press("i")
             for _ in range(30):
                 await pilot.pause(); await asyncio.sleep(0.1)
-                if type(app.screen).__name__ == "OpenCodeVersionsScreen":
+                if isinstance(app.screen, tui.ReportScreen):
                     break
-            assert type(app.screen).__name__ == "OpenCodeVersionsScreen"
+            assert isinstance(app.screen, tui.ReportScreen)
+            assert str(app.screen.query_one("#report-title").render()) == "Readiness check (read-only; nothing was started or changed)"
             assert f"Readiness of {m['name']}" in app.screen.report and "[passed]" in app.screen.report
             await pilot.press("escape"); await pilot.pause()
             assert "Readiness: last check 20" in str(app.query_one("#details").render())

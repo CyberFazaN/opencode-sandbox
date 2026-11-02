@@ -20,6 +20,46 @@ app=typer.Typer(cls=_HelpOrder,help="Manage isolated OpenCode workspaces on root
 ENVIRONMENTS, SESSIONS, DATA, HOST = "Environments", "Sessions", "Settings, changes and data", "Maintenance"
 profiles=typer.Typer(help="Provider profiles: named credentials for model providers (values never displayed).",no_args_is_help=True)
 app.add_typer(profiles,name="providers",rich_help_panel=DATA)
+manager_app=typer.Typer(help="Sandbox Manager releases, installation evidence and explicitly reviewed updates (not OpenCode/npm).",no_args_is_help=True)
+app.add_typer(manager_app,name="manager",rich_help_panel=HOST)
+
+
+@manager_app.command('status')
+def manager_status(check: bool=typer.Option(False,'--check',help='Check official published full GitHub releases; never install')):
+    """Show local installation classification and dated release evidence, without Docker or pipx execution."""
+    from . import manager_installation as mi
+    from . import manager_releases as mr
+    installation = mi.classify()
+    error = None
+    release = mr.discovery()['release']
+    if check:
+        try: release = mr.latest()
+        except c.SandboxError as exc: error = c.error_text(exc)
+    typer.echo(c.printable(json.dumps({'installation': installation, 'discovery': mr.discovery(),
+                                      'comparison': mr.comparison(installation['version'], release),
+                                      'release': release, 'check_error': error}, indent=2)))
+    if error: raise typer.Exit(2)
+
+
+@manager_app.command('update')
+def manager_update(tag: str=typer.Option(...,'--tag',help='Exact newer published full release tag vX.Y.Z; freshly revalidated, never latest or an implicit downgrade')):
+    """Review an exact manager update in a real terminal, then exit for independent replacement.
+
+    Confirmation requires a foreground terminal and defaults to Cancel. No automatic restart,
+    image build or environment migration. Exit means handoff only; wait for the independent
+    helper's final result/private record before restarting.
+    """
+    from . import manager_handoff as handoff
+    from . import manager_review as review
+    terminal = handoff.Terminal()  # refuse noninteractive/redirected invocations before any network
+    prepared = review.prepare(tag)
+    typer.echo(review.text(prepared, update=True))
+    if not typer.confirm(f'Update only this Sandbox Manager {prepared.version} -> {prepared.target.version}, accept public-default network policy and exit now?', default=False):
+        typer.echo('Canceled; no installation was changed.')
+        return
+    staged = handoff.prepare_update(review.Approval(prepared))
+    if not staged['supported']: raise c.SandboxError(staged['reason'])
+    handoff.complete_terminal_update(handoff.TerminalRequest(staged['artifact']), terminal)
 
 opencode_app=typer.Typer(help="OpenCode versions: check, policy, update and roll back (base images and environments).",no_args_is_help=True)
 app.add_typer(opencode_app,name="opencode",rich_help_panel=HOST)
@@ -44,17 +84,20 @@ def _root(version: bool = typer.Option(False, "--version", callback=_print_versi
     """Manage isolated OpenCode workspaces on rootless Docker."""
 
 @opencode_app.command("versions")
-def opencode_versions(check: bool=typer.Option(False,"--check",help="Also query the npm registry: environments with the notify policy report available updates")):
-    """OpenCode version and policy of every environment (running containers only; stopped ones are not started)."""
+def opencode_versions(check: bool=typer.Option(False,"--check",help="Query npm for the latest supported stable release; compare every policy without changing pins")):
+    """OpenCode version/policy: probe running containers; retain dated stopped evidence, never start them.
+
+    Available rows survive failed checks; errors go to stderr and exit status is 2.
+    """
     from . import opencode_versions as v
-    newest=v.latest() if check else None
-    if newest: typer.echo(f"npm registry: {newest}")
-    for item in v.versions():
-        typer.echo(f"{item['name']}: {v.environment_line(item,newest)}")
+    lines,errors=v.versions_report(check=check)
+    for line in lines: typer.echo(line)
+    for error in errors: typer.echo(error,err=True)
+    if errors: raise typer.Exit(2)
 
 @opencode_app.command("status")
 def opencode_status(name: str):
-    """OpenCode version running in one environment (a stopped container is not started)."""
+    """Actual/last-verified version and evidence for one environment; never starts a stopped container."""
     from . import opencode_versions as v
     typer.echo(v.environment_version(c.resolve(name)))
 
@@ -62,7 +105,7 @@ DISTRO_HELP="Distribution from the registry: "+", ".join(distros.REGISTRY)
 
 @opencode_app.command("check")
 def opencode_check(distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP)):
-    """Compare a base image's OpenCode version with the newest release on the npm registry."""
+    """Compare a base image's OpenCode version with npm's latest supported stable release."""
     from . import opencode_versions as v
     image=distros.get(distro).image
     current=v.image_version(image)
@@ -84,25 +127,29 @@ def opencode_policy_set(name: str, mode: str, version: str | None = typer.Option
     typer.echo(v.set_policy(c.resolve(name), mode, version))
 
 @opencode_app.command("update-base")
-def opencode_update_base(version: str=typer.Option("latest","--version",help="OpenCode 2.x version, or latest"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
-                         distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP)):
+def opencode_update_base(version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
+                         distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
+                         refresh: bool=typer.Option(False,"--refresh",help="Pull current upstream inputs and bypass build cache; never prune it")):
     """Rebuild a base image with another OpenCode version; keeps a rollback copy of the old one."""
     from . import opencode_versions as v
-    image=distros.get(distro).image
-    if not yes and not _confirm(f"Build, verify and replace base image {image} with OpenCode {version}?", docker=True):
+    plan=v.prepare_base_build(version,distro,refresh=refresh)
+    typer.echo(v.describe_base_build(plan))
+    if not yes and not _confirm(f"Replace {plan.image} ({plan.current_id or 'missing'}) with exact OpenCode {plan.target}; "
+                                f"{'Refresh & Rebuild' if refresh else 'Cached rebuild'}; keep rollback copy?", docker=True):
         raise typer.Abort()
-    typer.echo(v.update_base(version, distro))
+    typer.echo(v.update_base(plan.target, distro, refresh=refresh, plan=plan))
 
 @opencode_app.command("update")
-def opencode_update(name: str, version: str=typer.Option("latest","--version",help="OpenCode 2.x version, or latest"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation")):
+def opencode_update(name: str, version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation")):
     """Update OpenCode in a stopped environment; on failure its system layer is rolled back to a checkpoint."""
     from . import opencode_versions as v
     m=c.resolve(name)
+    plan=v.prepare_environment_update(m,version)
     typer.echo("Note: a checkpoint (docker commit) of the container's system layer is taken first; a failed update "
                "is rolled back to it, 'opencode rollback' undoes a successful one. /root and /workspace are not touched.")
-    if not yes and not _confirm(f"Temporarily start stopped environment {name}, update OpenCode to {version}, then stop it?", docker=True):
+    if not yes and not _confirm(f"Temporarily start stopped environment {name}, update OpenCode to {plan.target}, then stop it?", docker=True):
         raise typer.Abort()
-    result=v.update_environment(m,version)
+    result=v.update_environment(m,plan.target,plan=plan)
     if result.get("unchanged"): typer.echo(f"OpenCode {result['version']} is already installed; nothing changed")
     else: typer.echo(f"Updated OpenCode {result['previous_version'] or 'unknown (opencode --version failed)'} -> {result['version']}; "
                      f"rollback point {result['checkpoint']}")
@@ -130,14 +177,33 @@ def opencode_rollback(name: str, yes: bool=typer.Option(False,"--yes",help="Do n
 
 @opencode_app.command("rollback-base")
 def opencode_rollback_base(yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
-                           distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP)):
-    """Swap a base image with its newest rollback copy (verified first); existing containers are not changed."""
+                            distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
+                            copy: str | None=typer.Option(None,"--copy",help="Exact rollback tag or full sha256 image ID; required for several distinct copies, even with --yes"),
+                            list_copies: bool=typer.Option(False,"--list",help="List distinct managed rollback images and their aliases; do not change anything")):
+    """Swap a base with a selected, verified rollback copy; one distinct copy is the default, never the newest by date."""
     from . import opencode_versions as v
-    image=distros.get(distro).image
-    if not yes and not _confirm(f"Replace base image {image} with its newest rollback copy?", docker=True):
+    if list_copies and copy is not None:
+        raise c.SandboxError("--list cannot be combined with --copy")
+    inventory=v.base_rollback_inventory(distro)
+    if list_copies:
+        for line in v.format_base_rollback_copies(inventory): typer.echo(line)
+        return
+    plan=v.select_base_rollback(inventory,copy)
+    d=distros.get(distro)
+    image=d.image
+    typer.echo(f"Base image {image}: {plan.current_id or 'missing'}\nSelected copy: {plan.selected.image_id}")
+    for tag in plan.selected.aliases: typer.echo(f"  {tag}")
+    definition=plan.selected.definition
+    typer.echo(f"Copy build: {definition.distro} {definition.version}, revision {definition.revision}; "
+               f"OpenCode {plan.selected.version or 'unknown'} (build label). "
+               f"Required definition: {d.name} {d.version}, revision {d.revision}.")
+    typer.echo("The copy must pass the current definition's OS/tool/OpenCode checks. The replaced base is kept as a rollback copy. "
+               "Existing containers and writable layers are unchanged; future base-based creation and file-only restores use this base, with pins still enforced.")
+    if not yes and not _confirm(f"Replace {image} ({plan.current_id or 'missing'}) with {plan.selected.image_id}?", docker=True):
         raise typer.Abort()
-    result=v.rollback_base(distro)
+    result=v.rollback_base(distro,plan=plan)
     typer.echo(f"{result['image']}: OpenCode {result['version']}"
+               + (" (unchanged; selected image already current)" if result.get("unchanged") else "")
                + (f"; replaced image kept as {result['previous_image']}" if result["previous_image"] else ""))
 
 def pick(key:str | None):
@@ -150,9 +216,13 @@ def msg(m): typer.echo(f"{m['name']} [{m['id']}] ({m['kind']})")
 
 @app.command(rich_help_panel=HOST)
 def build(distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
-          opencode_version: str=typer.Option("latest","--opencode-version",help="OpenCode 2.x version (npm @opencode/cli)")):
-    """Build or rebuild a distribution's agent image (requires rootless Docker)."""
-    result=c.build(distro, opencode_version)
+          opencode_version: str=typer.Option("latest","--opencode-version",help="OpenCode 2.x version (npm @opencode/cli)"),
+          refresh: bool=typer.Option(False,"--refresh",help="Pull current upstream inputs and bypass build cache; never prune it")):
+    """Build/rebuild an agent image without a rollback copy (use opencode update-base to keep one)."""
+    from . import opencode_versions as v
+    plan=v.prepare_base_build(opencode_version,distro,refresh=refresh,keep_previous=False)
+    typer.echo(v.describe_base_build(plan))
+    result=c.build(distro, plan.target, refresh=refresh, plan=plan)
     typer.echo(f"{result['image']}: OpenCode {result['version']}"+(" (unchanged)" if result.get("unchanged") else ""))
 
 @app.command(rich_help_panel=HOST)
@@ -713,11 +783,31 @@ def tui():
     """Open the dashboard (also: opencode-sandbox without arguments in a terminal)."""
     if not c._tty():
         raise c.SandboxError("the dashboard needs an interactive terminal; in scripts use the commands (see --help)")
+    _dashboard()
+
+
+def _dashboard():
+    """One exit boundary for implicit/explicit dashboards; ordinary return never grants handoff."""
+    from . import manager_handoff as handoff
     from .tui import Dashboard
-    Dashboard().run()
+    try: terminal = handoff.Terminal()
+    except (OSError, ValueError, c.SandboxError): terminal = None
+    dashboard = Dashboard()
+    result = dashboard.run()
+    if result is None: return
+    if type(result) is not handoff.TerminalRequest or type(result.artifact) is not handoff.Artifact or result is not dashboard._manager_fixture \
+            or dashboard.is_running or dashboard.return_code != 0:
+        raise c.SandboxError('Dashboard did not complete a clean fixture handoff; nothing was armed')
+    from textual.drivers.linux_driver import LinuxDriver
+    driver = dashboard._driver
+    if type(driver) is not LinuxDriver or driver.is_headless or driver.is_inline \
+            or any(thread is None or thread.is_alive() for thread in (driver._key_thread, driver._writer_thread)):
+        raise c.SandboxError('Local terminal driver shutdown could not be verified; nothing was armed')
+    if result.artifact.update: handoff.complete_terminal_update(result, terminal)
+    else: handoff.complete_terminal_fixture(result, terminal)
 
 ORDER=("create","list","status","check","start","stop","promote","delete","run","shell","exec","quick","tui",
-       "config","changes","backup","container","agent-context","providers","repair","opencode","disk","build","doctor")
+       "config","changes","backup","container","agent-context","providers","repair","opencode","manager","disk","build","doctor")
 
 
 def _confirm(question, docker=False):
@@ -736,20 +826,24 @@ def _exit_on_signal(signum, frame):
 def main():
     import signal
     import sys
+
+    from . import installation_locks
     if sys.argv[1:2] not in ([], ["tui"]):  # Textual handles its own signals
         for sig in (signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, _exit_on_signal)
     try:
+        # Also cover python -m ...cli and previously generated cli:main console wrappers.
+        # The new bootstrap takes this lease before importing the CLI at all.
+        installation_locks.acquire_usage()
         if len(sys.argv)==1:
             if sys.stdin.isatty() and sys.stdout.isatty():
-                from .tui import Dashboard
-                Dashboard().run()
+                _dashboard()
             else: app(args=["--help"])
         else: app()
     except c.PrerequisiteError as exc:  # its own exit status (see doctor --help)
         typer.secho(f"Error: {exc}",fg=typer.colors.RED,err=True)
         raise SystemExit(exc.exit_code)
-    except c.SandboxError as exc:
+    except (c.SandboxError, installation_locks.Error) as exc:
         typer.secho(f"Error: {exc}",fg=typer.colors.RED,err=True)
         raise SystemExit(2)
     except OSError as exc:  # e.g. permission denied in a target: a message, not a traceback

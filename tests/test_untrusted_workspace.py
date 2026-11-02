@@ -1,5 +1,6 @@
 """The workspace (including .git) is agent-controlled."""
 import os
+import shlex
 import subprocess
 import tarfile
 import time
@@ -52,10 +53,28 @@ def test_agent_git_config_is_never_read_on_host(git_env, entry, key, value):
     marker = tmp / "PWNED"
     (w / ".gitattributes").write_text("* filter=evil diff=evil\n")
     (w / "a.txt").write_text("changed\n")
+    if key == "include.path":
+        # An absent include file is inert even with unsafe host Git; use a real executable canary.
+        sh_git(w, "config", "--file", str(tmp / "inc"), "core.fsmonitor", f"touch {shlex.quote(str(marker))}; false")
     sh_git(w, "config", key, value.format(marker=marker, home=tmp))
     result = ENTRY_POINTS[entry](m, tmp)
-    assert "a.txt" in result if isinstance(result, str) else True
+    if entry == "git_changes":
+        assert " M a.txt" in result and "a.txt | 2 +-" in result
+    elif entry == "change_summary":
+        assert "a.txt" in result["status"] and "a.txt" in result["diffstat"]
+        assert result["base"] == result["head"] == m["base_commit"]
+    else:
+        if entry == "export":
+            with tarfile.open(result) as archive:
+                patch = archive.extractfile("changes.patch").read()
+        else:
+            with zipfile.ZipFile(result) as archive:
+                patch = archive.read("changes.patch")
+        assert b"+changed\n" in patch
     assert not marker.exists()
+    if key == "include.path":
+        sh_git(w, "status", "--short")
+        assert marker.exists(), "control: ordinary Git must execute the test-owned included configuration"
 
 
 def test_safe_config_keys_still_work(git_env):

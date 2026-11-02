@@ -1,205 +1,216 @@
-# Baseline — OpenCode Sandbox 6.1.0
+# Baseline — OpenCode Sandbox 6.2.0 candidate
 
-The current state of the project: version, supported environments, how to test, the latest
-verification, known issues and what is not verified. Update it whenever one of these changes
-(`AGENTS.md`, D-045).
+Current checkout state and applicable recorded evidence, not a development diary. Commands and
+test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
+[ARCHITECTURE](ARCHITECTURE.md). Release gates: [CAMPAIGN](CAMPAIGN.md) and [RELEASING](RELEASING.md).
+The current checkpoint below records fresh verification; older sections retain their stated scope.
 
 ## Version
 
-| Item | Value |
+| Item | Current state |
 |---|---|
-| Manager version | `6.1.0` (single source: `src/opencode_sandbox/__init__.py`), Beta (D-055); 6.0.0 was the initial public version |
-| Distribution | `opencode-sandbox`, installed with pipx from the GitHub repository at a version tag (D-042, D-044); MIT (`LICENSE`), owner CyberFazaN (D-036) |
-| Branch | `main`; topic branches are merged with merge commits; releases are annotated tags `vX.Y.Z` (`RELEASING.md`) |
-| Schemas | environment metadata 2, backup 3; other schema versions are not migrated (D-002) |
+| Manager | `6.2.0` candidate, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
+| Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
+| Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
+| Images | Debian 13/default (`node:24-trixie`, revision 2); Arch rolling (`archlinux:base-devel`, revision 1) |
+
+The candidate includes component Updates views, optional default-off daily discovery,
+environment/base actions and independent manager update/recovery. These are implemented, not a
+pending roadmap. Schemas and image definitions have not changed. Availability,
+consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
+The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
+declined a reboot. Acceptance is not verification; final candidate release gates still apply.
 
 ## Supported environments
 
-- Host: Linux with the prerequisites of D-046; real evidence on Arch Linux only (kernel 7.2.11
-  at the 6.1.0 release; hosted CI adds the fake-Docker unit suite and a pipx installation on
-  Ubuntu 26.04). Python >= 3.11 (tested
-  3.11.18 and 3.14.8; 3.12/3.13 accepted, not tested separately; the 6.1.0 hosted CI used 3.11.17
-  and 3.14.9);
-  Git (tested 2.56.0); the user's own rootless Docker daemon (tested 29.9.2,
-  rootlesskit, slirp4netns, overlayfs, containerd image store; cgroup v2 with `cpu memory pids`
-  delegated by systemd 262).
-  Rootful, other users' and remote daemons and socket proxies are refused by design.
-- Python dependencies: Typer (tested 0.27.3), Textual (tested 8.2.8). Installation: pipx (tested
-  1.18.7). Tests: pytest; real terminal tests: pyte 0.8.2; quality gates: ruff 0.17.3, shellcheck
-  0.11.0 (`shellcheck-py`).
-- Sandbox definitions: Debian 13 (`node:24-trixie`, default, revision 2) and Arch Linux (`archlinux:base-devel`,
-  AUR via `ocs-aur`/paru), each with OpenCode `@opencode/cli` 2.x (tested 2.1.4 and 2.2.0).
-
-## Commands
-
-```sh
-# development venv and unit/host/Textual-pilot tests (fake Docker; no daemon contacted)
-python -m venv .venv && .venv/bin/pip install -e '.[test]'
-.venv/bin/pip install ruff shellcheck-py pyte   # optional: quality gates and real-terminal tests
-.venv/bin/python -m pytest -q                   # includes ruff and shellcheck (skipped if missing)
-.venv/bin/python tests/dashboard_screenshot.py  # regenerate docs/images/dashboard.svg (fake data)
-
-# package (sdist + wheel) and metadata check; packaging validation only, nothing is uploaded (D-042)
-.venv/bin/pip install build twine
-.venv/bin/python -m build --outdir dist . && .venv/bin/twine check --strict dist/*
-
-# real campaign: real rootless Docker, OpenCode, terminals, fault injection (about 10 minutes);
-# only on a disposable machine; needs both base images, network and pyte
-OCS_TEST_DOCKER=1 .venv/bin/python -m pytest -rA tests/integration
-# plus the rows that use sudo -n and restart/SIGKILL the user's daemon (read the docstring first)
-OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 .venv/bin/python -m pytest -rA tests/integration
-# the pipx rows (test_65) need pipx in the venv; OCS_TEST_PIPX_BUILD=1 adds an image build
-# from the installed package (downloads the base image); OCS_TEST_MANAGER=<launcher> runs the
-# campaign against an installed manager, e.g. a pipx installation of a local test tag
-.venv/bin/pip install pipx
-```
-
-The campaign works in `.work/<run-id>/` with `ocs-test-*` names, writes
-`.work/logs/<run-id>.log` (every command and PASS/FAIL check) and a manifest, and ends with the
-product's cleanup behind a guard and a leak check. `OCS_TEST_DISTROS` selects distributions;
-`test_30`/`test_40` expect OpenCode 2.2.0 in the base images; `test_10`/`test_80` use the local
-image `ubuntu:24.04` for the custom-image rows. Variables: `CONTRIBUTING.md`.
-
-Run the unit suites serially, in the foreground, with a short `--basetemp` outside the
-checkout (for example under `/tmp/opencode/`, created by and owned by that run): a temp
-directory under `.work/` is a hidden path inside a Git repository, which the direct-workspace
-and import guards rightly refuse, and deep paths exceed the 108-byte Unix socket limit. Use an
-absolute `PYTHONPATH` so test subprocesses import the checkout. The retained-OS row, the
-test-only image namespace for new base images and the socket-activation opt-in are described
-in `RELEASING.md` ("Verify").
+- Intended host: Linux meeting [the prerequisites](../install.md#requirements); real Docker/OpenCode
+  evidence is on Arch Linux only. Tested kernel 7.2.11, Git 2.56.0, own rootless Docker 29.9.2,
+  RootlessKit 3.3.0/slirp4netns, overlayfs/containerd image store, cgroup v2 with CPU/memory/PIDs
+  delegated by systemd 262. Foreign/rootful/remote daemons and socket proxies are refused.
+- Python >=3.11: local 3.11.18 and 3.14.8; 3.12/3.13 accepted, not tested separately. Stable hosted
+  CI used Ubuntu 26.04, Python 3.11.17/3.14.9, plus an unprivileged rolling Arch userland job.
+- Python 3.15 is stable ([upstream status](https://devguide.python.org/versions/)) and accepted by
+  the declared range, but not qualified here. The explicit CI endpoint remains 3.14 pending
+  current/lowest, installed-package/process verification and review of the required-check transition.
+- Current Typer/Textual 0.27.3/8.2.8; lowest direct versions 0.16.0/4.0.0. Test environment:
+  pytest 9.2.0, pyte 0.8.2, Ruff 0.17.3, shellcheck 0.11.0; pipx 1.18.7.
+- OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
 
 ## Verification
 
-### 6.1.0 release tree — 2026-10-30
+### 6.2.0 candidate qualification
 
-Release branch `release/6.1.0`: version, CHANGELOG, documents and records only; product
-modules other than `__version__`, image assets and schemas are identical to the verified
-candidate below. Everything in this table ran on the release tree itself.
+Local candidate qualification on 2026-11-02, from the approved `develop` tree. Detailed commands,
+input hashes, failed/pass XML, package comparisons and scan reviews are under ignored
+`.work/agents/release-6.2.0/`; real manifests/logs are `.work/logs/r62a*`, `r62b*` and `r62c*`.
 
-| Layer | Result |
+| Layer | Executed result and scope |
 |---|---|
-| Unit, host, Textual pilot, local processes | 969 passed, 56 opt-in skips in each of four serial suites (3.11.18 and 3.14.8, current and lowest direct dependencies); skips per suite: 49 real-campaign, 3 privileged and 4 socket-activation opt-ins, nothing else |
-| Static | Ruff, shellcheck (in the suites), actionlint and offline zizmor clean |
-| Package | sdist and wheel 6.1.0 on both endpoints; `twine check --strict` and `check_dist.py` passed; `release_check.py v6.1.0` accepts the dated CHANGELOG section |
-| pipx (CI-equivalent) | Installation of the branch from a `git+file` URL into isolated pipx directories on 3.11.18 and 3.14.8: `pipx_smoke.sh` passed (version, installed package and assets, `doctor` exit 8 for a missing context); 27 installed files byte-identical to the tree; read-only `doctor` against the real daemon exit 0, identity verified, resource support passed, the retained revision-1 Debian base warned as expected, no data directory written |
-| Repeated in a fresh clone | The four suites (same counts), Ruff/actionlint/offline zizmor, both-endpoint package and release checks, `git+file` pipx on both endpoints with a byte-identical payload and real read-only `doctor` exit 0 |
-| Real Docker, scoped | `test_20_security`, `test_35_prerequisites` and `test_65_pipx` (pipx tag install/upgrade/downgrade/uninstall from a disposable clone) on 3.14.8: 4 tests, 66 checks passed, 0 failed; guarded cleanup, no containers or volumes left, image inventory unchanged |
-| Full real campaign (I04) through an installed pipx manager | `pipx install git+file://…@v6.1.0` of a local test tag (in a disposable clone of the branch) on Python 3.14.8 as `OCS_TEST_MANAGER`; both base images built from the installed package's assets into a test-only `ocs-test-610` namespace (Debian 13 revision 2, Arch revision 1, OpenCode 2.2.0); the published `v6.0.0` installed from GitHub as `OCS_TEST_LEGACY_MANAGER` against the retained Debian 12 base; `OCS_TEST_PRIVILEGED=1`, `OCS_TEST_SOCKET_ACTIVATION=1`, `OCS_TEST_PIPX_BUILD=1`: 56 tests, 513 checks passed, 0 failed, 0 skipped (11 min 2 s). Nothing left with the run's data-directory label, tagged images unchanged, C10 units and runtime tree removed, the user's daemon active after the privileged restarts |
-| Harness setup found by the first I04 attempt | The runner venv lacked pipx (`test_65`) and the volatile `$XDG_RUNTIME_DIR/systemd/user` did not exist after a reboot (C10's fixture refuses to start without it); both provided, then the complete rerun above. No product failure |
-| Base images without the layer cache | The product's `build_image`/`verify_image` with `--no-cache` (not `--pull`, which could move the user's base tag) from the installed package: Debian 13 (52 s) and Arch (213 s) built every `RUN` step against current upstream packages and passed verification |
-| Real model provider | Installed 6.1.0 manager, isolated data: `providers set` at a hidden pty prompt (not echoed; 0600 profile; `providers list` names only), a Debian 13 `ocs-test-610` environment with network bridge, the user model `openrouter/z-ai/glm-5.3-flash`; the managed `run` opened the real OpenCode 2.2.0 TUI and the model answered `BASEOS=Debian 13` from the injected guidance without tools; terminal restored. The key was in no host process argument list, not in the container definition, home volume, workspace, `/tmp`, data directory, configuration (other than the profile) or the backup: 13 checks passed |
-| Pre-tag scans (RELEASING) | `gitleaks git` and `gitleaks dir` clean; `detect-secrets scan --all-files` (1.5.0) reports only the tests' deliberate dummy values; no home path, user or host name, private network address or e-mail address other than `example.invalid`/`example.org` |
-| Release decision (I06) | READY WITH ACCEPTED RISKS: every P0 and P1 row of `CAMPAIGN.md` PASS; the accepted risks are D09's host reboot and the items under "Unverified behaviour" |
-| Hosted CI on GitHub (release pull request, first runs of the revised matrix) | The first run failed one job: the Arch Linux userland container has no Docker CLI, and three configuration-change tests reached the real `docker` binary through the guidance refresh (elsewhere that call failed quietly against the fake endpoint). Fixed in the tests; an autouse fixture now makes any uncaught Docker CLI call behave as without a CLI on every host, so the local suites reproduce that job. Second run, all 10 jobs passed: Ubuntu 26.04 runners, unit suites on 3.11 and 3.14 with current and lowest direct dependencies 969 passed, 56 skipped each; Arch Linux userland (rolling Python, unprivileged user) 968 passed, 57 skipped (also `/run/user` missing in the container); package build and content and pipx installation from the checkout on 3.11.17 and 3.14.9; workflow lint |
-| Publication (2026-10-30) | The `main` ruleset's required checks set to the ten job names of the revised matrix; the release pull request merged with a merge commit (tree identical to the verified release tree); CI on `main` passed; annotated tag `v6.1.0` on the merge commit; the release workflow passed (tag and CHANGELOG check, the CI jobs against the tag, pipx installation of the tag on 3.11 and 3.14) and created the draft, whose notes equal the CHANGELOG section; published as the latest release. pipx from GitHub (`git+https://…@v6.1.0`) in isolated directories on 3.11.18 and 3.14.8: version 6.1.0, 27 installed files byte-identical to the tag, real read-only `doctor` exit 0 |
-| Not run on this tree | A host reboot (D09) |
+| Complete default suite, Python 3.11/lowest direct | **2205 passed / 86 real opt-in skips**, 331.12 s |
+| Complete default suite, Python 3.11/current | **2205 passed / 86 real opt-in skips**, 342.55 s |
+| Complete default suite, Python 3.14/lowest direct | **2205 passed / 86 real opt-in skips**, 352.74 s |
+| Complete default suite, Python 3.14/current | **2205 passed / 86 real opt-in skips**, 358.18 s |
+| Packaging and installed pipx | Both endpoints: isolated sdist/wheel build, strict twine/content checks, fresh private-tag pipx install/help/version/doctor; all **63 product files** match the candidate source |
+| Complete real installed-manager campaign | `r62b`: **86 tests / 1643 checks passed**, 0 failures/errors/skips, 2115.33 s; both distributions, retained Debian 12, packaged/cached/full-refresh builds, real OpenCode/fake-provider first prompts, terminals, native manager replacement/recovery, privileged and isolated socket-activation rows |
+| Python 3.11 installed-manager floor | `r62c`: **7 tests / 563 checks passed**, 0 failures/errors/skips, 337.96 s; actual pipx lifecycle, both-layout native manager update/recovery and both-distribution session exclusion, not a second complete campaign |
+| Static and privacy | Ruff/shellcheck and four dependency checks pass; actionlint/offline zizmor pass with existing exceptions. Gitleaks history/tree: 0 findings; offline detect-secrets: 11 reviewed deliberate test fixtures, no real secret identified; personal-data candidates reviewed |
 
-### 6.1.0 candidate — 2026-10-29–30
+The matrix uses the selected existing endpoint venvs, not a claim of four fresh resolutions.
+Fresh pipx installations resolved Typer 0.27.3/Textual 8.2.8, matching the current matrix. Lowest
+Typer emits two known Click deprecations. The Python 3.14 real harness emits 91 multi-threaded
+`forkpty` deprecation warnings; these were not suppressed or treated as application failures.
 
-Complete verification of the 6.1.0 implementation (D-047..D-054) before the version and
-document changes. Platform: Arch Linux, kernel 7.2.11, Python 3.11.18 and 3.14.8, Git 2.56.0,
-Docker 29.9.2 rootless (RootlessKit 3.3.0, slirp4netns), Typer 0.27.3 and Textual 8.2.8 (lowest
-direct: 0.16.0 and 4.0.0), pyte 0.8.2, pipx 1.18.7, OpenCode 2.2.0 in both base images (2.1.4
-for the update rows).
+Version preparation exposed synthetic fixtures tied to the checkout's 6.1.0 version; they now use
+explicit consistent old/new identities or genuinely newer targets. The initial complete real run
+`r62a` recorded 86 completed bodies but four teardown errors from six failed checks: one negative
+source fixture advertised the wrong tag, and session exclusion checked the runner's prefix rather
+than the separate installed manager. Only fixtures were corrected, with an additional unrelated-
+installation control; the fresh complete `r62b` run passed. No application safeguard was weakened.
+The four default matrices/package checks precede those two integration-only corrections; their
+production/unit inputs are unchanged. Later evidence-only edits receive focused document checks.
 
-| Layer | Result |
+Guarded cleanup and final inventory checks restored the original four image tags/full IDs, with
+no container/volume leaks. Only five manifested test tags and the created empty runtime unit
+directory were removed. Persistent protocol locks and original frozen hard-interruption recovery
+inputs remain. No reboot, real credential or paid-provider call was performed; the earlier real
+OpenRouter observation is retained evidence only, not a new candidate result.
+
+Hosted qualification supplements these local results: all ten jobs passed on the approved
+`develop` tree and on [release PR #3](https://github.com/CyberFazaN/opencode-sandbox/pull/3)
+([candidate CI](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41468038565)).
+The owner authorized the protected merge, annotated tag and publication. CAMPAIGN I06's reviewed
+decision is **READY WITH ACCEPTED RISKS**, retaining B15 as BLOCKED, not PASS. Evidence-only edits
+do not change the qualified product/test bytes. Required final-tree PR, `main` and tag checks and
+automated draft review remain mandatory under RELEASING; this is not a production-readiness claim.
+
+### Test-quality checkpoint before 6.2.0 preparation
+
+At this earlier checkpoint, application source, dependency declarations and image assets were
+unchanged. The test-quality checkpoint strengthens behavioral/security oracles and fixture
+isolation, consolidates duplicate coverage, and keeps the complete CI/release selections.
+Local policy is in CONTRIBUTING; current
+and minimum direct dependencies are resolved together with the project in CI, not a later downgrade.
+Evidence: versions, final four XMLs, timing profile, mutation controls and removal-to-retained-test
+rationale under ignored `.work/agents/`; real resource manifests and logs under `.work/logs/`.
+
+| Layer | Executed result and scope |
 |---|---|
-| Unit, host, Textual pilot, local processes | 969 passed, 56 opt-in skips in each of four serial suites: 3.11 and 3.14, current and lowest direct dependencies; `pip check` clean; only the two known Typer/Click deprecations with the lowest dependencies. Repeated independently on 2026-10-30 with the same result |
-| Static | Ruff, shellcheck, actionlint and offline zizmor clean; existing documented exclusions unchanged |
-| Package | sdist and wheel on both endpoints; `twine check --strict` and `check_dist.py` passed; 27 installed source and asset files byte-identical to the candidate |
-| pipx | Source-free installation from local Git tags on both endpoints; tag upgrade/downgrade, `reinstall --python`, uninstall with data retention and foreign-launcher safety: 1 test/21 checks on each endpoint; the CI smoke script measured exit 8 (missing context) and exit 4 (a private rootful daemon) on both |
-| Base images | Both packaged definitions built under test tags: Debian 13/revision 2 and Arch/revision 1 with OpenCode 2.2.0; OS, tools, tar and package/AUR checks passed. The user's base tags were never replaced |
-| Full real campaign through an installed pipx manager | 56 tests, 513 checks, 0 failed, 0 skipped (10 min 22 s), with the privileged rows and the C10 socket-activation units explicitly authorized, the image build from the installed package and a separately installed pre-change manager for the retained Debian 12 rows |
-| Base version workflows | 13 real checks on both test bases: update, rollback to the exact base ID, old/new/pinned environments preserved, a Debian 12 base copy refused on the Debian 13 definition |
-| Scoped real rows | C10 4 tests/14 checks from source and from an installed wheel (cold activation, warm path, overlapping start, stalled deadline, quit/Ctrl+C, own-user proxy refused); C05 1 test/8 checks reading `cpu.max`, `memory.max` and `pids.max`; H05 6 tests/83 checks (real OpenCode on both images, dashboard SIGKILL, CLI SIGTERM/SIGHUP, terminal restoration) |
-| Secrets and personal data | gitleaks: no leaks in the tree or history; detect-secrets: seven reviewed dummy test values; no personal paths outside fixtures |
-| Cleanup | Every data directory ended with the product's guarded cleanup; no containers, volumes, session clients, private daemons or test units left; original image tags and IDs unchanged. The build cache grew from real builds and was not pruned |
+| Complete default suite, Python 3.11/lowest direct | **2244 passed / 86 real opt-in skips**, 331.78 s |
+| Complete default suite, Python 3.11/current | **2244 passed / 86 real opt-in skips**, 338.79 s |
+| Complete default suite, Python 3.14/lowest direct | **2244 passed / 86 real opt-in skips**, 354.38 s |
+| Complete default suite, Python 3.14/current | **2244 passed / 86 real opt-in skips**, 360.22 s; passive timing instrumentation only |
+| Real Docker/security/backup | **1 test / 20 checks passed**, 14.91 s: real sessions, external-profile isolation and decompressed workspace/home backup canaries on the retained Debian base |
+| Real Docker/diagnostics | **2 tests / 30 checks passed**, 13.08 s: retained Debian and Arch, deadlines, cancellation, missing tooling, owned helper cleanup and persistence |
+| Failure-detection controls | Original restore-space test accepted compressed-size substitution; strengthened test rejects that, ignored reserve and exact-fit rejection (**3/3 targeted in-memory mutants**), not broad mutation coverage |
+| Static/dependencies | Ruff/shellcheck, actionlint, offline zizmor and four `pip check` results clean; existing lint exceptions and all mandatory jobs retained |
 
-Failures found during verification, fixed with regression tests and rerun (never waived):
+Commands used each endpoint venv's `python -B -m pytest -q -rs -p no:cacheprovider`, absolute source
+PYTHONPATH, serial foreground execution, fresh short external basetemps and separate JUnit results.
+Earlier failures exposed the real campaign inheriting unit fakes, path-sensitive socket/launcher
+fixtures and a parked-installer EOF/parent-death race. They were investigated and corrected before
+the final four passes; no retry waiver or relaxed signal/security assertion. Lowest Typer still
+emits the two known Click deprecations. Product cleanup passed, original four full image IDs were
+unchanged, and no current-run Docker resources leaked; persistent protocol lock inodes are retained.
 
-- A catchable signal between fork/exec and `Popen` storing the PID left the session client
-  unowned (4 of 80 concurrent runs); fixed by D-054. The first real rerun then found terminal
-  echo/canonical mode left off after SIGTERM/SIGHUP; the manager now restores its terminal.
-- The campaign's crash row raced systemd's automatic restart and hit the start limit, and
-  failed inventory queries could look like an empty inventory. The harness now waits for the
-  automatic restart, restores the daemon in teardown and refuses failed inventory queries.
-- The first activation run lacked the rootless launcher directory on the test's `PATH`.
+Affected execution time (summed JUnit case phases, not full-suite wall time) fell **23.63 -> 6.79 s**
+for 35 -> 28 cases with retained behavioral coverage. Total collection changed **2328 -> 2330**:
+2242 -> 2244 default cases, the same 86 real cases. The final four suites total about **23.1 min**;
+the normal local checkpoint pair takes **11.5 min**, not a CI/release reduction. Historical full
+timings are not a controlled before/after benchmark. Global fixture setup is not a useful
+optimization target (about 0.24 s combined in the primary profile).
 
-Not verified in this round: hosted execution of the revised CI matrix, a real model provider,
-a host reboot (D09), other host distributions and manual observation.
+Retained unchanged-package evidence: `.work/branch-migration-20261101/` passed both-endpoint
+build/twine/content checks with 63 source-identical product files; `branch-migration-pipx-20261102`
+passed the real installed-pipx lifecycle (1 test/21 checks, 40.92 s). These were not rerun for
+test-only changes. The complete real release campaign, privileged/socket/reboot rows, real OpenCode
+first prompts, fresh image builds and hosted CI were **not** renewed by this checkpoint. Final
+record edits are documentation only, with focused document/contracts verification, not new runtime proof.
 
-### Released 6.0.0 evidence
+### Updates final integration
 
-Release verification of 6.0.0 (2026-10-29) on the tree of the initial public commit; the release
-commit changes only this file, `CAMPAIGN.md` and the CHANGELOG date. The privileged rows ran on
-2026-10-28 on an earlier tree, which differed in the hosted-CI test fixes, the host-scope
-documents (D-046), a comment in `install.sh`, one help text in `setup-rootless.sh` and the text of
-two host hints. Platform: Arch Linux, kernel 7.2.11,
-Python 3.14.8, Git 2.56.0, Docker 29.9.2 rootless (slirp4netns), Typer 0.27.3, Textual 8.2.8,
-pyte 0.8.2, pipx 1.18.7, OpenCode 2.2.0 in both base images (2.1.4 for the update rows).
+Applicable cross-layer evidence for the unreleased implementation: `.work/up18/` (final source
+hashes, all failed/pass XML, reproducers and package proof), `.work/up17g/` (native updater proof)
+and `.work/logs/up18-final*` (commands/manifests). Earlier intermediate checkpoint narratives are
+in Git; they do not describe today's capabilities.
 
-| Layer | Result |
+| Layer | Executed result and scope |
 |---|---|
-| Static | `ruff check src tests .github/scripts` 0 findings; shellcheck on `install.sh`, `setup-rootless.sh`, `pacman-retry`, `install-opencode.sh`, `.github/scripts/pipx_smoke.sh` 0; `actionlint` (with shellcheck on the `run:` scripts) 0; `zizmor --offline` 0, also `--pedantic` (two documented ignores) |
-| Unit, host, Textual pilot | 791 passed, 49 skipped with `pyte` installed, 37 without it (the terminal modules then skip as a whole); every skipped test is a real-campaign test |
-| Real campaign: every module, both distributions, and the pipx rows with the image build from the installed package (`OCS_TEST_PIPX_BUILD=1`) | 44 tests passed, 451 checks passed, 0 failed (9 min 26 s); the 5 privileged tests skipped (not requested for this run); nothing left with the run's data-directory label; tagged images and the network interfaces unchanged; the build cache pruned back to its size before the run |
-| Privileged rows (`OCS_TEST_PRIVILEGED=1`), on the earlier tree described above | the full campaign including them: 49 tests, 495 checks passed, 0 failed (8 min 39 s); the firewall ruleset unchanged |
-| Real campaign through a pipx installation of a local test tag (`OCS_TEST_MANAGER`) | `test_10_lifecycle`, `test_35_prerequisites`, `test_40_opencode` (first prompt and Agent Context, both distributions), `test_50_tui`: 7 tests, 193 checks passed, 0 failed |
-| Hosted CI on GitHub (`ci.yml`, first runs before publication) | Ubuntu 26.04 runner, Python 3.14.9: unit suite with the current and with the lowest direct dependencies 790 passed, 38 skipped each; the Arch Linux job (`archlinux:base-devel` container, unprivileged user, umask 022) 789 passed, 39 skipped; skip reasons listed (`-rs`): real-campaign modules, the root-refusal test where the runner blocks unprivileged user namespaces, and `/run/user` missing in the container; package build and content check; pipx installation from the checkout with `pipx_smoke.sh`: `doctor` exit 8 for a missing context and exit 4 (`mismatch`) for the runner's rootful daemon; actionlint and zizmor 0. The first run found two environment dependencies in tests (Typer's forced colour terminal under `GITHUB_ACTIONS`, the runner's 2 CPUs), fixed in the tests |
-| CI rehearsal (before the first hosted run) | the same jobs run locally in fresh venvs and an `archlinux:base-devel` container; `release_check.py` refuses the undated section and passes a dated one; `build_image.py debian` built and verified the image against the rootless daemon |
-| Package | sdist and wheel built from the public tree, `twine check --strict` and `check_dist.py` passed; pipx installation of the tree from a `git+file` URL: `pipx_smoke.sh` passed, `doctor` verified the daemon and both images |
-| Publication smoke (recorded after the release) | Release workflow passed and created the draft; release published by the owner. pipx from GitHub over `git+https` at `v6.0.0` passed in isolated pipx directories (`--version`, `doctor`, `pipx_smoke.sh`, uninstall). Not repeated during stabilization |
-| Secrets and personal data | gitleaks 8.30.1 (`git` and `dir` modes): no leaks; detect-secrets 1.5.0: 6 findings, all deliberate dummy values in tests; no home paths, user or host names, private addresses (only rootlesskit's documented `10.0.2.2`) or personal e-mail addresses |
-| Real terminal, scripted | dashboard at 80x24 and 120x40, direct-workspace consent dialog at 80x24 |
-| Documents | README rendered at 80 columns and read; commands, options, links and anchors checked by tests |
+| Complete unit/host/pilot compatibility | **2220 passed / 86 opt-in skips** in each selected result; same 2306 ordered outcomes. Python 3.11/current 374.60 s, 3.11/lowest 365.27 s, 3.14/current 387.19 s, final 3.14/lowest 387.76 s; four clean dependency checks |
+| Final correction and reruns | Initial 3.14/lowest: **2216 passed / 4 failed / 86 skipped**. Fixed an interruption-fixture partial PID marker with atomic readiness/owned-family cleanup, and a real base-plan bug by verifying the daemon before latest-version npm discovery. **124 affected tests passed at all four endpoints**; the failed complete combination then passed. Unchanged complete/real results were reused, not relabelled as reruns |
+| Real Docker/OpenCode/terminal/pipx | **31 tests / 1146 checks passed**, no skips/deselections, 1381.67 s, `up18-final`: packaged/retained both-distribution races, bounded diagnostics, real binary/lifecycle evidence, 80x24/larger Updates/discovery/environment/base actions, cached/full-refresh builds, installed pipx and public manager replacement/recovery |
+| Packaging/static | Sdist/wheel, strict twine/content checks passed; all 63 product files, including the 18-module frozen helper inventory, matched source. Ruff/shellcheck, actionlint, offline zizmor and tree/history secret scans passed. Focused final contracts: **83 passed** |
 
-Release matrix: `CAMPAIGN.md` (90 rows): P0 50 PASS, P1 35 PASS, P2 4 PASS and 1 PASS in part
-(D09: host reboot BLOCKED, accepted); no FAIL, no NOT TESTED. Run logs stay on the test machine
-(`.work/logs/`) and are not part of the repository. The campaign prints `DeprecationWarning`s of
-Python's `pty.forkpty()` (the test process has threads when it opens a terminal); no effect was
-observed.
+The real file set under `tests/integration/` was `test_42_base_coordination.py`,
+`test_43_diagnostics.py`, `test_44_version_evidence.py`, `test_51_updates.py`,
+`test_52_discovery.py`, `test_53_environment_updates.py`, `test_54_base_updates.py`,
+`test_65_pipx.py`, `test_66_manager_inventory.py`, `test_67_installation_exclusion.py`,
+`test_67_manager_update.py`, with `OCS_TEST_DOCKER=1 OCS_TEST_RUN=up18-final`.
 
-## Known issues
+Native manager evidence covers actual pipx force replacement in default/custom-space layouts,
+Cancel-first public CLI/TUI, real terminal restoration and process-lifetime drain, exact expected
+installed source/commit/version/launcher/runtime/CLI health, failed-health startup blocking,
+manual previous-tag reinstall plus independent frozen recovery, handled interruption/escaped-child
+cleanup, hard-kill same-boot refusal even with an empty old group, and lost-terminal durable results.
+Private Git/loopback API transports are explicit fixtures, **not public-release authentication**
+or a host build sandbox. Separate official HTTPS reads observed the published 6.1.0 graph; that
+is not signed-code attestation or an actual public-network replacement test.
 
-Known issues and limitations accepted by design: `ISSUES.md`. Small open items, including two
-test-isolation limitations of the host-process signal tests: `TODO.md` ("Optional Polish").
+Guarded product cleanup passed; original image IDs were retained and no current-run containers,
+volumes or owned processes leaked. Frozen recovery inputs, including the incomplete hard-kill
+case, and persistent lock inodes remain. This was not the complete release campaign; no privileged,
+socket-activation, reboot, paid-provider or manual-observation result was renewed.
+
+### 6.1.0 release tree
+
+Evidence on the release tree, 2026-10-30; relevant to retained behaviour only:
+
+- **969 passed / 56 opt-in skips** in each of four Python/dependency suites; repeated in a fresh
+  clone. Static/workflow checks, both-endpoint packaging and source-free pipx smoke passed.
+- Full real campaign through an installed local test tag: **56 tests / 513 checks**, no failures
+  or skips, 11 min 2 s. Both packaged images built into a test-only namespace; published 6.0.0
+  supplied retained-Debian-12 compatibility. Privileged, socket-activation and installed-package
+  build opt-ins were explicitly authorized. Both no-cache image builds also passed.
+- One real OpenRouter `z-ai/glm-5.3-flash` session (Debian 13/OpenCode 2.2.0) received the base OS
+  in its first prompt; 13 credential/terminal checks passed. Automated first-prompt tests use a
+  fake provider on both images. Real credentials are not retained in evidence.
+- Hosted release PR/main/tag CI passed all ten jobs, including the endpoint matrices, Arch
+  userland, packaging, pipx and workflow lint. Public-tag pipx smoke passed on both local Python
+  endpoints. The initial Arch CI isolation failure was fixed in tests before those passing runs.
+- Pre-tag secret/personal-data scans passed with only deliberate dummy test values; cleanup left
+  original image tags intact and no owned test resources. The host reboot was not executed.
+
+The release decision accepted D09's reboot limitation. It does **not** accept B15's new manager
+recovery risk or verify the later Updates implementation. Detailed release evidence is retained
+in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level scope and limits.
 
 ## Unverified behaviour
 
-- Real model providers other than OpenRouter with `z-ai/glm-5.3-flash` (OpenCode 2.2.0,
-  Debian 13, verified at the 6.1.0 release tree), and a real provider on the Arch image; the
-  automated first-prompt rows use a fake OpenAI-compatible provider inside the container.
-- A host reboot (daemon restart, stop/start and a SIGKILL of the daemon unit were tested). Next
-  step: reboot, then `opencode-sandbox start NAME` and `check NAME` on a test environment.
-- Another user's real rootless dockerd (another user's socket and a real rootful dockerd were
-  refused).
-- pipx versions other than 1.18.7; Python 3.12/3.13 separately; interpreters below 3.11
-  (outside the declared range).
-- The scheduled image build on GitHub (`images.yml`).
-- Other distributions' packaged socket units and activation variants (an isolated user
-  listener with a separate rootless daemon was verified on Arch, also through pipx). Another
-  user's actual rootless dockerd is represented by another user's socket, not provisioned.
-- Typer 0.16.0 with Click 8.5 warns that Click 9 removes helpers it imports: the lower bound may
-  have to rise when Click 9 is released (the lowest-dependencies CI job shows it).
-- Real rootless Docker on hosts other than Arch Linux (D-046), a host without systemd, and a host
-  without delegated cgroup controllers; Textual 4.0 (the declared lower bound) in
-  a real terminal (its unit and pilot tests pass);
-  terminal emulators other than pyte; a kill inside `docker commit` itself; Dockerfile linting;
-  performance beyond the recorded baseline (CAMPAIGN I03, no targets).
+- **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
+  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized. Same-boot hard-interruption
+  refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
+  On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
+  original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
+  verifier and confirm startup/data retention. Never delete state/locks or infer success from an
+  empty old group, cache or installer exit.
+- **Host reboot generally (D09):** accepted at the stable release, not executed. Daemon restart,
+  stop/start and daemon-unit SIGKILL passed. Next: authorized reboot, then `start NAME` and
+  `check NAME` on a manifested test environment; do not equate this with B15's separate proof.
+- Real rootless Docker on other Linux distributions, without systemd or without delegated
+  controllers; other distributions' packaged socket-activation units. Provision a disposable host
+  and run the affected/full campaign before claiming it tested.
+- Another user's actual rootless dockerd: refusal was shown with another UID's socket, not a
+  provisioned foreign rootless engine. Test only with separately authorized resources.
+- pipx versions other than 1.18.7, Python 3.12/3.13/3.15 separately, Textual 4.0 in a real terminal,
+  other terminal emulators, other real model providers and a real provider on Arch. Execute the
+  corresponding installed/terminal/provider checks; mocks/pilots are not a substitute.
+- Real public-network manager replacement, human observation, a kill inside `docker commit`,
+  and scheduled GitHub image-build execution.
+  Each needs fresh evidence; no passed development subset closes these gaps.
+- Typer 0.16.0/Click 8.5 emits deprecations for helpers removed in Click 9. Keep the lowest-bound
+  CI check; re-evaluate bounds when that version resolves, not by suppressing warnings/assertions.
+- Performance beyond small recorded workspaces has no targets. Current complete suites were
+  about 360–388 s; the older 1201-test timing is not a current benchmark.
 
-## Documentation entry points
-
-| Document | Role |
-|---|---|
-| `README.md` | Overview: status and AI disclosure, fit, features, security summary, tested environment, install, quick start, external services |
-| `docs/README.md` | Index of the user guides (`install.md` … `troubleshooting.md`); `docs/images/dashboard.svg` is generated by `tests/dashboard_screenshot.py` |
-| `CHANGELOG.md` | Changes per release |
-| `CONTRIBUTING.md`, `SECURITY.md` | Contribution rules and test layers; vulnerability reporting and scope |
-| `AGENTS.md` | Instructions and permission boundaries for coding agents |
-| `TODO.md` | Roadmap: what 6.1.0 delivered, optional polish and deferred features |
-| `docs/engineering/BASELINE.md` | This file: current state |
-| `docs/engineering/ARCHITECTURE.md` | Current design and module map |
-| `docs/engineering/DECISIONS.md` | Decisions D-001..D-055 with rationale |
-| `docs/engineering/ISSUES.md` | Known issues and accepted limitations |
-| `docs/engineering/CAMPAIGN.md` | Release test matrix: 84 active rows, seven installer-only rows retired; historical evidence distinguished from the release tree's pending gates |
-| `docs/engineering/RELEASING.md` | Release checklist and tag procedure |
+Known limitations: [ISSUES](ISSUES.md); classified work: [TODO](../../TODO.md). No historical PASS,
+focused result or mocked Docker run establishes release readiness on a changed candidate.

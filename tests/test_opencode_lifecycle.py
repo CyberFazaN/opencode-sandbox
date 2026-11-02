@@ -1,6 +1,7 @@
 """D-019: OpenCode lifecycle — journalled per-environment update with checkpoint rollback,
 explicit rollback, pins at container creation, self-update disabled, base rollback (mocked Docker;
 real runs in tests/integration)."""
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -23,6 +24,7 @@ class FakeDocker:
         self.calls, self.exists, self.running = [], True, False
         self.version, self.install, self.base_label = version, install, base_label
         self.images = {"opencode-sandbox:debian"}
+        self.cid, self.iid = "a" * 64, "sha256:" + "b" * 64
         monkeypatch.setattr(c, "ensure_runtime", lambda distro=None: None)
         monkeypatch.setattr(c, "ensure_volume", lambda m: None)
         monkeypatch.setattr(c, "assert_volume_owned", lambda m: None)
@@ -36,6 +38,10 @@ class FakeDocker:
 
     def __call__(self, *args, capture=False, check=True):
         self.calls.append(args)
+        if args[:2] == ("container", "inspect") and "{{.Id}}" in args[3]:
+            return self.ok(self.cid + "|" + self.iid + "|" + args[-1].removeprefix("ocs-"))
+        if args[:1] == ("exec",) and args[2:4] == ("timeout", "--signal=KILL"):
+            args = (*args[:2], *args[5:])
         op = args[0]
         if op == "commit":
             self.images.add(args[2])
@@ -116,7 +122,7 @@ def test_update_repairs_a_broken_installation(monkeypatch):
     real = fake.__call__
 
     def broken(*args, capture=False, check=True):
-        if args[0] == "exec" and args[2:4] == ("opencode", "--version") and fake.version == "2.1.4":
+        if args[0] == "exec" and args[-2:] == ("opencode", "--version") and fake.version == "2.1.4":
             fake.calls.append(args)
             raise c.SandboxError("Command failed (255): docker exec")
         return real(*args, capture=capture, check=check)
@@ -131,7 +137,9 @@ def test_versions_report_a_broken_installation(monkeypatch):
     fake = FakeDocker(monkeypatch)
     fake.running = True
     m = env()
-    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="postinstall not run"))
+    real = fake.__call__
+    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="postinstall not run")
+                        if a[0] == "exec" else real(*a, **k))
     (item,) = [i for i in v.versions() if i["id"] == m["id"]]
     assert item["version"] is None and "`opencode --version` failed in the container" in v.environment_line(item)
 
@@ -263,10 +271,10 @@ def test_environment_lines():
     assert v.environment_line({**run, "policy": notify, "version": "2.1.4"}, "2.2.0") == "2.1.4; update available: 2.1.4 -> 2.2.0"
     assert v.environment_line({**run, "policy": notify, "version": "2.2.0"}, "2.2.0") == "2.2.0; current"
     assert v.environment_line({**run, "policy": notify, "version": "2.1.4"}) == "2.1.4; notify"
-    assert v.environment_line({**run, "policy": manual, "version": "2.1.4"}, "2.2.0") == "2.1.4; manual"
-    assert v.environment_line({**run, "policy": pin, "version": "2.1.4"}, "2.2.0") == "2.1.4; pinned"
+    assert v.environment_line({**run, "policy": manual, "version": "2.1.4"}, "2.2.0") == "2.1.4; manual; update available: 2.1.4 -> 2.2.0"
+    assert v.environment_line({**run, "policy": pin, "version": "2.1.4"}, "2.2.0") == "2.1.4; pinned; update available: 2.1.4 -> 2.2.0"
     assert "but runs 2.2.0 (changed outside the manager)" in v.environment_line({**run, "policy": pin, "version": "2.2.0"})
-    assert v.environment_line({"state": "stopped", "policy": notify, "version": None}) == "notify; not checked (stopped)"
+    assert v.environment_line({"state": "stopped", "policy": notify, "version": None}) == "notify; not checked (stopped); Unknown"
     assert v.environment_line({"state": "error: x", "policy": None, "version": None}) == "error: x"
 
 
@@ -286,33 +294,41 @@ def test_cli_versions_check_and_status(monkeypatch):
     assert "Last OpenCode update: updated 2.1.4 -> 2.2.0" in result.output and "rollback point ocs-checkpoint:" in result.output
 
 
-def test_rollback_base_swaps_with_the_newest_verified_copy(monkeypatch):
+def test_rollback_base_swaps_with_its_only_distinct_verified_copy(monkeypatch):
     calls, verified = [], []
-    tags = {"opencode-sandbox:debian-previous-aaaaaaaaaaaa": "2026-10-01T00:00:00Z",
-            "opencode-sandbox:debian-previous-bbbbbbbbbbbb": "2026-10-20T00:00:00Z",
+    tags = {"opencode-sandbox:debian-previous-bbbbbbbbbbbb": "2026-10-20T00:00:00Z",
             "opencode-sandbox:arch-previous-cccccccccccc": "2026-10-25T00:00:00Z"}
 
     def docker(*a, capture=False, check=True):
         calls.append(a)
         if a[:2] == ("image", "ls"):
             return SimpleNamespace(returncode=0, stdout="opencode-sandbox:debian\n" + "\n".join(tags), stderr="")
-        if a[:2] == ("image", "inspect") and a[3] == "{{.Created}}":
+        if a[:2] == ("image", "inspect") and "--format" in a and a[3] == "{{.Created}}":
             return SimpleNamespace(returncode=0, stdout=tags[a[4]], stderr="")
-        if a[:2] == ("image", "inspect") and "opencode-version" in a[3]:
+        if a[:2] == ("image", "inspect") and "--format" in a and "opencode-version" in a[3]:
             return SimpleNamespace(returncode=0, stdout="2.1.4\n", stderr="")
         if a[:2] == ("image", "inspect"):
-            return SimpleNamespace(returncode=0, stdout="sha256:current\n", stderr="")
+            if "previous" in a[-1] and a[-1] not in tags:
+                return SimpleNamespace(returncode=1, stdout="[]", stderr="No such image: " + a[-1])
+            iid = "sha256:" + ("b" if "previous" in a[-1] or a[-1] == "sha256:" + "b" * 64 else "a") * 64
+            return SimpleNamespace(returncode=0, stdout=json.dumps([{"Id": iid, "Config": {"Labels": {
+                **c.distros.get("debian").image_labels(), "org.opencode-sandbox.managed": "true", v.VERSION_LABEL: "2.1.4"}}}]), stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "ensure_runtime", lambda distro=None: None)
     monkeypatch.setattr(c, "docker", docker)
     monkeypatch.setattr(c, "verify_image", lambda d, tag, version: verified.append((d.id, tag, version)))
     result = v.rollback_base("debian")
-    newest = "opencode-sandbox:debian-previous-bbbbbbbbbbbb"
-    assert verified == [("debian", newest, "2.1.4")] and result["version"] == "2.1.4"
+    previous = "opencode-sandbox:debian-previous-bbbbbbbbbbbb"
+    assert verified == [("debian", "sha256:" + "b" * 64, "2.1.4")] and result["version"] == "2.1.4"
     tag_calls = [a for a in calls if a[0] == "tag"]
-    assert tag_calls == [("tag", "sha256:current", result["previous_image"]), ("tag", newest, "opencode-sandbox:debian")]
-    assert calls[-1] == ("image", "rm", newest)
-    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=0, stdout="opencode-sandbox:debian\n", stderr=""))
+    assert tag_calls == [("tag", "sha256:" + "a" * 64, result["previous_image"]),
+                         ("tag", "sha256:" + "b" * 64, "opencode-sandbox:debian")]
+    assert calls[-1] == ("image", "rm", previous)
+    def without_copies(*a, **k):
+        if a[:2] == ("image", "ls"):
+            return SimpleNamespace(returncode=0, stdout="opencode-sandbox:debian\n", stderr="")
+        return docker(*a, **k)
+    monkeypatch.setattr(c, "docker", without_copies)
     with pytest.raises(c.SandboxError, match="No rollback copy"):
         v.rollback_base("debian")
 

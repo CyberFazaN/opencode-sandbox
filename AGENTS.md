@@ -1,8 +1,7 @@
 # Instructions for coding agents
 
-These instructions are for AI coding agents (and the humans who direct them) working on this
-repository. Human contributors: [CONTRIBUTING.md](CONTRIBUTING.md) has the same rules in short
-form.
+Start here for the product contract and agent permissions. [CONTRIBUTING.md](CONTRIBUTING.md)
+is the authority for task execution, verification and contributor Git conventions (D-059).
 
 **Local instructions.** If a file `AGENTS.local.md` exists in the repository root (it is ignored by
 Git and never published), read it after this file. A maintainer uses it to describe their machine,
@@ -18,13 +17,9 @@ verified, never assumed). Hosts: Linux distributions that meet the prerequisites
 Linux is the development and real-test host. Base images come from a distribution
 registry (`src/opencode_sandbox/distros.py`): Debian 13 (`node:24-trixie`, default) and Arch
 Linux (`archlinux:base-devel`, AUR via `ocs-aur`); OpenCode is the npm package `@opencode/cli`
-(2.x only). It supports scratch, project and quick environments; managed workspaces (empty or a
-copy) and, not recommended, direct host workspaces; provider credential profiles; Git change
-review and transfer; backup and restore; snapshots, recreation and recovery; resource, network
-and port settings through one change plan; OpenCode version policies, updates and rollback;
-one-time initial integrations (Context7 by default); readiness checks; disk usage and safe
-cleanup; and injected sandbox guidance (Agent Context). Preserve user data and never silently
-expand host access.
+(2.x only). Preserve user files, persistent environments and configuration; never silently expand
+host access. Feature/module details are in [ARCHITECTURE.md](docs/engineering/ARCHITECTURE.md),
+not an instruction to inspect or retest every subsystem for every task.
 
 Scope guard: not a general container manager; no repository or package-repository management;
 after the first start the environment's OpenCode configuration (plugins, MCP servers, settings)
@@ -36,41 +31,48 @@ Versions are separate and each has one source of truth: manager
 schemas. Data of other schema versions is not migrated, and the manager never modifies or deletes
 it.
 
-## Records
+## Orientation and execution
 
-`docs/engineering/` holds the current-state maintainer records (D-045): `BASELINE.md` (state, test
-commands, latest verification, unverified behaviour), `ARCHITECTURE.md`, `DECISIONS.md` (D-0xx;
-changing an accepted decision needs a new entry that supersedes it), `ISSUES.md` (known issues
-and accepted limitations; new issues are GitHub issues), `CAMPAIGN.md` (the release test matrix)
-and `RELEASING.md`. Keep them true when the code changes. The roadmap and classified backlog is
-`TODO.md`; working records of a running multi-cycle effort live in a subdirectory of
-`docs/engineering/` and leave the tree when it ends (D-045). Deferred ideas are not
-implementation permission. User documentation: `README.md` and `docs/`.
+- Read this entry point, applicable local/nested instructions and the relevant parts of
+  CONTRIBUTING once per session; consult implementation and reference sections as needed.
+  Do not reload the entire engineering record set for each subtask. Check Docker state only
+  when the task touches it or must reconcile outstanding test resources.
+- Complete small tasks in one continuous cycle; group related work and verify by risk, not by
+  roadmap ID or commit count. No automatic STOP after a subtask. Follow the
+  [execution and resumption policy](CONTRIBUTING.md#task-execution); explicit STOP instructions
+  in the user's assignment still apply.
+- Before edits or commits, verify branch and worktree status. Ordinary work belongs on `develop`
+  or a topic branch based on it; `main` is published stable source/docs. Preserve unfamiliar work;
+  never silently switch branches over changes at risk or discard them. Do not reset, revert or
+  delete user work without authorization and scope verification. Hotfix/release integration
+  follows [the branch workflow](CONTRIBUTING.md#branch-workflow).
+- No rewriting published history, force-push, push, tag, release, upload or remote repository
+  change without explicit human permission for that operation. Branch policy is not permission.
+- `TODO.md` is the backlog, not implementation authorization. Architecture, decisions, known
+  issues and evidence are references under `docs/engineering/`, not a mandatory reading/update
+  checklist. [Record ownership](CONTRIBUTING.md#documentation-and-handoffs) explains when to
+  update them; historical checkpoint/STOP notes are not current instructions.
+- Keep temporary plans, investigations, handoffs and verification notes in ignored
+  `.work/agents/<task>/`, never tracked Markdown. Keep permanent instructions concise and durable;
+  follow [documentation hygiene](CONTRIBUTING.md#documentation-and-handoffs), not per-task reporting.
 
-## Working discipline
+## Test-resource safety
 
-1. Read the implementation rather than trusting documentation; establish expected behaviour from
-   code, `--help` and this contract, and flag conflicts.
-2. For every defect: minimal reproducer -> root cause -> narrowly scoped patch -> regression test
-   -> rerun. Prefer simple maintainable solutions; avoid speculative rewrites and feature creep.
-3. Work on a topic branch with focused commits; never rewrite published history, force-push,
-   push, tag, publish releases or change remote repositories without the human's permission.
-4. Run operations in increasing risk order: static and unit tests -> isolated data and
-   configuration directories -> disposable rootless containers and volumes -> destructive fault
-   injection on named test resources -> dashboard and end-to-end OpenCode.
-5. Test resources: names `ocs-test-*`, the label `org.opencode-sandbox.test=<run-id>` where the
-   product allows it, isolated `OPENCODE_SANDBOX_HOME`/`OPENCODE_SANDBOX_CONFIG` under
-   `.work/<run-id>/`, and a manifest of everything created. Never delete anything that is not on
-   the manifest; finish with the product's own cleanup in the isolated data directory behind a
-   guard, and verify that nothing leaked. The real campaign in `tests/integration/` does this.
-6. Large logs, venvs and temporary artifacts go to the ignored `.work/`. Never store secrets;
-   redact tokens, credentials and personal paths in reports.
-7. Never report unexecuted tests as passed. Report layers separately: unit (mocked Docker), host
-   (real files and Git), real Docker, real OpenCode, Textual pilot, real terminal (pty), manual
-   observation.
-8. Active documents and messages are English (`tests/test_language.py`); every command and option
-   named in the product, README or `docs/` must exist (`tests/test_cli_structure.py`); links and
-   anchors in the documents resolve (`tests/test_user_docs.py`).
+Select checks under [the verification policy](CONTRIBUTING.md#verification-policy). When real
+operations are needed, escalate from static/focused tests to isolated host checks, disposable
+rootless resources, then authorized fault injection/end-to-end checks; this is a safety order,
+not a requirement to run every layer for every task.
+
+- Test resources: names `ocs-test-*`, label `org.opencode-sandbox.test=<run-id>` where supported,
+  isolated `OPENCODE_SANDBOX_HOME`/`OPENCODE_SANDBOX_CONFIG` under `.work/<run-id>/`, and a manifest
+  of created resources. Never delete anything outside that manifest. Finish with guarded product
+  cleanup in the isolated data directory and verify no leaks. `tests/integration/` does this.
+- Large logs, venvs and artifacts go in ignored `.work/` (short owned pytest basetemps may use
+  `/tmp/opencode/`; see CONTRIBUTING). Never store or commit secrets; redact tokens, credentials
+  and personal paths in reports. Reuse tooling, not mutable test state.
+- Investigate failures; never bypass assertions or replace real integration proof with mocks for
+  speed. Report executed layers, skips, failures and unavailable verification honestly; a focused
+  PASS is not full regression or release readiness.
 
 ## Permissions
 
@@ -95,33 +97,10 @@ build AUR packages in `/workspace`; open inbound (LAN) ports; chown, chmod or de
 workspace; copy real credentials into logs; delete user projects; weaken security checks to make
 tests pass; silently skip or suppress failing tests.
 
-## Technical risks to validate
-
-- pipx installation from a tag, upgrade/downgrade by tag, uninstall and data retention
-  (`tests/integration/test_65_pipx.py`); foreign-launcher safety; prerequisite diagnostics without
-  host changes. Legacy installers are retired (D-048), not replaced by a setup wizard.
-- Daemon identity (`runtime_identity.py`: own UID, `dockerd` peer, user namespace, `rootless`
-  option; proxies, rootful, other users' and remote daemons refused), container ownership and
-  data-directory labels, collision safety, no privileged host access, network `bridge` versus
-  `none` and the measured reachability claims.
-- Data boundaries: managed and direct workspaces, the persistent home volume, the container's
-  system layer, `docker commit` limitations; recreation, settings changes and crash recovery
-  through journals.
-- Provider JSON permissions, rejection of executable `.env` profiles, key injection and shell
-  safety, secret leakage to process listings, logs, metadata and backups.
-- OpenCode installation in both images, latest-version lookup without host npm, per-environment
-  update and rollback, pinned policy, base rollback copies, disabled self-update, and real
-  first-prompt Agent Context delivery; respect existing OpenCode configuration.
-- Initial integrations applied exactly once; readiness checks read-only; cleanup never touches
-  objects of another data directory, base images or the build cache.
-- Git change export, bundles, staging and apply: symlinks, file names, uncommitted files,
-  permissions, conflicts; backup archive traversal and symlink checks and restore transaction
-  safety.
-- Dashboard keyboard navigation, focus, modals, confirmations, asynchronous operations, errors,
-  80x24 and larger terminals, and returning from interactive OpenCode and shells (sessions hung
-  up, also when the manager is killed).
-
 ## Release rule
+
+For explicit release requests such as "Review develop and prepare a new release if warranted", use
+the [release prompt](.github/prompts/release.md); this reference alone does not initiate a release.
 
 A release is recommended only when every P0 and P1 row of `docs/engineering/CAMPAIGN.md` is
 PASS with real evidence or explicitly BLOCKED with accepted risk and a reproducible next step

@@ -57,6 +57,7 @@ class Item:
     tags: tuple = ()          # images: every tag of the image
     scope: str | None = None  # DEFAULT or EXTRA when cleanup may remove it
     lock: tuple = ()          # lock keys held (non-blocking) while it is re-checked and removed
+    base_distro: str | None = None  # daemon-wide build then publication guards, after data locks
 
     @property
     def key(self):
@@ -344,14 +345,18 @@ def _classify_image(item, tag, labels, ids, envs, data_id, referenced, base, pre
         return
     if tag is not None and (p := previous.fullmatch(tag)):
         item.kind = "base rollback copy"
+        if not _base_owner(item, labels, p.group("distro")):
+            return
         if tag in referenced:
             item.status, item.detail = IN_USE, note + "an environment uses it"
         else:
-            item.status, item.detail, item.scope = SUPERSEDED, note + f"rollback-base --distro {p.group('distro')} uses the newest", EXTRA
+            item.status, item.detail, item.scope = SUPERSEDED, note + f"rollback-base --distro {p.group('distro')} --list shows selectable copies", EXTRA
         return
     if tag is not None and (p := candidate.fullmatch(tag)):
+        if not _base_owner(item, labels, p.group("distro")):
+            return
         item.kind, item.status, item.scope = "base build candidate", LEFTOVER, DEFAULT
-        item.detail, item.lock = note + "left by an interrupted build", (f"base-image-{p.group('distro')}",)
+        item.detail = note + "left by an interrupted build"
         return
     match = ENV_IMAGE.fullmatch(tag) if tag else None
     if tag in referenced:  # whatever its labels (e.g. a system image restored from another installation)
@@ -370,6 +375,8 @@ def _classify_image(item, tag, labels, ids, envs, data_id, referenced, base, pre
         if labels.get(c.DATA_LABEL):
             item.status, item.detail = NOT_MANAGED, note + "untagged, no owner label"
         else:
+            if not _base_owner(item, labels, labels.get(distros.LABEL + "distro")):
+                return
             item.kind, item.status, item.scope = "untagged base image", SUPERSEDED, EXTRA
             item.detail = note + "replaced base image (Docker refuses while a container uses it)"
         return
@@ -394,6 +401,15 @@ def _classify_image(item, tag, labels, ids, envs, data_id, referenced, base, pre
     else:
         item.status, item.detail = KEPT, note + ("snapshot of an existing environment (never removed by disk cleanup)" if kind
                                                   else "earlier layer of an existing environment's image")
+
+
+def _base_owner(item, labels, distro):
+    if not isinstance(distro, str) or distro not in distros.REGISTRY or distros.image_definition(distro, labels) is None \
+            or labels.get(c.DATA_LABEL) or labels.get(ID):
+        item.status, item.scope, item.detail = NOT_MANAGED, None, "no verifiable managed base distribution labels"
+        return False
+    item.base_distro = distro
+    return True
 
 
 def _host(inv, ids, envs):
@@ -459,6 +475,17 @@ def _recheck(item):
         if p.parent != c.BASE / "backups" or not BACKUP_TEMP.fullmatch(p.name) or p.is_symlink() or not p.is_dir():
             return "no longer an unfinished backup directory"
         return None
+    if item.base_distro:
+        try:
+            info = c.inspect_base_image(distros.get(item.base_distro), item.ref)
+        except c.SandboxError as exc:
+            return str(exc)
+        if info["Id"] != item.image_id:
+            return "image identity changed since inventory"
+        if not item.tags and info.get("RepoTags"):
+            return "image is no longer untagged"
+        if item.ref in referenced_images(c.all_envs()):
+            return "now referenced by an environment"
     if item.owner and item.lock == (item.owner,):
         try:
             m = c.resolve(item.owner)
@@ -477,8 +504,13 @@ def _remove(item):
         try:
             for key in item.lock:
                 stack.enter_context(c.lock(key, timeout=0))
-        except c.SandboxError:
-            return "busy (an operation holds its lock); run cleanup again later"
+            if item.base_distro:
+                stack.enter_context(c.base_lock(item.base_distro, "build", timeout=0))
+                stack.enter_context(c.base_lock(item.base_distro, "publication", timeout=0))
+        except c.SandboxError as exc:
+            if "busy:" in str(exc):
+                return "busy (an operation holds its lock); run cleanup again later"
+            return f"cannot acquire cleanup guards: {exc}"
         reason = _recheck(item)
         if reason:
             return "skipped: " + reason

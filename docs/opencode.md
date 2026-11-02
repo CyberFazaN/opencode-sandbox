@@ -67,20 +67,23 @@ opencode-sandbox agent-context refresh NAME  # rewrite now
 ```
 
 They fall back to the configured settings (with a note) when Docker cannot be asked, with an
-unknown OS version rather than today's default. The
-guidance is descriptive, not a security policy. It was verified with OpenCode 2.1.4 and 2.2.0 on
+unknown OS version rather than today's default. The dashboard's Agent Context preview (`a`)
+also explains this fallback and leaves the on-disk guidance unverified when container inspection
+fails; a configuration-only preview cannot establish that saved observed guidance is outdated.
+The guidance is descriptive, not a security policy. It was verified with OpenCode 2.1.4 and 2.2.0 on
 Debian and Arch by capturing the first model request of a managed `run` with a fake provider,
 and with one real provider: OpenRouter (`z-ai/glm-5.3-flash`, OpenCode 2.2.0, Debian 13)
 answered from the guidance in the first prompt.
 
 ## Versions
 
-Only OpenCode 2.x (npm package `@opencode/cli`) is installed or pinned; a newer major version is
-reported, never installed. OpenCode in a sandbox is installed and updated only by the manager:
+Only OpenCode 2.x (npm package `@opencode/cli`) is installed or pinned. `latest` selects the
+highest supported stable version even if npm's latest tag moves to another major; prereleases
+are excluded by default. An exact compatible alternative, including a prerelease, can be selected
+with `--version`. Unsupported majors are never installed. OpenCode in a sandbox is installed and updated only by the manager:
 every container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`, so OpenCode's own update check and
-self-update (also `update: auto` in your OpenCode configuration) are off. An `opencode upgrade`
-inside a container left world-writable files, about 940 MB of platform packages and a 470 MB
-npm cache in `/root`, and on Arch a broken binary.
+self-update (also `update: auto` in your OpenCode configuration) are off. The upstream updater
+has left unsafe permissions/caches and broken the Arch binary; use the manager's update commands.
 
 `opencode rollback-base` verifies a copy against the installed manager's current OS definition.
 A Debian-13 manager therefore refuses a Debian-12 base rollback copy; this is not an in-place
@@ -91,22 +94,77 @@ that environment's OS and system layer.
 | Command | Does |
 |---|---|
 | `opencode check [--distro ID]` | Compares a base image's version with the npm registry (over HTTPS, no host npm, no background checks) |
-| `opencode versions [--check]` | Each environment's running version and policy (stopped containers are not started); with `--check`, environments with the notify policy report available updates |
-| `opencode status NAME` | The version one environment runs |
+| `opencode versions [--check]` | Running versions or dated last verification/Unknown for stopped containers; `--check` compares every policy with npm's latest supported stable release |
+| `opencode status NAME` | One environment's actual/last-verified version, source, time and immutable object identity |
 | `opencode policy NAME`, `opencode policy-set NAME notify\|manual\|pinned [--version X]` | The update policy |
 | `opencode update NAME [--version X] --yes` | Update a stopped environment |
 | `opencode rollback NAME --yes` | Undo its last update |
 | `opencode update-recover NAME` | Finish an interrupted update (rolls back) |
-| `opencode update-base [--version X] [--distro ID]` | Rebuild a base image, keep a rollback copy |
-| `opencode rollback-base [--distro ID] --yes` | Swap a base image with its newest rollback copy |
+| `opencode update-base [--version X] [--distro ID] [--refresh]` | Build/rebuild a base image, keep a rollback copy; default cached, explicit pull/no-cache with refresh |
+| `opencode rollback-base [--distro ID] --list` | List distinct managed rollback images, full IDs and tag aliases (read-only) |
+| `opencode rollback-base [--distro ID] [--copy TAG_OR_FULL_IMAGE_ID] [--yes]` | Verify and swap the selected copy; default only when there is one distinct image |
 
-**Policies.** `notify` (the default) reports available updates with `versions --check`;
-`manual` reports nothing; `pinned` refuses updates to other versions, refuses to create a
+**Partial results.** `opencode versions --check` keeps available local version/policy rows when
+npm discovery fails; a failed discovery is not an up-to-date result. Registry results also
+remain available if local inventory fails. Per-environment inspection, policy or formatting
+errors are reported without hiding other environments. Available rows go to stdout, errors to
+stderr; any report error gives exit status 2. Without `--check`, the command never queries npm.
+Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
+The dashboard's [Updates views](dashboard.md#updates), opened with `v`, are separate from this
+CLI report: opening them reads local/cached information only. **Check** explicitly queries npm
+and checks the selected object; it does not start stopped containers. Base labels, installed
+runtime evidence, registry discovery and recovery state remain distinct.
+
+**Evidence and cache.** Successful runtime checks record the version, source, time, environment,
+daemon, immutable container and creation-image IDs in disposable files under the data directory's
+`update-cache/`, separate from metadata and recovery journals. Stopped containers show **last
+verified** with its time, or **Unknown**; creation labels and old update records do not verify the
+present binary. Replacement, restore, rollback and update journals invalidate or qualify earlier
+observations. A failed probe retains older evidence with its original time, never a fresh success.
+If Docker cannot be inspected, history is explicitly unverified against the current container.
+For a fresh stopped-container check, start it explicitly, then check; it remains running.
+
+npm success and the latest attempt are stored separately. Without `--check`, an existing cached
+comparison is visibly dated and no network request is made. Explicit discovery failures still
+exit 2, even if cached information survives. Invalid, unsafe, missing or unwritable caches do not
+block normal operations and are not installation authority. An explicit `latest` update requires
+a successful fresh lookup; it cannot silently use a cached target after failure. HTTP rate limits
+with Retry-After are retained and respected by later explicit requests. No daily scheduling or
+automatic updates are enabled by this cache.
+
+**Bounded checks.** Short Docker inventory/inspect calls have an eight-second per-call deadline
+and a 1 MiB combined output limit. The npm check has one eight-second total budget, including DNS,
+TLS and abbreviated package-metadata reading (8 MiB maximum), without host npm/Node. A running-container version
+probe has a five-second container-side limit; the host client gets three extra seconds for Docker
+transport/completion. Image definition/tool verification has a separate 30-second probe limit.
+Timeout or unavailable tooling is not a verified version, a missing image, or an up-to-date result.
+
+Container probes require compatible GNU `timeout` (present in managed images); missing tooling
+never permits an unbounded probe. Cancellation stops owned host checks, not necessarily remote exec
+immediately; container timers and label/full-ID helper cleanup remain responsible. An unreachable
+daemon can leave a named unconfirmed helper. [Readiness/cleanup limits](maintenance.md#readiness-checks)
+apply; they never impose short deadlines on builds, installs, commits or interactive commands, or
+mean an approved mutation was canceled/rolled back.
+
+**Concurrent base operations.** Builds and rollback share daemon/distribution guards across
+data directories and context aliases. A long build does not block creation from the current
+base; publication waits for a pin check and container creation to finish. Rebuild and rollback
+recheck image identity and managed distribution labels before replacement, refuse unexpected
+changes or colliding candidate/copy tags, and never treat a failed inspection as a missing image.
+These advisory guards do not coordinate older managers or manual Docker commands. They do not
+change existing containers, their writable layers, policies or user configuration.
+
+**Policies.** Explicit version comparisons show newer compatible versions for all policies.
+`manual` suppresses unsolicited notices, not requested information. `pinned` also suppresses
+general newer-version notices, but retains pin-mismatch reporting; availability does not change
+the pin or authorize an update. It refuses updates to other versions, refuses to create a
 container from a base image built with another version, and reports a version changed outside
 the manager.
 
 **Environment updates.** `opencode update` works on a **stopped** environment with network. It
-resolves `latest` first and refuses versions below 2.0.0. It commits a checkpoint
+resolves an exact latest-supported-stable target **before confirmation**, then revalidates that
+same target, container identity, policy, network and pending operation under the environment lock.
+It never substitutes a newer release after consent. It commits a checkpoint
 `ocs-checkpoint:<id>-*` of the container's system layer, journals the update, and on any
 failure replaces the container with one created from the checkpoint (the system layer exactly
 as before; `/root` and `/workspace` are not touched). It also repairs a broken installation.
@@ -116,8 +174,50 @@ point (`disk cleanup --superseded` keeps it).
 
 **Base images.** `opencode update-base` builds and verifies a candidate and keeps the replaced
 image as `opencode-sandbox:<distro>-previous-<hex>` (not for identical rebuilds);
-`opencode rollback-base` verifies the newest rollback copy and swaps it in (the replaced image
-becomes a rollback copy, so you can swap back). `build` rebuilds without a rollback copy. Base
-images only affect containers created later. Rebuilds reuse Docker's cached operating-system
-layers and refresh only OpenCode; update operating-system packages inside an environment with
-its package manager.
+`opencode rollback-base` verifies a selected rollback image and swaps it in (the replaced image
+becomes a rollback copy, so you can swap back). Use `opencode rollback-base --list` first; aliases
+of the same immutable image count as one copy. With several distinct images, supply an exact
+listed tag or full `sha256:...` image ID using `--copy`, even with `--yes`. Short image-ID prefixes
+are not accepted. `--yes` bypasses confirmation, not selection. Creation dates, version precedence
+and list order do not describe replacement history and are never used to guess a target.
+
+The preview identifies the selected copy, its build provenance and the current base. A changed
+or missing selected alias/current base refuses execution; review and select again. Existing
+copies with older provenance remain visible, but the selected image must still pass the current
+definition's OS, tool and OpenCode verification. The verified immutable image is published, its
+selected rollback aliases are removed, and the replaced base is retained under a new rollback
+tag. If the selected image is already current, verification reports unchanged without moving
+or removing tags. A failed/unverifiable inventory is an error, not permission to replace images.
+
+Build consent names the existing immutable image (or missing first build), distribution/definition,
+exact OpenCode target and mode. These are rechecked under the existing shared guards before a
+build and publication; a changed base requires a new review, never silent target substitution.
+The candidate's immutable ID passes OS/tool/binary verification before publication. Failed
+verification leaves the current base intact; cleanup removes only the known candidate. If its
+identity or cleanup cannot be confirmed, inspect the named leftover and actual base/copies before
+retrying `disk cleanup`. This is not a durable base-build journal or an automatic recovery engine.
+
+Choose the mode explicitly:
+
+- **Cached rebuild** (default): reuse eligible Docker layers with the selected definition and
+  exact OpenCode version. It may reuse OS/package layers; definition or cache changes may rerun
+  them. It does **not** guarantee fresh packages or an offline build.
+- **Refresh & Rebuild** (`--refresh`): request current upstream inputs and bypass the build cache
+  (`--pull --no-cache`). This downloads/rebuilds package layers, can take substantially longer
+  and use more disk, and **never prunes the shared build cache**. Repositories and upstream tags
+  can change during a build; this is not reproducibility, a security certification or a separate
+  upstream-freshness assessment.
+
+```sh
+opencode-sandbox opencode update-base --distro debian --version 2.1.4 --yes
+opencode-sandbox opencode update-base --distro arch --version 2.1.4 \
+  --refresh --yes
+```
+
+The dashboard [Base Images view](dashboard.md#base-image-actions) offers both modes and always
+keeps a rollback copy on replacement. The existing `build` command deliberately keeps **no**
+rollback copy, discloses that distinction, and also accepts `--refresh` (its target option remains
+`--opencode-version`). Base changes affect future base-based container creation and file-only
+restores, not existing containers, writable layers, home/workspace/configuration or integrations.
+Not-yet-created pinned environments must still match the new base. To upgrade packages in an
+existing environment, use that environment's package manager instead.

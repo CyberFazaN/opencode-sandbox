@@ -4,7 +4,104 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 6.2.0 — 2026-11-02
+
+Component Updates and recovery release (Beta). Python 3.11 or newer; environment/backup schemas
+and image definitions are unchanged. Upgrading does not rebuild images, migrate environments or
+enable automatic discovery. Actual post-reboot manager recovery remains unverified (accepted
+release risk); no automatic reboot or recovery is performed.
+
+### Added
+
+- Compact Updates views (`v`) replace the dashboard's Versions report: Manager, Base Images and
+  Environment OpenCode, local/cached-first without network requests or version probes on opening.
+  Explicit Check has independent registry/object results and cancellable owned read-only work;
+  Details discloses full evidence, errors, recovery and existing CLI guidance.
+- Read-only Manager checks (`manager status --check` and Updates): official published full
+  GitHub releases, dated independent failures, strict release tags and no implicit downgrade.
+  Local-only pipx provenance inspection reconciles the running package, VCS record, interpreter,
+  recorded source/options, actual executable/launcher and custom locations. Unsupported/editable/
+  foreign/shadowed/ambiguous installs get manual guidance, never takeover or conversion. Optional
+  daily discovery now includes an independent GitHub source, with no automatic installation.
+- Optional daily npm metadata discovery in dashboard Preferences, off by default: durable
+  attempt claims throttle failures/restarts/interruption, shared source requests coalesce across
+  CLI/Updates/background callers, and Retry-After applies to explicit checks too. One quiet
+  policy-filtered cached-availability indicator replaces repeated notices; no automatic runtime
+  probe, start, install or persistent service. Scheduling fails closed without safe writable
+  storage; bounded explicit discovery remains available.
+- Explicit Environment OpenCode Start/Update/Policy/Rollback/Recover in Updates, with compact
+  controls, scrollable exact consent, locked revalidation and existing checkpoint/journal handlers.
+  Recovery Center can also review interrupted OpenCode updates. Approved operations survive
+  closing Updates; read-only cancellation is not mutation rollback.
+- Base Images Build/Rebuild and Rollback in Updates, with exact image/target/mode consent and
+  rollback-preserving publication. Choose cached rebuild or explicit Refresh & Rebuild;
+  `build --refresh` and `opencode update-base --refresh` pull upstream and bypass build cache
+  without pruning it. App-owned builds expose bounded output in Details and survive Close.
+- Early process-lifetime installation leases for supported CLI/dashboard instances, independent
+  of data/configuration locations. A small stdlib bootstrap acquires shared access before CLI
+  imports; internal exclusive access refuses while another instance/session/worker is alive.
+  Persistent private lock files are never treated as stale or repaired. Older managers, direct
+  library callers and external pipx/Docker do not honor these locks; normal startup has no bypass.
+- Explicit exact-tag manager updates in Updates and `manager update --tag`, with Cancel-first
+  source/commit/installation/tool/network consent, real foreground terminal restoration and
+  actual worker/process-death exclusion. A frozen stdlib helper revalidates published GitHub
+  source, existing pipx/Python/dependencies and effective public-default client policy before
+  exact-tag replacement; no tool/Python switch, automatic restart/rollback or Update All.
+  Recognized locations/source Python are retained; unknown/custom settings get manual guidance,
+  not silent removal. Only inspected pipx 1.18.7 is supported. Host build code is not sandboxed,
+  HTTPS/API evidence is not signed-tag authentication, and force is not a backup.
+- Durable incomplete-update state and private recovery inputs outside the replaceable venv.
+  A parked installer independently proves live kernel ownership and durable process admission
+  before exec. Owned groups/adopted descendants are reaped without stale-PID signals; exact
+  installed records/source/commit/launcher and separate runtime/CLI-health queries determine
+  success, not an installer exit code or cache. Explicit frozen verify-only recovery survives a
+  broken launcher, with manual previous-tag reinstall guidance. Unknown hard-interruption
+  quiescence remains blocked in the same boot and may need a reboot before verification;
+  no identical-dependency or offline restoration promise, automatic reboot or state reset.
+
+### Fixed
+
+- The dashboard's Agent Context preview has its own environment-specific heading instead of
+  "OpenCode versions". When container inspection fails, it explains the configured-settings
+  fallback and leaves saved guidance unverified rather than incorrectly calling it outdated.
+  Readiness, cleanup and version reports retain their own headings in a shared read-only view.
+- OpenCode version inventory in the CLI and dashboard keeps available local rows when npm
+  discovery fails, and keeps registry results when local inventory fails. Per-environment errors
+  do not hide other rows. The CLI reports partial failures on stderr with exit status 2;
+  stopped containers are never started for discovery.
+- Base builds, publication, rollback and cleanup now coordinate across data directories and
+  context aliases for the same verified daemon. Pinned container creation holds publication
+  through its version check and creation. Image identity/ownership is rechecked before changes;
+  cleanup leaves busy candidates and rollback copies alone.
+- Base build consent binds the existing image, exact OpenCode target, definition and refresh
+  mode, rechecked before building and publication. Candidate verification uses its immutable ID;
+  a retagged candidate is neither published nor silently cleaned as the operation's own image.
+- Base rollback no longer guesses replacement order from Docker creation dates. It consolidates
+  aliases, defaults only for one distinct copy, and requires `--copy` for several, even with
+  `--yes`; `--list` shows full identities and aliases. Confirmation and execution bind to the
+  same immutable copy/current base, preserving verification and the replaced image.
+- Short Docker diagnostics and npm checks now have total execution/output bounds and reap their
+  owned clients on timeout or cancellation. Container probes have their own deadlines; interrupted
+  image helpers get bounded, label-checked cleanup. Canceled read-only dashboard workers cannot
+  publish late results. Builds, installs, commits and interactive commands keep their existing timing.
+- Dashboard refresh replaces or clears only its own daemon, resource-support and base-image
+  advisories, including successful checks. Unknown results replace obsolete warnings without
+  claiming success, and advisory/readiness cleanup preserves active operation progress and results.
+- Stopped environments retain dated, identity-bound OpenCode verification or show Unknown;
+  build labels and completed-update metadata are not treated as current runtime evidence.
+  Disposable caches preserve successful evidence separately from failed attempts, without
+  changing environment/backup schemas or starting containers for discovery.
+- OpenCode discovery selects the latest supported stable 2.x release even if npm latest moves
+  to another major. Explicit Manual/Pinned comparisons no longer hide newer versions; pin and
+  lifecycle restrictions remain. Updates resolve exact targets before confirmation and revalidate
+  them instead of silently selecting a later release.
+- Updates controls stay visible at 80x24 even when dashboard advisory notices exist; their
+  ownership is preserved and full messages remain available in Details. Recovery journals remain
+  visible even when their container is absent.
+- Checkpoint restoration failures persist their actual journal and error reason, including the
+  configuration-recovery successor after removal begins. Updates Details rereads authoritative
+  journal metadata instead of waiting for Docker inventory, and operation forms/Details keep
+  advisory overlays from covering consent controls.
 
 ## 6.1.0 — 2026-10-30
 

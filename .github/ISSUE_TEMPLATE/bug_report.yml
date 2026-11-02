@@ -1,62 +1,53 @@
 name: Bug report
-description: Something does not work as documented.
+description: Report a defect or unexpected behavior in OpenCode Sandbox.
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Security problems: please report them privately (Security tab, "Report a vulnerability"), not here.
-        Remove keys, tokens and private paths from everything you paste.
-  - type: input
-    id: version
-    attributes:
-      label: Version
-      description: Output of `opencode-sandbox --version`.
-      placeholder: opencode-sandbox 6.1.0
-    validations:
-      required: true
-  - type: dropdown
-    id: host
-    attributes:
-      label: Host
-      description: Arch Linux is the tested host; reports from other Linux distributions are welcome and answered on a best-effort basis.
-      options:
-        - Arch Linux
-        - Another Linux distribution (please name it and its version below)
-    validations:
-      required: true
-  - type: textarea
-    id: doctor
-    attributes:
-      label: Output of `opencode-sandbox doctor`
-      render: text
-    validations:
-      required: true
+        Thanks for reporting a problem with OpenCode Sandbox's CLI or terminal dashboard.
+
+        For suspected vulnerabilities, follow [SECURITY.md](https://github.com/CyberFazaN/opencode-sandbox/blob/main/SECURITY.md#reporting-a-vulnerability) instead of opening a public issue.
+        Issues are public. Remove API keys, tokens, credentials, private configuration, personal paths and other sensitive details from text, logs and screenshots.
   - type: textarea
     id: what
     attributes:
-      label: What happened
-      description: The command you ran, its full output, and what you expected instead.
+      label: What happened?
+      description: Describe the problem, including the command or dashboard action involved.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should have happened instead?
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
+      label: Steps to reproduce (optional)
+      description: If possible, list steps or a small example. For intermittent problems, describe when or how often they happen; exact steps are not required.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (optional)
+      description: Share only what you know. Arch Linux is the tested host; reports from other Linux distributions are welcome too.
       placeholder: |
-        1. opencode-sandbox create demo
-        2. ...
-  - type: input
-    id: versions
+        Linux distribution and version:
+        OpenCode Sandbox version (opencode-sandbox --version):
+        Python version:
+        Docker version and rootless setup:
+        Container image (Debian, Arch or custom):
+        Related versions, if relevant (OpenCode, pipx, Typer, Textual):
+    validations:
+      required: false
+  - type: textarea
+    id: context
     attributes:
-      label: Other versions
-      description: Docker (`docker version`), OpenCode in the environment (`opencode-sandbox opencode versions`), the environment's image (debian, arch or custom), and your host's Linux distribution and version.
-  - type: checkboxes
-    id: checks
-    attributes:
-      label: Checks
-      options:
-        - label: I searched the existing issues and read docs/troubleshooting.md.
-          required: true
-        - label: I removed keys, tokens and private paths from this report.
-          required: true
+      label: Logs, screenshots or additional context (optional)
+      description: Share relevant, sanitized excerpts (including `opencode-sandbox doctor`, if useful) or redacted screenshots. Use code fences for logs, not full configuration dumps.
+    validations:
+      required: false

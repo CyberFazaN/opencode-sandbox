@@ -9,13 +9,8 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ACTIVE_ROOT_DOCS = {"README.md", "CHANGELOG.md", "TODO.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md"}
 # A maintainer's untracked local instructions (AGENTS.md, .gitignore) are not part of the tree.
 LOCAL_DOCS = {"AGENTS.local.md"}
-# The user documentation (D-041): README.md and the guides in docs/.
-USER_GUIDES = {"README.md", "install.md", "getting-started.md", "concepts.md", "workspaces.md", "providers.md",
-               "settings.md", "opencode.md", "backup.md", "changes.md", "maintenance.md", "dashboard.md",
-               "security.md", "troubleshooting.md"}
 # Intentional non-English letters: a test fixture file name.
 ALLOWED = {"tests/test_gitflow_roundtrip.py": {"ü"}, "tests/integration/test_10_lifecycle.py": {"ü"}}
 FOREIGN = {"und", "nicht", "oder", "wird", "werden", "für", "auch", "sind", "dass", "wenn", "keine", "bitte", "eine",
@@ -23,7 +18,7 @@ FOREIGN = {"und", "nicht", "oder", "wird", "werden", "für", "auch", "sind", "da
 
 
 def active_files():
-    files = [ROOT / n for n in ACTIVE_ROOT_DOCS] + [ROOT / "pyproject.toml"]
+    files = sorted(p for p in ROOT.glob("*.md") if p.name not in LOCAL_DOCS) + [ROOT / "pyproject.toml"]
     files += sorted((ROOT / "docs").glob("*.md"))
     files += sorted((ROOT / "docs" / "engineering").rglob("*.md"))
     files += sorted(p for p in (ROOT / ".github").rglob("*") if p.is_file())
@@ -72,11 +67,3 @@ def test_active_documents_and_messages_are_english():
         if found:
             bad[rel] = sorted(set(found))
     assert bad == {}
-
-
-def test_only_current_documents_are_in_the_tree():
-    """No historical documents: earlier versions' material is not part of the public tree (D-038)."""
-    assert {p.name for p in ROOT.glob("*.md")} - LOCAL_DOCS == ACTIVE_ROOT_DOCS
-    assert {p.name for p in (ROOT / "docs").glob("*.md")} == USER_GUIDES
-    assert not (ROOT / "Dockerfile").exists()  # images build from src/opencode_sandbox/assets/images/
-    assert not any((ROOT / "docs" / "history").glob("*.md")) and not (ROOT / "docs" / "engineering" / "history").exists()

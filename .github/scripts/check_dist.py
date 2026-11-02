@@ -47,8 +47,21 @@ def check(dist):
                      for key, value in expected.items() if meta.get(key) != value]
         if f"{info}/licenses/LICENSE" not in names:
             problems.append("wheel: LICENSE missing in dist-info/licenses")
-        if "opencode-sandbox = opencode_sandbox.cli:main" not in wheel.read(f"{info}/entry_points.txt").decode():
+        if "opencode-sandbox = opencode_sandbox.launcher:main" not in wheel.read(f"{info}/entry_points.txt").decode():
             problems.append("wheel: console script opencode-sandbox missing")
+        for required in ('opencode_sandbox/launcher.py', 'opencode_sandbox/installation_locks.py',
+                         'opencode_sandbox/manager_tools.py', 'opencode_sandbox/manager_tool_probe.py',
+                         'opencode_sandbox/manager_handoff.py', 'opencode_sandbox/manager_helper.py',
+                         'opencode_sandbox/manager_verifier.py', 'opencode_sandbox/manager_targets.py',
+                         'opencode_sandbox/manager_review.py', 'opencode_sandbox/manager_review_tui.py',
+                         'opencode_sandbox/manager_observations.py', 'opencode_sandbox/installation_state.py',
+                         'opencode_sandbox/manager_source.py', 'opencode_sandbox/manager_process.py',
+                         'opencode_sandbox/manager_network.py', 'opencode_sandbox/manager_pip_probe.py',
+                         'opencode_sandbox/manager_execution.py', 'opencode_sandbox/http_probe.py',
+                         'opencode_sandbox/manager_records.py', 'opencode_sandbox/manager_result.py',
+                         'opencode_sandbox/manager_health.py', 'opencode_sandbox/manager_operation.py',
+                         'opencode_sandbox/manager_installer.py', 'opencode_sandbox/manager_update.py'):
+            if required not in names: problems.append(f'wheel: {required} missing')
         packaged = sorted(n[len("opencode_sandbox/assets/images/"):] for n in names
                           if n.startswith("opencode_sandbox/assets/images/") and not n.endswith("/"))
         if packaged != assets():
@@ -60,6 +73,20 @@ def check(dist):
         top = f"opencode_sandbox-{v}/"
         names = {m.name[len(top):] for m in sdist.getmembers() if m.name.startswith(top)}
         for required in ("LICENSE", "README.md", "pyproject.toml", "src/opencode_sandbox/__init__.py",
+                          'src/opencode_sandbox/launcher.py', 'src/opencode_sandbox/installation_locks.py',
+                          'src/opencode_sandbox/manager_tools.py', 'src/opencode_sandbox/manager_tool_probe.py',
+                          'src/opencode_sandbox/manager_handoff.py', 'src/opencode_sandbox/manager_helper.py',
+                          'src/opencode_sandbox/manager_verifier.py', 'src/opencode_sandbox/manager_targets.py',
+                          'src/opencode_sandbox/manager_review.py', 'src/opencode_sandbox/manager_review_tui.py',
+                          'src/opencode_sandbox/manager_observations.py',
+                          'src/opencode_sandbox/installation_state.py',
+                          'src/opencode_sandbox/manager_source.py', 'src/opencode_sandbox/manager_process.py',
+                          'src/opencode_sandbox/manager_network.py', 'src/opencode_sandbox/manager_pip_probe.py',
+                          'src/opencode_sandbox/manager_execution.py', 'src/opencode_sandbox/http_probe.py',
+                          'src/opencode_sandbox/manager_records.py', 'src/opencode_sandbox/manager_result.py',
+                          'src/opencode_sandbox/manager_health.py',
+                          'src/opencode_sandbox/manager_operation.py', 'src/opencode_sandbox/manager_installer.py',
+                          'src/opencode_sandbox/manager_update.py',
                          *(f"src/opencode_sandbox/assets/images/{a}" for a in assets())):
             if required not in names:
                 problems.append(f"sdist: {required} missing")

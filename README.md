@@ -12,8 +12,7 @@ OpenCode Sandbox is an independent open-source project. It is not affiliated wit
 the OpenCode project, and it is unrelated to other projects with similar names.
 
 > [!IMPORTANT]
-> **Beta, written by an AI agent.** Version 6.0.0 was the first public release; 6.1.0 is a
-> compatibility and reliability update. The code, tests and documentation were written with
+> **Beta, written by an AI agent.** The code, tests and documentation were written with
 > OpenCode and Claude Opus 5.5, with minimal human review. The evidence for its behaviour is
 > the automated test suite and a test campaign on real rootless Docker, run on Arch Linux only (see [Tested environment](#tested-environment)); there has been no
 > independent human security review. Expect defects, read the [security model](docs/security.md),
@@ -51,10 +50,24 @@ Consider something else if:
   through one change plan.
 - **Backups and recovery**: verified cold backups, restores into new environments, snapshots,
   and journalled operations with explicit recovery commands.
-- **OpenCode versions** managed per base image and environment: update policies, updates with
-  automatic rollback on failure; OpenCode's self-update is off.
+- **OpenCode versions** managed per base image and environment: dated stopped-version evidence,
+  latest supported stable discovery, update policies, updates with
+  automatic rollback on failure; OpenCode's self-update is off. Local version inventory remains
+  available when registry discovery fails.
+- **Updates inventory** in the dashboard (`v`): compact component views, local/cached-first,
+  explicit version checks and full evidence in Details. Opening it does not trigger discovery.
+  Optional daily GitHub/npm discovery is off by default and runs only while the dashboard is open.
+  Manager checks show published full releases and local installation evidence without running
+  pipx. Explicit manager updates review an exact newer published tag, close the dashboard, and
+  hand off to an independent verifier/updater; there is no automatic restart or Update All.
+  Environment Start/Update/Policy/Rollback/Recover reuse existing handlers with exact confirmation;
+  read-only Cancel never cancels an approved mutation.
+  Base Build/Rebuild and Rollback preserve copies; cached builds and explicit Refresh & Rebuild
+  stay separate, without migrating existing environments or pruning Docker's build cache.
+  [Current capabilities and limits](docs/dashboard.md#updates).
 - **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
-  operating system); one-time initial integrations (Context7 by default).
+  operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.
+  One-time initial integrations (Context7 by default).
 - **Diagnostics**: `doctor` for the host, read-only `check NAME` per environment including
   measured network reachability, disk usage and conservative cleanup.
 
@@ -78,8 +91,8 @@ Details: [docs/security.md](docs/security.md).
 | Component | Tested |
 |---|---|
 | Host, real rootless Docker | Arch Linux, kernel 7.2: the full test campaign |
-| Host, hosted CI only | Ubuntu 26.04 (GitHub's runner): unit tests with a simulated Docker, pipx installation (recorded for 6.0.0 on Python 3.14.9) |
-| Python | 3.11.18 and 3.14.8, the lowest and the newest supported versions. 3.12 and 3.13 are accepted but not tested separately |
+| Host, hosted CI only | Ubuntu 26.04: simulated-Docker tests, package and pipx checks on Python 3.11/3.14; rolling Arch userland tests as an unprivileged user (recorded for 6.1.0) |
+| Python | Local endpoints 3.11.18 and 3.14.8; hosted 6.1.0 checks used 3.11.17 and 3.14.9. Python 3.12/3.13 are accepted but not tested separately |
 | Docker | 29.9.2, rootless, slirp4netns |
 | pipx | 1.18.7 |
 | Typer, Textual | 0.27.3, 8.2.8 |
@@ -106,7 +119,7 @@ You need Linux with Python 3.11 or newer, pipx and Git; install them using your 
 documentation. Install the application from a release tag:
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.2.0
 opencode-sandbox --version
 ```
 

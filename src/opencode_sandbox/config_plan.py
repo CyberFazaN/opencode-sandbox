@@ -271,19 +271,20 @@ def _refresh_guidance(env_id):
         ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
 
 
-def recover(m: dict) -> dict:
+def recover(m: dict, *, precondition=None) -> dict:
     """Finish an interrupted change: re-run a journalled limit update, or complete a container
     recreation (`core.recover_runtime_reconfigure`)."""
     c.ensure_runtime(False)
     m = c.resolve(m["id"])
     if m.get("operation") == "runtime-recreate":
-        result = c.recover_runtime_reconfigure(m)
+        result = c.recover_runtime_reconfigure(m, precondition=precondition)
         _refresh_guidance(m["id"])
         return {**result, "next": f"start it with: opencode-sandbox start {m['name']}"}
     if m.get("operation") != "config-update":
         raise c.SandboxError("No interrupted configuration change")
     with c.lock(m["id"]):
         m = c.resolve(m["id"])
+        if precondition is not None: precondition(m)
         if m.get("operation") != "config-update" or not isinstance(m.get("pending_config"), dict):
             raise c.SandboxError("No interrupted configuration change")
         _update_container(m)
