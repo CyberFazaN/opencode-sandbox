@@ -4,7 +4,12 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 6.2.0 — 2026-11-02
+
+Component Updates and recovery release (Beta). Python 3.11 or newer; environment/backup schemas
+and image definitions are unchanged. Upgrading does not rebuild images, migrate environments or
+enable automatic discovery. Actual post-reboot manager recovery remains unverified (accepted
+release risk); no automatic reboot or recovery is performed.
 
 ### Added
 

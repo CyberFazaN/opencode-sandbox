@@ -1,4 +1,4 @@
-# Baseline — OpenCode Sandbox 6.1.0
+# Baseline — OpenCode Sandbox 6.2.0 candidate
 
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
@@ -9,17 +9,18 @@ The current checkpoint below records fresh verification; older sections retain t
 
 | Item | Current state |
 |---|---|
-| Manager | `6.1.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.2.0` candidate, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
 | Images | Debian 13/default (`node:24-trixie`, revision 2); Arch rolling (`archlinux:base-devel`, revision 1) |
 
-The checkout includes unreleased component Updates views, optional default-off daily discovery,
+The candidate includes component Updates views, optional default-off daily discovery,
 environment/base actions and independent manager update/recovery. These are implemented, not a
-pending roadmap. Manager version, schemas and image definitions have not changed. Availability,
+pending roadmap. Schemas and image definitions have not changed. Availability,
 consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
-No release recommendation follows: B15's post-reboot recovery risk is not accepted.
+The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
+declined a reboot. Acceptance is not verification; final candidate release gates still apply.
 
 ## Supported environments
 
@@ -139,7 +140,8 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 
 ## Unverified behaviour
 
-- **B15 post-reboot manager recovery:** actual execution is unverified and risk is **not accepted**.
+- **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
+  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized.
   On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
   original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
   verifier and confirm startup/data retention. Never delete state/locks or infer success from an

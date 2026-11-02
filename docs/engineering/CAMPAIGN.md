@@ -29,7 +29,8 @@ integration commands/results/limits are recorded once in
 [BASELINE](BASELINE.md#updates-final-integration); intermediate phase diaries are in Git.
 
 New B13/B14 have real evidence; B15's hard-kill refusal is real PASS but actual post-reboot recovery
-is **BLOCKED, approval not granted and residual risk not accepted**. Next step: on an authorized
+is **BLOCKED with owner-accepted release risk for 6.2.0 (2026-11-02); no reboot authorized**.
+Acceptance is not a post-reboot PASS. Next step: on an authorized
 disposable VM, retain a named hard-interrupted operation, reboot, perform an explicit manual repair
 only if needed, then run its original frozen verification command and check normal startup/data
 retention. No automatic reboot, reset, stale-PID signal or cache-based reopening is allowed.
@@ -67,7 +68,7 @@ release gates. The following table retains the precise existing row-level eviden
 | B12 | P1 | `pipx uninstall` removes its launcher and keeps environments, containers and volumes; a foreign/legacy launcher and its target are neither replaced nor deleted; after the test removes its own legacy launcher a working pipx launcher can be installed | `test_65_pipx.py`; the transition from a legacy source installation is documented, not automatic | PASS (D-049 real on 3.11/3.14; volume presence and foreign target contents checked) |
 | B13 | P0 | Exact public manager consent, actual process-lifetime usage/worker/session refusal, restored foreground terminal and helper-owned exclusion; no ordinary-CLI bypass | `test_66_manager_inventory.py`, `test_67_installation_exclusion.py`, `test_67_manager_update.py`; host/pilot manager boundary tests | PASS (`up18-final`: real installed public CLI/TUI, both pipx layouts/terminal sizes, actual source/tool/terminal gates and non-daemon drain; real session/exec refusals on both distributions) |
 | B14 | P0 | Exact-tag pipx replacement with durable parked-child admission; independent expected source/commit/version/launcher/runtime/CLI result and explicit failure/manual-reinstall recovery; data retained | `test_67_manager_update.py`; host whole-update/operation/installer tests | PASS (`up18-final`: actual force replacement, failed target health/barrier, actual manual previous-tag reinstall and original frozen verification; terminal loss still retains verified result; no inferred backup or automatic restart) |
-| B15 | P1 | Hard interruption never clears pending state from group absence/cache/exit status; independently verified recovery after old-process quiescence | `test_67_manager_update.py`, host interruption/operation tests; authorized post-reboot continuation still required | BLOCKED (real hard-kill/escaped-child/empty-group refusal and handled cleanup PASS in `up18-final`; actual reboot/frozen post-boot recovery unexecuted and not authorized, no accepted risk. Reproducible next step above; do not call this release-ready) |
+| B15 | P1 | Hard interruption never clears pending state from group absence/cache/exit status; independently verified recovery after old-process quiescence | `test_67_manager_update.py`, host interruption/operation tests; authorized post-reboot continuation still required | BLOCKED with owner-accepted release risk for 6.2.0 (2026-11-02): real hard-kill/escaped-child/empty-group refusal and handled cleanup PASS in `up18-final`; actual reboot/frozen post-boot recovery remains unexecuted, with no reboot authorized. Reproducible next step above; acceptance is not a PASS |
 
 ## C. Rootless Docker and images
 
@@ -202,8 +203,8 @@ installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 | All | 87 | 85 | 1 | 1 | 0 | 0 |
 
 - PASS in part: D09 (the host reboot is BLOCKED with accepted risk and a next step).
-- B15 is BLOCKED without accepted risk; its post-reboot path is not renewed by same-boot refusal
-  or unit/host proof. The unpublished Updates implementation is not a release recommendation.
+- B15 is BLOCKED with owner-accepted risk for 6.2.0; its post-reboot path is not renewed by same-boot
+  refusal or unit/host proof. Acceptance alone does not establish the remaining release gates.
 - C10 was re-established in the complete installed-pipx campaigns of the 6.1.0 candidate and
   of the release tree, not just host sockets or warmed direct Docker.
 - I04 passed on the 6.1.0 release tree (56 tests/513 checks); every real row's module ran

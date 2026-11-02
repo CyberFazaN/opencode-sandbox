@@ -23,8 +23,9 @@ def exercise(camp, ck, prefix, launcher, env, repo, base):
     public.update(PATH=str(launcher.parent) + ':' + str(Path(sys.executable).parent) + ':/usr/bin:/bin',
                   DOCKER_CONFIG=camp.env.get('DOCKER_CONFIG', str(Path.home() / '.docker')))
     git = ['git', '-C', str(repo)]
-    commit = camp._run([*git, 'rev-parse', 'v6.2.0^{commit}'], check=True).stdout.strip()
-    annotation = camp._run([*git, 'rev-parse', 'v6.2.0'], check=True).stdout.strip()
+    tag = json.loads((base / 'source-target.json').read_text())['tag']
+    commit = camp._run([*git, 'rev-parse', tag + '^{commit}'], check=True).stdout.strip()
+    annotation = camp._run([*git, 'rev-parse', tag], check=True).stdout.strip()
     site = next(prefix.glob('lib/python*/site-packages'))
     hook, module = site / 'ocs_test_manager_review.pth', site / 'ocs_test_manager_review.py'
     assert not hook.exists() and not module.exists()
@@ -43,8 +44,8 @@ def exercise(camp, ck, prefix, launcher, env, repo, base):
             camp.note(f'owned installed review mode={mode}, state/partial/pty={state}, data/config under {base}; '
                       f'test-only injector {hook}, {module}; actual console/bootstrap/identity/tools/source/consent/revalidation; '
                       'original launcher bytes restored after owned changed-body fault; exact hooks/config removed in finally; no helper/install payload')
-            with serve(graph(commit=commit, tags=(annotation,))) as (endpoint, server):
-                options = {'endpoint': endpoint, 'state': str(state)}
+            with serve(graph(commit=commit, tags=(annotation,), tag=tag)) as (endpoint, server):
+                options = {'endpoint': endpoint, 'state': str(state), 'tag': tag}
                 module.write_text('import runpy\n' + f"runpy.run_path({str(ROOT / 'tests/manager_review_fixture.py')!r})['install']({options!r})\n")
                 hook.write_text('import ocs_test_manager_review\n')
                 term = Term([str(launcher), 'tui'], *size, env=environment, log=camp.log)
@@ -84,7 +85,7 @@ def exercise(camp, ck, prefix, launcher, env, repo, base):
                     if mode == 'custom-config': credentials.unlink()
                     hook.unlink(); module.unlink()
         ck(exclusion(camp, prefix, busy=False), 'Manager review: all exact origin processes finished, exclusion free, persistent inode preserved')
-        local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, hook, module)
+        local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, hook, module, tag)
     finally:
         if hook.exists(): hook.unlink()
         if module.exists(): module.unlink()
@@ -92,7 +93,7 @@ def exercise(camp, ck, prefix, launcher, env, repo, base):
         if executable.read_bytes() != original: executable.write_bytes(original)
 
 
-def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, hook, module):
+def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, hook, module, tag):
     import signal
 
     from test_66_manager_inventory import exclusion
@@ -113,8 +114,8 @@ def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, h
         pip_site = next((prefix.parent.parent / 'shared').glob('lib/python*/site-packages'))
         pip_hook, pip_module = pip_site / 'ocs_test_policy.pth', pip_site / 'ocs_test_policy.py'
         assert not pip_hook.exists() and not pip_module.exists()
-        with serve(graph(commit=commit, tags=(annotation,))) as (endpoint, server), subreaper():
-            options = {'endpoint': endpoint, 'state': str(state), 'local_validate': True, 'staging': str(stage)}
+        with serve(graph(commit=commit, tags=(annotation,), tag=tag)) as (endpoint, server), subreaper():
+            options = {'endpoint': endpoint, 'state': str(state), 'local_validate': True, 'staging': str(stage), 'tag': tag}
             if mode.startswith('execution'):
                 options['execution_validate'] = True
                 camp.note('owned execution validation transport is substituted in frozen source only; actual pipx/Python/dependency/shared-pip/Git probes, '

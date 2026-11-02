@@ -6,14 +6,18 @@ import sys
 from pathlib import Path
 
 import pytest
-from test_manager_installation import installation as local_installation
+from test_manager_installation import make_installation
 
 from opencode_sandbox import manager_installation as installation_module
 from opencode_sandbox import manager_result as result
 
-installation = local_installation
 SCRIPT_BODY = ("import sys\nfrom opencode_sandbox.launcher import main\n"
                "if __name__ == '__main__':\n    sys.argv[0] = sys.argv[0].removesuffix('.exe')\n    sys.exit(main())\n")
+
+
+@pytest.fixture
+def installation(tmp_path, monkeypatch):
+    return make_installation(tmp_path, monkeypatch, version='6.1.0')
 
 
 @pytest.fixture

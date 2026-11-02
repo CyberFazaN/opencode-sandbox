@@ -79,7 +79,7 @@ def install(options):
         @work(thread=True, group='owned-manager-review')
         def prepare_review(self):
             try:
-                prepared = manager_review.prepare('v6.2.0')
+                prepared = manager_review.prepare(options['tag'])
                 report(prepared=True, identity=prepared.identity, prefix=prepared.prefix,
                        tag=prepared.target.tag, commit=prepared.target.commit)
                 self.call_from_thread(self.show_review, prepared)

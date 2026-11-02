@@ -11,16 +11,22 @@ from opencode_sandbox import manager_installation as i
 
 @pytest.fixture
 def installation(tmp_path, monkeypatch):
+    return make_installation(tmp_path, monkeypatch, version=__version__)
+
+
+def make_installation(tmp_path, monkeypatch, *, version):
+    """Keep a synthetic runtime and all its records on the same explicit version."""
+    monkeypatch.setattr(i, '__version__', version)
     home = tmp_path / 'pipx-home'
     prefix = home / 'venvs/opencode-sandbox'
     bindir = tmp_path / 'custom-bin'
     bindir.mkdir()
     site = prefix / 'lib/python3/site-packages'
-    dist = site / f'opencode_sandbox-{__version__}.dist-info'
+    dist = site / f'opencode_sandbox-{version}.dist-info'
     dist.mkdir(parents=True)
     module = site / 'opencode_sandbox/__init__.py'
     module.parent.mkdir()
-    module.write_text(f'__version__ = {__version__!r}\n')
+    module.write_text(f'__version__ = {version!r}\n')
     python = prefix / 'bin/python'
     python.parent.mkdir()
     python.symlink_to(sys.executable)
@@ -30,13 +36,13 @@ def installation(tmp_path, monkeypatch):
     launcher = bindir / app.name
     launcher.symlink_to(app)
     record = {'pipx_metadata_version': '0.12', 'environment': i.NAME, 'main_package': {
-        'package': i.NAME, 'package_or_url': 'git+' + i.URL + '@v' + __version__, 'package_version': __version__,
+        'package': i.NAME, 'package_or_url': 'git+' + i.URL + '@v' + version, 'package_version': version,
         'apps': [i.NAME], 'app_paths': [{'__type__': 'Path', '__Path__': str(app)}],
         'include_apps': True, 'include_dependencies': False, 'pip_args': [], 'suffix': '',
         'apps_of_dependencies': ['typer'], 'app_paths_of_dependencies': {'typer': [str(prefix / 'bin/typer')]}},
         'source_interpreter': {'__type__': 'Path', '__Path__': sys._base_executable},
         'python_version': 'Python ' + '.'.join(str(n) for n in sys.version_info[:3]), 'venv_args': [], 'injected_packages': {}}
-    direct = {'url': i.URL, 'vcs_info': {'vcs': 'git', 'requested_revision': 'v' + __version__, 'commit_id': 'a' * 40}}
+    direct = {'url': i.URL, 'vcs_info': {'vcs': 'git', 'requested_revision': 'v' + version, 'commit_id': 'a' * 40}}
     def save():
         (dist / 'direct_url.json').write_text(json.dumps(direct))
         (prefix / 'pipx_metadata.json').write_text(json.dumps(record))

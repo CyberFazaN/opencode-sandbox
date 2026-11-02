@@ -119,7 +119,7 @@ You need Linux with Python 3.11 or newer, pipx and Git; install them using your 
 documentation. Install the application from a release tag:
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.2.0
 opencode-sandbox --version
 ```
 
