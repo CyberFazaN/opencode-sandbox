@@ -1,23 +1,32 @@
-name: Feature request
-description: Suggest a change or a new feature.
+name: Feature or improvement request
+description: Suggest new functionality or improve existing OpenCode Sandbox behavior.
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        OpenCode Sandbox manages OpenCode environments on the user's own rootless Docker daemon. It is not a
-        general container manager and does not manage an environment's OpenCode configuration after its first start.
+        Suggest a new capability or an improvement within the [project scope](https://github.com/CyberFazaN/opencode-sandbox/blob/main/CONTRIBUTING.md#scope). No technical design is needed.
+
+        For suspected vulnerabilities, follow [SECURITY.md](https://github.com/CyberFazaN/opencode-sandbox/blob/main/SECURITY.md#reporting-a-vulnerability) instead of opening a public issue.
+        Issues are public. Remove API keys, tokens, credentials, private configuration, personal paths and other sensitive details from text and attachments.
   - type: textarea
     id: problem
     attributes:
-      label: Problem
-      description: What are you trying to do, and what stops you today?
+      label: Problem or limitation
+      description: What are you trying to do, and what makes it difficult today?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposal
-      description: How could OpenCode Sandbox help? Alternatives you considered.
+      label: Desired behavior and benefit
+      description: What would you like to happen, and how would it help you or others?
     validations:
       required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Examples, alternatives or suggestions (optional)
+      description: Share examples, alternatives or workarounds you considered, or implementation ideas if you have them.
+    validations:
+      required: false

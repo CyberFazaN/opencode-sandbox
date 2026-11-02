@@ -138,9 +138,15 @@ environments created from a rebuilt base image work again
 
 ## Reporting a problem
 
-Open an issue on GitHub with the output of `opencode-sandbox --version` and
-`opencode-sandbox doctor`, the command you ran and its full output, your Linux distribution and
-its version, and your Docker and OpenCode versions. Remove keys, tokens and private paths first.
+Use the [issue chooser](https://github.com/CyberFazaN/opencode-sandbox/issues/new/choose) for a bug
+report or feature/improvement request; a blank issue is available when neither form fits.
+For a bug, describe what happened and what you expected. Reproduction steps, environment details
+(application, Linux, Python, Docker and OpenCode versions, plus rootless setup), and relevant
+excerpts from `opencode-sandbox doctor` are helpful when available, not prerequisites. Intermittent
+reports are welcome even without exact steps.
+
+Issues are public: remove API keys, tokens, credentials, private configuration, personal paths and
+other sensitive information from text and attachments before sharing them.
 Arch Linux is the tested host; reports from other distributions are welcome and answered on a
-best-effort basis. Security
-problems: [SECURITY.md](../SECURITY.md), not a public issue.
+best-effort basis. For suspected vulnerabilities, follow the private disclosure process in
+[SECURITY.md](../SECURITY.md#reporting-a-vulnerability), not a public issue.
