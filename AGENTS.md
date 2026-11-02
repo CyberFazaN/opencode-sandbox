@@ -52,6 +52,9 @@ it.
   issues and evidence are references under `docs/engineering/`, not a mandatory reading/update
   checklist. [Record ownership](CONTRIBUTING.md#documentation-and-handoffs) explains when to
   update them; historical checkpoint/STOP notes are not current instructions.
+- Keep temporary plans, investigations, handoffs and verification notes in ignored
+  `.work/agents/<task>/`, never tracked Markdown. Keep permanent instructions concise and durable;
+  follow [documentation hygiene](CONTRIBUTING.md#documentation-and-handoffs), not per-task reporting.
 
 ## Test-resource safety
 

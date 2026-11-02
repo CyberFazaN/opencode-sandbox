@@ -329,9 +329,9 @@ Data retention and foreign-launcher safety have real tests (CAMPAIGN B09–B12).
 
 Current records are BASELINE (state/evidence/gaps), ARCHITECTURE (implementation), DECISIONS
 (rationale), ISSUES (accepted limitations), CAMPAIGN (release risks) and RELEASING (procedure).
-New defects use GitHub issues with authorization/private vulnerability reporting. Substantial
-ongoing work may use one subdirectory record; retire it when durable facts are consolidated.
-Git retains the completed plan. No routine per-action document updates (D-059/D-060).
+New defects use GitHub issues with authorization/private vulnerability reporting. Temporary agent
+plans/handoffs live outside tracked docs under ignored `.work/agents/<task>/` (D-061); only durable
+findings enter the records above. No routine per-action document updates (D-059/D-060).
 
 ## D-046 Host compatibility and evidence
 
@@ -440,7 +440,7 @@ AGENTS owns the product/permission entry point; CONTRIBUTING owns task execution
 verification and resumption. Finish small tasks continuously, group related work and use meaningful
 integration/risk checkpoints, not per-item STOP/commit/full-suite rules. Focused feedback is not
 complete correctness; high-risk boundaries need broader/real proof when warranted. Reuse only
-applicable unchanged evidence with honest scope. One lightweight record suffices for substantial
+applicable unchanged evidence with honest scope. One lightweight local record suffices for substantial
 ongoing work; ordinary tasks need none. Explicit assignment STOPs, dangerous-operation approval,
 blocker/decision handoffs, failure investigation, CI and full release gates remain mandatory.
 
@@ -453,3 +453,10 @@ docs without creating archives; Git retains it. IDs are not renumbered or reused
 copies/caches may be removed only after purpose, ownership, references and active use are checked;
 unknown repositories, persistent data, credentials, recovery state/inputs and protocol lock inodes
 are preserved. This changes no product behaviour, test assertion, CI/release gate or permission.
+
+## D-061 Local-only agent working context
+
+Supersedes D-045's tracked working-record location. Agent plans, investigations, handoffs and
+temporary verification records belong in ignored `.work/agents/<task>/`, never tracked Markdown.
+Only durable current knowledge belongs in permanent docs; CONTRIBUTING owns the concise hygiene,
+completion cleanup and unfinished-work/recovery retention rules. No new framework or routine records.

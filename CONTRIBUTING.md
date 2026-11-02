@@ -89,7 +89,21 @@ CI requirement. The 3.11 floor applies from 6.1.0; the 6.0.0 tag still requires 
 
 ### Documentation and handoffs
 
-Update a document only when its owned facts change, not because a commit happened:
+Before adding documentation, ask: is it current, useful beyond this task, and absent from the
+existing authoritative document? Prefer updating/shortening that document over creating another.
+Permanent docs contain durable architecture/rationale, security invariants, supported procedures,
+limitations and essential development instructions—not task progress, transcripts or intermediate
+decisions. Replace/remove invalidated material; use Git commits/history for ordinary change history.
+
+Keep temporary agent plans, scratch notes, investigations, handoffs and detailed verification
+records in **Git-ignored `.work/agents/<task>/`**, not `docs/`, AGENTS or other tracked Markdown.
+Inspect existing contents and confirm ignore rules before creating a task directory; never overwrite
+unrelated work or force-add these files. Keep only enough local context to resume substantial work.
+After successful completion, remove your disposable task notes; retain anything needed for unfinished
+work, recovery or unresolved investigations until no longer needed. Never delete `.work/` wholesale:
+it can contain repositories, installations and persistent data; preserve protocol locks/recovery inputs.
+
+Update permanent documents only when their owned durable facts change, not after every task/commit:
 
 - User guides and `CHANGELOG.md` ("Unreleased"): changed user-visible behaviour; neither needs an
   entry for internal process edits or every test-only change. Regenerate the dashboard screenshot
@@ -101,20 +115,12 @@ Update a document only when its owned facts change, not because a commit happene
   and unverified limits. `CAMPAIGN.md`: affected release-risk evidence/status, not a duplicate
   development log. `ISSUES.md`: accepted limitations; new defects go to GitHub issues (private
   reporting for vulnerabilities). Do not create/upload issues without the required permission.
-- `TODO.md`: changed backlog/completion status. For substantial multi-session work, keep **one**
-  working record in a subdirectory of `docs/engineering/` (D-045). Keep scope/decisions, completed
-  and pending work, relevant verification/limits, outstanding resource manifests and the next
-  meaningful step. Update at integration/handoff points, not after every action. Link evidence
-  once rather than copying it into a roadmap, baseline and separate handoff. When complete,
-  consolidate only durable facts into their owning records and retire the working record. Retain
-  applicable verification and unresolved-failure/recovery evidence; Git holds completed plans and
-  obsolete history. Inspect ownership, references and active use before deleting generated local
-  artifacts. `.work/` is not automatically disposable: it may contain repositories, installations,
-  recovery inputs or persistent test data. Never delete it wholesale or remove protocol lock files.
+- `TODO.md`: changed backlog priorities/status, not a task progress log. Promote only genuinely
+  durable findings from local notes into the appropriate owner above; do not copy the task narrative.
 
 Routine work needs no persistent plan/progress file: a clear commit (when requested) and concise
 completion summary with checks and limits suffice. On resumption, read AGENTS and applicable local
-instructions, the relevant policy sections and the single active handoff if one exists; check
+instructions, the relevant policy sections and a local handoff if one exists; check
 branch/status and changes since its checkpoint. Reconcile outstanding test resources if relevant.
 After compaction, refresh missing/changed instructions and evidence only; do not reread all large
 reference files or replay tests solely because the session resumed. Historical stage/STOP notes
@@ -219,8 +225,9 @@ report the gap and residual risk, not a PASS. A full default-suite PASS is not r
   build inputs, required refresh/build-path proof or release gates, not for unrelated docs edits.
 - Keep verification evidence brief: command/scope, source checkpoint, relevant environment,
   result (including skips/failures) and unexecuted layers. A completion summary suffices for routine
-  work; substantial checkpoints may link logs in the single working record or BASELINE. No new
-  result-cache framework, parallel runner or shared mutable fixtures are needed for this policy.
+  work. Detailed logs/results stay local; only essential checkpoint summaries and enduring gaps
+  belong in BASELINE/CAMPAIGN, not transcripts. No new result-cache framework, parallel runner or
+  shared mutable fixtures are needed for this policy.
 
 Active text is English (`tests/test_language.py`); documented commands/options must exist
 (`tests/test_cli_structure.py`) and links/anchors resolve (`tests/test_user_docs.py`). Report layers
