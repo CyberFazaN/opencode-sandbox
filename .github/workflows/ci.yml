@@ -71,6 +71,9 @@ jobs:
           if [ "$DEPENDENCIES" = "lowest direct" ]; then python -m pip install typer==0.16.0 textual==4.0.0; fi
           python -m pip check
           python -m pip list | grep -iE '^(typer|textual|click|rich) '
+      - name: External runtime prerequisite
+        working-directory: ${{ env.OCS_CI_PROJECT }}
+        run: python -m pytest -q tests/test_manager_tools.py::test_observed_external_runtime_and_locations_are_independent_without_installing
       - name: Unit, host and Textual pilot tests (ruff and shellcheck included)
         working-directory: ${{ env.OCS_CI_PROJECT }}
         run: python -m pytest -q -rs -p no:cacheprovider

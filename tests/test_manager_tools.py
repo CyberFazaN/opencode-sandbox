@@ -56,11 +56,26 @@ def test_unclassified_installation_cannot_trigger_external_execution(monkeypatch
     assert not result['supported'] and 'classification' in result['reason']
 
 
-def test_observed_external_runtime_and_locations_are_independent_without_installing(tools):
+def test_observed_external_runtime_and_locations_are_independent_without_installing(tools, monkeypatch):
     evidence, launcher, package, metadata = tools
     before = {path: path.read_bytes() for path in [launcher, *package.glob('*.py'), *metadata.iterdir()]}
+    original_call, refusals = c.call, []
+
+    def diagnostic_call(argv, **kwargs):
+        completed = original_call(argv, **kwargs)
+        try:
+            value = json.loads(completed.stdout.splitlines()[-1])
+        except (ValueError, IndexError):
+            value = None
+        # This positive fixture executes only the fixed source and owned version-only pipx.
+        # Failure reasons are static probe messages; never print raw stdout/stderr or evidence.
+        if isinstance(value, dict) and value.get('ok') is False:
+            refusals.append(value.get('reason'))
+        return completed
+
+    monkeypatch.setattr(c, 'call', diagnostic_call)
     result = manager_tools.assess(evidence)
-    assert result['supported'], result
+    assert result['supported'], {'assessment': result, 'probe_refusals': refusals}
     facts = result['evidence']
     assert facts['pipx_runtime']['pipx_version'] == '1.18.7'
     assert facts['settings']['PIPX_HOME'] == evidence['evidence']['pipx_home']

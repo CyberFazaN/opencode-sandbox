@@ -57,7 +57,7 @@ def test_ubuntu_tests_copy_the_complete_python_runtime_without_changing_the_host
     assert r'patchelf --set-rpath "\$ORIGIN/../lib"' in section
     assert 'cp -a "$GITHUB_WORKSPACE/." "$private_project/"' in section
     assert 'chmod -R go-w "$private_project"' in section
-    assert section.count('working-directory: ${{ env.OCS_CI_PROJECT }}') == 2
+    assert section.count('working-directory: ${{ env.OCS_CI_PROJECT }}') == 3
     assert "sudo" not in section and "/opt/hostedtoolcache" not in section
 
 
