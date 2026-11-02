@@ -12,8 +12,7 @@ OpenCode Sandbox is an independent open-source project. It is not affiliated wit
 the OpenCode project, and it is unrelated to other projects with similar names.
 
 > [!IMPORTANT]
-> **Beta, written by an AI agent.** Version 6.0.0 was the first public release; 6.1.0 is a
-> compatibility and reliability update. The code, tests and documentation were written with
+> **Beta, written by an AI agent.** The code, tests and documentation were written with
 > OpenCode and Claude Opus 5.5, with minimal human review. The evidence for its behaviour is
 > the automated test suite and a test campaign on real rootless Docker, run on Arch Linux only (see [Tested environment](#tested-environment)); there has been no
 > independent human security review. Expect defects, read the [security model](docs/security.md),
@@ -92,8 +91,8 @@ Details: [docs/security.md](docs/security.md).
 | Component | Tested |
 |---|---|
 | Host, real rootless Docker | Arch Linux, kernel 7.2: the full test campaign |
-| Host, hosted CI only | Ubuntu 26.04 (GitHub's runner): unit tests with a simulated Docker, pipx installation (recorded for 6.0.0 on Python 3.14.9) |
-| Python | 3.11.18 and 3.14.8, the lowest and the newest supported versions. 3.12 and 3.13 are accepted but not tested separately |
+| Host, hosted CI only | Ubuntu 26.04: simulated-Docker tests, package and pipx checks on Python 3.11/3.14; rolling Arch userland tests as an unprivileged user (recorded for 6.1.0) |
+| Python | Local endpoints 3.11.18 and 3.14.8; hosted 6.1.0 checks used 3.11.17 and 3.14.9. Python 3.12/3.13 are accepted but not tested separately |
 | Docker | 29.9.2, rootless, slirp4netns |
 | pipx | 1.18.7 |
 | Typer, Textual | 0.27.3, 8.2.8 |

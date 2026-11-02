@@ -94,8 +94,9 @@ Update a document only when its owned facts change, not because a commit happene
 - User guides and `CHANGELOG.md` ("Unreleased"): changed user-visible behaviour; neither needs an
   entry for internal process edits or every test-only change. Regenerate the dashboard screenshot
   with `python tests/dashboard_screenshot.py` when its layout changes.
-- `docs/engineering/ARCHITECTURE.md`: changed design/module boundaries. `DECISIONS.md`: an actual
-  accepted decision changes; append a superseding decision rather than erasing the rationale.
+- `docs/engineering/ARCHITECTURE.md`: current design/module boundaries. `DECISIONS.md`: essential
+  rationale and constraints for current decisions; append a superseding decision when the contract
+  changes. Remove obsolete implementation narratives; Git retains superseded detail (D-060).
 - `docs/engineering/BASELINE.md`: changed supported state, meaningful verification checkpoints
   and unverified limits. `CAMPAIGN.md`: affected release-risk evidence/status, not a duplicate
   development log. `ISSUES.md`: accepted limitations; new defects go to GitHub issues (private
@@ -105,8 +106,11 @@ Update a document only when its owned facts change, not because a commit happene
   and pending work, relevant verification/limits, outstanding resource manifests and the next
   meaningful step. Update at integration/handoff points, not after every action. Link evidence
   once rather than copying it into a roadmap, baseline and separate handoff. When complete,
-  consolidate only durable facts into their owning records and retire the working record;
-  preserve reproducible evidence and history in Git and ignored `.work/` logs.
+  consolidate only durable facts into their owning records and retire the working record. Retain
+  applicable verification and unresolved-failure/recovery evidence; Git holds completed plans and
+  obsolete history. Inspect ownership, references and active use before deleting generated local
+  artifacts. `.work/` is not automatically disposable: it may contain repositories, installations,
+  recovery inputs or persistent test data. Never delete it wholesale or remove protocol lock files.
 
 Routine work needs no persistent plan/progress file: a clear commit (when requested) and concise
 completion summary with checks and limits suffice. On resumption, read AGENTS and applicable local

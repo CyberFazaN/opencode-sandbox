@@ -82,9 +82,8 @@ highest supported stable version even if npm's latest tag moves to another major
 are excluded by default. An exact compatible alternative, including a prerelease, can be selected
 with `--version`. Unsupported majors are never installed. OpenCode in a sandbox is installed and updated only by the manager:
 every container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`, so OpenCode's own update check and
-self-update (also `update: auto` in your OpenCode configuration) are off. An `opencode upgrade`
-inside a container left world-writable files, about 940 MB of platform packages and a 470 MB
-npm cache in `/root`, and on Arch a broken binary.
+self-update (also `update: auto` in your OpenCode configuration) are off. The upstream updater
+has left unsafe permissions/caches and broken the Arch binary; use the manager's update commands.
 
 `opencode rollback-base` verifies a copy against the installed manager's current OS definition.
 A Debian-13 manager therefore refuses a Debian-12 base rollback copy; this is not an in-place
@@ -140,15 +139,12 @@ probe has a five-second container-side limit; the host client gets three extra s
 transport/completion. Image definition/tool verification has a separate 30-second probe limit.
 Timeout or unavailable tooling is not a verified version, a missing image, or an up-to-date result.
 
-Container probes require a compatible GNU `timeout` tool (present in the registry images); a
-custom image without it is not probed without a bound. A cancelled host client may leave its
-command running briefly, but the container-side timer still bounds the ordinary probe process
-group. Named image helpers run with network disabled and no implicit pull. Interrupted helpers
-get bounded cleanup by invocation labels and full container ID, never by a name alone; if removal
-cannot be confirmed, the error names the helper for later `disk cleanup --yes` after Docker is
-available and the helper has stopped. Checks never stop an existing environment. These limits do
-not impose short deadlines on builds, installs, checkpoints/commits, or interactive user commands;
-canceling a dashboard check is not a claim that a mutation was canceled or rolled back.
+Container probes require compatible GNU `timeout` (present in managed images); missing tooling
+never permits an unbounded probe. Cancellation stops owned host checks, not necessarily remote exec
+immediately; container timers and label/full-ID helper cleanup remain responsible. An unreachable
+daemon can leave a named unconfirmed helper. [Readiness/cleanup limits](maintenance.md#readiness-checks)
+apply; they never impose short deadlines on builds, installs, commits or interactive commands, or
+mean an approved mutation was canceled/rolled back.
 
 **Concurrent base operations.** Builds and rollback share daemon/distribution guards across
 data directories and context aliases. A long build does not block creation from the current

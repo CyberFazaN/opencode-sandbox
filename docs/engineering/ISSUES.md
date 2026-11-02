@@ -1,10 +1,9 @@
 # Known issues and accepted limitations
 
-The known issues of the current release that are not fixed, and the limitations accepted by
-design. New problems are tracked in GitHub issues; this file lists what remains true for the
-current release, with the decision or document that describes it. User-facing statements of the
-same limitations are in [docs/security.md](../security.md#known-limitations) and the guides.
-Problems fixed in a release are described in `CHANGELOG.md`, their evidence in `BASELINE.md`.
+Current checkout limitations and accepted design tradeoffs. New defects belong in GitHub issues;
+vulnerabilities use private reporting. User-facing limits are in
+[security.md](../security.md#known-limitations). BASELINE owns verification gaps; CAMPAIGN owns
+release blockers. A supported design limitation is not evidence that an untested path works.
 
 ## Product limitations (by design)
 
@@ -40,7 +39,7 @@ Problems fixed in a release are described in `CHANGELOG.md`, their evidence in `
 | pacman downloads from a mirror can stall during Arch image builds | Mitigated: the builds retry pacman three times |
 | Retained Debian 12 environments receive LTS security support only (until 2028-06-30) | The current default definition is Debian 13; manager/base upgrades do not upgrade retained containers. A system backup keeps the old OS; only an explicit new environment or no-system restore chooses the new local base |
 | Base rollback verifies the installed manager's current OS definition | `rollback-base` on the Debian-13 manager refuses a Debian-12 base copy; old copies are not deleted automatically, and retained Debian 12 environments/system backups remain usable. It is not an OS downgrade mechanism |
-| Manager update support is conservative, not code attestation or guaranteed rollback | Public exact review/terminal handoff, frozen independent execution checks, exact pipx replacement and verify-only recovery are implemented. Only inspected pipx 1.18.7/default options and public-default client policy are supported; detected custom settings, foreign/shadowed/ambiguous launchers require manual preservation, never takeover or silent removal. Requires Linux pidfds, flock fdinfo, parent-death/subreaper support and a restored original foreground tty; no normal-CLI exemption or unsafe fallback. HTTPS/PEP 610/RECORD facts are not signed-code authentication or a complete lazy-file inventory, and host build/site/tool code is not sandboxed. A hard-killed helper may leave escaped descendants: unknown same-boot quiescence stays blocked even after the old group is empty; a reboot may be needed before explicit verification. Actual post-reboot recovery remains unexecuted. Previous-tag reinstall is manual guidance, not identical dependency restoration or guaranteed offline recovery. Older managers/direct library calls/external pipx/Docker and hostile same-UID code do not honor these locks |
+| Manager update is conservative, not code attestation or guaranteed rollback | Only inspected pipx 1.18.7/default options/public client policy and supported Linux pidfd/flock/parent-death/subreaper/foreground-tty facilities; custom/foreign/ambiguous installs require manual preservation. Host build/site/tool code is trusted, not sandboxed. Hard-kill unknown quiescence blocks same-boot recovery even with an empty old group; actual post-reboot recovery remains unverified (B15). Previous-tag reinstall does not restore identical dependencies or promise offline recovery. External tools/old managers do not honor the locks. Exact protocol: [ARCHITECTURE](ARCHITECTURE.md#manager-update-and-independent-recovery); operation/recovery: [installation guide](../install.md#failed-or-interrupted-manager-update) |
 
 ## Not verified
 

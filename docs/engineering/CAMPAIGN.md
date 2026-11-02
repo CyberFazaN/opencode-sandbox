@@ -9,282 +9,32 @@ containers, volumes and images, and the privileged rows use `sudo` and restart t
 Arch Linux is therefore the only host with real evidence; the matrix has no rows for other host
 distributions (D-046).
 
-How to run the unit suite and the real campaign: `BASELINE.md` ("Commands") and
-`CONTRIBUTING.md`. Results of the latest pre-release run, with the platform versions:
-`BASELINE.md` ("Verification"). Unless noted otherwise, test files named without a directory are
+Commands and development test selection: [CONTRIBUTING](../../CONTRIBUTING.md#test-layers).
+Release procedure: [RELEASING](RELEASING.md#2-verify). Applicable evidence/platform versions:
+[BASELINE](BASELINE.md#verification). Unless noted otherwise, test files named without a directory are
 in `tests/integration/` (the real campaign: every check is logged with the row ID it belongs
 to); files under `tests/` are the unit, host and Textual pilot suite.
 
-After D-048, C10 (D-052) and the implemented manager update gates B13–B15, 87 rows are active. Installer-only rows B02–B08
-are retired, not passed or renumbered; their original evidence remains in the released 6.0.0
-record in Git history and BASELINE. Unless a later verification is stated, PASS means the
-historical 6.0.0 evidence for the retained behaviour; "6.1.0 candidate" marks evidence from the
-complete verification of the 6.1.0 implementation. I04 and I06 must be re-established on the
-release tree. B01 retains the manager's refusal of another user's daemon when run as
-root; retiring installer checks does not retire that boundary.
+There are 87 active rows. Retired installer-only IDs B02–B08 are not reused or counted as passed.
+Statuses are **recorded scoped evidence, not a current candidate's release result**: plain real
+PASS refers to retained earlier-release behaviour; rows naming the 6.1.0 candidate/release or a
+later run have that specific scope. I04/I06 and affected rows must be re-established on the release
+tree. B01 still tests manager refusal as root. Do not infer full-campaign/Python/host coverage from
+a focused run, a private source fixture or a historical PASS.
 
 ## Updates final integration
 
-UP-00..UP-18/PERF development is complete locally, unpublished; no release recommendation follows.
-`up18-final` passed **31 affected real tests / 1146 checks**, 1381.67 s, no skips/deselections:
-both distributions' packaged/retained base races, bounded probes, actual OpenCode/lifecycle evidence,
-80x24/larger Updates/discovery/environment/base actions and independent recovery, actual pipx
-lifecycle/provenance, session/exec exclusion, and public manager CLI/TUI replacement/recovery.
-New native manager cases cover default/custom-space paths, failed target health, manual previous-tag
-reinstall plus frozen fresh verification, handled native interruption/escaped descendant cleanup,
-hard helper death/startup blocking and lost-terminal durable completion. Private source/API/clone
-transports are declared fixtures, not public release authentication. All original assertions remain.
-
-Complete unit/host/pilot results are **2220 passed / 86 opt-in skips** per selected compatibility
-result, with **2306 identical ordered outcomes** across Python 3.11/3.14 and current/lowest direct
-dependencies. The initially failed 3.14/lowest complete result was preserved and repeated after
-fixing one fixture rendezvous race and daemon-before-npm preflight ordering; **124 affected cases**
-also passed at all four endpoints. Full command/scope/source hashes and package/static evidence:
-[BASELINE](BASELINE.md#updates-final-integration). No unchanged full real campaign was replayed.
+The component Updates implementation is complete on `develop`, not released. Applicable final
+integration commands/results/limits are recorded once in
+[BASELINE](BASELINE.md#updates-final-integration); intermediate phase diaries are in Git.
 
 New B13/B14 have real evidence; B15's hard-kill refusal is real PASS but actual post-reboot recovery
 is **BLOCKED, approval not granted and residual risk not accepted**. Next step: on an authorized
 disposable VM, retain a named hard-interrupted operation, reboot, perform an explicit manual repair
 only if needed, then run its original frozen verification command and check normal startup/data
 retention. No automatic reboot, reset, stale-PID signal or cache-based reopening is allowed.
-This and any release-tree/privileged/socket/model/manual rows not run here remain release gates;
-the following earlier checkpoint and 6.1.0 PASS evidence is historical where not explicitly renewed.
-
-### Earlier Updates checkpoint evidence
-
-These dated phase records retain their scope/failure trail; then-pending/disabled stages are not
-current product status or fresh verification of unexecuted layers. The working record is retired.
-
-Unpublished Updates work (D-056): UP-01 corrects shared reports and Agent Context heading/fallback;
-UP-02 preserves independent local/registry inventory results and surfaces partial failures. New
-report evidence at that checkpoint was unit/host/pilot only (BASELINE). The real/pty
-PASS entries below are historical, not new verification of these changes; report-specific
-real-terminal and live-source checks remain to be re-established in UP-18.
-
-UP-03 adds host-process locking/revalidation regressions and scoped real build/swap/rollback/
-cleanup/creation races (`test_42_base_coordination.py`) across data directories and canonical
-context aliases. Retained-image fixtures pass on Debian 12 and Arch with real OpenCode version
-and tool verification, not model-provider or current-definition freshness evidence. The initial
-packaged-definition attempts were DNS-blocked; after DNS recovered in UP-04, Debian 13 and Arch
-packaged builds/races passed. UP-04 extends the same test with real CLI list/explicit selection,
-multi-copy `--yes` refusal, alias retag after consent refusal, exact immutable publication and
-replaced-base preservation. All four packaged/retained cases passed with running containers and
-writable-layer markers intact (76 checks). Full campaign/pty evidence is not renewed by these
-scoped tests; checkpoint commands remain in Git and final gates are qualified above.
-
-UP-05 adds host-process/loopback-HTTP deadlines, cancellation/reaping and 80x24 pilot regressions.
-`test_43_diagnostics.py` covers real bounded exec/image probes on retained Debian/Arch, canceled
-client cleanup, missing timeout-tool refusal/restoration, no stopped-environment startup and
-writable-layer preservation. Together with the four base-race variants: **6 tests/106 checks
-passed**, final `up05-final`. The initial missing-tool stdout classification failure was fixed
-and rerun, not suppressed. These scoped results do not renew full campaign, privileged,
-model-provider or real-terminal/manual evidence; no release-readiness claim follows.
-
-UP-06 adds 26 mocked-check/pilot regressions at 80x24/100x30 for category-owned advisory clearing,
-unknown/repeated/overlapping results, progress ownership and cancellation-safe publication.
-The full unit/host/pilot suites pass on all four Python/dependency combinations (BASELINE).
-No new real-Docker/OpenCode, advisory-specific real-terminal or manual observation is claimed;
-earlier scoped real PASS entries are not renewed by this UI-only change. D-057 consolidates
-remaining work packages/dependencies, not the independent recovery/safety verification gates.
-
-UP-07/UP-08 add 125 default-suite cases for identity-bound version history, disposable cache
-safety, compatible stable resolution, exact targets and explicit policy comparisons; all four
-full compatibility suites pass. Scoped real `test_43_diagnostics.py` +
-`test_44_version_evidence.py`: **4 tests/72 checks passed**, `up0708-final`, on retained Debian
-12/revision 1 and Arch/revision 1. Includes real binary update/rollback, same-version verification,
-stopped no-start checks, SIGKILL recovery, recreation/file-only restore invalidation, preserved
-configuration/data and bounded probe cleanup. No fresh base build, full campaign, model-provider,
-installed-manager/pipx or report-specific real-terminal/manual evidence is renewed by this scope.
-The initial real-test fixture-marker failure was corrected and rerun, not skipped. Release gates
-and historical PASS qualifications below are unchanged.
-
-UP-10's independently useful manual/cached UI was verified before optional UP-09 scheduling
-(approved split checkpoint). Four full compatibility suites: **1365 passed,
-68 opt-in skips each**; 39 new default-suite cases plus retained/migrated report assertions.
-Scoped real `test_43_diagnostics.py test_44_version_evidence.py test_51_updates.py`:
-**8 tests/136 checks passed**, `up10-verified`, 193.19 s. New terminal rows exercise both retained
-distributions at 80x24/120x40, actual loopback HTTP and base probes, source failure/cancel,
-visible controls despite advisories, no stopped startup/metadata change and terminal restoration.
-Initial terminal evidence failed (4 teardown errors/30 failed checks); advisory overlays and
-test key-sequence errors were fixed and rerun, not waived. Transient final helpers are named,
-labeled and manifested. Existing image IDs remain; guarded cleanup leaves no containers/volumes.
-No full `test_50_tui.py` rerun, full campaign, fresh definitions/build, installed-manager/pipx,
-provider, privileged/socket/service or manual-observation evidence is implied. Release gates
-and historical PASS qualifications remain unchanged.
-
-UP-09 completes optional daily npm discovery with **42 new default-suite cases**, four complete
-compatibility suites (**1407 passed/72 opt-in skips each**) and **12 affected real tests/200 checks**,
-`up09-verified`, 178.60 s: `test_43_diagnostics.py`, `test_44_version_evidence.py`, `test_51_updates.py`,
-`test_52_discovery.py`. New keyboard-only daily-discovery rows on both retained distributions at
-80x24/120x40 cover default off, persisted opt-in/out, one quiet policy-filtered cached indicator,
-fresh processes after success/failure, explicit early checks, no implicit runtime/image probes
-or mutation (actual Docker argv recorded), unchanged stopped state/startup time/metadata and
-restored terminals. Initial new terminal run had three failed checks from a harness regex error;
-corrected, not waived. Unit/host/pilot rows additionally prove actual interruption before HTTP,
-thread/process overlap, Retry-After/clock/storage failure and cancellation/reaping. All real
-attempts cleaned behind the product guard; no containers/volumes/helpers leaked and four original
-image IDs stayed unchanged. Earlier scope qualifications and full-release gates remain unchanged;
-there is no GitHub discovery, new full campaign, fresh build or installed-manager evidence here.
-Final review narrowed coalescing so cached-only lock contention cannot replace explicit fresh
-discovery, then reran the matrix/real gate. A rerun hit tmpfs inode exhaustion (379 setup errors);
-only manifested current-run pytest roots were removed, logs retained, complete suites rerun clean.
-
-UP-11's environment actions and independent recovery gate pass: **64 new default-suite cases**,
-four complete compatibility suites (**1471 passed/78 opt-in skips each**) and **18 affected real
-tests/400 checks**, `up11-verified`, 489.49 s (`test_43`, `test_44`, `test_51`, `test_52`, new
-`test_53_environment_updates.py`). New terminal rows use both retained distributions at 80x24/
-120x40 for explicit Start, policy/pin consent and refusal, actual target installation/stopped
-completion, entire-system-layer rollback and actual later-layer snapshot preservation. Separate
-recovery rows exercise real SIGKILL, missing checkpoints, failed removal, persisted successor
-journal/error, existing config recovery and direct Recovery Center success; restored binary,
-configuration/data and normal terminal restoration are checked. Initial terminal failures and
-the lowest-dependency event-ownership failure were fixed/rerun, not waived (BASELINE/roadmap).
-Final review also routes older Recovery errors into a bounded scrollable pane, not collapsed
-toasts; new regressions and the complete/real gates above include that correction.
-All real attempts use guarded cleanup and retain manifests/evidence; no containers/volumes/helpers
-remain and four original tagged-image IDs are unchanged. This is not full-campaign, fresh-image,
-installed-pipx, paid-provider, privileged/service, manual-observation or release-readiness evidence.
-
-UP-12/UP-13 base actions/refresh: **54 new default cases**, four complete suites (**1525 passed,
-80 opt-in skips each**), and the affected real gate **24 tests/581 checks passed**,
-`up1213-reviewed`, 928.47 s. Includes packaged/retained base race rows (`test_42`), all existing
-affected diagnostics/version/Updates/discovery/environment-recovery rows (`test_43`, `test_44`,
-`test_51`..`test_53`), and new both-distribution cached/full-refresh/base-terminal rows (`test_54`).
-Cached and pull/no-cache package-layer builds have separate real evidence. Explicit official
-Docker Hub upstream aliases in copied FROM lines keep retained upstream tags read-only; no
-definition/tool/binary assertion is weakened. Real failure injection runs after actual candidate
-verification; current base, copies, pins, retained containers/layers and cleanup are checked.
-Single/multi-copy rollback, both mode confirmations and app-owned terminal progress/Close/Quit
-behavior pass at 80x24/120x40. Initial harness/expectation errors and final UI priority correction
-were recorded and rerun, not waived (BASELINE/checkpoint Git history). Ending daemon has zero containers/
-volumes/helpers, unchanged original four image IDs, and no test tags/aliases; build cache stays
-intact. No complete campaign, installed-pipx/manager, paid-provider, privileged/service or manual
-observation is renewed; release gates/historical release evidence remain unchanged.
-
-UP-14/UP-15 manager discovery/classification: **86 new default cases**, four complete suites
-(**1611 passed/82 opt-in skips each**) and **26 affected real tests/637 checks passed**,
-`up1415-final`, 981.42 s. Prior 24 affected base/race/diagnostic/lifecycle/restore/discovery/
-environment-recovery/base-terminal rows rerun unchanged in strength. New `test_66` covers actual
-isolated pipx default/custom-space locations, source/Python/VCS/launcher agreement, unsupported
-settings, foreign/PATH-shadowed launchers and actual foreign/editable installs. Installed-manager
-pty checks at 80x24/120x40 use a loopback release-source hook only, retain real invocation/records,
-keep local/cached evidence on remote failure, leave Update disabled and restore terminals. The
-declared local Git URL rewrite is transport-fixture evidence, not public-release authenticity or
-manager replacement/handoff/recovery evidence. An independent official unauthenticated GitHub GET
-found published v6.1.0; no paid API/login/upload. All intermediate default-metadata/template/harness
-failures were retained, fixed and rerun (BASELINE/roadmap). No complete campaign or manual/
-privileged/socket/service claim. Final daemon inventory has no containers/volumes/helpers and
-unchanged original four image IDs; build cache and persistent locks remain intact.
-
-UP-16 first safety checkpoint (partial task): **44 new default cases**, four complete suites
-(**1655 passed/84 opt-in skips each**, identical 1739 ordered outcomes), and **29 affected real
-tests/702 checks passed**, `up16a-final`, 1047.39 s. The previous 26 affected rows rerun with actual
-default/custom-space bootstrap launchers and live installed-dashboard shared/exclusive assertions.
-Full isolated `test_65` pipx install/upgrade/downgrade/uninstall/data-retention/foreign-launcher
-checks now test a private current-package snapshot; no published/source tag is changed. New
-`test_67` proves both distributions' real attached shells and long Docker exec hold usage leases;
-the base terminal rows also refuse exclusive access during approved mutations. Failed initial
-fixture/tag/marker attempts are retained in BASELINE/roadmap, fixed and rerun without waived
-assertions. No containers/volumes/test tags remain; original four image IDs, shared build cache
-and persistent protocol inodes are preserved. No independent helper/verifier/terminal-handoff,
-manager replacement/recovery, complete campaign, privileged/service or manual-observation claim.
-Manager Update remains disabled; **UP-16 is not complete**.
-
-UP-16 second trust checkpoint (still partial): **47 new default cases**, four complete suites
-(**1702 passed/84 opt-in skips each**, identical 1786 ordered outcomes), and **29 affected real
-tests/714 checks passed**, `up16b-final`, 1222.86 s. All prior affected rows/assertions retained.
-Actual external pipx 1.18.7/dependency/runtime checks preserve default/custom-space effective
-locations and the recorded source-Python path, work while the owned manager venv is temporarily
-absent, refuse an in-target console despite an outside shebang, and leave app bytes unchanged.
-Synthetic host/process cases separately cover lazy/missing declared paths, runtime/import/search/
-symlink-route dependence, unsafe/unknown settings, output secrecy and cancellation/reaping. A
-source-Python normalization reproducer and Python 3.14's missing-RECORD filtering failure were
-fixed without weakening assertions; the four complete suites and all 29 real rows then reran.
-No startup/status/UI consumer, helper artifact/lifetime transfer, fresh-verifier bypass, terminal
-handoff or replacement exists here; ordinary terminal-restoration evidence is not a handoff proof.
-No containers/volumes/test tags remain, all original image IDs unchanged, all persistent inodes/
-evidence/build cache preserved. **UP-16 is not complete; Manager Update remains disabled.**
-
-Latest UP-16 artifact/lifetime checkpoint (still partial): **61 new default cases**, four complete
-suites (**1763 passed/84 opt-in skips each**, identical **1847** ordered outcomes) and **29 affected
-real tests/732 checks**, `up16c-verified`, 1032.84 s. All prior affected rows/assertions retained.
-Actual default/custom-space installed packages freeze the stdlib helper outside their venv; the
-origin keeps usage during worker shutdown, then exits while its owned venv is hidden, and the
-frozen external helper acquires exclusion and exits. Supervisor explicitly adopts/reaps that exact
-child; source/launcher bytes unchanged, hidden venv restored before uninstall. Host tests cover
-thread-pool/non-daemon main-return/EOF versus actual death, armed/unarmed interruption, another
-instance, malformed protocol/budgets, spawn signals, private artifact preservation and descriptor/
-environment isolation. Final-review huge-integer budget failure fixed without weakening assertions;
-all four complete suites and the whole affected real gate rerun afterward. No containers/volumes/
-test tags remain and original image IDs are unchanged; persistent inodes/evidence/build cache
-preserved. **Not verifier access or restored-terminal handoff**: no CLI/TUI/startup consumer or
-mutation path; Manager Update stays disabled. Existing ordinary terminal checks are not promoted
-as helper-handoff proof. Full commands/failure trail/limits: BASELINE and the Updates working record.
-
-UP-16 fourth verifier-access checkpoint (still partial): **59 new default cases**, four complete
-suites (**1822 passed/84 opt-in skips each**, identical **1906** ordered outcomes) and **29 affected
-real tests/762 checks**, `up16d-final`, 996.24 s. All earlier assertions/rows retained. Actual
-default/custom-space installs run one fixed fresh read-only runtime query under helper exclusion;
-ordinary startup remains refused. A manifested early site descendant stays alive after helper/
-verifier death while exclusion is demonstrably free, then is explicitly terminated/reaped. No
-exclusive descriptor crosses exec: only an independent unlocked read-only witness, validated
-against the live owner's exact kernel lock record, then closed before query. Existing source/
-record/launcher bytes unchanged and operational, all original images unchanged, no containers/
-volumes/test tags/owned process leaks. Prior locked-descriptor design failed the unchanged
-descendant reproducer and was replaced; a procfs observation race failed the fourth initial suite,
-was corrected with strict disappearance/permission/live-PID regressions, then all four complete
-suites and all 29 real rows reran. Evidence/failure trails in BASELINE/working record. **Not expected
-source/launcher/basic-CLI/replacement verification or restored-terminal handoff**; no CLI/TUI/
-startup consumer or install path. Manager Update remains disabled, UP-16 partial. Persistent
-inodes/evidence/build cache preserved; no complete campaign/manual/privileged/release claim.
-
-UP-16 final restored-terminal checkpoint (2026-11-01): **39 new default cases**, four complete
-suites (**1861 passed/84 opt-in skips each**, all **1945** ordered outcomes identical), and the
-same **29 affected real tests/872 checks**, `up16e-verified`, 1183.76 s. Actual default/custom-space
-pipx packages each run seven new terminal scenarios, with a test-only injected key and no product
-trigger: real driver/tty restoration before arming, implicit 80x24/explicit 120x40, actual origin
-shutdown drain, live/canceled worker refusal then real Debian/Arch start, actual Docker shell
-client/session refusal/return, changed tty-mode refusal, and another installed dashboard's busy
-exclusion. No source/launcher/expected replacement-result or recovery claim. Configuration recovery
-retains app ownership through Close; process-lifetime usage/pidfd/unlocked verifier witness remain
-unchanged. First fixture failures exposed isolated HOME hiding rootless contexts; identity refused
-correctly. Existing read-only DOCKER_CONFIG preserved as in pipx lifecycle tests, no context or
-identity patch; failed evidence retained. Optional host renderer/import-path review then all four
-complete suites and all 29 real rows reran. **UP-16 complete for non-mutating handoff only**, no
-public action/command/env trigger or updater. Manager Update disabled until independent UP-17 gates.
-Original images unchanged, no containers/volumes/test tags/owned process leaks; no complete
-campaign/manual/privileged/release-readiness claim. Evidence/failure trail/commands: BASELINE and
-Updates roadmap. No bump/merge/push/upload/remote change/project tag/publication.
-
-UP-17 first exact-source checkpoint (2026-11-01): four complete compatibility suites (**1959
-passed/84 opt-in skips each**, **2043** ordered outcomes identical), **98 new default cases**
-(97 source/transport/cache/concurrency/refusal cases, one required-package-module check), and
-the unchanged **29 affected real tests/888 checks**, `up17a-final`, 1135.62 s. Default/custom-space
-actual installed pipx packages add real private annotated Git object/commit resolution, separate-
-process fresh same-target revalidation, moved-target refusal, HTTP 429/restarted shared throttling,
-and unchanged operational installed records/launcher; all prior real terminal/helper/verifier/
-exclusion/lifecycle assertions retained. This proves private transport/installed behavior, **not
-public release authenticity**, signed-tag authentication, installation consent, expected-build/
-replacement success or recovery. UP-17 remains partial and Manager Update disabled. Final four
-suites/full affected real gate ran after the test-style lint correction; failed evidence retained,
-no assertions relaxed. No original image/container/volume/owned-process leak; no complete campaign,
-manual/privileged/release-readiness claim. Commands, counts, failure trail and boundaries: BASELINE
-and Updates roadmap. No bump/merge/push/upload/remote change/project tag/publication.
-
-UP-17 second exact-origin review checkpoint (2026-11-01): four complete compatibility suites
-(**2038 passed/84 opt-in skips each**, **2122** ordered outcomes identical), **79 new default cases**
-(66 origin review, 10 pilots, two package gates, one UI error-report contract), and the unchanged
-**29 affected real tests/954 checks**, `up17b-final`, 1103.14 s. Both actual installed pipx layouts
-add six console/pty scenarios: explicit target/public-network consent and fresh origin revalidation
-at 80x24/120x40, default Cancel, changed actual launcher refusal, custom index environment and
-credential-file presence refusal without secret output. Original records/launcher bytes operational
-and unchanged after exact owned fault restoration. All prior source/helper/verifier/terminal/
-both-distro lifecycle/exclusion assertions retained. Initial input-batching fixture failure preserved;
-separate rendered/policy/navigation steps and keyboard-only pilot regressions, no assertions/budgets
-relaxed. **Origin-side only**: no independent post-exit/exclusive validator, effective installer
-network policy, helper payload, replacement/expected installed result or recovery. UP-17 partial,
-Manager Update disabled. Private Git/API/site injection is not public authenticity or human proof.
-No full campaign/privileged/release-readiness claim; no bump/merge/push/upload/project tag/publication.
+This and release-tree/privileged/socket/model/manual rows not renewed by the development run remain
+release gates. The following table retains the precise existing row-level evidence and limitations.
 
 ## Legend
 

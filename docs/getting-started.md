@@ -9,8 +9,9 @@ This walk-through assumes the application is installed and Docker is prepared
 opencode-sandbox doctor
 ```
 
-Every line should say `[passed]`, and the daemon identity must be `verified`. If not, see
-[troubleshooting.md](troubleshooting.md). Build a base image if `doctor` reports none:
+The daemon identity must be `verified`; read any resource, image or storage warnings too. Exit 0
+does not certify every advisory or measured resource enforcement. See
+[troubleshooting.md](troubleshooting.md) for failures. Build a base image if `doctor` reports none:
 `opencode-sandbox build`.
 
 ## 2. Store a provider key
