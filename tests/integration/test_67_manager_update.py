@@ -103,8 +103,10 @@ def test_real_pipx_exact_replacement_and_independent_recovery(campaign, checks, 
         camp._run([*git, 'tag', '-a', tag, '-m', 'owned updater fixture only'], check=True)
         return (camp._run([*git, 'rev-parse', tag + '^{commit}'], check=True).stdout.strip(),
                 camp._run([*git, 'rev-parse', tag], check=True).stdout.strip())
-    previous, _ = commit('v6.1.0')
     version_file = repo / 'src/opencode_sandbox/__init__.py'
+    # Own synthetic version pair, independent of the release being qualified.
+    version_file.write_text('__version__ = "6.1.0"\n')
+    previous, _ = commit('v6.1.0')
     version_file.write_text('__version__ = "6.2.0"\n')
     target, annotation = commit('v6.2.0')
     cli = repo / 'src/opencode_sandbox/cli.py'; original_cli = cli.read_bytes()

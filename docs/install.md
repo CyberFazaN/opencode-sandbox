@@ -31,7 +31,7 @@ either one on any host; they are independent of the distribution your host runs.
 ## Install the application
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.2.0
 opencode-sandbox --version
 ```
 
@@ -45,7 +45,7 @@ needed:
 
 ```sh
 pipx install --python python3.11 \
-  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.1.0
+  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.2.0
 ```
 
 `opencode-sandbox --help`, `--version` and `doctor` work without Docker.

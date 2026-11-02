@@ -6,6 +6,13 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+## 6.2.0 — 2026-11-02
+
+Component Updates and recovery release (Beta). Python 3.11 or newer; environment/backup schemas
+and image definitions are unchanged. Upgrading does not rebuild images, migrate environments or
+enable automatic discovery. Actual post-reboot manager recovery remains unverified (accepted
+release risk); no automatic reboot or recovery is performed.
+
 ### Added
 
 - Compact Updates views (`v`) replace the dashboard's Versions report: Manager, Base Images and

@@ -135,6 +135,7 @@ def spawn_origin(origin, tmp_path, *, budget=30, execution=False, frozen_transpo
         f'sys.prefix={str(prefix)!r}\nsys.executable={str(prefix / "bin/python")!r}\nsys.argv=[{str(launcher)!r}]\n'
         'from opencode_sandbox import installation_locks as locks\nlocks.acquire_usage()\n'
         'from opencode_sandbox import core as c,manager_installation as i,manager_targets as t,manager_releases as releases\n'
+        f'i.__version__={origin[0][0]["main_package"]["package_version"]!r}\n'
         'from opencode_sandbox import manager_review as r,manager_handoff as h\n'
         f'c.BASE=Path({str(c.BASE)!r});c.CONFIG=Path({str(c.CONFIG)!r})\n'
         f'i._running_distribution=lambda:(Path({str(dist.parent / "opencode_sandbox/__init__.py")!r}),Path({str(dist)!r}))\n'

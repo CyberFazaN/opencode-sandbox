@@ -5,6 +5,7 @@ import threading
 
 import pytest
 import test_manager_releases
+from packaging.version import Version
 from test_tui import run
 from test_updates_tui import until
 from textual.widgets import Button, TextArea
@@ -18,10 +19,13 @@ from opencode_sandbox import opencode_versions as v
 
 registry = test_manager_releases.registry
 github = test_manager_releases.github
+_installed = Version(__version__)
+NEXT_VERSION = f'{_installed.major}.{_installed.minor + 1}.0'
 
 
 @pytest.fixture
-def local(monkeypatch):
+def local(monkeypatch, github):
+    github['body'] = json.dumps([test_manager_releases.release('v' + NEXT_VERSION)]).encode()
     monkeypatch.setattr(readiness, 'image_checks', list)
     monkeypatch.setattr(updates, 'base_inventory', lambda *a, **k: {'state': 'not built', 'eligible': False})
     monkeypatch.setattr(mi, 'classify', lambda: {'version': __version__, 'classification': 'manual review',
@@ -39,7 +43,7 @@ def test_manager_open_is_network_free_then_check_and_details_never_expose_execut
         assert 'never checked' in screen.discovery_text()
         screen.action_check()
         await until(pilot, lambda: not screen._active)
-        assert 'GitHub: 6.2.0' in screen.discovery_text()
+        assert f'GitHub: {NEXT_VERSION}' in screen.discovery_text()
         assert 'Update available' in str(screen.query_one('#updates-selected').render())
         assert screen.query_one('#updates-update', Button).disabled
         for button in screen.query(Button): assert button.region.bottom <= size[1] and button.region.right <= size[0]
@@ -69,7 +73,7 @@ def test_manager_sources_fail_independently_and_keep_version(local, github, monk
             assert 'HTTP 503' in screen.discovery_text()
             assert screen.items['manager']['manager']['installation']['classification'] == 'manual review'
         else:
-            assert screen.manager_remote['release']['version'] == '6.2.0'
+            assert screen.manager_remote['release']['version'] == NEXT_VERSION
             assert 'RuntimeError: local evidence failed' in screen.items['manager']['manager']['error']
     run(test, (80, 24))
 
@@ -79,7 +83,7 @@ def test_manager_cancel_close_refuses_late_result_and_keeps_no_mutation(local, m
     def slow():
         started.set()
         assert release.wait(5)
-        return test_manager_releases.release() | {'tag': 'v6.2.0', 'version': '6.2.0'}
+        return test_manager_releases.release('v' + NEXT_VERSION) | {'tag': 'v' + NEXT_VERSION, 'version': NEXT_VERSION}
     monkeypatch.setattr(mr, 'latest', slow)
     async def test(app, pilot):
         await pilot.press('v', 'c')
@@ -103,11 +107,11 @@ def test_cli_is_independent_of_docker_npm_and_never_runs_pipx(local, github, mon
     assert json.loads(result.output)['installation']['version'] == __version__
     result = CliRunner().invoke(cli.app, ['manager', 'status', '--check'])
     assert result.exit_code == 0 and len(github['requests']) == 1
-    assert json.loads(result.output)['release']['version'] == '6.2.0'
+    assert json.loads(result.output)['release']['version'] == NEXT_VERSION
     github['status'] = 500
     result = CliRunner().invoke(cli.app, ['manager', 'status', '--check'])
     value = json.loads(result.output)
-    assert result.exit_code == 2 and value['release']['version'] == '6.2.0'
+    assert result.exit_code == 2 and value['release']['version'] == NEXT_VERSION
     assert value['installation']['version'] == __version__ and 'HTTP 500' in value['check_error']
 
 
@@ -126,7 +130,7 @@ def test_optional_manager_source_is_daily_independent_quiet_and_restart_safe(loc
         assert 'operation progress remains' in str(app.query_one('#status').render())
         assert notes == list(app._notifications) and len(github['requests']) == 1
         await pilot.press('v')
-        assert ('Check failed' if failure else 'GitHub: 6.2.0') in app.screen.discovery_text()
+        assert ('Check failed' if failure else f'GitHub: {NEXT_VERSION}') in app.screen.discovery_text()
     run(test, (80, 24))
     run(test, (80, 24))
     assert len(github['requests']) == 1

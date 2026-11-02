@@ -301,13 +301,14 @@ def test_real_pipx_readonly_classification(campaign, checks, layout):
         # Only a test-installed .pth source URL hook; the real console launcher, package,
         # interpreter, records and Docker calls remain unchanged. No production override.
         state = {'requests': 0, 'status': 200}
+        future_tag = json.loads((base / 'source-target.json').read_text())['tag']
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 state['requests'] += 1
                 self.send_response(state['status']); self.end_headers()
-                self.wfile.write(json.dumps([{'tag_name': 'v6.2.0', 'draft': False, 'prerelease': False,
+                self.wfile.write(json.dumps([{'tag_name': future_tag, 'draft': False, 'prerelease': False,
                     'published_at': '2026-10-30T12:00:00Z', 'body': 'Read-only real terminal [notes]',
-                    'html_url': 'https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.2.0'}]).encode())
+                    'html_url': 'https://github.com/CyberFazaN/opencode-sandbox/releases/tag/' + future_tag}]).encode())
             def log_message(self, *a): pass
         server = HTTPServer(('127.0.0.1', 0), Handler)
         thread = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .01}, daemon=True)
