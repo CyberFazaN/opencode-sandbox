@@ -140,7 +140,7 @@ def local_replay(camp, ck, prefix, launcher, public, base, commit, annotation, h
                 if mode == 'execution-policy-fault':
                     pip_module.write_text('import os\nos.environ["PIP_INDEX_URL"]="https://dummy-secret.invalid/simple"\n')
                     pip_hook.write_text('import ocs_test_policy\n')
-                if mode == 'execution-source-fault': server['routes'] = graph(commit='d' * 40, tags=(annotation,))
+                if mode == 'execution-source-fault': server['routes'] = graph(commit='d' * 40, tags=(annotation,), tag=tag)
                 requests = len(server['requests'])
                 state.with_suffix('.release').touch()
                 ck(term.exit_code(15) == 0 and term.restored(), 'Manager local replay: actual originating installed process exits after real terminal restoration')
