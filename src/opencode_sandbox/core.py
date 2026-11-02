@@ -281,7 +281,7 @@ def lock(key, timeout=30.0):
                     raise SandboxError(f"Environment busy: {key} (lock timeout)")
                 time.sleep(0.05)
         token = _DATA_LOCKS.set((*_DATA_LOCKS.get(), key))
-        try: yield
+        try: yield f
         finally:
             _DATA_LOCKS.reset(token)
             fcntl.flock(f,fcntl.LOCK_UN)
@@ -1237,11 +1237,12 @@ def exec_cmd(m,cmd):
 # Interrupted operations whose journal only their recovery command may close.
 JOURNALS = frozenset({"runtime-recreate","recreate","config-update","delete","restore","opencode-update"})
 
-def stop(m):
+def stop(m, *, precondition=None):
     """True if this call stopped a running container."""
     ensure_runtime(False)
     with lock(m["id"]):
         m=resolve(m["id"])
+        if precondition is not None: precondition(m)
         state=inspect_container(m)
         running=bool(state and state.get("Running"))
         if m.get("operation") in JOURNALS:
@@ -1255,6 +1256,11 @@ def stop(m):
                 mark(m,"error",last_error=f"Stop failed: {exc}")
                 raise
         mark(m,"stopped",operation=None,last_error=None)
+        # A successful explicit Stop also resolves a failed temporary-check restoration.
+        marker = env_dir(m['id']) / 'version-check.json'
+        if marker.exists() or marker.is_symlink():
+            from .environment_checks import clear_cleanup
+            clear_cleanup(m)
         return running
 
 def docker_reserve():
@@ -1558,12 +1564,14 @@ def promote(m,kind,name=None):
         m["kind"]=kind
         save(m)
 
-def build_image(distro, version, tag, *, refresh=False, verify=True):
+def build_image(distro, version, tag, *, refresh=False, verify=True, update_system=False):
     """Build a registry image with OpenCode `version` (concrete) as `tag`, then verify it."""
     from . import opencode_versions as v
     meta={**distro.image_labels(), distros.LABEL+"opencode-package": v.PACKAGE,
           distros.LABEL+"opencode-version": version}
     docker("build",*(("--pull","--no-cache") if refresh else ()),
+           '--build-arg', f'UPGRADE_SYSTEM={int(update_system or refresh)}',
+           '--build-arg', 'SYSTEM_PACKAGE_REFRESH=' + (secrets.token_hex(12) if update_system or refresh else 'cached'),
            "--build-arg",f"OPENCODE_VERSION={version}",*labels(scoped=False),
            *(arg for key,value in meta.items() for arg in ("--label",f"{key}={value}")),
            "-t",tag,"-f",str(distro.dockerfile),str(distros.IMAGES))
@@ -1606,10 +1614,10 @@ def verify_image(distro, tag, version):
     installed=v.normalize(p.stdout)
     if installed!=version: raise SandboxError(f"Built OpenCode {installed}, expected {version}")
 
-def build(distro=None, version=None, *, refresh=False, plan=None):
+def build(distro=None, version=None, *, refresh=False, plan=None, update_system=False):
     """Build (or rebuild) a distribution's base image; no rollback copy (see update-base)."""
     from . import opencode_versions as v
-    return v.update_base(version or "latest", distro, keep_previous=False, refresh=refresh, plan=plan)
+    return v.update_base(version or "latest", distro, keep_previous=False, refresh=refresh, plan=plan, update_system=update_system)
 
 TRANSIENT_STATES = frozenset({"creating", "starting", "stopping", "recreating", "deleting", "error"})
 

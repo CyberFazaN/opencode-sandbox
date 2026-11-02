@@ -60,12 +60,12 @@ class Distro:
 
 
 REGISTRY: dict[str, Distro] = {d.id: d for d in (
-    Distro(id="debian", name="Debian", version="13", revision=2, package_manager="apt",
+    Distro(id="debian", name="Debian", version="13", revision=3, package_manager="apt",
            os_release=(("ID", "debian"), ("VERSION_ID", "13")),
            install_hint="`apt-get update && apt-get install -y PACKAGE` as root (needs network).",
            tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "rg", "jq", "curl",
                   "gcc", "cmake")),
-    Distro(id="arch", name="Arch Linux", version="rolling", revision=1, package_manager="pacman",
+    Distro(id="arch", name="Arch Linux", version="rolling", revision=2, package_manager="pacman",
            os_release=(("ID", "arch"), ("BUILD_ID", "rolling")),
            install_hint="`pacman -Syu --needed PACKAGE` as root (needs network; Arch does not support partial "
                         "upgrades, so this also upgrades the container's other packages).",

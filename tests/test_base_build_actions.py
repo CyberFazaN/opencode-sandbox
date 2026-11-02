@@ -45,6 +45,28 @@ def test_both_modes_build_verify_and_preserve_copy_without_cache_pruning(runtime
     assert NEW in probe and not any('candidate' in value for value in probe)
 
 
+@pytest.mark.parametrize('distro', list(distros.REGISTRY))
+def test_explicit_package_upgrade_forces_fresh_package_layer_without_upstream_pull(runtime, monkeypatch, distro):
+    monkeypatch.setattr(c, 'docker', fake_docker(runtime, os_release='ID=arch\nBUILD_ID=rolling' if distro == 'arch' else 'ID=debian\nVERSION_ID=13'))
+    plan = v.prepare_base_build('2.1.4', distro, update_system=True)
+    assert plan.update_system and not plan.refresh
+    with pytest.raises(c.SandboxError, match='changed since confirmation'):
+        v.update_base(plan.target, distro, plan=plan)  # the package choice is part of immutable consent
+    assert not any(a[0] == 'build' for a in runtime)
+    for _ in range(2): v.update_base(plan.target, distro, update_system=True)
+    builds = [a for a in runtime if a[0] == 'build']
+    assert len(builds) == 2
+    assert all('UPGRADE_SYSTEM=1' in a and '--pull' not in a and '--no-cache' not in a for a in builds)
+    nonces = [next(arg for arg in a if arg.startswith('SYSTEM_PACKAGE_REFRESH=')) for a in builds]
+    assert nonces[0] != nonces[1] and all(not value.endswith('cached') for value in nonces)
+
+
+@pytest.mark.parametrize('distro', list(distros.REGISTRY))
+def test_refresh_includes_package_upgrades_in_plan_and_build(runtime, distro):
+    plan = v.prepare_base_build('2.1.4', distro, refresh=True)
+    assert plan.update_system and 'upgrade installed packages' in v.describe_base_build(plan)
+
+
 @pytest.mark.parametrize('when,change', [(when, change) for when in ('before', 'during')
     for change in ('current', 'missing', 'owner', 'endpoint', 'mode', 'target', 'keep', 'definition', 'assets', 'namespace')
     if when == 'before' or change not in ('mode', 'target', 'keep')])
@@ -183,5 +205,5 @@ def test_newer_managed_definition_is_explicitly_disclosed_not_silently_assumed_c
     plan = v.prepare_base_build('2.1.4')
     text = v.describe_base_build(plan)
     assert 'Current definition: debian 13, revision 99' in text
-    assert 'Selected definition: Debian 13, revision 2' in text and OLD in text
+    assert f'Selected definition: Debian 13, revision {distros.get("debian").revision}' in text and OLD in text
     assert not any(a[0] == 'build' for a in runtime)

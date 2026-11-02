@@ -69,12 +69,12 @@ class SettingsScreen(Screen):
     CSS = "SettingsScreen {align: center middle;} #settings-panel {width: 75; max-width: 100%; height: auto; max-height: 100%; border: round $accent; padding: 0 1;} #settings-panel Horizontal {height: auto;} #settings-panel Button {height: 3;}"
     def compose(self) -> ComposeResult:
         with Vertical(id="settings-panel"):
-            yield Static("Preferences of the dashboard (an environment's limits, network and profile: Settings, t)")
+            yield Static("Manager Settings", markup=False)
             yield Checkbox("Confirm before stopping", id="confirm-stop")
             yield Checkbox("Show quick environments", id="show-quick")
             yield Checkbox("Refresh after terminal session", id="refresh-return")
             yield Checkbox("Daily metadata discovery (dashboard only)", id="daily-discovery")
-            yield Static("Default off. GitHub + npm; one automatic attempt/source/24h.\nNo start, version probe or installation.", markup=False)
+            yield Checkbox("Copy selected text", id="copy-selected-text")
             with Horizontal():
                 yield Button("Save", id="save-settings", variant="primary")
                 yield Button("Cancel", id="cancel-settings")
@@ -83,7 +83,8 @@ class SettingsScreen(Screen):
         except Exception as exc:
             self.notify(c.error_text(exc), severity="error"); data = dict(preferences.DEFAULTS)
         for key, widget in (("confirm_stop", "confirm-stop"), ("show_quick", "show-quick"),
-                            ("refresh_on_return", "refresh-return"), ("daily_discovery", "daily-discovery")):
+                            ("refresh_on_return", "refresh-return"), ("daily_discovery", "daily-discovery"),
+                            ("copy_selected_text", "copy-selected-text")):
             self.query_one("#" + widget, Checkbox).value = data[key]
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "cancel-settings": self.app.pop_screen(); return
@@ -92,10 +93,12 @@ class SettingsScreen(Screen):
                 preferences.write({"confirm_stop": self.query_one("#confirm-stop", Checkbox).value,
                                    "show_quick": self.query_one("#show-quick", Checkbox).value,
                                    "refresh_on_return": self.query_one("#refresh-return", Checkbox).value,
-                                   "daily_discovery": self.query_one("#daily-discovery", Checkbox).value})
+                                   "daily_discovery": self.query_one("#daily-discovery", Checkbox).value,
+                                   "copy_selected_text": self.query_one("#copy-selected-text", Checkbox).value})
                 self.app.pop_screen()
                 self.app.action_refresh()
                 self.app.refresh_discovery_preferences()
+                self.app.refresh_clipboard_preferences()
             except Exception as exc: self.notify(c.error_text(exc), severity="error")
 
 class RecoveryScreen(Screen):

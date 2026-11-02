@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Select, Static, TextArea
+from textual.widgets import Button, Checkbox, Input, Select, Static, TextArea
 
 from . import core as c
 from . import distros
@@ -25,23 +25,33 @@ class BaseTargetScreen(ModalScreen[tuple | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id='base-target-panel'):
             yield Static(f'Build / Rebuild — {self.distro.name}', markup=False)
-            yield Static('Exact OpenCode 2.x target, or latest supported stable:', markup=False)
+            yield Static('OpenCode version (exact 2.x version or latest):', markup=False)
             yield Input(value='latest', id='base-target', compact=True)
+            yield Static('Build mode:', markup=False)
             yield Select([('Cached rebuild (reuse eligible layers)', False),
                           ('Refresh & Rebuild (pull + no-cache)', True)],
                          value=False, allow_blank=False, compact=True, id='base-refresh')
-            yield Static('Refresh downloads current upstream/package inputs and can take much longer.\n'
-                         'No cache pruning. Neither mode migrates existing environments.\n'
-                         'Next: resolve exact target and review current image, mode and rollback.', markup=False)
+            yield Checkbox('Update system packages', id='base-system', compact=True)
+            yield Static('Cached: reuse layers; no upstream pull. Refresh: pull + no-cache + package upgrades.\n'
+                         'Package updates force fresh indexes/upgrades, not an upstream image pull.\n'
+                         'Fresh Arch package layers always use -Syu, even without forcing an update.\n'
+                         'Existing environments are unchanged.', markup=False)
             with Horizontal():
                 yield Button('Cancel', id='base-target-cancel', compact=True)
                 yield Button('Review', id='base-target-review', compact=True)
 
     def action_cancel(self): self.dismiss(None)
 
+    def on_select_changed(self, event):
+        if event.select.id == 'base-refresh':
+            checkbox = self.query_one('#base-system', Checkbox)
+            checkbox.disabled = bool(event.value)
+            if event.value: checkbox.value = True
+
     def on_button_pressed(self, event: Button.Pressed):
         event.stop()
-        self.dismiss((self.query_one('#base-target', Input).value, self.query_one('#base-refresh', Select).value)
+        self.dismiss((self.query_one('#base-target', Input).value, self.query_one('#base-refresh', Select).value,
+                      self.query_one('#base-system', Checkbox).value)
                      if event.button.id == 'base-target-review' else None)
 
 
@@ -122,5 +132,5 @@ def rollback_consent(plan):
         'Existing containers, writable layers, home/workspace/configuration and integrations are unchanged.',
         'Future base-based creation and file-only restores use this base; not-yet-created pins remain enforced.',
         'This is not an upstream package-freshness or security assessment.',
-        'Consent is revalidated under shared base guards. Close/Cancel check never cancels an approved operation.',
+        'Consent is revalidated under shared base guards. Closing the screen never cancels an approved operation.',
     ])

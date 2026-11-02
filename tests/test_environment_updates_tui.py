@@ -98,7 +98,7 @@ def test_exact_update_consent_cancel_then_existing_executor_stops(sources, runti
     run(test, size)
 
 
-@pytest.mark.parametrize('reason', ['running', 'network', 'pin', 'journal', 'absent'])
+@pytest.mark.parametrize('reason', ['network', 'pin', 'journal', 'absent'])
 def test_live_refusals_never_start_stop_install_or_change_policy(sources, runtime, reason):
     m = sources
     if reason == 'running': runtime.running = True
@@ -146,7 +146,7 @@ def test_changed_selection_and_container_do_not_redirect_or_execute_confirmed_up
 
 def test_explicit_start_stays_running_and_check_remains_separate(sources, runtime):
     async def test(app, pilot):
-        await pilot.press('v', '3', 's')
+        await pilot.press('v', '3', 'f5')
         screen = app.screen_stack[-2] if isinstance(app.screen, EnvironmentConsentScreen) else app.screen
         await until(pilot, lambda: isinstance(app.screen, EnvironmentConsentScreen))
         await pilot.pause()
@@ -195,12 +195,10 @@ def test_approved_mutation_survives_cancel_close_and_quit_is_not_cancellation(so
     monkeypatch.setattr(v, 'update_environment', slow)
     async def test(app, pilot):
         await pilot.press('v', '3')
-        screen = app.screen
         await review_update(app, pilot)
         app.screen.query_one('#environment-confirm', Button).press()
         assert await asyncio.to_thread(started.wait, 1)
         await pilot.pause()
-        screen.action_cancel_checks()
         await pilot.press('escape', 'q')
         assert app.is_running and app._operation_pending and app._updates_mutation_active
         app.action_start_selected()
@@ -215,18 +213,17 @@ def test_approved_mutation_survives_cancel_close_and_quit_is_not_cancellation(so
 def test_cancel_or_close_during_read_only_planning_refuses_late_consent(sources, monkeypatch):
     started, release = threading.Event(), threading.Event()
     prepare = v.prepare_environment_update
-    def slow(*a):
+    def slow(*a, **kw):
         started.set()
         assert release.wait(4)
-        return prepare(*a)
+        return prepare(*a, **kw)
     monkeypatch.setattr(v, 'prepare_environment_update', slow)
     async def test(app, pilot):
         await pilot.press('v', '3', 'u', 'enter')
         screen = app.screen
         assert await asyncio.to_thread(started.wait, 1)
-        screen.action_cancel_checks()
-        assert screen._preparing is None
         await pilot.press('escape')
+        assert screen._preparing is None
         release.set()
         await pilot.pause(.2)
         assert len(app.screen_stack) == 1 and not app._operation_pending

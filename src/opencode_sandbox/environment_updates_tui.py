@@ -78,13 +78,14 @@ class EnvironmentConsentScreen(ModalScreen[bool]):
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     AUTO_FOCUS = "#environment-cancel"
 
-    def __init__(self, message):
+    def __init__(self, message, *, caution=False):
         super().__init__()
         self.message = c.printable(message)
+        self.caution = caution
 
     def compose(self) -> ComposeResult:
         with Vertical(id="environment-consent"):
-            yield Static("Review environment operation — no automatic installation", markup=False)
+            yield Static("Caution — stop environment and update" if self.caution else "Review environment operation", markup=False)
             yield TextArea(self.message, read_only=True, id="environment-consent-text")
             with Horizontal():
                 yield Button("Cancel", id="environment-cancel", compact=True)
@@ -101,7 +102,9 @@ def consent(m, action, plan):
     lines = [f"{action.capitalize()} — {m['name']} [{m['id']}]", ""]
     if action == "update":
         lines += [f"Install exact OpenCode {plan.target} (not a moving latest target).",
-                  "Requires an existing stopped, owned, network-enabled container; pins still apply.",
+                  *( ["CAUTION: this environment is running. Confirm stops it before taking the checkpoint.",
+                      "It will NOT restart afterward, on success or rollback. Use F5 to start explicitly."] if plan.running else []),
+                  "Requires an existing owned, network-enabled container; pins still apply.",
                   "Download from npm. Temporarily start for the update, verify the binary, then stop.",
                   "First commit the complete system layer as a checkpoint. Failure rolls back to it.",
                   "Successful update keeps that checkpoint for explicit rollback."]
@@ -125,9 +128,12 @@ def consent(m, action, plan):
         lines += ["Explicitly Start this environment. It remains running afterward.",
                   "May create its container and apply pending first-start integrations once.",
                   "Existing ownership, direct-workspace, profile, pin and journal checks still apply.",
-                  "Fresh version verification is a separate explicit Check; no automatic stop."]
+                   "Fresh version verification is a separate explicit Check; no automatic stop."]
+    elif action == 'stop':
+        lines += ['Stop this environment. Workspace and home volume are retained.',
+                  'It stays stopped until explicitly started (F5).']
     lines += ["", "Persistent home, workspace and user OpenCode configuration are not rolled back or replaced.",
               "Binary rollback cannot undo application-data changes or guarantee backward compatibility.",
-              "Confirmation is revalidated before mutation. Close/Cancel check never cancels an approved mutation.",
+               "Confirmation is revalidated before mutation. Closing the screen never cancels an approved mutation.",
               "If the manager is killed, inspect its journal and use the indicated recovery command."]
     return "\n".join(lines)

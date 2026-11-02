@@ -100,7 +100,7 @@ that environment's OS and system layer.
 | `opencode update NAME [--version X] --yes` | Update a stopped environment |
 | `opencode rollback NAME --yes` | Undo its last update |
 | `opencode update-recover NAME` | Finish an interrupted update (rolls back) |
-| `opencode update-base [--version X] [--distro ID] [--refresh]` | Build/rebuild a base image, keep a rollback copy; default cached, explicit pull/no-cache with refresh |
+| `opencode update-base [--version X] [--distro ID] [--refresh] [--update-system-packages]` | Build/rebuild a base image, keep a rollback copy; refresh pulls/bypasses cache and upgrades packages; package-only refresh does not force an upstream pull |
 | `opencode rollback-base [--distro ID] --list` | List distinct managed rollback images, full IDs and tag aliases (read-only) |
 | `opencode rollback-base [--distro ID] [--copy TAG_OR_FULL_IMAGE_ID] [--yes]` | Verify and swap the selected copy; default only when there is one distinct image |
 
@@ -112,7 +112,8 @@ stderr; any report error gives exit status 2. Without `--check`, the command nev
 Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
 The dashboard's [Updates views](dashboard.md#updates), opened with `v`, are separate from this
 CLI report: opening them reads local/cached information only. **Check** explicitly queries npm
-and checks the selected object; it does not start stopped containers. Base labels, installed
+and checks the selected object; stopped existing containers are temporarily started and restored.
+Check All confirms stopped targets. Ordinary CLI version reports still never start containers. Base labels, installed
 runtime evidence, registry discovery and recovery state remain distinct.
 
 **Evidence and cache.** Successful runtime checks record the version, source, time, environment,
@@ -122,7 +123,7 @@ verified** with its time, or **Unknown**; creation labels and old update records
 present binary. Replacement, restore, rollback and update journals invalidate or qualify earlier
 observations. A failed probe retains older evidence with its original time, never a fresh success.
 If Docker cannot be inspected, history is explicitly unverified against the current container.
-For a fresh stopped-container check, start it explicitly, then check; it remains running.
+For a fresh stopped-container check without leaving it running, use the dashboard's explicit Check.
 
 npm success and the latest attempt are stored separately. Without `--check`, an existing cached
 comparison is visibly dated and no network request is made. Explicit discovery failures still
@@ -203,10 +204,16 @@ Choose the mode explicitly:
   exact OpenCode version. It may reuse OS/package layers; definition or cache changes may rerun
   them. It does **not** guarantee fresh packages or an offline build.
 - **Refresh & Rebuild** (`--refresh`): request current upstream inputs and bypass the build cache
-  (`--pull --no-cache`). This downloads/rebuilds package layers, can take substantially longer
+  (`--pull --no-cache`), with installed-package upgrades. This downloads/rebuilds package layers, can take substantially longer
   and use more disk, and **never prunes the shared build cache**. Repositories and upstream tags
   can change during a build; this is not reproducibility, a security certification or a separate
-  upstream-freshness assessment.
+   upstream-freshness assessment.
+
+**Update system packages** (`--update-system-packages`, also accepted by `build`) forces the
+package layer to execute with fresh indexes and installed-package upgrades even in cached mode.
+It does not force an upstream image pull or prune shared cache. Debian uses `apt-get update`
+plus `apt-get upgrade`; index refresh alone is not a full upgrade. Fresh Arch package layers
+always use `pacman -Syu` to avoid partial upgrades, even without this cache-refresh request.
 
 ```sh
 opencode-sandbox opencode update-base --distro debian --version 2.1.4 --yes

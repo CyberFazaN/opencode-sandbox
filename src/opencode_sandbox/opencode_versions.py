@@ -1,6 +1,6 @@
 """OpenCode version checks and explicitly approved updates.
 
-Never starts stopped environments merely to inspect their versions.
+Passive inventory never starts environments; explicit temporary checks live in environment_checks.
 """
 from __future__ import annotations
 
@@ -472,6 +472,7 @@ class BaseBuildPlan:
     current_version: str | None
     definition: distros.Distro
     assets: str
+    update_system: bool = False
 
 
 def _build_assets():
@@ -481,14 +482,14 @@ def _build_assets():
     return digest.hexdigest()
 
 
-def _base_build_plan(d, target, refresh, keep_previous, current):
+def _base_build_plan(d, target, refresh, keep_previous, current, update_system=False):
     labels = current['Config']['Labels'] if current else {}
     return BaseBuildPlan(d.id, c.docker_endpoint(), d.image, target, refresh, keep_previous,
                          (current or {}).get('Id'), distros.image_definition(d.id, labels),
-                         labels.get(VERSION_LABEL), d, _build_assets())
+                         labels.get(VERSION_LABEL), d, _build_assets(), update_system)
 
 
-def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=True):
+def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=True, update_system=False):
     """Resolve before consent; inspect only, never build/probe or infer authority from a cache."""
     d = distros.get(distros.DEFAULT if distro is None else distro)
     target = supported(version) if version != 'latest' else None  # local validation needs no daemon/network
@@ -496,12 +497,12 @@ def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=Tru
     if target is None: target = resolve_target('latest')  # source guard is released before base guards
     with c.base_lock(d.id, 'publication'):
         current = c.inspect_base_image(d, d.image, missing=True)
-        return _base_build_plan(d, target, refresh, keep_previous, current)
+        return _base_build_plan(d, target, refresh, keep_previous, current, update_system or refresh)
 
 
-def _recheck_base_build(d, version, refresh, keep_previous, plan):
+def _recheck_base_build(d, version, refresh, keep_previous, plan, update_system=False):
     current = c.inspect_base_image(d, d.image, missing=True)
-    if distros.get(d.id) != d or _base_build_plan(d, version, refresh, keep_previous, current) != plan:
+    if distros.get(d.id) != d or _base_build_plan(d, version, refresh, keep_previous, current, update_system or refresh) != plan:
         raise c.SandboxError('Base image, definition, daemon or build mode changed since confirmation; review again')
     return current
 
@@ -518,6 +519,8 @@ def describe_base_build(plan):
         f"Exact OpenCode target: {plan.target}",
         ('Mode: Refresh & Rebuild — pull current upstream inputs and bypass build cache (--pull --no-cache).'
          if plan.refresh else 'Mode: Cached rebuild — reuse eligible layers; no forced pull/cache bypass.'),
+        ('System packages: force fresh indexes and upgrade installed packages (apt-get upgrade / pacman -Syu).'
+         if plan.update_system else 'System packages: cached layers may be reused. Fresh Arch package layers always use -Syu; Debian refreshes indexes and installs tools, without a full upgrade.'),
         'Network/download/time costs apply; upstream package repositories can change. Shared build cache is never pruned.',
         'A separate candidate must pass OS/tool/OpenCode verification before guarded publication.',
         ('The replaced image is kept as a rollback copy.' if plan.keep_previous else
@@ -528,13 +531,14 @@ def describe_base_build(plan):
     ]))
 
 
-def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan=None):
+def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan=None, update_system=False):
     """Build and verify a candidate base image for a distribution, then replace the tag.
 
     With keep_previous the replaced image stays available as `<repo>:<distro>-previous-<hex>`.
     """
     c.ensure_runtime()
     d = distros.get(distros.DEFAULT if distro is None else distro)
+    update_system = update_system or refresh
     # Resolve "latest" first: the literal build arg "latest" hits Docker's layer
     # cache, so the npm install step was never re-run and nothing was updated.
     version = supported(version) if plan is not None else resolve_target(version)
@@ -544,19 +548,20 @@ def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan
         c.require_docker_space("a base image build")
         candidate = distros.candidate_tag(d, __import__("secrets").token_hex(6))
         with c.base_lock(d.id, "publication"):
-            original = (_recheck_base_build(d, version, refresh, keep_previous, plan) if plan is not None
+            original = (_recheck_base_build(d, version, refresh, keep_previous, plan, update_system) if plan is not None
                         else c.inspect_base_image(d, d.image, missing=True))
             _unused_base_tag(d, candidate)
         candidate_id = None
         try:
             build_output.phase('Refresh & Rebuild: pulling upstream and bypassing build cache' if refresh else 'Cached rebuild: reusing eligible layers')
-            candidate_id = c.build_image(d, version, candidate, verify=False, **({'refresh': True} if refresh else {}))
+            candidate_id = c.build_image(d, version, candidate, verify=False, **({'refresh': True} if refresh else {}),
+                                         **({'update_system': True} if update_system else {}))
             build_output.phase('Verifying candidate OS, tools and exact OpenCode binary')
             c.verify_image(d, candidate_id, version)
             previous = None
             build_output.phase('Revalidating and publishing verified candidate')
             with c.base_lock(d.id, "publication"):  # not held throughout a long build
-                old = (_recheck_base_build(d, version, refresh, keep_previous, plan) if plan is not None
+                old = (_recheck_base_build(d, version, refresh, keep_previous, plan, update_system) if plan is not None
                        else c.inspect_base_image(d, d.image, missing=True))
                 if (old or {}).get("Id") != (original or {}).get("Id"):
                     raise c.SandboxError("Base image changed during the build; refusing replacement; retry after review")
@@ -654,7 +659,7 @@ def _exec_version(m, *, container_id=None):
     return normalize(p.stdout)
 
 
-def update_blocker(m, state, target):
+def update_blocker(m, state, target, *, stop_running=False):
     """Pure shared eligibility, also re-evaluated under the execution lock; no network/start."""
     supported(target)
     if m.get("operation"): return str(c.pending_operation(m))
@@ -664,7 +669,7 @@ def update_blocker(m, state, target):
     if c.runtime_settings(m)["network"] == "none":
         return ("OpenCode update downloads from npm but this environment has network=none; "
                 "update the base image instead, or temporarily change the network with config apply NAME --network bridge")
-    if state is None or state.get("Running"):
+    if state is None or state.get("Running") and not stop_running:
         return "OpenCode update requires an existing stopped container"
     return None
 
@@ -674,6 +679,7 @@ class EnvironmentUpdatePlan:
     target: str
     identity: tuple[tuple[str, str], ...]
     metadata: str
+    running: bool = False
 
 
 @dataclass(frozen=True)
@@ -699,15 +705,28 @@ def recheck_environment_start(m, plan):
         raise c.SandboxError("Environment/container changed since confirmation; review again")
 
 
-def prepare_environment_update(m, version):
+def prepare_environment_stop(m):
+    c.ensure_runtime(False)
+    m = c.resolve(m['id'])
+    state = c.inspect_container(m)
+    return EnvironmentStartPlan(_consent_metadata(m), c.docker_endpoint(), c.data_id(),
+                                tuple(sorted(_environment_identity(m).items())) if state is not None else None)
+
+
+def recheck_environment_stop(m, plan):
+    if prepare_environment_stop(m) != plan:
+        raise c.SandboxError('Environment/container changed since Stop review; review again')
+
+
+def prepare_environment_update(m, version, *, stop_running=False):
     target = resolve_target(version, m)
     c.ensure_runtime(False)
     m = c.resolve(m["id"])
     state = c.inspect_container(m)
-    reason = update_blocker(m, state, target)
+    reason = update_blocker(m, state, target, stop_running=stop_running)
     if reason: raise c.SandboxError(reason)
     c.assert_volume_owned(m)
-    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())), _consent_metadata(m))
+    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())), _consent_metadata(m), bool(state.get('Running')))
 
 
 def _remember_update(m, value, identity, at):
@@ -769,15 +788,20 @@ def update_environment(m, version, *, plan=None):
         reason = update_blocker(m, {"Running": False}, target)
         if reason: raise c.SandboxError(reason)
         state = c.inspect_container(m)
-        reason = update_blocker(m, state, target)
+        reason = update_blocker(m, state, target, stop_running=bool(plan and plan.running))
         if reason: raise c.SandboxError(reason)
         if plan is not None and (tuple(sorted(_environment_identity(m).items())) != plan.identity
-                                 or _consent_metadata(m) != plan.metadata):
+                                 or _consent_metadata(m) != plan.metadata or bool(state.get('Running')) != plan.running):
             raise c.SandboxError("Environment/container changed since confirmation; review again")
         c.assert_volume_owned(m)
         c.recheck_mount(m)  # the update starts it
         c.require_docker_space("an OpenCode update (checkpoint + npm install)")
         identity = _environment_identity(m)
+        if state.get('Running'):
+            # Explicit exact TUI consent only. Stop before checkpointing; no implicit restart.
+            c.docker('stop', identity['container'], capture=True)
+            if (c.inspect_container(m) or {}).get('Running'):
+                raise c.SandboxError('Environment did not stop; update not started')
         checkpoint = "ocs-checkpoint:" + m["id"] + "-" + __import__("secrets").token_hex(4)
         c.docker("commit", c.cname(m), checkpoint, capture=True)
         before = m.get("opencode_update")

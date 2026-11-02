@@ -70,8 +70,8 @@ def test_environment_actions_terminal(campaign, checks, distro, size):
         confirm(t, ck, 'Environment Manual policy')
         ck(t.wait_for('OpenCode policy saved', 20) and camp.metadata(name).get('opencode_policy') == 'manual'
            and camp.metadata(name).get('opencode_pin') is None, 'Environment Manual policy: explicit unpin does not install anything')
-        # Start remains running, and never disguises a temporary start/probe/stop workflow.
-        t.send('s', .3)
+        # Explicit F5 Start remains running, unlike temporary version checks.
+        t.send('\x1b[15~', .3)
         confirm(t, ck, 'Explicit Start')
         ck(t.wait_for('Started; remains running', 30) and camp.inspect(eid)['State']['Running'], 'Explicit Start: actual running state preserved')
         t.send(ESC, .2)
@@ -106,7 +106,7 @@ def test_environment_actions_terminal(campaign, checks, distro, size):
         kept = camp.docker('run', '--rm', '--name', helper, '--network', 'none', '--label', f'org.opencode-sandbox.test={camp.run}',
                            '--entrypoint', 'sh', snapshot, '-c', 'cat /etc/ocs-test-after-update; opencode --version').stdout
         ck('later-system-change' in kept and '2.1.4' in kept, 'Environment rollback: actual present snapshot keeps later system changes and updated binary')
-        t.send('s', .3)
+        t.send('\x1b[15~', .3)
         confirm(t, ck, 'Post-rollback Start')
         ck(t.wait_for('Started; remains running', 30), 'Post-rollback Start: explicit recreation completes')
         ck('2.2.0' in camp.sh(eid, 'opencode --version').stdout, 'Environment rollback: actual original OpenCode restored')

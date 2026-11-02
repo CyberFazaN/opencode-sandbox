@@ -6,6 +6,23 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+### Changed
+
+- Cleaner Updates views with a Manager summary, styled tabs, consistent shortcut footer, visible
+  operation results and Check All. Cancel Check controls are removed; closing still cleans up checks.
+- Explicit environment version checks temporarily start existing stopped containers, then restore
+  their stopped state under lifecycle locks, including independent cleanup after manager death.
+  Check All confirms stopped targets; F5/F6 provide explicit Start/Stop. Running updates require
+  caution consent and finish stopped, without an automatic restart.
+- Unsupported automatic manager updates offer manual guidance; only freshly verified GitHub pipx
+  installations receive a version-specific, settings-preserving command to copy.
+- Rebuild forms separate OpenCode version, cache/refresh mode and system-package upgrades.
+  `--update-system-packages` forces fresh indexes/upgrades without pulling the upstream image;
+  `--refresh` includes package upgrades. Debian/Arch image definitions advance to revisions 3/2.
+- Manager Settings adds opt-in selected-text copying with accurate native/OSC 52 feedback.
+  Editable inputs are excluded. Keys toggles with `?` and supports Esc/Close; menu separators
+  and compact-terminal focus/feedback are more consistent.
+
 ## 6.2.0 — 2026-11-02
 
 Component Updates and recovery release (Beta). Python 3.11 or newer; environment/backup schemas

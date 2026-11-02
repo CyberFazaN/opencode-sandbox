@@ -69,8 +69,9 @@ def test_cli_base_confirmation_receives_an_exact_target(monkeypatch):
     monkeypatch.setattr(c, 'docker', fake_docker([]))
     monkeypatch.setattr(v, "latest", lambda: "2.2.0")
     monkeypatch.setattr(cli, "_confirm", lambda text, **kwargs: seen.append(text) or True)
-    def update(version, distro, *, refresh, plan):
+    def update(version, distro, *, refresh, plan, update_system):
         assert not refresh and plan.target == version and plan.keep_previous
+        assert not update_system
         seen.append((version, distro))
     monkeypatch.setattr(v, "update_base", update)
     result = CliRunner().invoke(app, ["opencode", "update-base"])

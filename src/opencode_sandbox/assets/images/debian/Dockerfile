@@ -2,7 +2,12 @@
 # (distros.py) at build time.
 FROM node:24-trixie
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
+ARG UPGRADE_SYSTEM=0
+# A per-build nonce forces a requested package upgrade even when other layers are cached.
+ARG SYSTEM_PACKAGE_REFRESH=cached
+RUN test -n "$SYSTEM_PACKAGE_REFRESH" && apt-get update \
+ && if [ "$UPGRADE_SYSTEM" = 1 ]; then apt-get upgrade -y; fi \
+ && apt-get install -y --no-install-recommends \
  bash ca-certificates curl wget git git-lfs openssh-client python3 python3-pip python3-venv \
  build-essential cmake pkg-config jq ripgrep fd-find unzip zip tar less procps iproute2 \
  iputils-ping dnsutils sudo nano vim-tiny rsync patch file && rm -rf /var/lib/apt/lists/*

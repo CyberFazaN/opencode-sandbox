@@ -28,7 +28,7 @@ from .tui_runtime import publish, work
 
 
 class ConfirmScreen(ModalScreen[bool]):
-    CSS = "ConfirmScreen {align: center middle;} #confirm-panel {width: 72; max-width: 100%; height: auto; max-height: 100%; border: round $error; background: $surface; padding: 1 2;} #confirm-panel Horizontal {height: auto;}"
+    CSS = "ConfirmScreen {align: center middle;} ConfirmScreen ToastRack {height: 0; max-height: 0; overflow: hidden;} #confirm-panel {width: 72; max-width: 100%; height: auto; max-height: 100%; border: round $error; background: $surface; padding: 1 2;} #confirm-panel Horizontal {height: auto;}"
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     AUTO_FOCUS = "#cancel"
     def __init__(self, message: str):
@@ -47,6 +47,31 @@ class ConfirmScreen(ModalScreen[bool]):
 
     def action_cancel(self) -> None:
         self.dismiss(False)
+
+
+class KeysScreen(ModalScreen):
+    """Full-width, scrollable help rather than a split panel that crowds compact terminals."""
+    CSS = """KeysScreen {align: center middle;}
+    KeysScreen ToastRack {height: 0; max-height: 0; overflow: hidden;}
+    #keys-panel {width: 90%; height: 90%; border: round $accent; background: $surface; padding: 0 1;}
+    #keys-text {height: 1fr;} #keys-close {height: 1;}"""
+    BINDINGS = [Binding('question_mark', 'close', 'Close', key_display='?'), Binding('escape', 'close', 'Close')]
+
+    def __init__(self, bindings):
+        super().__init__()
+        self.bindings = bindings
+
+    def compose(self):
+        with Vertical(id='keys-panel'):
+            yield Static('Keys — ? or Esc to close', markup=False)
+            yield TextArea('\n'.join(f'{b.key_display or b.key:14} {b.description}' for b in self.bindings
+                                     if b.description), read_only=True, id='keys-text')
+            yield Button('Close', id='keys-close', compact=True)
+
+    def action_close(self): self.dismiss()
+    def on_button_pressed(self, event):
+        event.stop()
+        self.action_close()
 
 
 class CreateScreen(ModalScreen[dict | None]):
@@ -155,8 +180,8 @@ class Dashboard(App):
     CSS = """
     Screen {layout: vertical;}
     #search {width: 1fr;}
-    .bar {height: auto; grid-gutter: 0 1;}
-    .bar Button {width: 1fr;}
+    .bar {height: auto; grid-gutter: 0 0;}
+    .bar Button {width: 1fr; border-right: solid $foreground 20%;}
     #envs {height: 1fr; min-height: 3;}
     #details {height: 9; border: round $accent; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
     #status, #metrics {height: 1; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
@@ -166,7 +191,7 @@ class Dashboard(App):
     BINDINGS = [Binding("q", "quit", "Quit"), Binding("question_mark", "show_help_panel", "Keys"),
                 Binding("slash", "focus_search", "Filter"),
                 Binding("o", "open_selected", "OpenCode"), Binding("s", "shell_selected", "Shell"),
-                Binding("f5", "start_selected", "Start"), Binding("f6", "stop_selected", "Stop"),
+                Binding("f5", "start_selected", "Start", key_display='F5'), Binding("f6", "stop_selected", "Stop", key_display='F6'),
                 Binding("n", "create_environment", "New"), Binding("x", "delete_selected", "Delete"),
                 Binding("r", "refresh_readiness", "Refresh", show=False), Binding("c", "current_folder", "This folder", show=False),
                 Binding("p", "providers", "Provider profiles", show=False), Binding("g", "settings", "Preferences", show=False),
@@ -212,7 +237,79 @@ class Dashboard(App):
             yield Button("Delete", id="delete", variant="error", compact=True)
         yield Static("Resource metrics: select an environment and press Usage", id="metrics", markup=False)
         yield Static("Ready", id="status", markup=False)
-        yield Footer()
+        footer = Footer(show_command_palette=False)
+        footer.compact = True
+        yield footer
+
+    def action_show_help_panel(self):
+        if isinstance(self.screen, KeysScreen):
+            self.screen.action_close()
+            return
+        bindings = self.BINDINGS if len(self.screen_stack) == 1 else [
+            *self.screen.BINDINGS, *[b for b in self.BINDINGS if b.action in self._GLOBAL_ACTIONS]]
+        self.push_screen(KeysScreen(bindings))
+
+    def refresh_clipboard_preferences(self):
+        from . import preferences
+        try: self._copy_selected = preferences.read()['copy_selected_text']
+        except (c.SandboxError, OSError, ValueError): self._copy_selected = False
+
+    def on_mouse_up(self, event):
+        # MouseUp exists on Textual 4 as well as 8; defer until Screen updates its selection.
+        if getattr(self, '_copy_selected', False):
+            screen = self.screen
+            self.call_later(self._copy_selection, screen)
+
+    def on_text_area_selection_changed(self, event):
+        if not getattr(self, '_copy_selected', False) or not event.text_area.read_only: return
+        if getattr(self, '_selection_timer', None): self._selection_timer.stop()
+        area, screen = event.text_area, self.screen
+        self._selection_timer = self.set_timer(.25, lambda: self._copy_selection(screen, area))
+
+    def _copy_selection(self, screen, area=None):
+        if self.screen is not screen or not getattr(self, '_copy_selected', False): return
+        focused = screen.focused
+        if isinstance(focused, Input) or isinstance(focused, TextArea) and not focused.read_only: return
+        text = area.selected_text if area is not None and area.is_mounted else screen.get_selected_text()
+        if text and text.strip() and text != getattr(self, '_last_auto_copy', None):
+            self._last_auto_copy = text
+            self.copy_text(text)
+
+    def copy_text(self, text):
+        """Explicit copies work regardless of the selection preference. No false OSC 52 success."""
+        self._clipboard = text  # Textual's local paste buffer; do not emit two clipboard writes.
+        self._copy_token = token = object()
+        if not hasattr(self, '_clipboard_mutex'):
+            import threading
+            self._clipboard_mutex = threading.Lock()
+        driver = self._driver
+        terminal = driver is not None and not driver.is_headless
+        self._copy_worker(text, token, terminal)
+
+    @work(thread=True, group='clipboard')
+    def _copy_worker(self, text, token, terminal):
+        from .clipboard import native_copy
+        with self._clipboard_mutex:
+            if token is not self._copy_token: return
+            copied = native_copy(text) if terminal else None
+        publish(self, self._copy_finished, text, token, terminal, copied)
+
+    def _copy_finished(self, text, token, terminal, copied):
+        if self._copy_token is not token: return
+        if copied:
+            message = 'Copied to clipboard'
+        elif terminal:
+            try:
+                super().copy_to_clipboard(text)
+                message = 'Clipboard request sent to terminal (OSC 52; acceptance unverified)'
+            except (OSError, RuntimeError):
+                message = 'Clipboard unavailable; text is available for manual copy'
+        else:
+            message = 'System clipboard unavailable; copied only within this application'
+        # Updates intentionally suppresses overlay toasts; use its reserved status line instead.
+        feedback = getattr(self.screen, 'clipboard_feedback', None)
+        if feedback: feedback(message)
+        else: self.notify(message, title='Clipboard', timeout=3)
 
     def on_mount(self) -> None:
         self._operation_pending = False
@@ -244,6 +341,7 @@ class Dashboard(App):
         self._prerequisites_worker()
         self.set_interval(60, self.refresh_discovery_preferences)
         self.refresh_discovery_preferences()
+        self.refresh_clipboard_preferences()
 
     def refresh_discovery_preferences(self):
         if self._manager_update_intent is not None: return
@@ -841,6 +939,9 @@ class Dashboard(App):
                 if action == "start":
                     c.start(m, precondition=lambda current: v.recheck_environment_start(current, plan))
                     result = "Started; remains running. Use Check for fresh version verification."
+                elif action == 'stop':
+                    c.stop(m, precondition=lambda current: v.recheck_environment_stop(current, plan))
+                    result = 'Stopped; workspace and home volume retained.'
                 elif action == "update":
                     outcome = v.update_environment(m, plan.target, plan=plan)
                     result = "OpenCode update complete; stopped. " + json.dumps(outcome)
@@ -886,7 +987,7 @@ class Dashboard(App):
         with c.runtime_feedback(progress=None, cancelled=None), build_output.listen(progress):
             try:
                 if action == 'build':
-                    outcome = v.update_base(plan.target, key, refresh=plan.refresh, plan=plan)
+                    outcome = v.update_base(plan.target, key, refresh=plan.refresh, update_system=plan.update_system, plan=plan)
                     result = ('Base verified unchanged; ' if outcome.get('unchanged') else 'Base build verified and published; ') + json.dumps(outcome)
                 else:
                     outcome = v.rollback_base(key, plan=plan)
@@ -904,7 +1005,7 @@ class Dashboard(App):
         self._set_busy('Base: ' + c.printable(phase))
 
     def _base_finished(self, key, result, failed, callback):
-        self._base_operation.update(result=result, phase='Failed; inspect actual base/copies before retry' if failed else 'Complete')
+        self._base_operation.update(result=result, failed=failed, phase='Failed; inspect actual base/copies before retry' if failed else 'Complete')
         self._updates_mutation_active = False
         self._finished(result, failed)
         callback(key, result, failed)

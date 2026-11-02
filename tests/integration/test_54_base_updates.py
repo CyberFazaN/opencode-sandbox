@@ -184,7 +184,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
                 ck(not Path(str(hold) + '.ready').exists(), 'Base terminal: Cancel never built/refreshed')
                 term.send('b', .3)
                 term.send('\x05', .1); term.send('\x15', .1); term.send('2.1.4', .2)
-                term.send(TAB * 3 + ENTER, .3)
+                term.send(TAB * 4 + ENTER, .3)
                 consent(term, ck, 'Cached mode consent')
                 ck('Cached rebuild' in term.text(), 'Base terminal: cached mode is independent and explicit')
                 term.send(TAB + ENTER, .3)

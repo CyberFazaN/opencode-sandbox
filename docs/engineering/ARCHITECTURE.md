@@ -236,7 +236,7 @@ retry/reapply, including after restore. Context7 is the default, not a promise i
 
 ## Updates UI
 
-`v` opens independent Manager/Base Images/Environment OpenCode views. Opening renders local/cached
+`v` opens independent Manager/Base Images/Environments views. Opening renders local/cached
 facts before bounded inspections; it does not discover, probe binaries or start environments.
 Explicit Check and Details keep source/local errors separate, bind selection/generation and reject
 late results. Shared `ReportScreen` is titled plain scrollable text, not component-specific logic.
@@ -248,6 +248,19 @@ object identities and revalidate in existing handlers. No universal updater or m
 Recovery Center rereads authoritative journals, routes OpenCode/configuration recovery to their
 handlers and retains CLI guidance for other journals. Small-terminal forms use bounded text;
 dashboard notices are disclosed in Details rather than covering 80x24 controls.
+
+`environment_checks` owns explicit temporary checks, separately from passive version reports and
+normal launch/provisioning. It holds the environment flock across inspection/start/probe/restoration.
+`temporary_check_guard` inherits that open lock description, owns start/stop of the exact container
+and restores on pipe EOF, including parent death. Fresh state/identity revalidation refuses changed
+batch consent; originally-running containers are never stopped. Failed cleanup retains a private
+`version-check.json` alongside metadata and actionable feedback, not a success or a new environment
+schema. Explicit Stop reconciles it. Normal interactive startup/configuration flows are not called.
+
+The Manager tab uses a summary card. Unsupported automatic review opens manual guidance; an exact
+pipx command is generated only from fresh verified ownership/settings, never by converting unknown
+installations. Clipboard writes prefer available local Linux transports, then Textual OSC 52 with
+explicitly unverified terminal acceptance. Selection copy is opt-in, deduplicated and excludes inputs.
 
 Base build output drains continuously into a 32 KiB tail with throttled UI publication and explicit
 truncation, no percentage or build deadline. After process death, inspect actual images/copies/

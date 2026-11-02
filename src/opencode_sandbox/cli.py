@@ -129,15 +129,16 @@ def opencode_policy_set(name: str, mode: str, version: str | None = typer.Option
 @opencode_app.command("update-base")
 def opencode_update_base(version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
                          distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
-                         refresh: bool=typer.Option(False,"--refresh",help="Pull current upstream inputs and bypass build cache; never prune it")):
+                         refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image, bypass cache and upgrade system packages; never prune"),
+                         update_system_packages: bool=typer.Option(False,"--update-system-packages",help="Force fresh package indexes and installed-package upgrades without forcing an upstream image pull")):
     """Rebuild a base image with another OpenCode version; keeps a rollback copy of the old one."""
     from . import opencode_versions as v
-    plan=v.prepare_base_build(version,distro,refresh=refresh)
+    plan=v.prepare_base_build(version,distro,refresh=refresh,update_system=update_system_packages)
     typer.echo(v.describe_base_build(plan))
     if not yes and not _confirm(f"Replace {plan.image} ({plan.current_id or 'missing'}) with exact OpenCode {plan.target}; "
                                 f"{'Refresh & Rebuild' if refresh else 'Cached rebuild'}; keep rollback copy?", docker=True):
         raise typer.Abort()
-    typer.echo(v.update_base(plan.target, distro, refresh=refresh, plan=plan))
+    typer.echo(v.update_base(plan.target, distro, refresh=refresh, update_system=plan.update_system, plan=plan))
 
 @opencode_app.command("update")
 def opencode_update(name: str, version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation")):
@@ -217,12 +218,13 @@ def msg(m): typer.echo(f"{m['name']} [{m['id']}] ({m['kind']})")
 @app.command(rich_help_panel=HOST)
 def build(distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
           opencode_version: str=typer.Option("latest","--opencode-version",help="OpenCode 2.x version (npm @opencode/cli)"),
-          refresh: bool=typer.Option(False,"--refresh",help="Pull current upstream inputs and bypass build cache; never prune it")):
+          refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image, bypass cache and upgrade system packages; never prune"),
+          update_system_packages: bool=typer.Option(False,"--update-system-packages",help="Force fresh package indexes and installed-package upgrades without forcing an upstream image pull")):
     """Build/rebuild an agent image without a rollback copy (use opencode update-base to keep one)."""
     from . import opencode_versions as v
-    plan=v.prepare_base_build(opencode_version,distro,refresh=refresh,keep_previous=False)
+    plan=v.prepare_base_build(opencode_version,distro,refresh=refresh,keep_previous=False,update_system=update_system_packages)
     typer.echo(v.describe_base_build(plan))
-    result=c.build(distro, plan.target, refresh=refresh, plan=plan)
+    result=c.build(distro, plan.target, refresh=refresh, update_system=plan.update_system, plan=plan)
     typer.echo(f"{result['image']}: OpenCode {result['version']}"+(" (unchanged)" if result.get("unchanged") else ""))
 
 @app.command(rich_help_panel=HOST)

@@ -8,7 +8,7 @@ from test_tui import run, settle
 from textual.widgets import Button, TextArea
 
 from opencode_sandbox import core as c
-from opencode_sandbox import distros, readiness, tui, updates
+from opencode_sandbox import distros, environment_checks, readiness, tui, updates
 from opencode_sandbox import opencode_versions as v
 from opencode_sandbox import update_cache as cache
 from opencode_sandbox.updates_tui import UpdatesScreen
@@ -26,6 +26,7 @@ def sources(monkeypatch):
         return {"state": "current definition", "version": None, "observation": None, "eligible": True,
                 "build_version": "2.0.0", "image": "sha256:" + "b" * 64}
     monkeypatch.setattr(v, "environment_version", environment)
+    monkeypatch.setattr(environment_checks, 'check', lambda m, **kw: v.environment_version(m, check=True))
     monkeypatch.setattr(updates, "base_inventory", base)
     monkeypatch.setattr(v, "latest", lambda: calls.append(("npm",)) or "2.2.0")
     monkeypatch.setattr(readiness, "image_checks", list)
@@ -53,17 +54,20 @@ def test_local_first_compact_views_focus_and_details(sources, size, entry):
         assert screen.query_one('#updates-update', Button).disabled
         for view, key in (("bases", "2"), ("environments", "3"), ("manager", "1")):
             await pilot.press(key)
-            assert screen.view == view and app.focused is screen.query_one("#updates-table")
-            for selector in ("#updates-title", "#updates-tabs", "#updates-table", "#updates-selected", "#updates-buttons", "#updates-keys"):
+            focus = '#updates-check' if view == 'manager' else '#updates-table'
+            assert screen.view == view and app.focused is screen.query_one(focus)
+            for selector in ("#updates-title", "#updates-tabs", '#updates-manager' if view == 'manager' else '#updates-table', "#updates-buttons", 'Footer'):
                 widget = screen.query_one(selector)
                 assert widget.region.height > 0 and widget.region.right <= size[0] and widget.region.bottom <= size[1]
-            assert screen.query_one("#updates-table").region.height >= 3
+            if view != 'manager': assert screen.query_one("#updates-table").region.height >= 3
             for button in screen.query(Button): assert button.region.bottom <= size[1] and button.region.right <= size[0]
+            for shortcut in screen.query('FooterKey'):
+                assert shortcut.region.right <= size[0] and shortcut.region.height == 1
             await pilot.press("d")
             assert isinstance(app.screen, tui.ReportScreen)
             assert app.screen.query_one("#report-text", TextArea).read_only
             await pilot.press("escape")
-            assert app.screen is screen and app.focused is screen.query_one("#updates-table")
+            assert app.screen is screen and app.focused is screen.query_one(focus)
         await pilot.press("3", "tab")
         assert app.focused is screen.query_one("#updates-check")
         await pilot.press("shift+tab")
@@ -81,14 +85,32 @@ def test_explicit_check_uses_selected_object_and_shares_npm_across_views(sources
         await until(pilot, lambda: not app.screen._active)
         assert ("environment", m["id"], True) in calls and calls.count(("npm",)) == 1
         assert not any(call[0] == "base" and call[-1] is True for call in calls)
-        assert "npm: 2.2.0" in app.screen.discovery_text()
+        assert "Available OpenCode: 2.2.0" in app.screen.discovery_text()
         await pilot.press("2")
-        assert "npm: 2.2.0" in app.screen.discovery_text()
+        assert "Available OpenCode: 2.2.0" in app.screen.discovery_text()
         assert all(i["version"] is None for i in app.screen.items["bases"].values())
-        assert "build label: 2.0.0" in str(app.screen.query_one("#updates-selected").render())
+        await pilot.press('d')
+        assert '"build_version": "2.0.0"' in app.screen.report
+        await pilot.press('escape')
         await pilot.press("c")
         await until(pilot, lambda: not app.screen._active)
         assert sum(call[0] == "base" and call[-1] is True for call in calls) == 1
+    run(test, (80, 24))
+
+
+@pytest.mark.parametrize('key', ['c', 'C'])
+def test_base_checks_refresh_eligibility_instead_of_trusting_cached_rows(sources, key):
+    _m, calls = sources
+    async def test(app, pilot):
+        await pilot.press('v', '2')
+        screen = app.screen
+        for item in screen.items['bases'].values(): item.update(eligible=False, state='not built')
+        await pilot.press(key)
+        await until(pilot, lambda: not screen._active)
+        checked = [entry for entry in calls if entry[0] == 'base' and entry[-1] is True]
+        assert len(checked) == (1 if key == 'c' else len(distros.REGISTRY))
+        assert calls.count(('npm',)) == 1
+        for _, distro, _ in checked: assert screen.items['bases'][distro]['eligible'] is True
     run(test, (80, 24))
 
 
@@ -109,7 +131,7 @@ def test_independent_check_failures_keep_inventory_and_other_results(sources, mo
         else:
             section = "bases" if source == "base" else "environments"
             assert "RuntimeError:" in next(iter(screen.items[section].values()))["error"]
-            assert "npm: 2.2.0" in screen.discovery_text()
+            assert "Available OpenCode: 2.2.0" in screen.discovery_text()
         await pilot.press("d")
         assert "failure [literal]" in app.screen.report
         assert "[literal]" in app.screen.query_one("#report-text", TextArea).text
@@ -124,7 +146,7 @@ def test_cached_remote_failure_and_stopped_history_remain_dated(sources):
     async def test(app, pilot):
         await pilot.press("v", "3")
         screen = app.screen
-        assert "cached; checked" in screen.discovery_text() and "stale" in screen.discovery_text()
+        assert "checked" in screen.discovery_text() and "stale" in screen.discovery_text()
         assert "HTTP 429" in screen.discovery_text()
         assert ("npm",) not in calls
     run(test)
@@ -143,13 +165,13 @@ def test_slow_sources_publish_independently_and_coalesce_inflight_checks(sources
         screen = app.screen
         assert await asyncio.to_thread(started.wait, 1)
         await until(pilot, lambda: ("environments", m["id"]) not in screen._active)
-        assert "Checking npm" in screen.discovery_text()
-        await pilot.press("2", "c")
+        assert "Checking available version on npm" in screen.discovery_text()
+        await pilot.press("2")
         assert calls.count(("npm",)) == 1
         assert screen.items["environments"][m["id"]]["state"] == "stopped"
         release.set()
         await until(pilot, lambda: not screen._active)
-        assert "npm: 2.2.0" in screen.discovery_text()
+        assert "Available OpenCode: 2.2.0" in screen.discovery_text()
     try: run(test, (80, 24))
     finally: release.set()
 
@@ -191,7 +213,7 @@ def test_late_inventory_cannot_replace_a_newer_explicit_check(sources, monkeypat
     finally: release.set()
 
 
-def test_cancel_check_preserves_prior_evidence_and_refuses_late_results(sources, monkeypatch):
+def test_close_preserves_prior_evidence_and_refuses_late_results(sources, monkeypatch):
     m, _calls = sources
     release, started = threading.Event(), threading.Event()
     observation = cache.evidence("2.1.4", "container-exec", {})
@@ -208,11 +230,10 @@ def test_cancel_check_preserves_prior_evidence_and_refuses_late_results(sources,
         await until(pilot, lambda: screen.items["environments"][m["id"]].get("version") == "2.1.4")
         await pilot.press("c")
         assert await asyncio.to_thread(started.wait, 1)
-        screen.query_one("#updates-cancel", Button).press()
-        await pilot.pause()
+        assert not screen.query('#updates-cancel')
+        await pilot.press('escape')
         assert not screen._active
         assert screen.items["environments"][m["id"]]["observation"] == observation
-        assert "Check canceled" in screen.items["environments"][m["id"]]["notice"]
         release.set()
         await settle(pilot)
         assert screen.items["environments"][m["id"]]["version"] == "2.1.4"
@@ -236,7 +257,7 @@ def test_selection_survives_view_changes_and_resize_without_hidden_dashboard_act
         await pilot.resize_terminal(80, 24)
         await pilot.pause()
         assert table.virtual_size.width <= table.size.width
-        await pilot.press("f5", "x", "o")
+        await pilot.press("x", "o")
         assert app.screen is screen and mutations == []
         await pilot.press("d", "c", "3", "f5")
         assert isinstance(app.screen, tui.ReportScreen) and mutations == []
@@ -257,10 +278,10 @@ def test_check_and_details_never_authorize_mutations_or_infer_installed_labels(s
         assert screen.items["environments"][m["id"]]["version"] is None
         # UP-11 enables a read-only review request, not installation based on this cached row.
         assert not screen.query_one("#updates-update", Button).disabled
-        assert "review live eligibility before consent" in str(screen.query_one("#updates-reason").render())
+        assert 'Check complete' in str(screen.query_one("#updates-reason").render())
         assert mutations == []
         await pilot.press("d")
-        assert "No stopped container is started by Check" in app.screen.report
+        assert "Explicit Check may temporarily start stopped containers" in app.screen.report
         assert "Pins, ownership and pending journals" in app.screen.report
         assert calls.count(("npm",)) == 1
         await pilot.press("escape", "u")

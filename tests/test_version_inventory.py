@@ -111,7 +111,7 @@ def test_tui_inventory_survives_registry_failure(inventory, error):
         assert rows["ocs-test-up02-created"]["state"] == "not-created"
         assert f"Check failed: {c.error_text(error)}" in str(screen.query_one("#updates-discovery").render())
         running = rows["ocs-test-up02-running"]["id"]
-        assert str(screen.query_one("#updates-table").get_row(running)[2]) == "2.1.4 (last verified)"
+        assert str(screen.query_one("#updates-table").get_row(running)[2]) == "2.1.4"
         assert_read_only_checks(inventory, ordered=False)
         await pilot.press("escape")
         assert len(app.screen_stack) == 1
@@ -160,7 +160,7 @@ def test_local_source_failure_does_not_hide_registry_result(monkeypatch, invento
             assert f"Local inventory failed: {c.error_text(error)}" in str(screen.query_one("#updates-selected").render())
             assert screen.query_one("#updates-table").row_count == 0
             if registry_ok:
-                assert "npm: 2.2.0" in screen.discovery_text() and "Check failed" not in screen.discovery_text()
+                assert "Available OpenCode: 2.2.0" in screen.discovery_text() and "Check failed" not in screen.discovery_text()
             else:
                 assert "Check failed: Registry unavailable [test]" in screen.discovery_text()
             assert inventory.events.count(("registry",)) == 1

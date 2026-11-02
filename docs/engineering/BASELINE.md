@@ -13,11 +13,12 @@ The current checkpoint below records fresh verification; older sections retain t
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
-| Images | Debian 13/default (`node:24-trixie`, revision 2); Arch rolling (`archlinux:base-devel`, revision 1) |
+| Images | Debian 13/default (`node:24-trixie`, revision 3); Arch rolling (`archlinux:base-devel`, revision 2) |
 
 The release includes component Updates views, optional default-off daily discovery,
 environment/base actions and independent manager update/recovery. These are implemented, not a
-pending roadmap. Schemas and image definitions have not changed. Availability,
+pending roadmap. Published 6.2.0 kept the schemas/image definitions; unreleased TUI changes advance
+the image definitions to support explicit package upgrades without changing environment/backup schemas. Availability,
 consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
 The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
 declined a reboot. Acceptance is not verification; original frozen recovery inputs remain retained.
@@ -38,6 +39,26 @@ declined a reboot. Acceptance is not verification; original frozen recovery inpu
 - OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
 
 ## Verification
+
+### Unreleased TUI and explicit-check changes — 2026-11-02
+
+The full default suites passed on Python 3.11.18/Typer 0.16.0/Textual 4.0.0 and Python
+3.14.8/Typer 0.27.3/Textual 8.2.8: **2236 passed, 94 opt-in integration skips each**. Subsequent
+small base-eligibility refresh/manager-status refinements passed final focused suites: 82 current
+and 58 lowest-dependency tests, including compact UI, manual guidance, clipboard, docs and quality
+checks as applicable. The earlier full results cover unchanged subsystems, not a fresh full run
+after those refinements.
+
+Scoped real Debian/Arch checks passed for cached/full-refresh candidate builds, rollback/copy and
+existing-environment preservation, update/checkpoint recovery, temporary-check state restoration,
+failed-stop evidence and explicit reconciliation, parent SIGKILL, running-update stop consent,
+Check All/F5/F6 at 80x24 and 120x40, and exact single OSC 52 output. The final recovery/check/terminal
+subset was 10 passed; unchanged build/action evidence is reused from the preceding scoped run.
+An advisory covering recovery consent was reproduced and fixed, then the real recovery cases passed.
+Manifests and detailed logs are local under `.work/logs/tui-ux-20261102{a,b,c}*`; all runs finished
+guarded cleanup without resource leaks or changes to pre-existing image tags. Native clipboard
+backend behavior is unit-tested; actual desktop/terminal clipboard acceptance and manual visual
+observation are not claimed. This is not a complete campaign, four-way matrix or release qualification.
 
 ### Published 6.2.0
 

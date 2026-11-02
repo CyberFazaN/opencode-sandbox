@@ -115,11 +115,9 @@ def test_base_mutation_survives_close_cancel_and_normal_quit_with_bounded_detail
     monkeypatch.setattr(c, 'build_image', build)
     async def test(app, pilot):
         await pilot.press('v', '2')
-        screen = app.screen
         await review(app, pilot)
         app.screen.query_one('#base-confirm', Button).press()
         assert await asyncio.to_thread(started.wait, 1)
-        screen.action_cancel_checks()
         await pilot.press('escape', 'q')
         assert app.is_running and app._operation_pending and app._updates_mutation_active
         await pilot.press('v', '2', 'd')
@@ -178,10 +176,8 @@ def test_canceled_late_base_planning_cannot_publish_consent_or_start_a_build(sou
     monkeypatch.setattr(v, 'prepare_base_build', slow)
     async def test(app, pilot):
         await pilot.press('v', '2', 'b')
-        screen = app.screen_stack[-2]
         app.screen.query_one('#base-target-review', Button).press()
         assert await asyncio.to_thread(started.wait, 1)
-        screen.action_cancel_checks()
         await pilot.press('escape')
         release.set()
         await pilot.pause(.2)

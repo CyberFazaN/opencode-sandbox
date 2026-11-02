@@ -7,7 +7,10 @@ ENV LANG=C.UTF-8
 # Downloads are retried: mirror transfers stalled repeatedly during image builds;
 # completed files stay in the cache between attempts.
 COPY arch/pacman-retry /usr/local/lib/ocs-build/pacman-retry
-RUN sh /usr/local/lib/ocs-build/pacman-retry -Syu --noconfirm --needed git git-lfs openssh python python-pip \
+ARG UPGRADE_SYSTEM=0
+ARG SYSTEM_PACKAGE_REFRESH=cached
+# Arch must never perform a partial upgrade. The nonce forces this layer when requested.
+RUN test -n "$SYSTEM_PACKAGE_REFRESH" && sh /usr/local/lib/ocs-build/pacman-retry -Syu --noconfirm --needed git git-lfs openssh python python-pip \
   cmake jq ripgrep fd unzip zip less nano vim rsync curl wget bind nodejs npm \
  && rm -rf /var/cache/pacman/pkg/* /usr/local/lib/ocs-build \
  && useradd --system --create-home --home-dir /var/lib/aurbuild --shell /usr/bin/nologin aurbuild \

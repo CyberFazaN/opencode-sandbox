@@ -43,13 +43,17 @@ def test_manager_open_is_network_free_then_check_and_details_never_expose_execut
         assert 'never checked' in screen.discovery_text()
         screen.action_check()
         await until(pilot, lambda: not screen._active)
-        assert f'GitHub: {NEXT_VERSION}' in screen.discovery_text()
-        assert 'Update available' in str(screen.query_one('#updates-selected').render())
-        assert screen.query_one('#updates-update', Button).disabled
+        assert f'Available manager: {NEXT_VERSION}' in screen.discovery_text()
+        assert 'Update available' in str(screen.query_one('#updates-manager').render())
+        assert not screen.query_one('#updates-update', Button).disabled
         for button in screen.query(Button): assert button.region.bottom <= size[1] and button.region.right <= size[0]
-        assert screen.query_one('#updates-table').region.height >= 3
+        assert not screen.query_one('#updates-table').display
         await pilot.press('u')
-        assert app.screen is screen and not app._operation_pending
+        from opencode_sandbox.manager_review_tui import ManualUpdateScreen
+        await until(pilot, lambda: isinstance(app.screen, ManualUpdateScreen))
+        assert app.screen.command is None and 'Editable' in app.screen.message
+        assert not app._operation_pending
+        await pilot.press('escape')
         await pilot.press('d')
         report = app.screen.query_one('#report-text', TextArea)
         assert report.read_only and 'Release [notes]' in report.text and 'Editable' in report.text
@@ -89,8 +93,6 @@ def test_manager_cancel_close_refuses_late_result_and_keeps_no_mutation(local, m
         await pilot.press('v', 'c')
         screen = app.screen
         assert await asyncio.to_thread(started.wait, 1)
-        screen.action_cancel_checks()
-        assert 'canceled' in screen.discovery_text()
         await pilot.press('escape')
         release.set()
         await pilot.pause(.2)
@@ -130,7 +132,7 @@ def test_optional_manager_source_is_daily_independent_quiet_and_restart_safe(loc
         assert 'operation progress remains' in str(app.query_one('#status').render())
         assert notes == list(app._notifications) and len(github['requests']) == 1
         await pilot.press('v')
-        assert ('Check failed' if failure else f'GitHub: {NEXT_VERSION}') in app.screen.discovery_text()
+        assert ('Check failed' if failure else f'Available manager: {NEXT_VERSION}') in app.screen.discovery_text()
     run(test, (80, 24))
     run(test, (80, 24))
     assert len(github['requests']) == 1

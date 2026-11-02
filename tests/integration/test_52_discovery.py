@@ -81,7 +81,7 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
         ck(terminal.wait_for(r"Updates \(1\)", 20) and state["requests"] == 1, "Daily terminal: restart reuses daily successful attempt")
         terminal.send("v", .3)
         terminal.send("3", .5)
-        ck(terminal.wait_for("npm: 2.2.1", 15), "Daily terminal: cached discovery visible without implicit Check")
+        ck(terminal.wait_for("Available OpenCode: 2.2.1", 15), "Daily terminal: cached discovery visible without implicit Check")
         state["fail"] = True
         terminal.send("c", .5)
         ck(terminal.wait_for("HTTP 503", 15) and state["requests"] == 2, "Daily terminal: explicit early refresh keeps failure visible")

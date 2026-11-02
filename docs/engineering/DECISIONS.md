@@ -460,3 +460,14 @@ Supersedes D-045's tracked working-record location. Agent plans, investigations,
 temporary verification records belong in ignored `.work/agents/<task>/`, never tracked Markdown.
 Only durable current knowledge belongs in permanent docs; CONTRIBUTING owns the concise hygiene,
 completion cleanup and unfinished-work/recovery retention rules. No new framework or routine records.
+
+## D-062 Explicit temporary version checks and running-update consent
+
+Refines D-019/D-056: dashboard Check may temporarily start an existing stopped container solely
+for a bounded version probe; passive inventory, CLI version reports and automatic discovery never
+start it. Check All confirms stopped targets. Retain lifecycle exclusion through restoration,
+including an independent parent-death guard; do not invoke normal launch/provisioning or create
+missing containers. Unconfirmed cleanup stays visible with exact-identity recovery evidence.
+Originally-running targets stay running. A running environment update requires explicit stop
+caution before checkpoint/install and finishes stopped, never an implicit restart. Existing
+ownership, pin, checkpoint, journal and user-configuration boundaries remain in force.
