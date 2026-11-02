@@ -45,13 +45,15 @@ jobs:
           cp -a "$pythonLocation/." "$private_python/"
           chmod -R go-w "$private_python"
           echo "$private_python/bin" >> "$GITHUB_PATH"
-          echo "pythonLocation=$private_python" >> "$GITHUB_ENV"
-          # setup-python also exports loader/build paths; none should retain the writable cache.
-          echo "LD_LIBRARY_PATH=$private_python/lib" >> "$GITHUB_ENV"
-          echo "PKG_CONFIG_PATH=$private_python/lib/pkgconfig" >> "$GITHUB_ENV"
-          for name in Python_ROOT_DIR Python2_ROOT_DIR Python3_ROOT_DIR; do
-            echo "$name=$private_python" >> "$GITHUB_ENV"
-          done
+          {
+            echo "pythonLocation=$private_python"
+            # setup-python also exports loader/build paths; none should retain the writable cache.
+            echo "LD_LIBRARY_PATH=$private_python/lib"
+            echo "PKG_CONFIG_PATH=$private_python/lib/pkgconfig"
+            for name in Python_ROOT_DIR Python2_ROOT_DIR Python3_ROOT_DIR; do
+              echo "$name=$private_python"
+            done
+          } >> "$GITHUB_ENV"
       - name: Install
         env:
           DEPENDENCIES: ${{ matrix.dependencies }}

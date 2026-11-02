@@ -51,8 +51,9 @@ def test_ubuntu_tests_copy_the_complete_python_runtime_without_changing_the_host
     assert 'cp -a "$pythonLocation/." "$private_python/"' in section
     assert 'chmod -R go-w "$private_python"' in section
     assert 'echo "$private_python/bin" >> "$GITHUB_PATH"' in section
-    assert 'echo "pythonLocation=$private_python" >> "$GITHUB_ENV"' in section
-    assert 'echo "LD_LIBRARY_PATH=$private_python/lib" >> "$GITHUB_ENV"' in section
+    assert 'echo "pythonLocation=$private_python"' in section
+    assert 'echo "LD_LIBRARY_PATH=$private_python/lib"' in section
+    assert '} >> "$GITHUB_ENV"' in section
     assert "sudo" not in section and "/opt/hostedtoolcache" not in section
 
 
