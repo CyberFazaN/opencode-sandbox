@@ -59,9 +59,31 @@ def test_unclassified_installation_cannot_trigger_external_execution(monkeypatch
 def test_observed_external_runtime_and_locations_are_independent_without_installing(tools, monkeypatch):
     evidence, launcher, package, metadata = tools
     before = {path: path.read_bytes() for path in [launcher, *package.glob('*.py'), *metadata.iterdir()]}
-    original_call, refusals = c.call, []
+    original_call, refusals, routes = c.call, [], []
 
     def diagnostic_call(argv, **kwargs):
+        # Observe only this fixed probe's unchanged failing guard frame in the child. Do not
+        # alter its checks/results or forward the child's raw output/environment to the report.
+        hook = '''
+def _ci_trace(frame, event, argument):
+    if frame.f_code.co_name != 'outside' or frame.f_globals.get('Refused') is not Refused:
+        return None
+    if event == 'exception' and argument[0] is Refused and str(argument[1]) == 'External runtime has unsafe ownership or writable paths':
+        candidate = frame.f_locals.get('item', frame.f_locals.get('current'))
+        try:
+            info = candidate.lstat() if candidate.is_symlink() else candidate.stat()
+            display = str(candidate).replace(str(Path.home()), '$HOME')
+            print(json.dumps({'ci_unsafe_route': display, 'uid': info.st_uid, 'mode': oct(info.st_mode & 0o7777), 'probe': sys.argv[1]}), file=sys.stderr)
+        except OSError:
+            pass
+    return _ci_trace
+sys.settrace(_ci_trace)
+'''
+        argv = list(argv)
+        source = argv.index('-c') + 1
+        marker = "\nif __name__ == '__main__':"
+        assert argv[source].count(marker) == 1
+        argv[source] = argv[source].replace(marker, '\n' + hook + marker)
         completed = original_call(argv, **kwargs)
         try:
             value = json.loads(completed.stdout.splitlines()[-1])
@@ -71,11 +93,18 @@ def test_observed_external_runtime_and_locations_are_independent_without_install
         # Failure reasons are static probe messages; never print raw stdout/stderr or evidence.
         if isinstance(value, dict) and value.get('ok') is False:
             refusals.append(value.get('reason'))
+        for line in completed.stderr.splitlines():
+            try:
+                value = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(value, dict) and set(value) == {'ci_unsafe_route', 'uid', 'mode', 'probe'}:
+                routes.append(value)
         return completed
 
     monkeypatch.setattr(c, 'call', diagnostic_call)
     result = manager_tools.assess(evidence)
-    assert result['supported'], {'assessment': result, 'probe_refusals': refusals}
+    assert result['supported'], json.dumps({'probe_refusals': refusals, 'unsafe_routes': routes, 'assessment': result['reason']})
     facts = result['evidence']
     assert facts['pipx_runtime']['pipx_version'] == '1.18.7'
     assert facts['settings']['PIPX_HOME'] == evidence['evidence']['pipx_home']
