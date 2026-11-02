@@ -58,7 +58,8 @@ def implementation(prepared, *, escape=False, sleep=False):
     if escape:
         body += (f' child=subprocess.Popen([{EXTERNAL!r},"-I","-B","-S","-c","import time;time.sleep(30)"],start_new_session=True)\n'
                  ' value["descendant"]=child.pid\n')
-    body += f' Path({str(marker)!r}).write_text(json.dumps(value))\n'
+    body += (f' ready=Path({str(marker)!r});partial=ready.with_name(ready.name+".partial")\n'
+             ' partial.write_text(json.dumps(value));partial.replace(ready)\n')
     if sleep: body += ' time.sleep(30)\n'
     body += ' return 0\n'
     (package / '__main__.py').write_text(body)
@@ -94,7 +95,8 @@ def owner(prepared, *, fault=None):
         code += (' actual=installer.protocol._message\n'
                  ' def parked(*args,**kwargs):\n'
                  '  value=actual(*args,**kwargs)\n'
-                 f'  Path({str(marker.with_suffix(".parked"))!r}).write_text(json.dumps(value))\n'
+                 f'  ready=Path({str(marker.with_suffix(".parked"))!r});partial=ready.with_name(ready.name+".partial")\n'
+                 '  partial.write_text(json.dumps(value));partial.replace(ready)\n'
                  '  time.sleep(30)\n'
                  '  return value\n'
                  ' installer.protocol._message=parked\n')
@@ -172,6 +174,20 @@ def test_killed_owner_never_leaves_an_inherited_lock_or_clears_authoritative_pen
             process = owner(prepared, fault='parked' if parked else None)
             value = wait_marker(prepared[4].with_suffix('.parked') if parked else prepared[4])
             child = value['pid']; descendant = value.get('descendant')
+            if parked:
+                # EOF refusal can beat PDEATHSIG during parent exit. Stop this exact parked
+                # child after its authenticated rendezvous so the kernel signal, not scheduling,
+                # determines the outcome; SIGKILL must still terminate a stopped process.
+                descriptor = os.pidfd_open(child)
+                try: signal.pidfd_send_signal(descriptor, signal.SIGSTOP)
+                finally: os.close(descriptor)
+                deadline = time.monotonic() + 2
+                while True:
+                    fields = Path(f'/proc/{child}/stat').read_text().rsplit(')', 1)[1].split()
+                    assert int(fields[1]) == process.pid and fields[19] == value['start']
+                    if fields[0] == 'T': break
+                    assert time.monotonic() < deadline, 'Owned installer did not enter the stopped rendezvous'
+                    time.sleep(.01)
             process.kill(); process.communicate(timeout=5)
             assert wait_helper(child) == -signal.SIGKILL; child = None
             with locks.exclusive(prepared[0]['prefix']): pass

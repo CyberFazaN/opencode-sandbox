@@ -3,7 +3,7 @@
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
 [ARCHITECTURE](ARCHITECTURE.md). Release gates: [CAMPAIGN](CAMPAIGN.md) and [RELEASING](RELEASING.md).
-The checks below predate this documentation cleanup; none is claimed as newly executed.
+The current checkpoint below records fresh verification; older sections retain their stated scope.
 
 ## Version
 
@@ -29,6 +29,9 @@ No release recommendation follows: B15's post-reboot recovery risk is not accept
   delegated by systemd 262. Foreign/rootful/remote daemons and socket proxies are refused.
 - Python >=3.11: local 3.11.18 and 3.14.8; 3.12/3.13 accepted, not tested separately. Stable hosted
   CI used Ubuntu 26.04, Python 3.11.17/3.14.9, plus an unprivileged rolling Arch userland job.
+- Python 3.15 is stable ([upstream status](https://devguide.python.org/versions/)) and accepted by
+  the declared range, but not qualified here. The explicit CI endpoint remains 3.14 pending
+  current/lowest, installed-package/process verification and review of the required-check transition.
 - Current Typer/Textual 0.27.3/8.2.8; lowest direct versions 0.16.0/4.0.0. Test environment:
   pytest 9.2.0, pyte 0.8.2, Ruff 0.17.3, shellcheck 0.11.0; pipx 1.18.7.
 - OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
@@ -37,29 +40,45 @@ No release recommendation follows: B15's post-reboot recovery risk is not accept
 
 ### Current code checkpoint — 2026-11-02
 
-The branch-workflow change added three CI/release contract tests without changing application
-source, dependencies or image assets. Evidence: `.work/branch-migration-20261101/` (XML, source
-comparison, package proof and manifests) and `.work/logs/branch-migration-pipx-20261102*`.
+Application source, dependency declarations and image assets are unchanged. The test-quality
+checkpoint strengthens behavioral/security oracles and fixture isolation, consolidates duplicate
+coverage, and keeps the complete CI/release selections. Local policy is in CONTRIBUTING; current
+and minimum direct dependencies are resolved together with the project in CI, not a later downgrade.
+Evidence: versions, final four XMLs, timing profile, mutation controls and removal-to-retained-test
+rationale under ignored `.work/agents/`; real resource manifests and logs under `.work/logs/`.
 
 | Layer | Executed result and scope |
 |---|---|
-| Complete default suite, Python 3.11/current | **2223 passed / 86 real opt-in skips**, 360.61 s |
-| Complete default suite, Python 3.14/current | **2223 passed / 86 real opt-in skips**, 373.72 s; same 2309 ordered outcomes |
-| Lowest dependencies | **91 focused workflow/release/docs/language/CLI/quality tests passed** at each endpoint, 4.07/3.26 s; not complete lowest-dependency regression |
-| Real Docker/installed pipx | `test_65_pipx.py`: **1 passed / 21 checks**, 40.92 s, no skips; tag installation/replacement/data retention/foreign-launcher/uninstall, no image-build opt-in |
-| Packaging, both endpoints | Tracked-input sdist/wheel, strict twine and `check_dist.py` passed; 63 product files byte-identical to source, no private instructions/injectors shipped |
-| Static/security | Ruff/shellcheck, actionlint, offline zizmor, tracked-tree/history gitleaks and four dependency `pip check` results clean; existing documented lint exceptions unchanged |
+| Complete default suite, Python 3.11/lowest direct | **2244 passed / 86 real opt-in skips**, 331.78 s |
+| Complete default suite, Python 3.11/current | **2244 passed / 86 real opt-in skips**, 338.79 s |
+| Complete default suite, Python 3.14/lowest direct | **2244 passed / 86 real opt-in skips**, 354.38 s |
+| Complete default suite, Python 3.14/current | **2244 passed / 86 real opt-in skips**, 360.22 s; passive timing instrumentation only |
+| Real Docker/security/backup | **1 test / 20 checks passed**, 14.91 s: real sessions, external-profile isolation and decompressed workspace/home backup canaries on the retained Debian base |
+| Real Docker/diagnostics | **2 tests / 30 checks passed**, 13.08 s: retained Debian and Arch, deadlines, cancellation, missing tooling, owned helper cleanup and persistence |
+| Failure-detection controls | Original restore-space test accepted compressed-size substitution; strengthened test rejects that, ignored reserve and exact-fit rejection (**3/3 targeted in-memory mutants**), not broad mutation coverage |
+| Static/dependencies | Ruff/shellcheck, actionlint, offline zizmor and four `pip check` results clean; existing lint exceptions and all mandatory jobs retained |
 
-Full commands used the endpoint venv's `python -m pytest -q -rs`, absolute source PYTHONPATH,
-serial foreground execution, fresh short external basetemps and separate JUnit results. The
-focused files were `test_python_ci.py`, `test_release_scripts.py`, `test_user_docs.py`,
-`test_language.py`, `test_cli_structure.py`, `test_quality.py`. Real pipx used
-`OCS_TEST_DOCKER=1 OCS_TEST_RUN=branch-migration-pipx-20261102` with only `test_65_pipx.py`.
-Packaging used `build --no-isolation`, `twine check --strict`, `.github/scripts/check_dist.py`.
-Product cleanup/leak checks passed and the original four full image IDs were unchanged.
+Commands used each endpoint venv's `python -B -m pytest -q -rs -p no:cacheprovider`, absolute source
+PYTHONPATH, serial foreground execution, fresh short external basetemps and separate JUnit results.
+Earlier failures exposed the real campaign inheriting unit fakes, path-sensitive socket/launcher
+fixtures and a parked-installer EOF/parent-death race. They were investigated and corrected before
+the final four passes; no retry waiver or relaxed signal/security assertion. Lowest Typer still
+emits the two known Click deprecations. Product cleanup passed, original four full image IDs were
+unchanged, and no current-run Docker resources leaked; persistent protocol lock inodes are retained.
 
-Full lowest-dependency suites and the complete real release campaign were **not** rerun at this
-checkpoint. Later instruction/security-table edits are documentation only, not new runtime proof.
+Affected execution time (summed JUnit case phases, not full-suite wall time) fell **23.63 -> 6.79 s**
+for 35 -> 28 cases with retained behavioral coverage. Total collection changed **2328 -> 2330**:
+2242 -> 2244 default cases, the same 86 real cases. The final four suites total about **23.1 min**;
+the normal local checkpoint pair takes **11.5 min**, not a CI/release reduction. Historical full
+timings are not a controlled before/after benchmark. Global fixture setup is not a useful
+optimization target (about 0.24 s combined in the primary profile).
+
+Retained unchanged-package evidence: `.work/branch-migration-20261101/` passed both-endpoint
+build/twine/content checks with 63 source-identical product files; `branch-migration-pipx-20261102`
+passed the real installed-pipx lifecycle (1 test/21 checks, 40.92 s). These were not rerun for
+test-only changes. The complete real release campaign, privileged/socket/reboot rows, real OpenCode
+first prompts, fresh image builds and hosted CI were **not** renewed by this checkpoint. Final
+record edits are documentation only, with focused document/contracts verification, not new runtime proof.
 
 ### Updates final integration
 
@@ -133,7 +152,7 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
   and run the affected/full campaign before claiming it tested.
 - Another user's actual rootless dockerd: refusal was shown with another UID's socket, not a
   provisioned foreign rootless engine. Test only with separately authorized resources.
-- pipx versions other than 1.18.7, Python 3.12/3.13 separately, Textual 4.0 in a real terminal,
+- pipx versions other than 1.18.7, Python 3.12/3.13/3.15 separately, Textual 4.0 in a real terminal,
   other terminal emulators, other real model providers and a real provider on Arch. Execute the
   corresponding installed/terminal/provider checks; mocks/pilots are not a substitute.
 - Actual post-change full release campaign, real public-network manager replacement, human

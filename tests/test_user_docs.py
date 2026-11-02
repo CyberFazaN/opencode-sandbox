@@ -4,6 +4,7 @@ regenerated. Commands and options named in the documents: tests/test_cli_structu
 import re
 from pathlib import Path
 
+import pytest
 from test_language import ACTIVE_ROOT_DOCS, USER_GUIDES, active_files
 
 from opencode_sandbox import __version__
@@ -13,6 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 REPOSITORY = "https://github.com/CyberFazaN/opencode-sandbox"
 LINK = re.compile(r"\]\(([^)\s]+)\)")
+# Match a claimed requirement, not an accurate limitation of the test evidence.
+ARCH_HOST_REQUIREMENT = re.compile(
+    r"\b(?:You need|requires?) Arch(?: Linux)?\b"
+    r"|\bArch Linux is (?:required|the (?:required|supported|only supported) host)\b"
+    r"|\b(?:only supported|required|supported) hosts?(?: is| are|:)\s*Arch(?: Linux)?\b"
+    r"|\bonly Arch Linux is supported\b", re.IGNORECASE)
 
 
 def user_documents():
@@ -50,16 +57,12 @@ def anchors(path):
     return found
 
 
-def test_anchor_rules_match_github():
-    sample = ROOT / ".work" / "anchor-sample.md"
-    sample.parent.mkdir(exist_ok=True)
+def test_anchor_rules_match_github(tmp_path):
+    sample = tmp_path / "anchor-sample.md"
     sample.write_text("# Direct workspaces (not recommended)\n## 1. Check the host\n## Keys\n## Keys\n"
                       "```sh\n# a comment, not a heading\n```\n## `check NAME` and `doctor`\n")
-    try:
-        assert anchors(sample) == {"direct-workspaces-not-recommended", "1-check-the-host", "keys", "keys-1",
-                                   "check-name-and-doctor"}
-    finally:
-        sample.unlink()
+    assert anchors(sample) == {"direct-workspaces-not-recommended", "1-check-the-host", "keys", "keys-1",
+                               "check-name-and-doctor"}
 
 
 def test_relative_links_and_anchors_resolve():
@@ -127,15 +130,28 @@ def test_user_documents_do_not_mention_internal_records():
 
 def test_documents_do_not_require_arch_linux_as_the_host():
     """D-046: Linux hosts in general; Arch Linux is the tested host, not a requirement."""
-    pattern = re.compile(r"(only|supported) (tested )?host|You need Arch|Arch Linux is the (only|required|supported)|requires? Arch"
-                         r"|other than Arch", re.IGNORECASE)
     files = [*user_documents(), *(ROOT / name for name in ACTIVE_ROOT_DOCS),
              ROOT / ".github/ISSUE_TEMPLATE/bug_report.yml"]
-    found = [(path.name, line.strip()) for path in files for line in path.read_text().splitlines() if pattern.search(line)]
+    found = [(path.name, line.strip()) for path in files for line in path.read_text().splitlines()
+             if ARCH_HOST_REQUIREMENT.search(line)]
     assert found == []
     requirements = (DOCS / "install.md").read_text()
     for prerequisite in ("| Linux |", "newuidmap", "user namespaces", "cgroup v2", "distribution's official documentation"):
         assert prerequisite in requirements, prerequisite
+
+
+@pytest.mark.parametrize("text,requires_arch", [
+    ("You need Arch Linux to run the manager.", True),
+    ("The manager requires Arch Linux.", True),
+    ("Arch Linux is the only supported host.", True),
+    ("Supported hosts: Arch Linux", True),
+    ("Only Arch Linux is supported.", True),
+    ("Arch Linux remains the only host with real Docker/OpenCode evidence otherwise.", False),
+    ("Arch Linux is the only tested host, not a requirement.", False),
+    ("Linux distributions other than Arch can meet the prerequisites.", False),
+])
+def test_host_requirement_guard_distinguishes_support_from_test_evidence(text, requires_arch):
+    assert bool(ARCH_HOST_REQUIREMENT.search(text)) is requires_arch
 
 
 def test_rootless_setup_points_to_upstream_and_distribution_documentation():

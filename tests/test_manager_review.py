@@ -58,11 +58,6 @@ installation = local_installation
 tools = tools_fixture
 
 
-def test_review_preparation_is_distinct_from_source_evidence_or_cached_classification():
-    from opencode_sandbox import manager_review
-    assert callable(manager_review.prepare) and callable(manager_review.revalidate)
-
-
 def test_preparation_binds_fresh_installation_tools_source_routes_and_no_helper(prepared, origin, monkeypatch):
     from opencode_sandbox import manager_review as r
     _, state = origin

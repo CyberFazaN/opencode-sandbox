@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from campaign import DISTROS
+from campaign import DISTROS, backup_profile_leaks
 
 GIT = ["git", "-c", "user.name=ocs-test", "-c", "user.email=ocs-test@example.invalid"]
 MARKERS = "cat /workspace/ws-marker.txt /root/home-marker.txt /etc/ocs-test-system-marker"
@@ -182,8 +182,7 @@ def test_lifecycle_settings_changes_backup(campaign, checks, distro):
     camp.note(f"backup {backup}")
     ck(stat.S_IMODE(backup.stat().st_mode) == 0o700, "E04 backup directory is 0700")
     camp.ocs("backup", "verify", str(backup))
-    raw = b"".join(p.read_bytes() for p in backup.rglob("*") if p.is_file() and p.stat().st_size < 50 * 2**20)
-    ck(b"not-a-real-key" not in raw, "F06 the profile value is not in the backup's small files")
+    ck(not backup_profile_leaks(backup, b"not-a-real-key"), "F06 external profile absent from manifest and workspace/home payloads")
     restored = f"ocs-test-rest-{distro}"
     camp.ocs("backup", "restore", str(backup), restored)
     rid = camp.adopt(restored)

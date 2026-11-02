@@ -3,6 +3,7 @@ C01, C06). Dummy keys only."""
 import hashlib
 import json
 import os
+import shutil
 import socket
 import stat
 import subprocess
@@ -10,7 +11,7 @@ import sys
 import threading
 
 import pytest
-from campaign import MANAGER, SOCKET
+from campaign import MANAGER, SOCKET, backup_profile_leaks
 
 pyte = pytest.importorskip("pyte")
 from pty_term import Term
@@ -75,6 +76,21 @@ def test_profiles_secrets_and_isolation(campaign, checks):
     ck(not any("dummy-profile-b" in line for line in output), "F06 no value in any command output of this test")
     exec_env = camp.ocs("exec", "ocs-test-sec-a", "--", "sh", "-c", "echo ${QA_KEY:-unset}")
     ck("unset" in exec_env.stdout, "exec does not load the provider profile (documented)")
+
+    # External profiles are mounts, not persistent home/workspace data. Inspect decompressed
+    # payloads, with a positive canary proving that both actual archives were examined.
+    camp.sh(a, "printf ocs-test-backup-canary > /workspace/backup-canary; "
+               "printf ocs-test-backup-canary > /root/backup-canary")
+    camp.ocs("backup", "create", "ocs-test-sec-a", "--stop", "--no-system")
+    backup, = (camp.data / "backups").glob(f"ocs-test-sec-a-{a}-*.ocsbackup")
+    camp.note(f"backup {backup}")
+    camp.ocs("backup", "verify", str(backup))
+    ck(set(backup_profile_leaks(backup, b"ocs-test-backup-canary")) ==
+       {"workspace.tar.gz:backup-canary", "home.tar.gz:backup-canary"}, "F06 control: both backup payloads actually scanned")
+    ck(not backup_profile_leaks(backup, HOSTILE.encode()), "F06 external profile absent from archived contents and manifest")
+    shutil.rmtree(backup)
+    camp.note(f"removed backup {backup}")
+    camp.ocs("start", "ocs-test-sec-a")
 
     # F03: changing A's profile recreates its container with the new mount; B is unaffected
     b_id = camp.inspect(b)["Id"]

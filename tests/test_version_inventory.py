@@ -5,7 +5,8 @@ Docker and npm are mocked; metadata and the Textual pilot use isolated real file
 from types import SimpleNamespace
 
 import pytest
-from test_tui import run, settle
+from test_tui import run
+from test_updates_tui import until
 from typer.testing import CliRunner
 
 from opencode_sandbox import core as c
@@ -68,14 +69,13 @@ def assert_read_only_checks(inventory, *, check=True, ordered=True):
 
 async def check_updates(app, pilot):
     await pilot.press("v", "3")
-    await settle(pilot)
     screen = app.screen
     assert isinstance(screen, UpdatesScreen)
     table = screen.query_one("#updates-table")
     running = next(m for m in c.all_envs() if m["name"] == "ocs-test-up02-running")
     table.move_cursor(row=table.get_row_index(running["id"]))
     await pilot.press("c")
-    await settle(pilot)
+    await until(pilot, lambda: not screen._active and screen.items["environments"][running["id"]].get("version") == "2.1.4")
     return screen
 
 
@@ -99,7 +99,8 @@ def test_cli_inventory_survives_registry_failure(inventory, error):
     assert_read_only_checks(inventory)
 
 
-@pytest.mark.parametrize("error", REGISTRY_ERRORS)
+# All error forms run through the CLI above; pilots retain both expected and unexpected errors.
+@pytest.mark.parametrize("error", [REGISTRY_ERRORS[0], REGISTRY_ERRORS[-1]])
 def test_tui_inventory_survives_registry_failure(inventory, error):
     inventory.discovery["error"] = error
     async def t(app, pilot):
@@ -108,7 +109,9 @@ def test_tui_inventory_survives_registry_failure(inventory, error):
         assert rows["ocs-test-up02-running"]["version"] == "2.1.4"
         assert rows["ocs-test-up02-stopped"]["state"] == "stopped"
         assert rows["ocs-test-up02-created"]["state"] == "not-created"
-        assert f"Check failed: {c.error_text(error)}" in screen.discovery_text()
+        assert f"Check failed: {c.error_text(error)}" in str(screen.query_one("#updates-discovery").render())
+        running = rows["ocs-test-up02-running"]["id"]
+        assert str(screen.query_one("#updates-table").get_row(running)[2]) == "2.1.4 (last verified)"
         assert_read_only_checks(inventory, ordered=False)
         await pilot.press("escape")
         assert len(app.screen_stack) == 1
@@ -122,9 +125,12 @@ def test_cli_inventory_without_check_never_queries_registry(inventory):
     assert_read_only_checks(inventory, check=False)
 
 
-@pytest.mark.parametrize("frontend", ["cli", "tui"])
+@pytest.mark.parametrize("frontend,error", [
+    ("cli", OSError("Cannot read local metadata [test]")),
+    ("cli", RuntimeError("Local inventory defect [test]")),
+    ("tui", RuntimeError("Local inventory defect [test]")),
+])
 @pytest.mark.parametrize("registry_ok", [False, True])
-@pytest.mark.parametrize("error", [OSError("Cannot read local metadata [test]"), RuntimeError("Local inventory defect [test]")])
 def test_local_source_failure_does_not_hide_registry_result(monkeypatch, inventory, frontend, registry_ok, error):
     inventory.discovery["error"] = None if registry_ok else c.SandboxError("Registry unavailable [test]")
     def fail():
@@ -146,16 +152,13 @@ def test_local_source_failure_does_not_hide_registry_result(monkeypatch, invento
     else:
         async def t(app, pilot):
             # The new UI enumerates local metadata independently of the CLI's active report.
-            await pilot.press("v", "3")
-            await settle(pilot)
-            screen = app.screen
             def fail_metadata(): raise error
             monkeypatch.setattr(c, "all_envs", fail_metadata)
-            await pilot.press("escape", "v", "3", "c")
-            await settle(pilot)
+            await pilot.press("v", "3", "c")
             screen = app.screen
-            assert screen.inventory_error == c.error_text(error)
-            assert not screen.items["environments"]
+            await until(pilot, lambda: not screen._active)
+            assert f"Local inventory failed: {c.error_text(error)}" in str(screen.query_one("#updates-selected").render())
+            assert screen.query_one("#updates-table").row_count == 0
             if registry_ok:
                 assert "npm: 2.2.0" in screen.discovery_text() and "Check failed" not in screen.discovery_text()
             else:
@@ -164,9 +167,12 @@ def test_local_source_failure_does_not_hide_registry_result(monkeypatch, invento
         run(t, (80, 24))
 
 
-@pytest.mark.parametrize("frontend", ["cli", "tui"])
+@pytest.mark.parametrize("frontend,row_error", [
+    ("cli", ValueError("Cannot format row [test]")),
+    ("cli", KeyError("version")),
+    ("tui", KeyError("version")),
+])
 @pytest.mark.parametrize("registry_ok", [False, True])
-@pytest.mark.parametrize("row_error", [ValueError("Cannot format row [test]"), KeyError("version")])
 def test_bad_rows_do_not_hide_other_environments(monkeypatch, inventory, frontend, registry_ok, row_error):
     inventory.discovery["error"] = None if registry_ok else c.SandboxError("Registry unavailable [test]")
     bad_policy = c.create("ocs-test-up02-policy", "scratch")

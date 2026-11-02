@@ -36,11 +36,6 @@ def data(prepared):
             'context': {name: os.environ.get(name) for name in o.CONTEXT}}
 
 
-def test_post_exit_local_replay_requires_a_separate_stdlib_validator():
-    from opencode_sandbox import manager_observations
-    assert callable(manager_observations.validate)
-
-
 def test_shared_route_context_and_critical_inventory_match_origin_review(prepared):
     value = json.loads(prepared.binding)
     assert set(o.CONTEXT) == set(r.CONTEXT)

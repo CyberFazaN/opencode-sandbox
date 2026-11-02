@@ -1,6 +1,7 @@
 """Expected installed files are checked independently of pipx status, caches and exit codes."""
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from opencode_sandbox import manager_installation as installation_module
 from opencode_sandbox import manager_result as result
 
 installation = local_installation
+SCRIPT_BODY = ("import sys\nfrom opencode_sandbox.launcher import main\n"
+               "if __name__ == '__main__':\n    sys.argv[0] = sys.argv[0].removesuffix('.exe')\n    sys.exit(main())\n")
 
 
 @pytest.fixture
@@ -20,8 +23,11 @@ def installed(installation):
     (dist / 'METADATA').write_text('Metadata-Version: 2.1\nName: opencode-sandbox\nVersion: 6.1.0\n')
     (dist / 'entry_points.txt').write_text('[console_scripts]\nopencode-sandbox = opencode_sandbox.launcher:main\n')
     app = launcher.resolve()
-    app.write_text(f'#!{prefix / "bin/python"}\nimport sys\nfrom opencode_sandbox.launcher import main\n'
-                   "if __name__ == '__main__':\n    sys.argv[0] = sys.argv[0].removesuffix('.exe')\n    sys.exit(main())\n")
+    python = str(prefix / 'bin/python')
+    quoted = '"' + python + '"' if shlex.quote(python) != python else python
+    header = (f'#!{python}\n' if len(os.fsencode(python)) + 3 <= 127 and not any(ch.isspace() for ch in python)
+              else '#!/bin/sh\n' + "'''exec' " + quoted + ' "$0" "$@"\n' + "' '''\n")
+    app.write_text(header + SCRIPT_BODY)
     files = [app, dist / 'METADATA', dist / 'RECORD', dist / 'entry_points.txt', dist / 'direct_url.json',
              dist.parent / 'opencode_sandbox/__init__.py']
     (dist / 'RECORD').write_text(''.join(os.path.relpath(path, dist.parent) + ',,\n' for path in files))
@@ -104,7 +110,8 @@ def test_unknown_record_fields_cannot_be_hidden_by_healthy_cached_or_installer_r
 def test_long_path_shell_launcher_cannot_claim_health_with_unquoted_shell_metacharacters(installed, tmp_path):
     python = tmp_path / ('x' * 130 + ';not-a-command') / 'python'
     app = installed[0] / 'bin/opencode-sandbox'
-    body = app.read_text().split('\n', 1)[1]
-    app.write_text('#!/bin/sh\n' + "'''exec' " + str(python) + ' "$0" "$@"\n' + "' '''\n" + body)
+    app.write_text('#!/bin/sh\n' + "'''exec' " + str(python) + ' "$0" "$@"\n' + "' '''\n" + SCRIPT_BODY)
     with pytest.raises(result.Refused, match='template'):
         result._launcher(app, python, 'opencode_sandbox.launcher:main')
+    app.write_text('#!/bin/sh\n' + "'''exec' \"" + str(python) + '" "$0" "$@"\n' + "' '''\n" + SCRIPT_BODY)
+    result._launcher(app, python, 'opencode_sandbox.launcher:main')  # same valid body, correctly quoted control

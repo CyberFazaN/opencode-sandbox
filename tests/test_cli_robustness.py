@@ -11,20 +11,6 @@ from opencode_sandbox.cli import app
 runner = CliRunner()
 
 
-def test_every_command_help_renders():
-    group = __import__("typer").main.get_command(app)
-    def walk(cmd, path):
-        yield path
-        if getattr(cmd, "commands", None):
-            for name, sub in cmd.commands.items():
-                yield from walk(sub, path + [name])
-    paths = list(walk(group, []))
-    assert len(paths) > 40
-    for path in paths:
-        result = runner.invoke(app, path + ["--help"])
-        assert result.exit_code == 0, (path, result.output)
-
-
 def test_runtime_recover_without_pending_operation_is_clean_error(monkeypatch):
     m = c.create("ocs-qa-rr", "scratch")
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)

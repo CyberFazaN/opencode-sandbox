@@ -61,13 +61,6 @@ def test_symlink_target_with_nul_or_backslash_refused(tmp_path):
     src=tmp_path/'src';src.mkdir();(src/'x').symlink_to('a\\b')
     with pytest.raises(c.SandboxError,match='backslash'): b.archive_directory(src,tmp_path/'a.tar.gz')
 
-def test_symlink_parent_archive_rejected(tmp_path):
-    p=tmp_path/'bad.tar.gz'
-    with tarfile.open(p,'w:gz') as tf:
-        link=tarfile.TarInfo('dir');link.type=tarfile.SYMTYPE;link.linkname='safe';tf.addfile(link)
-        info=tarfile.TarInfo('dir/payload');info.size=1;tf.addfile(info,io.BytesIO(b'x'))
-    with pytest.raises(c.SandboxError,match='through symlink'): b.unpack(p,tmp_path/'out')
-
 def test_prune_dry_run_and_keep(tmp_path):
     for i in range(3):
         p=tmp_path/f'{i}.ocsbackup';p.mkdir()

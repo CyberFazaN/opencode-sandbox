@@ -475,15 +475,26 @@ def test_host_helpers(tmp_path):
 
 
 def test_probe_script_runs_and_classifies(tmp_path):
-    """The script the container executes, run here against loopback only."""
+    """Real loopback connections; DNS failure is injected without depending on the host resolver."""
     import subprocess
     import sys
-    listener = socket.socket(); listener.bind(("127.0.0.1", 0)); listener.listen(1)
-    closed = socket.socket(); closed.bind(("127.0.0.1", 0)); port_closed = closed.getsockname()[1]; closed.close()
-    spec = {"open": ["127.0.0.1", listener.getsockname()[1], "tok"], "closed": ["127.0.0.1", port_closed],
-            "dns": ["ocs-qa-no-such-host.invalid", 9]}
-    out = subprocess.run([sys.executable, "-c", r.PROBE, json.dumps(spec)], capture_output=True, text=True, timeout=30, check=True)
-    listener.close()
+    bootstrap = '''import socket
+getaddrinfo = socket.getaddrinfo
+def resolve(host, *args, **kwargs):
+    if host == "ocs-qa-no-such-host.invalid":
+        raise socket.gaierror(socket.EAI_NONAME, "test-owned DNS failure")
+    assert host == "127.0.0.1", "probe test must not contact external hosts"
+    return getaddrinfo(host, *args, **kwargs)
+socket.getaddrinfo = resolve
+'''
+    with socket.socket() as listener, socket.socket() as closed:
+        listener.bind(("127.0.0.1", 0)); listener.listen(1)
+        # Keep the non-listening port reserved so another process cannot acquire it mid-test.
+        closed.bind(("127.0.0.1", 0))
+        spec = {"open": ["127.0.0.1", listener.getsockname()[1], "tok"],
+                "closed": ["127.0.0.1", closed.getsockname()[1]], "dns": ["ocs-qa-no-such-host.invalid", 9]}
+        out = subprocess.run([sys.executable, "-I", "-B", "-c", bootstrap + r.PROBE, json.dumps(spec)],
+                             capture_output=True, text=True, timeout=5, check=True)
     assert json.loads(out.stdout) == {"open": "connected", "closed": "refused", "dns": "no-dns"}
 
 

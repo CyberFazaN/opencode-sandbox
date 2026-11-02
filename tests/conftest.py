@@ -37,9 +37,9 @@ def _plain_cli_errors(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_real_daemon_identity(request, monkeypatch):
-    """Unit tests never verify the real daemon; tests of the verifier opt out with `real_identity`."""
+    """Unit tests use fake identity; verifier tests and the real campaign explicitly opt out."""
     monkeypatch.setattr(c, "_ENDPOINT", None)
-    if request.node.get_closest_marker("real_identity"):
+    if request.node.get_closest_marker("real_identity") or request.node.get_closest_marker("docker"):
         return
     monkeypatch.setattr(rid, "verify", lambda context=None, **k: rid.Identity(
         rid.VERIFIED, context or "rootless", k.get("endpoint") or FAKE_ENDPOINT, FAKE_ENDPOINT[7:]))
@@ -50,7 +50,7 @@ def _no_host_docker_cli(request, monkeypatch):
     """A Docker CLI call that no test double intercepts behaves as on a host without the CLI
     (the hosted Arch Linux job), so results never depend on whether this host has one. Tests
     that mock subprocess.run themselves replace this; `real_session` tests use a fake binary."""
-    if request.node.get_closest_marker("real_session"):
+    if request.node.get_closest_marker("real_session") or request.node.get_closest_marker("docker"):
         return
     real = c.subprocess.run
     real_popen = c.subprocess.Popen
@@ -68,11 +68,13 @@ def _no_host_docker_cli(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _no_real_resource_probe(monkeypatch):
+def _no_real_resource_probe(request, monkeypatch):
     """Unit/pilot runs use explicit healthy daemon evidence, never an installed host Docker CLI.
 
     Tests of the actual query keep its pre-fixture callable and mock only its transport.
     """
+    if request.node.get_closest_marker("docker"):
+        return
     monkeypatch.setattr(c, "docker_info", lambda: {"CgroupVersion": "2", "CgroupDriver": "systemd",
         "MemoryLimit": True, "CpuCfsQuota": True, "CpuCfsPeriod": True, "PidsLimit": True})
 
@@ -81,7 +83,7 @@ def _no_real_resource_probe(monkeypatch):
 def _no_real_session_processes(request, monkeypatch):
     """Interactive sessions go through the mocked `c.docker`; no watchdog process is started.
     Tests of the real processes opt out with `real_session`."""
-    if request.node.get_closest_marker("real_session"):
+    if request.node.get_closest_marker("real_session") or request.node.get_closest_marker("docker"):
         return
     monkeypatch.setattr(c, "session_watchdog", lambda m, token: None)
 

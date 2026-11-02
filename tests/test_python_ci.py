@@ -2,9 +2,12 @@
 import os
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
+from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +29,16 @@ def test_current_arch_and_lowest_direct_dependency_coverage_remain():
     assert "pacman -Syu" in text and "su ci -c" in text
     assert "dependencies: [current, lowest direct]" in text
     assert "typer==0.16.0 textual==4.0.0" in text
+
+
+def test_lowest_direct_dependency_pins_match_the_declared_project_bounds():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    requirements = {r.name: r for r in map(Requirement, project["dependencies"])}
+    pins = dict(re.findall(r"\b(typer|textual)==([\d.]+)", (ROOT / ".github/workflows/ci.yml").read_text()))
+    assert set(pins) == set(requirements)
+    for name, requirement in requirements.items():
+        lower, = [s.version for s in requirement.specifier if s.operator == ">="]
+        assert Version(pins[name]) == Version(lower), name
 
 
 @pytest.mark.parametrize("event", ["push", "pull_request"])
@@ -149,6 +162,7 @@ def test_install_controls_new_metadata_after_the_last_pip_call_without_changing_
     installer = commands / 'python'
     installer.write_text('''#!/bin/sh
 set -eu
+printf '%s\\n' "$*" >> "$CI_INSTALL_ARGUMENTS"
 case "$3" in
 install)
   mkdir -p "$pythonLocation/lib/python3/site-packages/packaging-26.3.dist-info" "$OCS_CI_PROJECT/src/product.egg-info"
@@ -160,11 +174,17 @@ esac
 ''')
     installer.chmod(0o700)
     record = tmp_path / 'install-record'
+    arguments = tmp_path / 'install-arguments'
     subprocess.run(['bash', '-eu', '-c', script], check=True, capture_output=True, text=True,
                    env={**os.environ, 'pythonLocation': str(runtime), 'OCS_CI_PROJECT': str(project),
                         'GITHUB_WORKSPACE': str(host), 'DEPENDENCIES': dependencies,
-                        'CI_INSTALL_RECORD': str(record), 'PATH': str(commands) + os.pathsep + os.defpath})
-    assert record.read_text().splitlines() == ['777'] * (3 if dependencies == 'lowest direct' else 2)
+                         'CI_INSTALL_RECORD': str(record), 'CI_INSTALL_ARGUMENTS': str(arguments),
+                         'PATH': str(commands) + os.pathsep + os.defpath})
+    installs = [line for line in arguments.read_text().splitlines() if line.startswith('-m pip install ')]
+    project_install, = [line for line in installs if '.[test]' in line]
+    assert ('typer==0.16.0 textual==4.0.0' in project_install) is (dependencies == 'lowest direct')
+    assert not any('typer==' in line and '.[test]' not in line for line in installs)
+    assert record.read_text().splitlines() == ['777', '777']
     target = tmp_path / 'application-home/venvs/opencode-sandbox'
     for metadata in (runtime / 'lib/python3/site-packages/packaging-26.3.dist-info', project / 'src/product.egg-info'):
         assert outside(str(metadata), target) == str(metadata)

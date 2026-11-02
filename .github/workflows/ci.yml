@@ -68,8 +68,11 @@ jobs:
         run: |
           umask 022
           python -m pip install --upgrade pip
-          python -m pip install -e '.[test]' ruff shellcheck-py pyte
-          if [ "$DEPENDENCIES" = "lowest direct" ]; then python -m pip install typer==0.16.0 textual==4.0.0; fi
+          if [ "$DEPENDENCIES" = "lowest direct" ]; then
+            python -m pip install -e '.[test]' typer==0.16.0 textual==4.0.0 ruff shellcheck-py pyte
+          else
+            python -m pip install -e '.[test]' ruff shellcheck-py pyte
+          fi
           # Installation can recreate writable metadata after the initial copy was controlled.
           # Normalize only these private copies, after the final dependency installation.
           chmod -R go-w "$pythonLocation" "$OCS_CI_PROJECT"

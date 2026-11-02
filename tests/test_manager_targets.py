@@ -29,11 +29,6 @@ def github(monkeypatch):
         yield state
 
 
-def test_source_resolution_is_separate_from_cached_latest_or_local_classification():
-    from opencode_sandbox import manager_targets
-    assert callable(manager_targets.resolve) and callable(manager_targets.revalidate)
-
-
 @pytest.mark.parametrize('tags', [(), ('a' * 40,), ('a' * 40, 'b' * 40), tuple(str(n) * 40 for n in range(4))])
 def test_exact_lightweight_and_bounded_nested_annotated_tags(github, tags):
     github['routes'] = graph(tags=tags)

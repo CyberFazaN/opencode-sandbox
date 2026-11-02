@@ -204,11 +204,53 @@ High-risk selection checklist (apply the affected rows, not every row to every c
 | Manager self-update/destructive operations | pipx tag install/upgrade/downgrade/uninstall/data retention, foreign-launcher refusal, independent helper/terminal handoff, exact installed-result verification and interruption/recovery, not success-path-only checks |
 | OpenCode/images/session boundaries | Both affected distributions, supported-major/pin/update/rollback policy, disabled self-update, real first-prompt Agent Context and user-owned configuration; keyboard/focus/confirmation/async errors and terminal/session return or manager death when affected |
 
-Use the Python 3.11/3.14 × current/lowest matrix for shared/security/compatibility integration
-checkpoints when those surfaces are affected; choose targeted endpoint checks for narrower risks.
+At meaningful local integration checkpoints, default to the complete suite on Python 3.11 with
+lowest direct dependencies and Python 3.14 with current compatible dependencies. Add the other
+combinations immediately when dependency/interpreter interactions or high-risk uncertainty warrant
+them; do not require four full runs after every shared-code edit. Use targeted endpoint checks for
+narrower risks. Public CI and final release qualification still require the complete four-way matrix.
 Affected real-Docker/OpenCode paths need both distributions where applicable, and installed pipx/
 terminal/fault paths for installation changes. Obtain the permissions in AGENTS first; if unavailable,
 report the gap and residual risk, not a PASS. A full default-suite PASS is not real integration proof.
+
+### Python and dependency compatibility
+
+| Combination | Local cadence | Why retain it |
+|---|---|---|
+| 3.11 / lowest direct | Meaningful integration checkpoint | Declared Python and application-dependency floors |
+| 3.14 / current compatible | Meaningful integration checkpoint | Current runtime and ordinary fresh pipx resolution |
+| 3.11 / current compatible | Relevant-change checks; final qualification | New libraries on the oldest Python; interpreter-specific resolution |
+| 3.14 / lowest direct | Relevant-change checks; final qualification | Old libraries on new Python, including TUI/event and stdlib changes |
+
+Daily work uses focused tests in the active environment. All four combinations remain mandatory
+in hosted CI and release validation, alongside the rolling Arch job and existing package/pipx/real
+campaign gates. Do not move default safety/process tests into an optional group to shorten a run.
+Python 3.14 is the configured endpoint, not an upper support bound. Python 3.15 is now stable and
+accepted by the declared range, but not yet qualified here: before replacing a required 3.14 CI
+job, validate current/lowest dependencies plus installed-package/process behavior on 3.15 and
+review the required-check transition. Python 3.12/3.13 remain accepted without separate jobs.
+
+"Lowest direct" pins Typer 0.16.0 and Textual 4.0.0 in the **same resolution** as the project/test
+installation; it does not pin every transitive dependency to its historical minimum. For example:
+
+```sh
+python -m pip install -e '.[test]' typer==0.16.0 textual==4.0.0 \
+  ruff shellcheck-py pyte
+python -m pip check
+python -m pip list
+```
+
+Use the intended venv's Python. Record actual Python/direct/transitive versions: current compatible
+versions may differ by interpreter, and a reused venv is not proof of fresh resolution. Normal pipx
+tag installation resolves dependencies at installation time, not from a project lock file; retained
+or manually constrained installations can still use old libraries on new Python. Neither crossed
+combination is therefore redundant. Do not add a full transitive-version cross-product.
+
+The checkpoint pair halves complete local suite executions compared with all four combinations;
+it does not reduce CI/release coverage. Measured runtimes and their limits belong in BASELINE, not
+a performance guarantee. Do not rerun unchanged combinations merely to obtain another timing;
+use final-tree evidence and investigate failures without automatic retries. The real campaign
+remains separate from this matrix.
 
 ### Avoid redundant checks
 
