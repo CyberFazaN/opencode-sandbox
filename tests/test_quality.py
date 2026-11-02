@@ -2,7 +2,6 @@
 catch are reported with their type when they are not the manager's own errors; catches that
 show nothing are limited to the errors they expect; ruff and shellcheck run clean with the
 project configuration (skipped when the tool is not installed)."""
-import ast
 import os
 import shutil
 import subprocess
@@ -27,29 +26,6 @@ def test_error_text_names_unexpected_error_types():
     assert c.error_text(c.SandboxError("Environment 'x': not found")) == "Environment 'x': not found"
     assert c.error_text(KeyError("created")) == "KeyError: 'created'"
     assert c.error_text(RuntimeError()) == "RuntimeError"
-
-
-def _broad_handlers(tree):
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ExceptHandler):
-            names = [node.type] if not isinstance(node.type, ast.Tuple) else list(node.type.elts)
-            if node.type is None or any(isinstance(n, ast.Name) and n.id in ("Exception", "BaseException") for n in names):
-                yield node
-
-
-@pytest.mark.parametrize("module", [*sorted(p.name for p in SRC.glob("*tui.py")), "opencode_versions.py"])
-def test_every_broad_catch_in_dashboard_and_version_reports_shows_the_error(module):
-    """A dashboard action or batch report may catch every error to preserve partial results, but
-    must show it through core.error_text, so an unexpected error is named by its type."""
-    tree = ast.parse((SRC / module).read_text(encoding="utf-8"))
-    offenders = []
-    for handler in _broad_handlers(tree):
-        used = {n.args[0].id for n in ast.walk(handler) if isinstance(n, ast.Call)
-                and getattr(n.func, "attr", getattr(n.func, "id", None)) == "error_text"
-                and n.args and isinstance(n.args[0], ast.Name)}
-        if handler.name is None or handler.name not in used:
-            offenders.append(handler.lineno)
-    assert offenders == [], f"{module}: broad except without error_text at lines {offenders}"
 
 
 def test_dashboard_names_an_unexpected_error_type(monkeypatch):

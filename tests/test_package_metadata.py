@@ -28,10 +28,6 @@ def test_project_urls_point_to_the_repository():
     assert PROJECT["urls"] and all(url.startswith(REPOSITORY) for url in PROJECT["urls"].values())
 
 
-def test_readme_states_independence():
-    assert "not affiliated with or endorsed by the OpenCode project" in " ".join((ROOT / "README.md").read_text().split())
-
-
 def test_verified_python_floor_and_lint_target_agree():
     assert PROJECT["requires-python"] == ">=3.11"
     assert CONFIG["tool"]["ruff"]["target-version"] == "py311"

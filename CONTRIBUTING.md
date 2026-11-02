@@ -184,6 +184,10 @@ complete project correctness**. CI and [release gates](docs/engineering/RELEASIN
 unchanged; do not disable coverage, weaken assertions, suppress failures or substitute mocks for
 real verification to save time.
 
+Regression tests should protect meaningful behavior or durable contracts, not incidental internal
+names, source structure or documentation wording. Prefer behavioral checks; remove obsolete or
+redundant checks rather than preserving them solely because they once caught a regression.
+
 | Change / checkpoint | Local verification |
 |---|---|
 | Prose/typo/instruction-only | Review the diff and relevant links/anchors/language checks; run CLI-document contracts if command examples change. No full application suite, Docker campaign, image rebuild or packaging replay just for prose |

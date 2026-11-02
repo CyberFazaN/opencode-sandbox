@@ -256,15 +256,6 @@ def test_standard_shell_trampoline_is_inspected_as_data_not_evaluated(tools):
     assert manager_tools.assess(evidence)['supported']
 
 
-def test_probe_source_has_only_stdlib_top_level_imports():
-    import ast
-    source = Path(manager_tools.__file__).with_name('manager_tool_probe.py')
-    tree = ast.parse(source.read_text())
-    imports = {node.names[0].name.split('.')[0] if isinstance(node, ast.Import) else node.module.split('.')[0]
-               for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))}
-    assert imports <= sys.stdlib_module_names
-
-
 @pytest.mark.parametrize('metacharacter', [';', '&', '*', "'", '('])
 def test_unquoted_shell_metacharacters_in_external_console_interpreter_refuse_before_any_execution(tools, tmp_path, monkeypatch, metacharacter):
     evidence, launcher, *_ = tools

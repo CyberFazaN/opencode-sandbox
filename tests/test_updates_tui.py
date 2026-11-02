@@ -264,9 +264,10 @@ def test_check_and_details_never_authorize_mutations_or_infer_installed_labels(s
         assert "Pins, ownership and pending journals" in app.screen.report
         assert calls.count(("npm",)) == 1
         await pilot.press("escape", "u")
-        assert app.screen.__class__.__name__ == "TargetScreen" and mutations == []
+        assert app.focused is app.screen.query_one("#update-target")
+        assert app.screen.query_one("#update-target").value == "latest" and mutations == []
         await pilot.press("escape")
-        assert mutations == [] and c.resolve(m["id"]).get("operation") is None
+        assert app.screen is screen and mutations == [] and c.resolve(m["id"]).get("operation") is None
     run(test, (80, 24))
 
 

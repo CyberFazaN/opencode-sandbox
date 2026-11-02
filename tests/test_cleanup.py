@@ -419,20 +419,21 @@ def test_tui_disk_screen_confirms_before_removing(world):
             await pilot.press("D")
             for _ in range(50):
                 await pilot.pause(); await asyncio.sleep(0.05)
-                if type(app.screen).__name__ == "DiskScreen":
+                if len(app.screen.query("#disk-cleanup")):
                     break
-            assert type(app.screen).__name__ == "DiskScreen" and "Removed by disk cleanup" in app.screen.report
+            report = app.screen.query_one("#disk-report")
+            assert report.read_only and f"ocs-{GONE}" in report.text
             app.screen.query_one("#disk-cleanup").press(); await pilot.pause()
-            assert type(app.screen).__name__ == "ConfirmScreen" and "Remove 9 object(s)" in app.screen.message
+            assert app.focused is app.screen.query_one("#cancel")
+            assert f"ocs-{GONE}" in app.screen.message
             assert f"ocs-{GONE}" in {x["Name"][1:] for x in d.containers.values()}  # nothing removed yet
             app.screen.query_one("#confirm").press()
             for _ in range(50):
                 await pilot.pause(); await asyncio.sleep(0.05)
-                if isinstance(app.screen, tui.ReportScreen):
+                if len(app.screen.query("#report-text")):
                     break
-            assert isinstance(app.screen, tui.ReportScreen)
-            assert str(app.screen.query_one("#report-title").render()) == "Cleanup result"
-            assert "Removed: environment container" in app.screen.report
+            report = app.screen.query_one("#report-text")
+            assert report.read_only and f"Removed: environment container ocs-{GONE}" in report.text
     asyncio.run(main())
     assert f"ocs-{GONE}" not in {x["Name"][1:] for x in d.containers.values()}
     assert "pgdata" in d.volumes and f"ocs-home-{world.live['id']}" in d.volumes

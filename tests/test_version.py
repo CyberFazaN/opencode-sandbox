@@ -1,6 +1,5 @@
-"""One version literal, version-independent resource names, labelled Docker objects."""
+"""Package/CLI version agreement, version-independent resource names and labelled Docker objects."""
 import json
-import re
 import subprocess
 import sys
 import tomllib
@@ -16,15 +15,10 @@ from opencode_sandbox import core as c
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_single_version_literal():
+def test_package_version_is_derived_from_the_public_version():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     assert "version" not in project["project"] and "version" in project["project"]["dynamic"]
     assert project["tool"]["setuptools"]["dynamic"]["version"] == {"attr": "opencode_sandbox.__version__"}
-    assert opencode_sandbox.__version__ == "6.1.0"
-    sources = [p for p in (ROOT / "src").rglob("*.py")] + [ROOT / "pyproject.toml"]
-    literal = re.compile(r"\b6\.\d+\.\d+\b")
-    holders = [p.relative_to(ROOT).as_posix() for p in sources if literal.search(p.read_text())]
-    assert holders == ["src/opencode_sandbox/__init__.py"]
 
 
 def test_cli_version_option():

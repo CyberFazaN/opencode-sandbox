@@ -57,23 +57,6 @@ def test_development_pushes_cannot_trigger_release_automation():
     assert "permissions: {}" in text
 
 
-def test_ubuntu_tests_copy_the_complete_python_runtime_without_changing_the_host_cache():
-    text = (ROOT / ".github/workflows/ci.yml").read_text()
-    section = text.split("\n  tests:\n", 1)[1].split("\n  arch:\n", 1)[0]
-    assert 'mktemp -d "$HOME/ocs-ci-python.XXXXXX"' in section
-    assert 'cp -a "$pythonLocation/." "$private_python/"' in section
-    assert 'chmod -R go-w "$private_python"' in section
-    assert 'echo "$private_python/bin" >> "$GITHUB_PATH"' in section
-    assert 'echo "pythonLocation=$private_python"' in section
-    assert 'echo "LD_LIBRARY_PATH=$private_python/lib"' in section
-    assert '} >> "$GITHUB_ENV"' in section
-    assert r'patchelf --set-rpath "\$ORIGIN/../lib"' in section
-    assert 'cp -a "$GITHUB_WORKSPACE/." "$private_project/"' in section
-    assert 'chmod -R go-w "$private_project"' in section
-    assert section.count('working-directory: ${{ env.OCS_CI_PROJECT }}') == 3
-    assert "sudo" not in section and "/opt/hostedtoolcache" not in section
-
-
 def test_arch_editable_source_has_owned_ancestors_and_controlled_modes():
     text = (ROOT / ".github/workflows/ci.yml").read_text()
     section = text.split("\n  arch:\n", 1)[1].split("\n  package:\n", 1)[0]

@@ -226,7 +226,7 @@ def test_confirm_dialog_buttons_are_normal_size():
 def test_no_registry_call_until_requested(monkeypatch, fake_runtime, failed):
     """G09: no background network call or update at startup; only on explicit request."""
     from opencode_sandbox import opencode_versions as v
-    c.create("ocs-qa-g09", "scratch")
+    m = c.create("ocs-qa-g09", "scratch")
     looked_up = []
     def latest(timeout=8):
         looked_up.append(1)
@@ -240,15 +240,14 @@ def test_no_registry_call_until_requested(monkeypatch, fake_runtime, failed):
         await pilot.press("v")
         await settle(pilot, 0.5)
         assert looked_up == []  # opening Updates is local/cached-only, including failures
-        assert type(app.screen).__name__ == "UpdatesScreen"
         await pilot.press("3", "c")
         await settle(pilot, 0.5)
         assert looked_up == [1]
         if failed:
-            assert "Registry unavailable [test]" in app.screen.discovery_text()
+            assert "Registry unavailable [test]" in str(app.screen.query_one("#updates-discovery").render())
         else:
-            assert "2.1.4" in app.screen.discovery_text()
-        assert any(item["name"] == "ocs-qa-g09" for item in app.screen.items["environments"].values())
+            assert "2.1.4" in str(app.screen.query_one("#updates-discovery").render())
+        assert str(app.screen.query_one("#updates-table").get_row(m["id"])[0]) == m["name"]
         assert not any(a[0] in ("build", "commit") for a in fake_runtime)
     run(t, (80, 24))
 

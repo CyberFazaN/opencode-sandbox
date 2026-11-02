@@ -144,7 +144,7 @@ Guidance describes privileges, persistence, workspace mode (never host path), ne
 base provenance and historical initial provisioning, not current user configuration or security
 enforcement. Observed runtime wins and differences are qualified; failed inspection falls back
 with a note, not verification. Network none omits ports. D-051 governs OS/tool provenance;
-`tests/golden/` pins content, and real first-prompt tests establish delivery.
+Focused rendering tests protect these facts, and real first-prompt tests establish delivery.
 
 ## D-019 Manager-owned OpenCode lifecycle
 
