@@ -99,6 +99,9 @@ tests pass; silently skip or suppress failing tests.
 
 ## Release rule
 
+For explicit release requests such as "Review develop and prepare a new release if warranted", use
+the [release prompt](.github/prompts/release.md); this reference alone does not initiate a release.
+
 A release is recommended only when every P0 and P1 row of `docs/engineering/CAMPAIGN.md` is
 PASS with real evidence or explicitly BLOCKED with accepted risk and a reproducible next step
 (`docs/engineering/RELEASING.md`). Never call a release production-ready because unit tests pass.
