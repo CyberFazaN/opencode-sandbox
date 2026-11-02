@@ -39,11 +39,53 @@ declined a reboot. Acceptance is not verification; final candidate release gates
 
 ## Verification
 
-### Current code checkpoint — 2026-11-02
+### 6.2.0 candidate qualification
 
-Application source, dependency declarations and image assets are unchanged. The test-quality
-checkpoint strengthens behavioral/security oracles and fixture isolation, consolidates duplicate
-coverage, and keeps the complete CI/release selections. Local policy is in CONTRIBUTING; current
+Local candidate qualification on 2026-11-02, from the approved `develop` tree. Detailed commands,
+input hashes, failed/pass XML, package comparisons and scan reviews are under ignored
+`.work/agents/release-6.2.0/`; real manifests/logs are `.work/logs/r62a*`, `r62b*` and `r62c*`.
+
+| Layer | Executed result and scope |
+|---|---|
+| Complete default suite, Python 3.11/lowest direct | **2205 passed / 86 real opt-in skips**, 331.12 s |
+| Complete default suite, Python 3.11/current | **2205 passed / 86 real opt-in skips**, 342.55 s |
+| Complete default suite, Python 3.14/lowest direct | **2205 passed / 86 real opt-in skips**, 352.74 s |
+| Complete default suite, Python 3.14/current | **2205 passed / 86 real opt-in skips**, 358.18 s |
+| Packaging and installed pipx | Both endpoints: isolated sdist/wheel build, strict twine/content checks, fresh private-tag pipx install/help/version/doctor; all **63 product files** match the candidate source |
+| Complete real installed-manager campaign | `r62b`: **86 tests / 1643 checks passed**, 0 failures/errors/skips, 2115.33 s; both distributions, retained Debian 12, packaged/cached/full-refresh builds, real OpenCode/fake-provider first prompts, terminals, native manager replacement/recovery, privileged and isolated socket-activation rows |
+| Python 3.11 installed-manager floor | `r62c`: **7 tests / 563 checks passed**, 0 failures/errors/skips, 337.96 s; actual pipx lifecycle, both-layout native manager update/recovery and both-distribution session exclusion, not a second complete campaign |
+| Static and privacy | Ruff/shellcheck and four dependency checks pass; actionlint/offline zizmor pass with existing exceptions. Gitleaks history/tree: 0 findings; offline detect-secrets: 11 reviewed deliberate test fixtures, no real secret identified; personal-data candidates reviewed |
+
+The matrix uses the selected existing endpoint venvs, not a claim of four fresh resolutions.
+Fresh pipx installations resolved Typer 0.27.3/Textual 8.2.8, matching the current matrix. Lowest
+Typer emits two known Click deprecations. The Python 3.14 real harness emits 91 multi-threaded
+`forkpty` deprecation warnings; these were not suppressed or treated as application failures.
+
+Version preparation exposed synthetic fixtures tied to the checkout's 6.1.0 version; they now use
+explicit consistent old/new identities or genuinely newer targets. The initial complete real run
+`r62a` recorded 86 completed bodies but four teardown errors from six failed checks: one negative
+source fixture advertised the wrong tag, and session exclusion checked the runner's prefix rather
+than the separate installed manager. Only fixtures were corrected, with an additional unrelated-
+installation control; the fresh complete `r62b` run passed. No application safeguard was weakened.
+The four default matrices/package checks precede those two integration-only corrections; their
+production/unit inputs are unchanged. Later evidence-only edits receive focused document checks.
+
+Guarded cleanup and final inventory checks restored the original four image tags/full IDs, with
+no container/volume leaks. Only five manifested test tags and the created empty runtime unit
+directory were removed. Persistent protocol locks and original frozen hard-interruption recovery
+inputs remain. No reboot, real credential or paid-provider call was performed; the earlier real
+OpenRouter observation is retained evidence only, not a new candidate result.
+
+This is **local qualification**, not publication authorization or completed hosted release CI.
+Hosted `develop` CI passed all ten jobs on the approved pre-preparation tree; the protected release
+PR/review and `main`/tag checks still belong to RELEASING. CAMPAIGN I06's final decision is pending.
+
+### Test-quality checkpoint before 6.2.0 preparation
+
+At this earlier checkpoint, application source, dependency declarations and image assets were
+unchanged. The test-quality checkpoint strengthens behavioral/security oracles and fixture
+isolation, consolidates duplicate coverage, and keeps the complete CI/release selections.
+Local policy is in CONTRIBUTING; current
 and minimum direct dependencies are resolved together with the project in CI, not a later downgrade.
 Evidence: versions, final four XMLs, timing profile, mutation controls and removal-to-retained-test
 rationale under ignored `.work/agents/`; real resource manifests and logs under `.work/logs/`.
@@ -141,7 +183,8 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 ## Unverified behaviour
 
 - **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
-  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized.
+  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized. Same-boot hard-interruption
+  refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
   On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
   original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
   verifier and confirm startup/data retention. Never delete state/locks or infer success from an
@@ -157,8 +200,8 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 - pipx versions other than 1.18.7, Python 3.12/3.13/3.15 separately, Textual 4.0 in a real terminal,
   other terminal emulators, other real model providers and a real provider on Arch. Execute the
   corresponding installed/terminal/provider checks; mocks/pilots are not a substitute.
-- Actual post-change full release campaign, real public-network manager replacement, human
-  observation, a kill inside `docker commit`, and scheduled GitHub image-build execution.
+- Real public-network manager replacement, human observation, a kill inside `docker commit`,
+  and scheduled GitHub image-build execution.
   Each needs fresh evidence; no passed development subset closes these gaps.
 - Typer 0.16.0/Click 8.5 emits deprecations for helpers removed in Click 9. Keep the lowest-bound
   CI check; re-evaluate bounds when that version resolves, not by suppressing warnings/assertions.
