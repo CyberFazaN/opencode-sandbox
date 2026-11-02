@@ -13,7 +13,7 @@ the OpenCode project, and it is unrelated to other projects with similar names.
 
 > [!IMPORTANT]
 > **Beta, written by an AI agent.** The code, tests and documentation were written with
-> OpenCode and Claude Opus 5.5, with minimal human review. The evidence for its behaviour is
+> OpenCode with Claude Opus 5.5 and GPT-6.1 Sol, with minimal human review. The evidence for its behaviour is
 > the automated test suite and a test campaign on real rootless Docker, run on Arch Linux only (see [Tested environment](#tested-environment)); there has been no
 > independent human security review. Expect defects, read the [security model](docs/security.md),
 > and do not rely on it as your only protection against code you consider hostile.
