@@ -7,7 +7,7 @@ Only the latest release receives fixes. Upgrade by installing the newest tag
 
 | Version | Supported |
 |---|---|
-| 6.0.x | yes |
+| 6.1.0 | yes |
 
 ## Reporting a vulnerability
 
