@@ -65,8 +65,8 @@ def test_observed_external_runtime_and_locations_are_independent_without_install
     assert facts['pipx_runtime']['pipx_version'] == '1.18.7'
     assert facts['settings']['PIPX_HOME'] == evidence['evidence']['pipx_home']
     assert facts['settings']['PIPX_MAN_DIR'] == evidence['evidence']['locations']['man_dir']
-    assert facts['settings']['PIPX_DEFAULT_PYTHON'] == str(Path(sys._base_executable).resolve())
-    assert facts['pipx_runtime']['locations'] == facts['settings']
+    assert facts['settings']['PIPX_DEFAULT_PYTHON'] == evidence['evidence']['source_python']
+    assert facts['pipx_runtime']['locations'] == {name: str(Path(value).resolve()) for name, value in facts['settings'].items()}
     assert set(facts['pipx_runtime']['dependencies']) == {'pipx', 'packaging'}
     assert 'Unavailable' in result['execution'] and 'no execution grant' in result['reason']
     assert before == {path: path.read_bytes() for path in before}
@@ -168,13 +168,18 @@ def test_tools_stay_independent_if_the_named_replaceable_prefix_is_temporarily_a
     finally: saved.rename(target)
 
 
-def test_recorded_source_python_spelling_is_preserved_not_replaced_with_its_binary_target(tools):
+@pytest.mark.parametrize('route', ['venv', 'external-alias'])
+def test_recorded_source_python_spelling_is_preserved_not_replaced_with_its_binary_target(tools, tmp_path, route):
     evidence, *_ = tools
-    evidence['evidence']['source_python'] = sys.executable
+    source = sys.executable
+    if route == 'external-alias':
+        alias = tmp_path / 'source-python-alias'; alias.symlink_to(sys.executable)
+        source = str(alias)
+    evidence['evidence']['source_python'] = source
     result = manager_tools.assess(evidence)
     assert result['supported'], result
-    assert result['evidence']['settings']['PIPX_DEFAULT_PYTHON'] == sys.executable
-    assert result['evidence']['pipx_runtime']['locations']['PIPX_DEFAULT_PYTHON'] == str(Path(sys.executable).resolve())
+    assert result['evidence']['settings']['PIPX_DEFAULT_PYTHON'] == source
+    assert result['evidence']['pipx_runtime']['locations']['PIPX_DEFAULT_PYTHON'] == str(Path(source).resolve())
 
 
 def test_source_python_alias_through_target_is_not_canonicalized_away(tools):

@@ -1,5 +1,7 @@
 """Minimum/current Python gates; real Docker stays in the opt-in release campaign."""
+import os
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -40,3 +42,65 @@ def test_development_pushes_cannot_trigger_release_automation():
     triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
     assert triggers.strip() == 'push:\n    tags: ["v*"]'
     assert "permissions: {}" in text
+
+
+def test_ubuntu_tests_copy_the_complete_python_runtime_without_changing_the_host_cache():
+    text = (ROOT / ".github/workflows/ci.yml").read_text()
+    section = text.split("\n  tests:\n", 1)[1].split("\n  arch:\n", 1)[0]
+    assert 'mktemp -d "$HOME/ocs-ci-python.XXXXXX"' in section
+    assert 'cp -a "$pythonLocation/." "$private_python/"' in section
+    assert 'chmod -R go-w "$private_python"' in section
+    assert 'echo "$private_python/bin" >> "$GITHUB_PATH"' in section
+    assert 'echo "pythonLocation=$private_python" >> "$GITHUB_ENV"' in section
+    assert 'echo "LD_LIBRARY_PATH=$private_python/lib" >> "$GITHUB_ENV"' in section
+    assert "sudo" not in section and "/opt/hostedtoolcache" not in section
+
+
+def test_arch_editable_source_has_owned_ancestors_and_controlled_modes():
+    text = (ROOT / ".github/workflows/ci.yml").read_text()
+    section = text.split("\n  arch:\n", 1)[1].split("\n  package:\n", 1)[0]
+    assert 'cp -a "$GITHUB_WORKSPACE" /home/ci/project' in section
+    assert 'chown -R ci: /home/ci/project' in section
+    assert 'chmod -R go-w /home/ci/project' in section
+    assert 'umask 022 && cd /home/ci/project' in section
+    assert 'chown -R ci: "$GITHUB_WORKSPACE"' not in section
+
+
+def test_private_runtime_step_preserves_source_bytes_routes_and_permissions(tmp_path):
+    text = (ROOT / ".github/workflows/ci.yml").read_text()
+    section = text.split('      - name: Private controlled Python runtime\n', 1)[1].split('      - name: Install\n', 1)[0]
+    script = '\n'.join(line[10:] for line in section.split('        run: |\n', 1)[1].splitlines())
+    source, home = tmp_path / 'hosted runtime', tmp_path / 'owned home'
+    (source / 'bin').mkdir(parents=True)
+    (source / 'lib').mkdir()
+    home.mkdir(mode=0o700)
+    binary, library = source / 'bin/python3', source / 'lib/stdlib.py'
+    binary.write_bytes(b'owned executable fixture')
+    library.write_bytes(b'owned stdlib fixture')
+    (source / 'bin/python').symlink_to('python3')
+    unrelated = tmp_path / 'unrelated'
+    unrelated.write_bytes(b'not part of this runtime')
+    unrelated.chmod(0o666)
+    (source / 'outside-alias').symlink_to(unrelated)
+    for path in (source, source / 'bin', source / 'lib', binary):
+        path.chmod(0o777)
+    library.chmod(0o666)
+    before = {path: (path.read_bytes(), path.stat().st_mode) for path in (binary, library, unrelated)}
+    paths, environment = tmp_path / 'github-path', tmp_path / 'github-env'
+    subprocess.run(['bash', '-eu', '-c', script], check=True, capture_output=True, text=True,
+                   env={**os.environ, 'HOME': str(home), 'pythonLocation': str(source),
+                        'GITHUB_PATH': str(paths), 'GITHUB_ENV': str(environment)})
+    exports = dict(line.split('=', 1) for line in environment.read_text().splitlines())
+    private = Path(exports['pythonLocation'])
+    assert private.parent == home and private != source
+    assert exports == {'pythonLocation': str(private), 'LD_LIBRARY_PATH': str(private / 'lib'),
+                       'PKG_CONFIG_PATH': str(private / 'lib/pkgconfig'),
+                       **{name: str(private) for name in ('Python_ROOT_DIR', 'Python2_ROOT_DIR', 'Python3_ROOT_DIR')}}
+    assert paths.read_text().splitlines() == [str(private / 'bin')]
+    for path in (private, private / 'bin', private / 'lib', private / 'bin/python3', private / 'lib/stdlib.py'):
+        assert path.stat().st_uid == os.getuid() and not path.stat().st_mode & 0o022
+    assert (private / 'bin/python3').read_bytes() == binary.read_bytes()
+    assert (private / 'lib/stdlib.py').read_bytes() == library.read_bytes()
+    assert (private / 'bin/python').is_symlink() and (private / 'bin/python').readlink() == Path('python3')
+    assert (private / 'outside-alias').is_symlink() and (private / 'outside-alias').readlink() == unrelated
+    assert before == {path: (path.read_bytes(), path.stat().st_mode) for path in before}

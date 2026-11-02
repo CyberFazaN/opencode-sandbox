@@ -36,6 +36,22 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
+      - name: Private controlled Python runtime
+        # Hosted toolcache files/ancestors are world-writable. Success fixtures must meet the
+        # updater's real ownership/mode checks, not bypass them or change the shared host cache.
+        # Copy the whole installation: a venv or copied binary still uses the original stdlib.
+        run: |
+          private_python="$(mktemp -d "$HOME/ocs-ci-python.XXXXXX")"
+          cp -a "$pythonLocation/." "$private_python/"
+          chmod -R go-w "$private_python"
+          echo "$private_python/bin" >> "$GITHUB_PATH"
+          echo "pythonLocation=$private_python" >> "$GITHUB_ENV"
+          # setup-python also exports loader/build paths; none should retain the writable cache.
+          echo "LD_LIBRARY_PATH=$private_python/lib" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$private_python/lib/pkgconfig" >> "$GITHUB_ENV"
+          for name in Python_ROOT_DIR Python2_ROOT_DIR Python3_ROOT_DIR; do
+            echo "$name=$private_python" >> "$GITHUB_ENV"
+          done
       - name: Install
         env:
           DEPENDENCIES: ${{ matrix.dependencies }}
@@ -64,14 +80,16 @@ jobs:
           persist-credentials: false
       - name: Unit tests as an unprivileged user
         # Several tests check user ownership and permissions: run as a normal user,
-        # with the usual umask (a container step may inherit 0000; the direct-workspace checks
-        # then rightly refuse the world-writable test directories).
+        # with the usual umask. The editable source's entire ancestor route must also be owned
+        # and controlled; chown of only the mounted workspace leaves foreign-owned ancestors.
         run: |
+          umask 022
           useradd --create-home ci
-          chown -R ci: "$GITHUB_WORKSPACE"
-          # shellcheck disable=SC2016  # the inner shell started by su expands $0
-          su ci -c 'umask 022 && cd "$0" && python -m venv /home/ci/venv && /home/ci/venv/bin/pip install -q -e ".[test]" ruff pyte \
-            && /home/ci/venv/bin/python -m pytest -q -rs -p no:cacheprovider' "$GITHUB_WORKSPACE"
+          cp -a "$GITHUB_WORKSPACE" /home/ci/project
+          chown -R ci: /home/ci/project
+          chmod -R go-w /home/ci/project
+          su ci -c 'umask 022 && cd /home/ci/project && python -m venv /home/ci/venv && /home/ci/venv/bin/pip install -q -e ".[test]" ruff pyte \
+            && /home/ci/venv/bin/python -m pytest -q -rs -p no:cacheprovider'
 
   package:
     name: Package build and content (Python ${{ matrix.python }})
