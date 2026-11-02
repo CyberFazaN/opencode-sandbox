@@ -91,8 +91,6 @@ jobs:
 
   arch:
     name: Unit tests (Arch Linux userland)
-    # TEMP: shorten Ubuntu diagnosis on develop pushes; restore before final verification.
-    if: github.event_name != 'push' || github.ref != 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
