@@ -180,6 +180,11 @@ Cancel is focused first. Changed metadata, policy, container or checkpoint requi
   update checkpoints the full system layer, temporarily
   starts for installation/verification and finishes stopped; failure restores that checkpoint.
   An identical target verifies without reinstalling. No implicit network/policy change.
+  **Update system packages** (off by default) first upgrades installed packages with the
+  environment's package manager inside the same checkpoint; consent names the exact commands.
+  If the upgrade fails, OpenCode is not updated and the checkpoint is restored. Package upgrades
+  are **not fully reversible**: rollback restores the system layer, not home/workspace changes
+  or migrated data. Unavailable for custom images. Unchecked, packages stay unchanged.
 - **Policy** changes Notify/Manual/Pinned and an exact pin only after separate confirmation.
   It installs nothing and does not bypass update, rollback or first-creation restrictions.
 - **Rollback** restores the **entire system layer**, snapshotting the present layer first.
@@ -215,13 +220,11 @@ In **Base Images** (`2`), **Build/Rebuild** (`b` or `u`) opens the target/mode f
 build, pull or package-freshness assessment. Opening the view still inspects only local metadata.
 
 Choose an exact compatible target or let latest resolve before consent. **Cached rebuild** reuses
-eligible layers; **Refresh & Rebuild** explicitly pulls/bypasses cache with extra network/time/disk,
-never pruning it, and includes system-package upgrades. **Update system packages** with a cached
-build forces the package layer to run with fresh indexes and upgrades without forcing an upstream
-image pull. Debian uses `apt-get update` plus `apt-get upgrade`; fresh Arch package layers always
-use `pacman -Syu` to avoid unsupported partial upgrades, even when not forcing a cache refresh.
-An unchecked cached build may reuse old package layers. Neither certifies package freshness/security
-or reproducibility. Cancel-first
+the local upstream image and layers before the package step; **Refresh & Rebuild** explicitly
+pulls/bypasses cache with extra network/time/disk, never pruning it. **Both modes always upgrade
+system packages** with fresh indexes (Debian `apt-get update` plus `apt-get upgrade`, Arch a full
+`pacman -Syu`); there is no option to skip it. Neither certifies package freshness/security or
+reproducibility. Cancel-first
 consent names distribution/definition/target/current image/mode; unknown ownership or changed
 identities refuse. The verified immutable candidate is published only after live revalidation.
 The dashboard keeps a rollback copy on replacement; identical verified results make no extra copy.

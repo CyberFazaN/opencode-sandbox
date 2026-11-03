@@ -16,9 +16,13 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   caution consent and finish stopped, without an automatic restart.
 - Unsupported automatic manager updates offer manual guidance; only freshly verified GitHub pipx
   installations receive a version-specific, settings-preserving command to copy.
-- Rebuild forms separate OpenCode version, cache/refresh mode and system-package upgrades.
-  `--update-system-packages` forces fresh indexes/upgrades without pulling the upstream image;
-  `--refresh` includes package upgrades. Debian/Arch image definitions advance to revisions 3/2.
+- Every base build, cached or refresh, upgrades system packages with fresh indexes (Debian
+  `apt-get upgrade`, Arch full `pacman -Syu`); there is no opt-out. Rebuild forms separate the
+  OpenCode version and cache/refresh mode. Debian/Arch image definitions advance to revisions 3/2.
+- Environment OpenCode updates add opt-in **Update system packages**
+  (`opencode update --update-system-packages`), off by default: installed packages are upgraded
+  inside the update checkpoint first, and a failed upgrade stops before OpenCode. Package
+  upgrades are not fully reversible by rollback; custom-image environments refuse the option.
 - Manager Settings adds opt-in selected-text copying with accurate native/OSC 52 feedback.
   Editable inputs are excluded. Keys toggles with `?` and supports Esc/Close; compact-terminal
   feedback is more consistent.

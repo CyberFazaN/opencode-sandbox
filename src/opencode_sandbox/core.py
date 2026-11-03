@@ -1564,14 +1564,14 @@ def promote(m,kind,name=None):
         m["kind"]=kind
         save(m)
 
-def build_image(distro, version, tag, *, refresh=False, verify=True, update_system=False):
-    """Build a registry image with OpenCode `version` (concrete) as `tag`, then verify it."""
+def build_image(distro, version, tag, *, refresh=False, verify=True):
+    """Build a registry image with OpenCode `version` (concrete) as `tag`, then verify it.
+    Every build upgrades system packages; a fresh nonce keeps that layer out of the cache."""
     from . import opencode_versions as v
     meta={**distro.image_labels(), distros.LABEL+"opencode-package": v.PACKAGE,
           distros.LABEL+"opencode-version": version}
     docker("build",*(("--pull","--no-cache") if refresh else ()),
-           '--build-arg', f'UPGRADE_SYSTEM={int(update_system or refresh)}',
-           '--build-arg', 'SYSTEM_PACKAGE_REFRESH=' + (secrets.token_hex(12) if update_system or refresh else 'cached'),
+           '--build-arg', 'SYSTEM_PACKAGE_REFRESH=' + secrets.token_hex(12),
            "--build-arg",f"OPENCODE_VERSION={version}",*labels(scoped=False),
            *(arg for key,value in meta.items() for arg in ("--label",f"{key}={value}")),
            "-t",tag,"-f",str(distro.dockerfile),str(distros.IMAGES))
@@ -1614,10 +1614,10 @@ def verify_image(distro, tag, version):
     installed=v.normalize(p.stdout)
     if installed!=version: raise SandboxError(f"Built OpenCode {installed}, expected {version}")
 
-def build(distro=None, version=None, *, refresh=False, plan=None, update_system=False):
+def build(distro=None, version=None, *, refresh=False, plan=None):
     """Build (or rebuild) a distribution's base image; no rollback copy (see update-base)."""
     from . import opencode_versions as v
-    return v.update_base(version or "latest", distro, keep_previous=False, refresh=refresh, plan=plan, update_system=update_system)
+    return v.update_base(version or "latest", distro, keep_previous=False, refresh=refresh, plan=plan)
 
 TRANSIENT_STATES = frozenset({"creating", "starting", "stopping", "recreating", "deleting", "error"})
 

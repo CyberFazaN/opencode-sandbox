@@ -471,3 +471,13 @@ missing containers. Unconfirmed cleanup stays visible with exact-identity recove
 Originally-running targets stay running. A running environment update requires explicit stop
 caution before checkpoint/install and finishes stopped, never an implicit restart. Existing
 ownership, pin, checkpoint, journal and user-configuration boundaries remain in force.
+
+## D-063 System package upgrades
+
+Every base build upgrades installed packages (Debian `apt-get update` + `upgrade`, Arch full
+`pacman -Syu`); a per-build value keeps that layer out of the cache in both modes, so there is no
+opt-out and repeated builds publish new images. Existing environments upgrade only on explicit,
+default-off request, as the first step inside the journalled OpenCode-update checkpoint: failure
+restores it before OpenCode changes. Commands come from the distribution registry; custom images
+refuse. Never present rollback as a full undo of package upgrades: changes outside the system
+layer and migrated data remain.

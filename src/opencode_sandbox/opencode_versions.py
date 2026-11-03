@@ -472,7 +472,6 @@ class BaseBuildPlan:
     current_version: str | None
     definition: distros.Distro
     assets: str
-    update_system: bool = False
 
 
 def _build_assets():
@@ -482,14 +481,14 @@ def _build_assets():
     return digest.hexdigest()
 
 
-def _base_build_plan(d, target, refresh, keep_previous, current, update_system=False):
+def _base_build_plan(d, target, refresh, keep_previous, current):
     labels = current['Config']['Labels'] if current else {}
     return BaseBuildPlan(d.id, c.docker_endpoint(), d.image, target, refresh, keep_previous,
                          (current or {}).get('Id'), distros.image_definition(d.id, labels),
-                         labels.get(VERSION_LABEL), d, _build_assets(), update_system)
+                         labels.get(VERSION_LABEL), d, _build_assets())
 
 
-def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=True, update_system=False):
+def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=True):
     """Resolve before consent; inspect only, never build/probe or infer authority from a cache."""
     d = distros.get(distros.DEFAULT if distro is None else distro)
     target = supported(version) if version != 'latest' else None  # local validation needs no daemon/network
@@ -497,12 +496,12 @@ def prepare_base_build(version, distro=None, *, refresh=False, keep_previous=Tru
     if target is None: target = resolve_target('latest')  # source guard is released before base guards
     with c.base_lock(d.id, 'publication'):
         current = c.inspect_base_image(d, d.image, missing=True)
-        return _base_build_plan(d, target, refresh, keep_previous, current, update_system or refresh)
+        return _base_build_plan(d, target, refresh, keep_previous, current)
 
 
-def _recheck_base_build(d, version, refresh, keep_previous, plan, update_system=False):
+def _recheck_base_build(d, version, refresh, keep_previous, plan):
     current = c.inspect_base_image(d, d.image, missing=True)
-    if distros.get(d.id) != d or _base_build_plan(d, version, refresh, keep_previous, current, update_system or refresh) != plan:
+    if distros.get(d.id) != d or _base_build_plan(d, version, refresh, keep_previous, current) != plan:
         raise c.SandboxError('Base image, definition, daemon or build mode changed since confirmation; review again')
     return current
 
@@ -518,9 +517,8 @@ def describe_base_build(plan):
         f"Selected definition: {d.name} {d.version}, revision {d.revision}",
         f"Exact OpenCode target: {plan.target}",
         ('Mode: Refresh & Rebuild — pull current upstream inputs and bypass build cache (--pull --no-cache).'
-         if plan.refresh else 'Mode: Cached rebuild — reuse eligible layers; no forced pull/cache bypass.'),
-        ('System packages: force fresh indexes and upgrade installed packages (apt-get upgrade / pacman -Syu).'
-         if plan.update_system else 'System packages: cached layers may be reused. Fresh Arch package layers always use -Syu; Debian refreshes indexes and installs tools, without a full upgrade.'),
+         if plan.refresh else 'Mode: Cached rebuild — reuse the local upstream image and layers before the package step; no forced pull.'),
+        f'System packages: always refreshed and upgraded in both modes ({d.build_upgrade}).',
         'Network/download/time costs apply; upstream package repositories can change. Shared build cache is never pruned.',
         'A separate candidate must pass OS/tool/OpenCode verification before guarded publication.',
         ('The replaced image is kept as a rollback copy.' if plan.keep_previous else
@@ -531,14 +529,13 @@ def describe_base_build(plan):
     ]))
 
 
-def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan=None, update_system=False):
+def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan=None):
     """Build and verify a candidate base image for a distribution, then replace the tag.
 
     With keep_previous the replaced image stays available as `<repo>:<distro>-previous-<hex>`.
     """
     c.ensure_runtime()
     d = distros.get(distros.DEFAULT if distro is None else distro)
-    update_system = update_system or refresh
     # Resolve "latest" first: the literal build arg "latest" hits Docker's layer
     # cache, so the npm install step was never re-run and nothing was updated.
     version = supported(version) if plan is not None else resolve_target(version)
@@ -548,20 +545,20 @@ def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan
         c.require_docker_space("a base image build")
         candidate = distros.candidate_tag(d, __import__("secrets").token_hex(6))
         with c.base_lock(d.id, "publication"):
-            original = (_recheck_base_build(d, version, refresh, keep_previous, plan, update_system) if plan is not None
+            original = (_recheck_base_build(d, version, refresh, keep_previous, plan) if plan is not None
                         else c.inspect_base_image(d, d.image, missing=True))
             _unused_base_tag(d, candidate)
         candidate_id = None
         try:
-            build_output.phase('Refresh & Rebuild: pulling upstream and bypassing build cache' if refresh else 'Cached rebuild: reusing eligible layers')
-            candidate_id = c.build_image(d, version, candidate, verify=False, **({'refresh': True} if refresh else {}),
-                                         **({'update_system': True} if update_system else {}))
+            build_output.phase('Refresh & Rebuild: pulling upstream, bypassing build cache and upgrading packages' if refresh
+                               else 'Cached rebuild: reusing eligible layers and upgrading packages')
+            candidate_id = c.build_image(d, version, candidate, verify=False, **({'refresh': True} if refresh else {}))
             build_output.phase('Verifying candidate OS, tools and exact OpenCode binary')
             c.verify_image(d, candidate_id, version)
             previous = None
             build_output.phase('Revalidating and publishing verified candidate')
             with c.base_lock(d.id, "publication"):  # not held throughout a long build
-                old = (_recheck_base_build(d, version, refresh, keep_previous, plan, update_system) if plan is not None
+                old = (_recheck_base_build(d, version, refresh, keep_previous, plan) if plan is not None
                        else c.inspect_base_image(d, d.image, missing=True))
                 if (old or {}).get("Id") != (original or {}).get("Id"):
                     raise c.SandboxError("Base image changed during the build; refusing replacement; retry after review")
@@ -659,10 +656,12 @@ def _exec_version(m, *, container_id=None):
     return normalize(p.stdout)
 
 
-def update_blocker(m, state, target, *, stop_running=False):
+def update_blocker(m, state, target, *, stop_running=False, system_packages=False):
     """Pure shared eligibility, also re-evaluated under the execution lock; no network/start."""
     supported(target)
     if m.get("operation"): return str(c.pending_operation(m))
+    if system_packages and c.env_distro(m) is None:
+        return "System package upgrades need a registry distribution; this custom-image environment's package manager is unknown"
     p = policy(m)
     if p["mode"] == "pinned" and target != p["version"]:
         return f"Environment pinned to OpenCode {p['version']}; change policy first"
@@ -680,6 +679,17 @@ class EnvironmentUpdatePlan:
     identity: tuple[tuple[str, str], ...]
     metadata: str
     running: bool = False
+    system_packages: bool = False
+
+
+def system_upgrade_lines(m, requested):
+    """Shared CLI/TUI disclosure of the opt-in package upgrade; never claims full reversibility."""
+    if not requested: return ["System packages: not upgraded; only OpenCode is updated."]
+    d = c.env_distro(m)
+    return [f"System packages: FIRST upgrade installed packages with {d.package_manager}: {d.system_upgrade_summary}",
+            "If the package upgrade fails, OpenCode is not updated and the container is restored from the checkpoint.",
+            "Package upgrades are not fully reversible. Rollback restores the checkpointed system layer, not changes",
+            "outside it (home volume, workspace) or data and configuration that upgraded programs migrated."]
 
 
 @dataclass(frozen=True)
@@ -718,15 +728,16 @@ def recheck_environment_stop(m, plan):
         raise c.SandboxError('Environment/container changed since Stop review; review again')
 
 
-def prepare_environment_update(m, version, *, stop_running=False):
+def prepare_environment_update(m, version, *, stop_running=False, system_packages=False):
     target = resolve_target(version, m)
     c.ensure_runtime(False)
     m = c.resolve(m["id"])
     state = c.inspect_container(m)
-    reason = update_blocker(m, state, target, stop_running=stop_running)
+    reason = update_blocker(m, state, target, stop_running=stop_running, system_packages=system_packages)
     if reason: raise c.SandboxError(reason)
     c.assert_volume_owned(m)
-    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())), _consent_metadata(m), bool(state.get('Running')))
+    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())), _consent_metadata(m),
+                                 bool(state.get('Running')), bool(system_packages))
 
 
 def _remember_update(m, value, identity, at):
@@ -767,7 +778,7 @@ def _restore_checkpoint_steps(m, result, *, checkpoint=None):
     c._finish_reconfigure(m)
 
 
-def update_environment(m, version, *, plan=None):
+def update_environment(m, version, *, plan=None, system_packages=False):
     """Update OpenCode in a stopped container with the image build's install script (D-019).
 
     Journal `opencode-update` with a docker-commit checkpoint of the container's system layer,
@@ -775,27 +786,34 @@ def update_environment(m, version, *, plan=None):
     container is replaced by one created from that checkpoint (exactly the previous system
     layer; the /root volume and /workspace are not part of it and not touched). After a success
     the checkpoint stays the environment's rollback point (`rollback_environment`).
+
+    Opt-in `system_packages` (the confirmed plan's choice when a plan is given) first runs the
+    distribution's package upgrade inside the same checkpointed transaction; its failure rolls
+    back before OpenCode is touched. A package upgrade keeps the checkpoint even when OpenCode
+    was already current. Restoring the checkpoint cannot undo effects outside the system layer.
     """
     target = supported(version) if plan is not None else resolve_target(version, m)
     if plan is not None and target != plan.target:
         raise c.SandboxError("Update target differs from the confirmed target; review again")
+    if plan is not None: system_packages = plan.system_packages
     c.ensure_runtime(False)
     with c.lock(m["id"]):
         m = c.resolve(m["id"])
         if m.get("operation"):
             raise c.pending_operation(m)
         # Policy/network refusals precede Docker inspection, as in the original executor.
-        reason = update_blocker(m, {"Running": False}, target)
+        reason = update_blocker(m, {"Running": False}, target, system_packages=system_packages)
         if reason: raise c.SandboxError(reason)
         state = c.inspect_container(m)
-        reason = update_blocker(m, state, target, stop_running=bool(plan and plan.running))
+        reason = update_blocker(m, state, target, stop_running=bool(plan and plan.running), system_packages=system_packages)
         if reason: raise c.SandboxError(reason)
         if plan is not None and (tuple(sorted(_environment_identity(m).items())) != plan.identity
                                  or _consent_metadata(m) != plan.metadata or bool(state.get('Running')) != plan.running):
             raise c.SandboxError("Environment/container changed since confirmation; review again")
         c.assert_volume_owned(m)
         c.recheck_mount(m)  # the update starts it
-        c.require_docker_space("an OpenCode update (checkpoint + npm install)")
+        c.require_docker_space("a system package and OpenCode update (checkpoint + downloads)" if system_packages
+                               else "an OpenCode update (checkpoint + npm install)")
         identity = _environment_identity(m)
         if state.get('Running'):
             # Explicit exact TUI consent only. Stop before checkpointing; no implicit restart.
@@ -805,9 +823,11 @@ def update_environment(m, version, *, plan=None):
         checkpoint = "ocs-checkpoint:" + m["id"] + "-" + __import__("secrets").token_hex(4)
         c.docker("commit", c.cname(m), checkpoint, capture=True)
         before = m.get("opencode_update")
-        record = {"state": "applying", "from": None, "to": target, "checkpoint": checkpoint, "at": c.now(), "result": None}
+        record = {"state": "applying", "from": None, "to": target, "checkpoint": checkpoint, "at": c.now(), "result": None,
+                  **({"system_packages": True} if system_packages else {})}
         m["opencode_update"] = record
         c.mark(m, "updating", operation=UPDATE_OP)  # journal: from here on a crash is rolled back
+        step = "OpenCode update"
         try:
             c.docker("start", c.cname(m), capture=True)
             try:
@@ -818,7 +838,17 @@ def update_environment(m, version, *, plan=None):
                 # install script below is the repair. Its checkpoint holds the broken state.
                 record["from"] = None
             c.save(m)
-            if record["from"] != target:
+            current = record["from"]
+            if system_packages:
+                step = "System package upgrade"
+                c.docker("exec", c.cname(m), "sh", "-c", c.env_distro(m).system_upgrade, capture=True)
+                step = "OpenCode update"
+                try:
+                    current = _exec_version(m, container_id=identity["container"])
+                    verified_at = time.time()
+                except c.SandboxError:
+                    current = None  # the upgrade broke the binary: the install script repairs it
+            if current != target:
                 c.docker("exec", c.cname(m), *INSTALL, target, capture=True)
                 installed = _exec_version(m, container_id=identity["container"])
                 verified_at = time.time()
@@ -827,15 +857,19 @@ def update_environment(m, version, *, plan=None):
             c.docker("stop", c.cname(m), capture=True)
         except Exception as exc:  # any failure rolls back to the checkpoint, then is raised
             failure = c.error_text(exc)
+            packages = step == "System package upgrade"
             try:
-                _restore_checkpoint(m, f"update to {target} failed ({failure[:300]}); rolled back to the checkpoint")
+                _restore_checkpoint(m, (f"system package upgrade failed ({failure[:300]}); OpenCode not updated; " if packages
+                                        else f"update to {target} failed ({failure[:300]}); ") + "rolled back to the checkpoint")
             except Exception as restore_exc:  # noqa: BLE001 — reported together with the update failure
-                raise c.SandboxError(f"OpenCode update failed: {failure}; rollback failed: {c.error_text(restore_exc)}. "
+                raise c.SandboxError(f"{step} failed: {failure}; rollback failed: {c.error_text(restore_exc)}. "
                                      + str(c.pending_operation(m))) from exc
-            raise c.SandboxError(f"OpenCode update failed: {failure}. Rolled back: the container is recreated from "
-                                 f"checkpoint {checkpoint} at the next start (system layer as before the update; "
-                                 "/root and /workspace untouched).") from exc
-        if record["from"] == target:
+            raise c.SandboxError(f"{step} failed: {failure}. " + ("OpenCode was not updated. " if packages else "")
+                                 + f"Rolled back: the container is recreated from checkpoint {checkpoint} at the next start "
+                                 "(system layer as before the update; "
+                                 + ("/root and /workspace are not part of the checkpoint, so changes made there remain)."
+                                    if system_packages else "/root and /workspace untouched).")) from exc
+        if record["from"] == target and not system_packages:
             m["opencode_update"] = before
             if before is None:
                 m.pop("opencode_update")
@@ -843,10 +877,13 @@ def update_environment(m, version, *, plan=None):
             _remember_update(m, target, identity, verified_at)
             c.docker("image", "rm", checkpoint, capture=True, check=False)
             return {"version": target, "previous_version": target, "unchanged": True}
-        record.update(state="done", at=c.now(), result=f"updated {record['from'] or 'unknown (broken)'} -> {target}")
+        result = (f"OpenCode {target} unchanged" if record["from"] == target
+                  else f"updated {record['from'] or 'unknown (broken)'} -> {target}")
+        record.update(state="done", at=c.now(), result=("system packages upgraded; " if system_packages else "") + result)
         c.mark(m, "stopped", operation=None, last_error=None)
         _remember_update(m, target, identity, verified_at)
-        return {"version": target, "previous_version": record["from"], "checkpoint": checkpoint}
+        return {"version": target, "previous_version": record["from"], "checkpoint": checkpoint,
+                **({"system_packages": True} if system_packages else {})}
 
 
 @dataclass(frozen=True)
@@ -956,7 +993,10 @@ def rollback_environment(m, *, plan=None):
         elif m.get("image"):
             snapshot = c.snapshot_tag(m)
             c.docker("tag", m["image"], snapshot)
-        _restore_checkpoint(m, f"rolled back {record['to']} -> {record['from'] or 'unknown (broken)'}" + (f"; previous system layer kept as {snapshot}" if snapshot else ""),
+        _restore_checkpoint(m, f"rolled back {record['to']} -> {record['from'] or 'unknown (broken)'}"
+                            + ("; checkpointed pre-upgrade system packages restored (changes outside the system layer remain)"
+                               if record.get("system_packages") else "")
+                            + (f"; previous system layer kept as {snapshot}" if snapshot else ""),
                             checkpoint=plan.checkpoint_id if plan else None)
         return {"version": record["from"], "rolled_back_from": record["to"], "snapshot": snapshot, "image": m["image"]}
 

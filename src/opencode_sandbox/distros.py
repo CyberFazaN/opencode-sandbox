@@ -27,6 +27,12 @@ class Distro:
     os_release: tuple[tuple[str, str], ...]
     package_manager: str
     install_hint: str
+    # Package step of every base build (Dockerfile), as shown before consent.
+    build_upgrade: str
+    # Opt-in upgrade of an existing environment's installed packages, run as root before an
+    # OpenCode update; its description is shown before consent.
+    system_upgrade: str
+    system_upgrade_summary: str
     # Executables the Agent Context promises; each build checks that they are on PATH.
     tools: tuple[str, ...]
     # Commands each build must run successfully (catches, e.g., a helper linked to another libalpm).
@@ -63,12 +69,23 @@ REGISTRY: dict[str, Distro] = {d.id: d for d in (
     Distro(id="debian", name="Debian", version="13", revision=3, package_manager="apt",
            os_release=(("ID", "debian"), ("VERSION_ID", "13")),
            install_hint="`apt-get update && apt-get install -y PACKAGE` as root (needs network).",
+           build_upgrade="apt-get update, then apt-get upgrade",
+           system_upgrade=("export DEBIAN_FRONTEND=noninteractive && apt-get update"
+                           " && apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade"
+                           " && apt-get clean && rm -rf /var/lib/apt/lists/*"),
+           system_upgrade_summary=("apt-get update, then apt-get upgrade. It never removes or newly installs packages, "
+                                   "so upgrades that need that are held back; locally changed configuration files are kept."),
            tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "rg", "jq", "curl",
                   "gcc", "cmake")),
     Distro(id="arch", name="Arch Linux", version="rolling", revision=2, package_manager="pacman",
            os_release=(("ID", "arch"), ("BUILD_ID", "rolling")),
            install_hint="`pacman -Syu --needed PACKAGE` as root (needs network; Arch does not support partial "
                         "upgrades, so this also upgrades the container's other packages).",
+           build_upgrade="a full pacman -Syu",
+           system_upgrade=("pacman -Sy --noconfirm --needed archlinux-keyring && pacman -Su --noconfirm"
+                           " && rm -rf /var/cache/pacman/pkg/*"),
+           system_upgrade_summary=("pacman -Sy archlinux-keyring, then a full pacman -Su. AUR/foreign packages, including "
+                                   "paru, are not rebuilt; a pacman/libalpm change can break paru in this environment."),
            tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "rg", "jq", "curl",
                   "gcc", "cmake", "makepkg", "paru", "ocs-aur"),
            smoke=("paru --version", "ocs-aur --version"),

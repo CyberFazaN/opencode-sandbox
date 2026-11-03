@@ -129,31 +129,37 @@ def opencode_policy_set(name: str, mode: str, version: str | None = typer.Option
 @opencode_app.command("update-base")
 def opencode_update_base(version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
                          distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
-                         refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image, bypass cache and upgrade system packages; never prune"),
-                         update_system_packages: bool=typer.Option(False,"--update-system-packages",help="Force fresh package indexes and installed-package upgrades without forcing an upstream image pull")):
-    """Rebuild a base image with another OpenCode version; keeps a rollback copy of the old one."""
+                         refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image and bypass the build cache; never prune")):
+    """Rebuild a base image with another OpenCode version; keeps a rollback copy of the old one.
+
+    Every build upgrades the image's system packages, in cached and refresh mode."""
     from . import opencode_versions as v
-    plan=v.prepare_base_build(version,distro,refresh=refresh,update_system=update_system_packages)
+    plan=v.prepare_base_build(version,distro,refresh=refresh)
     typer.echo(v.describe_base_build(plan))
     if not yes and not _confirm(f"Replace {plan.image} ({plan.current_id or 'missing'}) with exact OpenCode {plan.target}; "
                                 f"{'Refresh & Rebuild' if refresh else 'Cached rebuild'}; keep rollback copy?", docker=True):
         raise typer.Abort()
-    typer.echo(v.update_base(plan.target, distro, refresh=refresh, update_system=plan.update_system, plan=plan))
+    typer.echo(v.update_base(plan.target, distro, refresh=refresh, plan=plan))
 
 @opencode_app.command("update")
-def opencode_update(name: str, version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation")):
+def opencode_update(name: str, version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
+                    update_system_packages: bool=typer.Option(False,"--update-system-packages",help="Upgrade the environment's installed system packages first; OpenCode is not updated if this fails")):
     """Update OpenCode in a stopped environment; on failure its system layer is rolled back to a checkpoint."""
     from . import opencode_versions as v
     m=c.resolve(name)
-    plan=v.prepare_environment_update(m,version)
+    plan=v.prepare_environment_update(m,version,system_packages=update_system_packages)
     typer.echo("Note: a checkpoint (docker commit) of the container's system layer is taken first; a failed update "
                "is rolled back to it, 'opencode rollback' undoes a successful one. /root and /workspace are not touched.")
-    if not yes and not _confirm(f"Temporarily start stopped environment {name}, update OpenCode to {plan.target}, then stop it?", docker=True):
+    for line in v.system_upgrade_lines(m, plan.system_packages): typer.echo(line)
+    if not yes and not _confirm(f"Temporarily start stopped environment {name}, "
+                                f"{'upgrade its system packages, ' if plan.system_packages else ''}update OpenCode to {plan.target}, then stop it?", docker=True):
         raise typer.Abort()
     result=v.update_environment(m,plan.target,plan=plan)
     if result.get("unchanged"): typer.echo(f"OpenCode {result['version']} is already installed; nothing changed")
-    else: typer.echo(f"Updated OpenCode {result['previous_version'] or 'unknown (opencode --version failed)'} -> {result['version']}; "
-                     f"rollback point {result['checkpoint']}")
+    else: typer.echo(("System packages upgraded; " if result.get("system_packages") else "")
+                     + (f"OpenCode {result['version']} unchanged" if result['previous_version']==result['version'] else
+                        f"Updated OpenCode {result['previous_version'] or 'unknown (opencode --version failed)'} -> {result['version']}")
+                     + f"; rollback point {result['checkpoint']}")
 
 @opencode_app.command("update-recover")
 def opencode_update_recover(name: str):
@@ -169,7 +175,10 @@ def opencode_rollback(name: str, yes: bool=typer.Option(False,"--yes",help="Do n
     m=c.resolve(name)
     record=m.get("opencode_update") or {}
     if not yes and not _confirm(f"Recreate {name} from the checkpoint before its last OpenCode update "
-                                f"({record.get('to')} -> {record.get('from')})? The current system layer is kept as a snapshot.",
+                                f"({record.get('to')} -> {record.get('from')})? The current system layer is kept as a snapshot."
+                                + (" That update also upgraded system packages: their checkpointed versions return, but changes "
+                                   "outside the system layer (home volume, workspace, migrated data) are not undone."
+                                   if record.get("system_packages") else ""),
                                 docker=True):
         raise typer.Abort()
     result=v.rollback_environment(m)
@@ -218,13 +227,14 @@ def msg(m): typer.echo(f"{m['name']} [{m['id']}] ({m['kind']})")
 @app.command(rich_help_panel=HOST)
 def build(distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
           opencode_version: str=typer.Option("latest","--opencode-version",help="OpenCode 2.x version (npm @opencode/cli)"),
-          refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image, bypass cache and upgrade system packages; never prune"),
-          update_system_packages: bool=typer.Option(False,"--update-system-packages",help="Force fresh package indexes and installed-package upgrades without forcing an upstream image pull")):
-    """Build/rebuild an agent image without a rollback copy (use opencode update-base to keep one)."""
+          refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image and bypass the build cache; never prune")):
+    """Build/rebuild an agent image without a rollback copy (use opencode update-base to keep one).
+
+    Every build upgrades the image's system packages, in cached and refresh mode."""
     from . import opencode_versions as v
-    plan=v.prepare_base_build(opencode_version,distro,refresh=refresh,keep_previous=False,update_system=update_system_packages)
+    plan=v.prepare_base_build(opencode_version,distro,refresh=refresh,keep_previous=False)
     typer.echo(v.describe_base_build(plan))
-    result=c.build(distro, plan.target, refresh=refresh, update_system=plan.update_system, plan=plan)
+    result=c.build(distro, plan.target, refresh=refresh, plan=plan)
     typer.echo(f"{result['image']}: OpenCode {result['version']}"+(" (unchanged)" if result.get("unchanged") else ""))
 
 @app.command(rich_help_panel=HOST)

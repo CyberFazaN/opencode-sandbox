@@ -180,14 +180,17 @@ OpenCode is `@opencode/cli` 2.x only; self-update is disabled. Supported stable 
 fresh to an exact target **before consent**, never silently replaced afterward. Manual policy
 suppresses unsolicited notices, not requested comparisons; pins constrain creation/update.
 Environment update requires a stopped owned network-enabled container, checkpoints its entire
-system layer, journals installation/verification and finishes stopped. Failure/recovery restores
+system layer, journals installation/verification and finishes stopped. Opt-in package upgrades
+run the registry's distribution command first inside that checkpoint (consent-bound plan field,
+journal `system_packages`); failure restores it before OpenCode changes. Failure/recovery restores
 the checkpoint; rollback first snapshots the present layer. A successor recreation failure retains
 `runtime-recreate` and points to `config recover`, not blindly back to `update-recover`.
 
 Base build consent binds daemon, definition/assets, current immutable image or proven absence,
 target, mode and retention. Build a unique candidate, verify its immutable ID, then revalidate
-consent/candidate tags before publication. Cached builds reuse eligible layers; explicit refresh
-uses `--pull --no-cache`, never cache prune. `update-base`/TUI retain replaced bases; CLI `build`
+consent/candidate tags before publication. Every build passes a fresh package-step nonce, so
+packages are always upgraded; cached builds reuse earlier layers, explicit refresh uses
+`--pull --no-cache`, never cache prune. `update-base`/TUI retain replaced bases; CLI `build`
 deliberately permits no-copy replacement and discloses it. No existing container migrates.
 Rollback groups aliases by full image ID: select automatically only for one distinct copy, otherwise
 require an explicit listed tag/full ID even with `--yes`. Dates/order are not replacement history.

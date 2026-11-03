@@ -950,7 +950,8 @@ class Dashboard(App):
                     result = 'Stopped; workspace and home volume retained.'
                 elif action == "update":
                     outcome = v.update_environment(m, plan.target, plan=plan)
-                    result = "OpenCode update complete; stopped. " + json.dumps(outcome)
+                    result = ("System package upgrade and OpenCode update complete; stopped. " if outcome.get("system_packages")
+                              else "OpenCode update complete; stopped. ") + json.dumps(outcome)
                 elif action == "policy":
                     result = "OpenCode policy saved. " + json.dumps(v.set_policy(m, plan.mode, plan.version, plan=plan))
                 elif action == "rollback":
@@ -993,7 +994,7 @@ class Dashboard(App):
         with c.runtime_feedback(progress=None, cancelled=None), build_output.listen(progress):
             try:
                 if action == 'build':
-                    outcome = v.update_base(plan.target, key, refresh=plan.refresh, update_system=plan.update_system, plan=plan)
+                    outcome = v.update_base(plan.target, key, refresh=plan.refresh, plan=plan)
                     result = ('Base verified unchanged; ' if outcome.get('unchanged') else 'Base build verified and published; ') + json.dumps(outcome)
                 else:
                     outcome = v.rollback_base(key, plan=plan)

@@ -3,13 +3,13 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Select, Static, TextArea
+from textual.widgets import Button, Checkbox, Input, Select, Static, TextArea
 
 from . import core as c
 from . import opencode_versions as v
 
 
-class TargetScreen(ModalScreen[str | None]):
+class TargetScreen(ModalScreen[tuple | None]):
     CSS = "TargetScreen {align: center middle;} TargetScreen ToastRack {height: 0; max-height: 0; overflow: hidden;} #target-panel {width: 74; max-width: 100%; height: auto; border: round $accent; padding: 0 1;} #target-panel Horizontal {height: auto;}"
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     AUTO_FOCUS = "#update-target"
@@ -21,20 +21,31 @@ class TargetScreen(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         p = v.policy(self.environment)
         with Vertical(id="target-panel"):
+            d = c.env_distro(self.environment)
             yield Static(f"Update OpenCode — {self.environment['name']}", markup=False)
-            yield Static("Exact 2.x version, or latest supported stable.\nNext: resolve, check eligibility, then review exact consent.", markup=False)
+            yield Static("Exact 2.x version, or latest supported stable:", markup=False)
             yield Input(value=p["version"] or "latest", id="update-target", compact=True)
+            yield Checkbox(f"Update system packages first ({d.package_manager})" if d
+                           else "Update system packages (unavailable: custom image)",
+                           value=False, disabled=d is None, id="update-system", compact=True)
+            yield Static("Off: update only OpenCode.\n"
+                         "On: upgrade packages first; a failed upgrade stops before OpenCode.\n"
+                         "Package upgrades are not fully reversible by rollback.\n"
+                         "Next: resolve, check eligibility, then review exact consent.", markup=False)
             with Horizontal():
                 yield Button("Cancel", id="target-cancel", compact=True)
                 yield Button("Review", id="target-review", compact=True)
 
     def action_cancel(self): self.dismiss(None)
 
-    def on_input_submitted(self): self.dismiss(self.query_one("#update-target", Input).value)
+    def _value(self):
+        return self.query_one("#update-target", Input).value, self.query_one("#update-system", Checkbox).value
+
+    def on_input_submitted(self): self.dismiss(self._value())
 
     def on_button_pressed(self, event: Button.Pressed):
         event.stop()
-        self.dismiss(self.query_one("#update-target", Input).value if event.button.id == "target-review" else None)
+        self.dismiss(self._value() if event.button.id == "target-review" else None)
 
 
 class PolicyScreen(ModalScreen[tuple | None]):
@@ -104,6 +115,7 @@ def consent(m, action, plan):
         lines += [f"Install exact OpenCode {plan.target} (not a moving latest target).",
                   *( ["CAUTION: this environment is running. Confirm stops it before taking the checkpoint.",
                       "It will NOT restart afterward, on success or rollback. Use F5 to start explicitly."] if plan.running else []),
+                  *v.system_upgrade_lines(m, plan.system_packages),
                   "Requires an existing owned, network-enabled container; pins still apply.",
                   "Download from npm. Temporarily start for the update, verify the binary, then stop.",
                   "First commit the complete system layer as a checkpoint. Failure rolls back to it.",
@@ -113,6 +125,9 @@ def consent(m, action, plan):
         lines += [f"Exact checkpoint: {plan.checkpoint}", f"Immutable image: {plan.checkpoint_id}",
                   f"Recorded binary: {plan.previous_version or 'Unknown'} -> {plan.target or 'Unknown'} (not a runtime check).",
                   "Restore the ENTIRE checkpointed system layer, not only the OpenCode binary."]
+        if (m.get("opencode_update") or {}).get("system_packages"):
+            lines += ["That update also upgraded system packages. Their checkpointed versions return in the system",
+                      "layer, but changes outside it (home volume, workspace, migrated data) are not undone."]
         if action == "rollback": lines += ["Keep the present system layer as a snapshot first (including later changes)."]
         else: lines += ["Interrupted update: roll back, never guess whether npm completed.",
                         "Stop/remove any owned current container; unfinished update-layer changes are discarded."]

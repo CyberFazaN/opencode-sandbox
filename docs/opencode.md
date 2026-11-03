@@ -97,10 +97,10 @@ that environment's OS and system layer.
 | `opencode versions [--check]` | Running versions or dated last verification/Unknown for stopped containers; `--check` compares every policy with npm's latest supported stable release |
 | `opencode status NAME` | One environment's actual/last-verified version, source, time and immutable object identity |
 | `opencode policy NAME`, `opencode policy-set NAME notify\|manual\|pinned [--version X]` | The update policy |
-| `opencode update NAME [--version X] --yes` | Update a stopped environment |
+| `opencode update NAME [--version X] [--update-system-packages] --yes` | Update a stopped environment; optionally upgrade its system packages first |
 | `opencode rollback NAME --yes` | Undo its last update |
 | `opencode update-recover NAME` | Finish an interrupted update (rolls back) |
-| `opencode update-base [--version X] [--distro ID] [--refresh] [--update-system-packages]` | Build/rebuild a base image, keep a rollback copy; refresh pulls/bypasses cache and upgrades packages; package-only refresh does not force an upstream pull |
+| `opencode update-base [--version X] [--distro ID] [--refresh]` | Build/rebuild a base image, keep a rollback copy; every build upgrades system packages, refresh also pulls/bypasses cache |
 | `opencode rollback-base [--distro ID] --list` | List distinct managed rollback images, full IDs and tag aliases (read-only) |
 | `opencode rollback-base [--distro ID] [--copy TAG_OR_FULL_IMAGE_ID] [--yes]` | Verify and swap the selected copy; default only when there is one distinct image |
 
@@ -169,6 +169,19 @@ It never substitutes a newer release after consent. It commits a checkpoint
 `ocs-checkpoint:<id>-*` of the container's system layer, journals the update, and on any
 failure replaces the container with one created from the checkpoint (the system layer exactly
 as before; `/root` and `/workspace` are not touched). It also repairs a broken installation.
+
+`--update-system-packages` (off by default; **Update system packages** in the dashboard) first
+upgrades the environment's installed packages inside that same checkpointed update: Debian runs
+`apt-get update` and `apt-get upgrade` (no removals or new packages, so such upgrades are held
+back; changed configuration files are kept), Arch runs `pacman -Sy archlinux-keyring` and a full
+`pacman -Su`. A failed upgrade stops **before** OpenCode is touched and restores the checkpoint.
+After the upgrade, OpenCode is verified again and reinstalled if the upgrade broke it; an already
+current OpenCode then keeps the checkpoint as the rollback point. Custom-image environments
+refuse the option: their package manager is unknown. Package upgrades are **not fully
+reversible**: rollback restores the checkpointed system layer, but not changes outside it (the
+`/root` home volume, `/workspace`) or data and configuration that upgraded programs migrated.
+On Arch, AUR/foreign packages such as `paru` are not rebuilt (see the libalpm limitation).
+Without the option, packages are left unchanged.
 `opencode rollback` undoes the last successful update the same way, keeping the current system
 layer as an `ocs-snapshot:*` image first; the last update's checkpoint is kept as the rollback
 point (`disk cleanup --superseded` keeps it).
@@ -200,20 +213,19 @@ retrying `disk cleanup`. This is not a durable base-build journal or an automati
 
 Choose the mode explicitly:
 
-- **Cached rebuild** (default): reuse eligible Docker layers with the selected definition and
-  exact OpenCode version. It may reuse OS/package layers; definition or cache changes may rerun
-  them. It does **not** guarantee fresh packages or an offline build.
+- **Cached rebuild** (default): reuse the local upstream image and the eligible Docker layers
+  before the package step, with the selected definition and exact OpenCode version. It is not
+  an offline build.
 - **Refresh & Rebuild** (`--refresh`): request current upstream inputs and bypass the build cache
-  (`--pull --no-cache`), with installed-package upgrades. This downloads/rebuilds package layers, can take substantially longer
-  and use more disk, and **never prunes the shared build cache**. Repositories and upstream tags
-  can change during a build; this is not reproducibility, a security certification or a separate
-   upstream-freshness assessment.
+  (`--pull --no-cache`). This can take substantially longer and use more disk, and **never prunes
+  the shared build cache**. Repositories and upstream tags can change during a build; this is not
+  reproducibility, a security certification or a separate upstream-freshness assessment.
 
-**Update system packages** (`--update-system-packages`, also accepted by `build`) forces the
-package layer to execute with fresh indexes and installed-package upgrades even in cached mode.
-It does not force an upstream image pull or prune shared cache. Debian uses `apt-get update`
-plus `apt-get upgrade`; index refresh alone is not a full upgrade. Fresh Arch package layers
-always use `pacman -Syu` to avoid partial upgrades, even without this cache-refresh request.
+**Every build upgrades system packages**, in both modes and for the `build` command too: a
+per-build value forces the package layer to run with fresh indexes, so it and the later layers
+are never reused from the cache. Debian runs `apt-get update` and `apt-get upgrade`; Arch runs a
+full `pacman -Syu` (never a partial upgrade) and therefore also rebuilds `paru`. A repeated build
+publishes a new image even with the same OpenCode version. There is no option to skip this.
 
 ```sh
 opencode-sandbox opencode update-base --distro debian --version 2.1.4 --yes
@@ -227,4 +239,5 @@ rollback copy, discloses that distinction, and also accepts `--refresh` (its tar
 `--opencode-version`). Base changes affect future base-based container creation and file-only
 restores, not existing containers, writable layers, home/workspace/configuration or integrations.
 Not-yet-created pinned environments must still match the new base. To upgrade packages in an
-existing environment, use that environment's package manager instead.
+existing environment, use `opencode update NAME --update-system-packages` or the environment's
+package manager.

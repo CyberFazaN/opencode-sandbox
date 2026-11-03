@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, Input, Select, Static, TextArea
+from textual.widgets import Button, Input, Select, Static, TextArea
 
 from . import core as c
 from . import distros
@@ -31,10 +31,8 @@ class BaseTargetScreen(ModalScreen[tuple | None]):
             yield Select([('Cached rebuild (reuse eligible layers)', False),
                           ('Refresh & Rebuild (pull + no-cache)', True)],
                          value=False, allow_blank=False, compact=True, id='base-refresh')
-            yield Checkbox('Update system packages', id='base-system', compact=True)
-            yield Static('Cached: reuse layers; no upstream pull. Refresh: pull + no-cache + package upgrades.\n'
-                         'Package updates force fresh indexes/upgrades, not an upstream image pull.\n'
-                         'Fresh Arch package layers always use -Syu, even without forcing an update.\n'
+            yield Static('Cached: no upstream pull. Refresh: pull and bypass the build cache.\n'
+                         f'Both modes always upgrade system packages:\n  {self.distro.build_upgrade}.\n'
                          'Existing environments are unchanged.', markup=False)
             with Horizontal():
                 yield Button('Cancel', id='base-target-cancel', compact=True)
@@ -42,16 +40,9 @@ class BaseTargetScreen(ModalScreen[tuple | None]):
 
     def action_cancel(self): self.dismiss(None)
 
-    def on_select_changed(self, event):
-        if event.select.id == 'base-refresh':
-            checkbox = self.query_one('#base-system', Checkbox)
-            checkbox.disabled = bool(event.value)
-            if event.value: checkbox.value = True
-
     def on_button_pressed(self, event: Button.Pressed):
         event.stop()
-        self.dismiss((self.query_one('#base-target', Input).value, self.query_one('#base-refresh', Select).value,
-                      self.query_one('#base-system', Checkbox).value)
+        self.dismiss((self.query_one('#base-target', Input).value, self.query_one('#base-refresh', Select).value)
                      if event.button.id == 'base-target-review' else None)
 
 

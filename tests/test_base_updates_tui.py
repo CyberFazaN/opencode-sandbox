@@ -7,7 +7,7 @@ import test_base_rollback
 from test_opencode_versions import OLD, fake_docker
 from test_tui import run
 from test_updates_tui import until
-from textual.widgets import Button, Select
+from textual.widgets import Button, Checkbox, Select, Static
 
 from opencode_sandbox import build_output, distros, readiness, updates
 from opencode_sandbox import core as c
@@ -35,6 +35,7 @@ def sources(monkeypatch):
 async def review(app, pilot, refresh=False):
     await pilot.press('b')
     assert isinstance(app.screen, BaseTargetScreen)
+    assert not app.screen.query(Checkbox) and 'always upgrade system packages' in ' '.join(str(w.render()) for w in app.screen.query(Static))
     app.screen.query_one('#base-refresh', Select).value = refresh
     app.screen.query_one('#base-target-review', Button).press()
     await until(pilot, lambda: isinstance(app.screen, BaseConsentScreen))
@@ -56,6 +57,7 @@ def test_build_exact_mode_consent_cancel_then_preserving_executor(sources, monke
         message = app.screen.message
         assert OLD in message and 'Exact OpenCode target: 2.1.4' in message
         assert ('Refresh & Rebuild' if refresh else 'Cached rebuild') in message
+        assert 'System packages: always refreshed and upgraded in both modes (apt-get update, then apt-get upgrade)' in message
         assert 'kept as a rollback copy' in message and 'pins remain enforced' in message
         assert app.focused.id == 'base-cancel'
         for button in app.screen.query(Button): assert button.region.bottom <= size[1]

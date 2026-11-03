@@ -2,11 +2,11 @@
 # (distros.py) at build time.
 FROM node:24-trixie
 ENV DEBIAN_FRONTEND=noninteractive
-ARG UPGRADE_SYSTEM=0
-# A per-build nonce forces a requested package upgrade even when other layers are cached.
-ARG SYSTEM_PACKAGE_REFRESH=cached
-RUN test -n "$SYSTEM_PACKAGE_REFRESH" && apt-get update \
- && if [ "$UPGRADE_SYSTEM" = 1 ]; then apt-get upgrade -y; fi \
+# Every build upgrades installed packages: the manager passes a per-build nonce, so this layer
+# runs with fresh indexes even when earlier layers are cached.
+ARG SYSTEM_PACKAGE_REFRESH
+RUN test -n "${SYSTEM_PACKAGE_REFRESH:?build with --build-arg SYSTEM_PACKAGE_REFRESH}" && apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends \
  bash ca-certificates curl wget git git-lfs openssh-client python3 python3-pip python3-venv \
  build-essential cmake pkg-config jq ripgrep fd-find unzip zip tar less procps iproute2 \

@@ -686,7 +686,7 @@ class UpdatesScreen(Screen):
     @work(thread=True, group='updates-prepare')
     def _prepare_base_worker(self, key, action, value, token):
         try:
-            if action == 'build': plan = v.prepare_base_build(value[0], key, refresh=value[1], update_system=value[2])
+            if action == 'build': plan = v.prepare_base_build(value[0], key, refresh=value[1])
             else: plan = v.base_rollback_inventory(key)
             publish(self.app, self._base_prepared, token, key, action, plan, None)
         except Exception as exc:
@@ -746,7 +746,7 @@ class UpdatesScreen(Screen):
         from .environment_updates_tui import consent
         try:
             m = c.resolve(key)
-            if action == "update": plan = v.prepare_environment_update(m, value, stop_running=True)
+            if action == "update": plan = v.prepare_environment_update(m, value[0], stop_running=True, system_packages=value[1])
             elif action == "policy": plan = v.prepare_environment_policy(m, *value)
             elif action == "start": plan = v.prepare_environment_start(m)
             elif action == 'stop': plan = v.prepare_environment_stop(m)
