@@ -17,8 +17,9 @@ The current checkpoint below records fresh verification; older sections retain t
 
 The release includes component Updates views, optional default-off daily discovery,
 environment/base actions and independent manager update/recovery. These are implemented, not a
-pending roadmap. Published 6.2.0 kept the schemas/image definitions; unreleased TUI changes advance
-the image definitions to support explicit package upgrades without changing environment/backup schemas. Availability,
+pending roadmap. Published 6.2.0 kept the schemas/image definitions; unreleased changes advance the
+image definitions so every base build upgrades system packages, and environment OpenCode updates
+offer a default-off package upgrade (D-063), without changing environment/backup schemas. Availability,
 consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
 The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
 declined a reboot. Acceptance is not verification; original frozen recovery inputs remain retained.
@@ -39,6 +40,25 @@ declined a reboot. Acceptance is not verification; original frozen recovery inpu
 - OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
 
 ## Verification
+
+### Unreleased system package correction — 2026-11-03
+
+The full default suites passed on Python 3.11.18/Typer 0.16.0/Textual 4.0.0 and Python
+3.14.8/Typer 0.27.3/Textual 8.2.8: **2256 passed, 96 opt-in integration skips each**. Later edits
+touched only `tests/integration/` and passed Ruff/collection.
+
+Real Debian/Arch checks: `test_53_environment_updates.py` **8 passed** (`pkg53a`), including the
+new package-upgrade rows. Deterministic in-layer apt/pacman faults were refused before OpenCode
+with the checkpoint restored; a real dashboard upgrade changed the installed package sets before
+the exact OpenCode install; rollback restored the previous OpenCode and package set; markers and
+user configuration were kept. `test_54_base_updates.py` **2 passed / 118 checks** (`pkg54d`, 27 min):
+repeated cached builds reran the package step with distinct nonces and published new verified
+images, refresh/failed-candidate/rollback rows passed, and the Rebuild form has no opt-out.
+Earlier runs `pkg54a`–`c` exposed two harness defects (a substring check matching consent text and
+an undrained pty that stalled Textual and the build); they were fixed and are not product failures.
+Logs and manifests are local under `.work/logs/pkg5*`; guarded cleanup left no resources and
+pre-existing image tags unchanged. Arch cached builds now rebuild `paru` each time. This is not a
+complete campaign or release qualification and does not certify package freshness.
 
 ### Unreleased TUI and explicit-check changes — 2026-11-02
 
