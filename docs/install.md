@@ -161,6 +161,9 @@ it; some checks require an already running container.
 
 Release 6.0.0 built Debian 12 (image revision 1); 6.1.0 builds Debian 13 (revision 2). After
 upgrading from 6.0.0, explicitly rebuild the Debian base when `doctor` reports revision 1.
+Current development definitions are Debian revision 4 and Arch revision 3; rebuild when `doctor`
+reports an older definition to obtain the new direct-launch wrapper and neutral system config.
+Retained environment layers do not acquire new image files merely from a manager/base upgrade.
 Neither upgrading the manager nor rebuilding the base upgrades an existing container.
 Stop/start, recreation and backups with the system layer keep its OS;
 [workspaces.md](workspaces.md#distributions-and-images) explains the explicit choice for a new

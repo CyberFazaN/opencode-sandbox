@@ -46,6 +46,9 @@ Consider something else if:
 - **Change review**: export, bundle, inspect and stage the agent's changes as a review branch;
   host Git never uses the sandbox's Git configuration or hooks.
 - **Provider profiles**: named credentials, stored with mode `0600`, mounted read-only.
+- **OpenCode Configs**: copy user-maintained directories once at creation; export the global
+  config to a private temporary host workspace, apply edits with drift detection, or reload a
+  profile/Empty. Shared CLI/dashboard actions work with stopped environments too.
 - **Settings** for CPU, memory, processes, network and published ports (`127.0.0.1` only)
   through one change plan.
 - **Backups and recovery**: verified cold backups, restores into new environments, snapshots,
@@ -65,9 +68,11 @@ Consider something else if:
   Base Build/Rebuild and Rollback preserve copies; cached builds and explicit Refresh & Rebuild
   stay separate, without migrating existing environments or pruning Docker's build cache.
   [Current capabilities and limits](docs/dashboard.md#updates).
-- **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
-  operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.
-  One-time initial integrations (Context7 by default).
+- **Optional Agent Context**: enabled by default per environment; OpenCode is told what the
+  sandbox is (user, workspace, network, limits, operating system). The file remains available
+  when automatic inclusion is off; [preview it in the dashboard](docs/dashboard.md) with `a`.
+- **Direct container launches**: `ocs-opencode` safely loads the mounted provider profile and
+  starts a private OpenCode server, including from scripts or a direct Docker shell.
 - **Diagnostics**: `doctor` for the host, read-only `check NAME` per environment including
   measured network reachability, disk usage and conservative cleanup.
 
@@ -161,7 +166,6 @@ The manager sends no telemetry. These services are contacted:
 | Debian or Arch package mirrors | Base image builds, and packages you install in an environment |
 | AUR, GitHub, crates.io | The Arch image build (the AUR helper `paru` and its sources); AUR packages you install |
 | npm registry | OpenCode installs and updates; version checks (`opencode check`, `opencode versions --check`) from the host; the internet probe of `check NAME` from inside the container |
-| Context7 (`mcp.context7.com`) | Configured once in every new environment by default, then used by OpenCode when the agent asks for library documentation; opt out with `create --no-integrations` |
 | Your model provider | Whatever your provider profile and OpenCode configuration use |
 
 OpenCode itself, and anything the agent runs, can contact other services when the network mode
@@ -175,6 +179,7 @@ is `bridge`.
 - [Environments and workspaces](docs/workspaces.md),
   [provider profiles](docs/providers.md), [settings](docs/settings.md)
 - [OpenCode and the Agent Context](docs/opencode.md)
+- [OpenCode Configs and the host export editor](docs/opencode-configs.md)
 - [Backups](docs/backup.md), [change review](docs/changes.md),
   [maintenance](docs/maintenance.md)
 - [Dashboard](docs/dashboard.md), [security model](docs/security.md),

@@ -78,7 +78,7 @@ def test_root_is_refused(campaign, checks, sudo):
     p = sudo(camp, *env, *MANAGER, "doctor")
     ck(p.returncode != 0 and "another user" in p.stdout + p.stderr and "Traceback" not in p.stdout + p.stderr,
        f"B01 the manager as root refuses the user's rootless daemon ({(p.stdout + p.stderr).strip()[-160:]})")
-    created = sudo(camp, *env, *MANAGER, "create", "ocs-test-asroot", "--no-integrations")
+    created = sudo(camp, *env, *MANAGER, "create", "ocs-test-asroot")
     p = created if created.returncode != 0 else sudo(camp, *env, *MANAGER, "start", "ocs-test-asroot")
     ck(p.returncode != 0 and "another user" in p.stdout + p.stderr, f"B01 create/start as root is refused ({created.returncode})")
     ck(camp.docker("ps", "-aq").stdout.split() == containers, "B01 no container was created")
@@ -110,7 +110,7 @@ def test_rootful_and_foreign_daemons_are_refused(campaign, checks, sudo):
         env = context_env(camp, "ocs-test-rootful", sock)
         p = camp.ocs("doctor", check=False, env=env)
         ck(p.returncode != 0 and "root (a rootful daemon)" in p.stdout + p.stderr, "C01 doctor: rootful daemon refused (mismatch)")
-        camp.ocs("create", "ocs-test-viarootful", "--no-integrations", env=env)
+        camp.ocs("create", "ocs-test-viarootful", env=env)
         camp.adopt("ocs-test-viarootful")
         p = camp.ocs("start", "ocs-test-viarootful", check=False, env=env)
         ck(p.returncode != 0 and "rootful" in p.stdout + p.stderr and "Traceback" not in p.stdout + p.stderr,
@@ -193,7 +193,7 @@ def test_daemon_restart_stop_and_crash(campaign, checks, restore_daemon_after_fa
     if others:
         pytest.skip(f"other containers are running on the daemon: {others}")
     name = "ocs-test-daemon"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("start", name)
     camp.sh(eid, "echo ocs-test-marker > /workspace/ws-marker.txt; echo ocs-test-marker > /root/home-marker.txt; "
                  "echo ocs-test-marker > /etc/ocs-test-system-marker; sync")

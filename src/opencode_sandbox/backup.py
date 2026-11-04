@@ -349,10 +349,11 @@ def backup(m,destination=None,*,include_system=True,stop_running=False,include_w
                     c.docker('image','save','-o',str(temp/'system-image.tar'),tag,capture=True)
                     files.append('system-image.tar')
                 finally: c.docker('image','rm',tag,capture=True,check=False)
-            from . import __version__
+            from . import __version__, agent_context
             manifest={'format':'opencode-sandbox-backup','schema':SCHEMA,'manager_version':__version__,'created':c.now(),
-                      'environment':{**{k:m.get(k) for k in ('id','name','kind','source','base_commit','profile','opencode_policy','opencode_pin','distro','provisioning')},
-                                     'custom_image':c.custom_image(m),
+                      'environment':{**{k:m.get(k) for k in ('id','name','kind','source','base_commit','profile','opencode_policy','opencode_pin','distro','agent_context_enabled','opencode_config_source')},
+                                      'custom_image':c.custom_image(m),
+                                      'agent_context_enabled':agent_context.enabled(m),
                                      'runtime':c.runtime_settings(m)},
                       'workspace':{'mode':mode,'included':include_workspace},
                       'files':{name:{'sha256':digest(temp/name),'size':(temp/name).stat().st_size} for name in files},
@@ -562,7 +563,6 @@ def restore(path,name,*,restore_system=True):
         # Like `create --image`, the first start pulls it (D-026).
         settings['restore_warnings'].append(f"Custom image {settings['custom_image']} is not present locally; the first "
                                             'start pulls it like create --image (or load or build it first).')
-    from . import integrations
     runtime=settings.pop('runtime')
     conflicts=c.port_conflicts({'id':None},runtime)
     if conflicts:
@@ -573,9 +573,9 @@ def restore(path,name,*,restore_system=True):
     journal={**{k:v for k,v in settings.items() if k not in ('profile','distro','custom_image')},'runtime':runtime,
              'status':'restoring','operation':'restore','restored_from':str(root),'restore_system':restore_system,
              'restore_stage':'initial'}
-    # The home volume carries whatever was configured; the request is history and never re-applied.
+    # The home volume carries the independent global config; never re-import its source.
     m=c.create(name,kind='scratch',profile=settings['profile'],distro=settings['distro'],image=settings['custom_image'],
-               provisioning=integrations.as_history(env.get('provisioning')),journal=journal)
+               journal=journal)
     # A failure is recorded by _restore_into under the lock, only for this restore's journal; a
     # refusal before it leaves the journal as it is.
     return _restore_into(m,root,manifest,restore_system=restore_system)
@@ -604,7 +604,12 @@ def _restored_settings(env):
         from . import distros
         distros.get(env['distro'])
     result={'profile':profile,'runtime':runtime,'restore_warnings':warnings,
-            'distro':env['distro'],'custom_image':env.get('custom_image') if env['distro'] is None else None}
+             'distro':env['distro'],'custom_image':env.get('custom_image') if env['distro'] is None else None}
+    enabled=env.get('agent_context_enabled',True)
+    if not isinstance(enabled,bool): raise c.SandboxError('Invalid Agent Context setting in backup')
+    source=env.get('opencode_config_source')
+    if source is not None: c.safe_name(source)
+    result.update(agent_context_enabled=enabled,opencode_config_source=source)
     policy=env.get('opencode_policy')
     if policy is not None:
         from . import opencode_versions as v

@@ -141,7 +141,7 @@ def consent(m, action, plan):
                   "Explicit comparisons remain available. A pin still restricts execution/creation."]
     elif action == "start":
         lines += ["Explicitly Start this environment. It remains running afterward.",
-                  "May create its container and apply pending first-start integrations once.",
+                  "May create its container; refreshes and reconciles saved Agent Context activation.",
                   "Existing ownership, direct-workspace, profile, pin and journal checks still apply.",
                    "Fresh version verification is a separate explicit Check; no automatic stop."]
     elif action == 'stop':

@@ -41,10 +41,11 @@ copied without hidden files. The original folder is never mounted or changed.
 opencode-sandbox create webapp --source ~/code/webapp --profile work
 ```
 
-`create` prints what it set up and the next command. Every new environment asks for the
-Context7 integration (current library documentation, a public remote MCP server) at its first
-start; `--no-integrations` opts out. Other choices (Arch Linux instead of Debian, a direct
-workspace, other integrations) are in [workspaces.md](workspaces.md) and `create --help`.
+`create` prints its choices and the next command. OpenCode config defaults to **Local** (no
+initial import); `--opencode-config PROFILE` copies a user-maintained directory once. Specialized
+Agent Context defaults on; `--no-agent-context` disables automatic inclusion without removing
+the file. See [OpenCode Configs](opencode-configs.md), [workspaces.md](workspaces.md) and
+`create --help` for other choices.
 
 ## 4. Work with OpenCode
 

@@ -112,7 +112,7 @@ ck(c.docker('exec',c.cname(m),'cat','/var/tmp/ocs-test-marker',capture=True).std
 def test_owned_bounded_probes_and_cleanup(campaign, checks, distro):
     camp, ck = campaign, checks
     name = "ocs-test-" + camp.run + "-" + distro + "-diagnostics"
-    eid = camp.create(name, "--distro", distro, "--no-integrations")
+    eid = camp.create(name, "--distro", distro)
     camp.python(f"from opencode_sandbox import core as c\nm=c.resolve({name!r})\n"
                 "with c.lock(m['id']):\n m['runtime']=c.validate_runtime_settings({**c.runtime_settings(m),'network':'none'}); c.save(m)\n")
     try:

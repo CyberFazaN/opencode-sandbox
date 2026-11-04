@@ -20,7 +20,7 @@ def test_reported_support_and_actual_kernel_limits(campaign, checks):
        "C05 doctor reports required CPU/memory/pids support on the working host")
     ck("enforcement not measured" in doctor.stdout, "C05 doctor does not present reported capability as measured enforcement")
     name = "ocs-test-resource-support"
-    eid = camp.create(name, "--image", "ubuntu:24.04", "--no-integrations")
+    eid = camp.create(name, "--image", "ubuntu:24.04")
     camp.ocs("config", "apply", name, "--network", "none", "--cpus", "0.5", "--memory", "256m", "--pids", "64", "--yes")
     camp.ocs("start", name)
     ck(limits(camp, eid) == (0.5, 256 * 2**20, 64), "C05 actual cpu.max/memory.max/pids.max match initial settings")

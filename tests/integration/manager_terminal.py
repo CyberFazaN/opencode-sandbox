@@ -26,7 +26,7 @@ def exercise(camp, ck, prefix, env, evidence, staging, base, layout):
     env = dict(env, DOCKER_CONFIG=camp.env.get('DOCKER_CONFIG', str(Path.home() / '.docker')))
     distro = 'debian' if layout == 'default' else 'arch'
     name = 'ocs-test-handoff-' + distro
-    camp.create(name, '--distro', distro, '--no-integrations')
+    camp.create(name, '--distro', distro)
     for mode, size in [('drain', (80, 24)), ('explicit', (120, 40)), ('worker', (80, 24)),
                        ('cancelled-worker', (120, 40)), ('session', (80, 24)), ('modes', (80, 24)), ('busy', (80, 24))]:
         state = base / ('terminal-' + mode + '.json')

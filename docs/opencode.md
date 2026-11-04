@@ -6,17 +6,18 @@
 `opencode --standalone`, a private OpenCode server per launch. (The V2 background service would
 keep the environment of whichever client started it first, so the provider keys of later
 launches would be ignored.) `shell NAME` opens a root bash with the same variables; OpenCode
-started from there, or from `exec`, also reads the Agent Context, but `exec` does not load the
-provider profile.
+started from there, or from `exec`, reads the system config's saved Agent Context setting.
+Generic `exec` does not load the provider profile: use `ocs-opencode` for a validated profile
+and private server from shells/scripts. Plain `opencode` does not load the mounted profile itself.
 
 If the terminal closes or the manager process ends (also by `SIGKILL`, through a per-session
 watchdog), the manager hangs up the session inside the container, like a real terminal would;
 jobs started with `nohup` survive.
 
-Your own OpenCode configuration is left alone: `~/.config/opencode/` in the home volume,
-project `opencode.json` and `AGENTS.md` files, and an `OPENCODE_CONFIG_CONTENT` value in the
-provider profile. The manager writes OpenCode's configuration only once, for the
-[initial integrations](workspaces.md#initial-integrations).
+Your own global/project OpenCode configuration belongs to you. The manager changes the global
+tree only through an explicitly selected creation Copy, Apply Export or Reload/Empty operation
+([OpenCode Configs](opencode-configs.md)); there is no automatic provisioning or synchronization.
+Provider profiles cannot override config paths/content.
 
 ## Agent Context
 
@@ -43,22 +44,37 @@ states only what the manager configures or verifies:
   promises. Missing/offline provenance is unknown. Labels describe the base, not later changes
   inside the container; inspect `/etc/os-release` only when needed. Custom images get no OS or
   tool claims.
-- **Initial integrations:** the names requested at creation and the recorded outcome of the
-  one-time setup (or "not done yet"), always followed by "may have been changed or removed
-  since"; never what is configured now.
 - **Working behaviour:** start with the task, no system inventory, follow the project's
   `AGENTS.md`; OpenCode's own update check is off, so do not run `opencode upgrade`.
 
 **Delivery.** The guidance lives on the host in the environment's `agent-context/` directory,
 which every container mounts read-only at `/run/ocs-agent/` (file `context.md`). The managed
-images contain the system configuration `/etc/opencode/opencode.json` with only
-`"instructions": ["/run/ocs-agent/context.md"]`. OpenCode combines `instructions` from all its
-configuration files, so the guidance is added to your configuration, never replaces it. A
-custom image without that file gets no guidance; `run` warns.
+images ship a neutral `/etc/opencode/opencode.json`. **Include specialized Agent Context**
+defaults on at creation and can be changed in environment Settings or the CLI:
 
-**Freshness.** `run` and `shell` regenerate the guidance from current metadata and the
-container's settings before every launch, and a refresh is visible in a running container at
-once. Commands:
+```sh
+opencode-sandbox create NAME --no-agent-context
+opencode-sandbox config apply NAME --no-agent-context
+opencode-sandbox config apply NAME --agent-context
+```
+
+The file is always generated/refreshed and mounted, even when automatic inclusion is disabled.
+At every managed start (including recreation, update and temporary version-check starts), the
+manager reconciles only the exact `/run/ocs-agent/context.md` entry in the system `instructions`
+array: once when enabled, absent when disabled. All other fields and instructions retain their
+values/order. Malformed JSON or a non-array `instructions` fails without resetting the document;
+managed OpenCode must not launch with a known mismatched activation. Running setting changes
+do not interrupt sessions; an existing process may need a new launch to observe activation.
+For stopped containers the saved choice is reconciled at the next managed start.
+
+User global/project configuration and `AGENTS.md` are never rewritten for this setting. Native
+OpenCode precedence/merging still applies: disabling automatic inclusion cannot stop your own
+config explicitly referencing the file. Starts outside manager control (`docker start`) cannot
+be intercepted; use manager Start before launching OpenCode after changing settings or drift.
+Custom images need Python and GNU timeout for safe reconciliation and managed launches.
+
+**Freshness.** Managed Start, `run` and `shell` regenerate guidance from current metadata and
+container settings; an atomic refresh is visible through the directory mount at once. Commands:
 
 ```sh
 opencode-sandbox agent-context show NAME     # preview
@@ -237,7 +253,7 @@ The dashboard [Base Images view](dashboard.md#base-image-actions) offers both mo
 keeps a rollback copy on replacement. The existing `build` command deliberately keeps **no**
 rollback copy, discloses that distinction, and also accepts `--refresh` (its target option remains
 `--opencode-version`). Base changes affect future base-based container creation and file-only
-restores, not existing containers, writable layers, home/workspace/configuration or integrations.
+restores, not existing containers, writable layers or home/workspace/configuration.
 Not-yet-created pinned environments must still match the new base. To upgrade packages in an
 existing environment, use `opencode update NAME --update-system-packages` or the environment's
 package manager.

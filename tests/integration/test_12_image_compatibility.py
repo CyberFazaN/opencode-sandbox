@@ -65,7 +65,7 @@ def version_roundtrip(camp, ck, name, eid, os_version):
 def test_new_debian_definition_update_and_rollback(campaign, checks):
     camp, ck = campaign, checks
     name = "ocs-test-definition13"
-    eid = camp.create(name, "--distro", "debian", "--no-integrations")
+    eid = camp.create(name, "--distro", "debian")
     camp.ocs("start", name)
     write_state(camp, eid)
     ck(os_is(camp, eid, "13") and context_is(camp, name, "13"), "C02/G05 new base is actually Debian 13 and guidance says 13")

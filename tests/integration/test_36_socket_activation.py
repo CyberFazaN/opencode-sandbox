@@ -100,7 +100,7 @@ Service={name}.service
         camp.note(f"C10 image archive {archive}; ubuntu:24.04 loaded only into the isolated daemon")
         camp._run(["docker", "-H", SOCKET, "image", "save", "-o", str(archive), "ubuntu:24.04"], check=True)
         docker("image", "load", "-i", str(archive))
-        ocs("create", "ocs-test-activation", "--image", "ubuntu:24.04", "--no-integrations")
+        ocs("create", "ocs-test-activation", "--image", "ubuntu:24.04")
         meta = json.loads(next((Path(env["OPENCODE_SANDBOX_HOME"]) / "environments").glob("*/metadata.json")).read_text())
         ids.append(meta["id"])
         camp.note(f"C10 isolated environment ocs-test-activation id={meta['id']}")

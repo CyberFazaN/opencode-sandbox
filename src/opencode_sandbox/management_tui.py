@@ -34,7 +34,9 @@ class ProviderScreen(Screen):
         table = self.query_one("#providers-table", DataTable)
         table.clear()
         for name in sorted(c.profile_list()):
-            table.add_row(name, ", ".join(c.profile_keys(name)), key=name)
+            try: detail = ", ".join(c.profile_keys(name))
+            except (c.SandboxError, OSError) as exc: detail = "Invalid profile: " + c.error_text(exc)
+            table.add_row(Text(c.printable(name)), Text(c.printable(detail)), key=name)
     def on_button_pressed(self, event: Button.Pressed):
         action = event.button.id
         if action == "close-profiles": self.app.pop_screen(); return

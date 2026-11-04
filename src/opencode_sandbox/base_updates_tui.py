@@ -120,7 +120,7 @@ def rollback_consent(plan):
         f'Required definition: {d.name} {d.version}, revision {d.revision}.',
         'The copy must pass current OS/tool/OpenCode checks before publication; a legacy copy may be refused.',
         'The replaced current image is kept as a rollback copy. Selected aliases are consumed after the swap.',
-        'Existing containers, writable layers, home/workspace/configuration and integrations are unchanged.',
+        'Existing containers, writable layers and home/workspace/configuration are unchanged.',
         'Future base-based creation and file-only restores use this base; not-yet-created pins remain enforced.',
         'This is not an upstream package-freshness or security assessment.',
         'Consent is revalidated under shared base guards. Closing the screen never cancels an approved operation.',

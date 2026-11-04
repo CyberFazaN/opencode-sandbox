@@ -1,5 +1,4 @@
-"""Initial integrations exactly once (campaign row G10) and quick sessions (D08), real Docker."""
-import json
+"""Quick sessions (D08), real Docker."""
 import re
 
 import pytest
@@ -7,28 +6,6 @@ from campaign import MANAGER
 
 pyte = pytest.importorskip("pyte")
 from pty_term import Term
-
-CONFIG = "/root/.config/opencode/opencode.json"
-
-
-def test_context7_is_added_once_and_then_belongs_to_the_user(campaign, checks):
-    camp, ck = campaign, checks
-    name = "ocs-test-int"
-    eid = camp.create(name)  # default integrations: Context7
-    out = camp.ocs("start", name).stdout
-    ck("context7" in out.lower(), f"G10 the first start sets up Context7 ({out.strip()[-120:]})")
-    config = json.loads(camp.sh(eid, f"cat {CONFIG}").stdout)
-    ck("context7" in json.dumps(config.get("mcp", {})), "G10 the server is in the environment's global OpenCode config")
-    status = camp.ocs("status", name).stdout
-    ck(re.search(r"Initial integrations \(history, not current state\): context7: ", status) is not None, "G10 status reports it as history")
-    camp.sh(eid, f"python3 -c \"import json; p='{CONFIG}'; c=json.load(open(p)); c.pop('mcp', None); json.dump(c, open(p, 'w'))\"")
-    edited = camp.sh(eid, f"sha256sum {CONFIG}").stdout
-    camp.ocs("stop", name)
-    camp.ocs("start", name)
-    camp.ocs("container", "recreate", name, "--yes")
-    camp.ocs("config", "apply", name, "--network", "none", "--yes")
-    ck(camp.sh(eid, f"sha256sum {CONFIG}").stdout == edited, "G10 never re-applied: the user's removal survives start, recreate and settings changes")
-    camp.delete(name)
 
 
 def test_quick_session_promote_and_keep(campaign, checks):

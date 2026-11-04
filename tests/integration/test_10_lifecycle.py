@@ -80,7 +80,7 @@ def test_lifecycle_settings_changes_backup(campaign, checks, distro):
                 "c.init_dirs(); c.profile_set('ocs-test-fake', {'QA_API_KEY': 'not-a-real-key'})")
     src = source_repo(camp, distro)
     name = f"ocs-test-life-{distro}"
-    eid = camp.create(name, "--source", str(src), "--distro", distro, "--no-integrations", "--profile", "ocs-test-fake")
+    eid = camp.create(name, "--source", str(src), "--distro", distro, "--profile", "ocs-test-fake")
     ws = camp.data / "environments" / eid / "workspace"
 
     # D02 import: committed files only, names, modes and symlinks kept, nothing outside copied
@@ -285,7 +285,7 @@ def test_custom_image_provenance(campaign, checks):
     if camp.docker("image", "inspect", CUSTOM, check=False).returncode:
         pytest.skip(f"{CUSTOM} is not present locally")
     name = "ocs-test-custom"
-    eid = camp.create(name, "--image", CUSTOM, "--no-integrations")
+    eid = camp.create(name, "--image", CUSTOM)
     camp.ocs("start", name)
     camp.ocs("stop", name)
     camp.ocs("config", "apply", name, "--network", "none", "--yes")

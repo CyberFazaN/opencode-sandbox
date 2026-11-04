@@ -61,20 +61,16 @@ environment; never rely on a background server's previously captured environment
 
 ## D-008 Agent Context delivery and session isolation
 
-The image's system configuration adds `/run/ocs-agent/context.md` to OpenCode instructions; a
-read-only directory bind mount makes atomic host refresh visible. User/project configuration and
-`OPENCODE_CONFIG_CONTENT` are not replaced. Run/shell regenerate guidance; custom images without
-the instruction entry get a warning, not fallback injection. Managed `opencode --standalone`
+Per-environment system configuration includes `/run/ocs-agent/context.md` when enabled (D-065); a
+read-only directory bind mount makes atomic host refresh visible. User/project configuration is
+not replaced for context delivery. Managed `opencode --standalone`
 avoids a background server retaining another launch's provider key. A per-launch token identifies
 the exact session to hang up after abnormal manager exit. Real first-prompt evidence is required.
 
-## D-009 Initial integrations are once-only
+## D-009 Retired initial integration provisioning
 
-Provision requested MCP servers at the first start using OpenCode's own command, only without any
-existing global config: upstream add can replace entries or corrupt unparseable configuration.
-Persist `applying` before attempting, record outcome and never retry/reapply on later starts,
-recreation, updates or restore. Failure does not fail start. Requests contain no secrets; Context7
-is default but offline setup is not proof it works. Afterward configuration belongs to the user.
+Superseded by D-064. Catalogs, provisioning controls and metadata are removed, without compatibility
+handlers. Existing user-authored MCP/global config is not proactively edited or erased.
 
 ## D-010 Shared settings plan
 
@@ -141,7 +137,7 @@ the normal no-new-privileges container boundary. Debian pins VERSION_ID 13; Arch
 ## D-018 Guidance reports configured/observed facts
 
 Guidance describes privileges, persistence, workspace mode (never host path), network/resources,
-base provenance and historical initial provisioning, not current user configuration or security
+base provenance, not current user configuration or security
 enforcement. Observed runtime wins and differences are qualified; failed inspection falls back
 with a note, not verification. Network none omits ports. D-051 governs OS/tool provenance;
 Focused rendering tests protect these facts, and real first-prompt tests establish delivery.
@@ -250,8 +246,8 @@ No symlinks below Git objects/refs/reftable/info and no grafts at each host comm
 object-data link replacement can affect read-only data; copying whole stores was rejected for cost.
 New data/subdirectories are private; existing data-root permissions are not rewritten. Drop NET_RAW/
 MKNOD only after measured package compatibility; further drops need evidence. Refuse output inside
-any workspace. Missing-image errors retain salvage options, not implicit deletion; failed post-
-provisioning guidance refresh is logged without undoing start. Shared base guards are D-056.
+any workspace. Missing-image errors retain salvage options, not implicit deletion; failed start
+reconciliation prevents managed launch. Shared base guards are D-056.
 
 ## D-034 Quality and visible errors
 
@@ -367,7 +363,8 @@ certify package freshness, and never overwrite active operations.
 
 ## D-051 Retain actual base provenance
 
-Debian definition is 13 (`node:24-trixie`), revision 2; Arch remains rolling/revision 1. New base
+Debian definition is 13 (`node:24-trixie`); Arch remains rolling. Definition revisions follow the
+registry (later package-step and launcher/context changes are D-063/D-065). New base
 builds never upgrade existing/derived/restored system layers. Read inherited managed labels from
 the owned container/selected image, never infer OS from today's mutable base tag or metadata.
 Unknown stays unknown; old definitions do not inherit current tool promises. File-only restore
@@ -466,7 +463,7 @@ completion cleanup and unfinished-work/recovery retention rules. No new framewor
 Refines D-019/D-056: dashboard Check may temporarily start an existing stopped container solely
 for a bounded version probe; passive inventory, CLI version reports and automatic discovery never
 start it. Check All confirms stopped targets. Retain lifecycle exclusion through restoration,
-including an independent parent-death guard; do not invoke normal launch/provisioning or create
+including an independent parent-death guard; do not invoke interactive launch/global import or create
 missing containers. Unconfirmed cleanup stays visible with exact-identity recovery evidence.
 Originally-running targets stay running. A running environment update requires explicit stop
 caution before checkpoint/install and finishes stopped, never an implicit restart. Existing
@@ -481,3 +478,28 @@ default-off request, as the first step inside the journalled OpenCode-update che
 restores it before OpenCode changes. Commands come from the distribution registry; custom images
 refuse. Never present rollback as a full undo of package upgrades: changes outside the system
 layer and migrated data remain.
+
+## D-064 Explicit whole-global-config transfers
+
+User-maintained profile directories/root symlinks are read-only inputs, never live mounts or
+automatically synchronized. Initial Copy requires a fresh volume; later explicit Reload/Empty
+and Export/Apply cover the entire global config tree, not effective config, system, project or
+other home auth/state. Preserve internal symlink text, modes and file bytes; reject unsupported
+entries. Private deterministic /tmp exports bind UID/data-root/stable environment identity and a
+validated external marker, not a stored path/session. Baselines hash original/current container
+trees, never host edits; overwrite consent binds one observed digest and retains final checks.
+Same-volume staging, atomic directory exchange, durable commit/recovery and manager/volume locks
+protect replacement across process death. No blanket transaction guarantee against arbitrary
+OpenCode writers or hostile same-UID processes is claimed.
+
+## D-065 Optional context activation and one provider launcher
+
+Base system configs are neutral. Persist default-on per-environment activation; always keep the
+context generated/mounted and reconcile only its exact system instruction on every managed start,
+including recreation/update/temporary checks. Preserve unrelated JSON/list order; malformed configs
+fail without resetting them. Stopped changes reconcile at next start; active sessions are never
+interrupted. Native user references remain possible. Reserve exactly the three config path/content
+provider variables at host and container validation boundaries, with no broad OPENCODE_* ban.
+The same stdlib validator powers managed launches and both images' discoverable `ocs-opencode`
+executable; private-server semantics, safe JSON/argv handling and conditional interactive hints
+replace shell aliases/evaluation or duplicated credential rules.

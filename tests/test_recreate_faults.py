@@ -11,6 +11,7 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(c,'BASE',tmp_path/'data')
     monkeypatch.setattr(c,'CONFIG',tmp_path/'config')
     monkeypatch.setattr(c,'ensure_runtime',lambda image=True: None)
+    monkeypatch.setattr(c, 'guidance_inputs', lambda m, **k: {"image": c.env_image(m), "runtime": c.runtime_settings(m)})
 
 def test_recreate_failure_keeps_journal_and_snapshot(monkeypatch):
     m=c.create('demo','scratch')

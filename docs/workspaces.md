@@ -3,14 +3,14 @@
 ## Creating an environment
 
 `create NAME` makes an environment with an empty persistent workspace (kind `scratch`) on the
-default distribution with the default integrations. Everything else is optional;
-`create --help` groups the options (workspace, distribution or image, integrations), and
+default distribution, Local OpenCode config and specialized Agent Context enabled. Everything else is optional;
+`create --help` groups workspace and distribution/image options, and
 `create` prints the choices it made and the next command.
 
 ```sh
 opencode-sandbox create notes
 opencode-sandbox create webapp --source ~/code/webapp --profile work
-opencode-sandbox create tools --distro arch --no-integrations
+opencode-sandbox create tools --distro arch
 ```
 
 ### A copy of a folder (`--source`)
@@ -86,7 +86,7 @@ the directory; `delete` removes only the container, the volume and the metadata.
 
 | `--distro` | Base image | Built from | Notes |
 |---|---|---|---|
-| `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | Image revision 2 since 6.1.0; 6.0.0 built Debian 12 (revision 1) |
+| `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | Current definition revision 4; 6.0.0 built Debian 12 (revision 1) |
 | `arch` | `opencode-sandbox:arch` | `archlinux:base-devel` (rolling) | AUR packages through `ocs-aur` |
 
 Build the base image first (`opencode-sandbox build --distro ID`). The distribution is recorded
@@ -130,29 +130,14 @@ inside a container; inspect `/etc/os-release` there when an exact current versio
   `ocs-aur` stops working in that environment until it is created again from a rebuilt base
   image (`opencode-sandbox build --distro arch`).
 
-## Initial integrations
+## Initial OpenCode configuration
 
-By default every new environment (also `quick` and the dashboard's) asks for the **Context7**
-remote MCP server: current library documentation, public, no key, needs network. Options of
-`create`:
-
-| Option | Effect |
-|---|---|
-| `--no-integrations` | No integrations |
-| `--integration NAME` | Choose from the catalog (`create --help`); repeatable; replaces the default |
-| `--mcp-remote NAME=URL` | A custom remote MCP server |
-| `--mcp-local "NAME=COMMAND ARGS"` | A custom local MCP server |
-
-Custom servers take no headers or secrets; add keys yourself later. At the **first start** the
-manager runs `opencode mcp add --global` in the container, which writes
-`/root/.config/opencode/opencode.json` in the home volume. If any global OpenCode configuration
-already exists there, nothing is written ("skipped").
-
-The outcome is recorded once (`status`, and the Agent Context says "configured", never
-"working"; with network `none` remote servers are marked as unable to work offline) and is
-**never applied again**: not on later starts, recreation, settings changes, updates or restores,
-and no drift is checked. After the first start the configuration is yours. A failure does not
-stop the start; `start` and `status` print the `opencode mcp add` commands to run yourself.
+**Local** (default) imports nothing; configure OpenCode natively in the environment.
+**Copy** imports an entire user-maintained profile directory once into the fresh home volume,
+before the first launch. CLI: `create NAME --opencode-config PROFILE`; dashboard: New → More
+options → OpenCode config → Copy. No source profile is needed afterward. See
+[OpenCode Configs](opencode-configs.md) for profiles, exports and explicit Reload/Empty.
+MCP servers and plugins are native OpenCode configuration, not a manager integration catalog.
 
 ## Everyday commands
 
@@ -164,6 +149,6 @@ stop the start; `start` and `status` print the `opencode mcp add` commands to ru
 | `start NAME`, `stop NAME` | Start or stop the container |
 | `run NAME` | OpenCode in `/workspace` with the provider profile ([opencode.md](opencode.md)) |
 | `shell NAME` | A root bash |
-| `exec NAME -- CMD` | One command, for scripts: no provider profile, and the Agent Context is not regenerated |
+| `exec NAME -- CMD` | One command; generic exec does not inject provider variables, but `ocs-opencode` loads them; managed start refreshes/reconciles Agent Context |
 | `delete NAME [--export-first] [--yes]` | Show the changes, optionally export them, delete |
 | `promote NAME scratch\|project` | Keep a quick session |

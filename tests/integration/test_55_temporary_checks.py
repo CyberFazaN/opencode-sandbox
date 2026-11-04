@@ -23,7 +23,7 @@ pytestmark = [pytest.mark.real_session, pytest.mark.real_identity]
 def test_temporary_check_state_failure_and_parent_death(campaign, checks, distro):
     camp, ck = campaign, checks
     name = f'ocs-test-temporary-check-{distro}'
-    eid = camp.create(name, '--distro', distro, '--no-integrations')
+    eid = camp.create(name, '--distro', distro)
     camp.ocs('start', name)
     version = camp.sh(eid, 'opencode --version').stdout.strip().split()[-1].removeprefix('v')
     camp.sh(eid, 'umask 022; echo keep-check-workspace > /workspace/ocs-test-check; echo keep-check-home > /root/ocs-test-check')
@@ -99,7 +99,7 @@ def test_temporary_check_state_failure_and_parent_death(campaign, checks, distro
 def test_check_all_terminal_consent_and_fkeys(campaign, checks, distro, size):
     camp, ck = campaign, checks
     name = f'ocs-test-check-all-{distro}-{size[0]}'
-    eid = camp.create(name, '--distro', distro, '--no-integrations')
+    eid = camp.create(name, '--distro', distro)
     camp.ocs('start', name); camp.ocs('stop', name)
     old = camp.inspect(eid)
     script = camp.tmp('check-all-terminal') / f'{distro}-{size[0]}.py'

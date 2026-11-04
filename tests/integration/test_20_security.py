@@ -46,8 +46,8 @@ def test_profiles_secrets_and_isolation(campaign, checks):
     listing = camp.ocs("providers", "list").stdout
     ck("QA_KEY" in listing and "dummy" not in listing, "F02 providers list shows names, never values")
 
-    a = camp.create("ocs-test-sec-a", "--no-integrations", "--profile", "ocs-test-a")
-    b = camp.create("ocs-test-sec-b", "--no-integrations", "--profile", "ocs-test-b")
+    a = camp.create("ocs-test-sec-a", "--profile", "ocs-test-a")
+    b = camp.create("ocs-test-sec-b", "--profile", "ocs-test-b")
     camp.ocs("start", "ocs-test-sec-a")
     camp.ocs("start", "ocs-test-sec-b")
 
@@ -164,7 +164,7 @@ def test_socket_proxy_and_foreign_names_are_refused(campaign, checks):
                       capture_output=True, text=True, check=False).returncode == 0, "the proxy really reaches the daemon")
     p = camp.ocs("doctor", check=False, env=env)
     ck("unverified-proxy" in p.stdout + p.stderr, f"C01 doctor: unverified-proxy ({(p.stdout + p.stderr).strip()[-200:]})")
-    p = camp.ocs("create", "ocs-test-viaproxy", "--no-integrations", check=False, env=env)
+    p = camp.ocs("create", "ocs-test-viaproxy", check=False, env=env)
     q = camp.ocs("start", "ocs-test-viaproxy", check=False, env=env)
     ck(q.returncode != 0 and "unverified-proxy" in q.stdout + q.stderr, "C01 start through the proxy is refused")
     if p.returncode == 0:
@@ -173,7 +173,7 @@ def test_socket_proxy_and_foreign_names_are_refused(campaign, checks):
     stop.set()
 
     # C06: a foreign container squatting on the name of a new environment's container
-    eid = camp.create("ocs-test-squat", "--no-integrations")
+    eid = camp.create("ocs-test-squat")
     camp.docker("run", "-d", "--name", f"ocs-{eid}", "--network", "none", "opencode-sandbox:debian", "sleep", "300")
     camp.note(f"foreign container ocs-{eid} (unlabelled squatter, created by the test)")
     p = camp.ocs("start", "ocs-test-squat", check=False)

@@ -2,9 +2,9 @@
 
 The manager owns this file outside the workspace, in a directory that is bind-mounted
 read-only at /run/ocs-agent (a directory mount shows atomic replacements; a single-file
-mount would keep the old inode). The managed image's system config
-/etc/opencode/opencode.json lists it in `instructions`, which OpenCode combines with the
-instructions of every other config document, so user configuration stays untouched.
+mount would keep the old inode). Every managed start reconciles the saved activation in
+/etc/opencode/opencode.json; the image itself is neutral. OpenCode combines instructions
+with its other configuration, which is never rewritten for this setting.
 """
 from __future__ import annotations
 
@@ -17,6 +17,80 @@ from . import distros
 CONTAINER_DIR = "/run/ocs-agent"
 CONTAINER_PATH = CONTAINER_DIR + "/context.md"
 SYSTEM_CONFIG = "/etc/opencode/opencode.json"
+
+
+def enabled(m):
+    value = m.get("agent_context_enabled", True)
+    if not isinstance(value, bool):
+        from .core import SandboxError
+        raise SandboxError("Invalid saved Agent Context setting")
+    return value
+
+
+def system_document(document, include):
+    """Change only the exact manager instruction; preserve unrelated entries and their order."""
+    if not isinstance(document, dict) or not isinstance(document.get("instructions", []), list):
+        raise ValueError("System OpenCode config must be an object with an instructions array")  # noqa: TRY004 — public document-validation error
+    instructions = document.get("instructions", [])
+    result, found = [], False
+    for entry in instructions:
+        if entry == CONTAINER_PATH:
+            if include and not found:
+                result.append(entry)
+            found = True
+        else:
+            result.append(entry)
+    if include and not found:
+        result.append(CONTAINER_PATH)
+    return {**document, "instructions": result}
+
+
+# Executed only inside the owned container. No global/user/project configuration is consulted.
+SYSTEM_SCRIPT = r'''import json,os,stat,sys,tempfile
+path='/etc/opencode/opencode.json'
+parent=os.path.dirname(path)
+if os.path.islink('/etc') or os.path.islink(parent) or os.path.islink(path):
+    sys.exit('Unsafe system OpenCode config path; symlinks are not changed')
+os.makedirs(parent,mode=0o755,exist_ok=True)
+try:
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd) as f:
+        st=os.fstat(f.fileno())
+        if not stat.S_ISREG(st.st_mode) or st.st_size>8*1024**2:
+            sys.exit('System OpenCode config must be a bounded regular JSON file; preserved')
+        document=json.load(f)
+except FileNotFoundError: document={}
+except (ValueError,UnicodeError): sys.exit('Malformed system OpenCode JSON; preserved, repair it manually')
+try: updated=system_document(document,sys.argv[1]=='1')
+except ValueError: sys.exit('System OpenCode config must be an object with an instructions array; preserved')
+if updated!=document or not os.path.exists(path):
+    mode=stat.S_IMODE(os.stat(path).st_mode) if os.path.exists(path) else 0o644
+    fd,tmp=tempfile.mkstemp(prefix='.ocs-system-',dir=parent)
+    try:
+        with os.fdopen(fd,'w') as f:
+            os.fchmod(f.fileno(),mode)
+            json.dump(updated,f,indent=2); f.write('\n'); f.flush(); os.fsync(f.fileno())
+        os.replace(tmp,path)
+        d=os.open(parent,os.O_RDONLY|os.O_DIRECTORY)
+        try: os.fsync(d)
+        finally: os.close(d)
+    finally:
+        if os.path.exists(tmp): os.unlink(tmp)
+'''
+
+
+def reconcile(m, *, include=None):
+    """Locked, running-container reconciliation. Failure prevents managed OpenCode launch."""
+    import inspect
+
+    from . import core as c
+    script = "CONTAINER_PATH=" + repr(CONTAINER_PATH) + "\n" + inspect.getsource(system_document) + "\n" + SYSTEM_SCRIPT
+    p = c.docker("exec", "--user", "0:0", c.cname(m), "timeout", "--signal=KILL", "15s", "python3", "-c", script,
+                 str(int(enabled(m) if include is None else include)), capture=True, check=False)
+    if p.returncode:
+        # Script's errors are fixed messages, but an image's Python/startup hooks need not be.
+        raise c.SandboxError("Cannot reconcile system Agent Context activation. Check /etc/opencode/opencode.json "
+                             "(JSON object, instructions array, no symlinks) and Python availability; configuration was not replaced with defaults")
 
 
 OBSERVED = (("network", "network"), ("cpus", "CPU limit"), ("memory", "memory limit"), ("pids", "process limit"))
@@ -98,7 +172,6 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
     else:
         lines += ["", "## Operating system",
                   "- Custom image: installed tools, OS and package manager are unknown; inspect only when needed."]
-    lines += integration_lines(m)
     lines += ["", "## Working behavior",
               "- Start with the user's task; avoid a full system inventory or repeated probing.",
               "- If a dependency is missing, explain the required change; use container-local installation only when appropriate and permitted.",
@@ -126,22 +199,6 @@ def workspace_lines(m: dict) -> list[str]:
         lines.append("- This is a quick (disposable) session: when it ends, the user decides whether to export, keep, "
                      "promote or delete it. Do not rely on /workspace being kept.")
     return lines
-
-
-def integration_lines(m: dict) -> list[str]:
-    """Initial integrations (D-009) are history: provisioned once, possibly changed since."""
-    provisioning = m.get("provisioning")
-    requested = provisioning.get("requested") if isinstance(provisioning, dict) else None
-    if not requested or not isinstance(requested, list):
-        return []
-    result = provisioning.get("result")
-    names = ", ".join(str(item) for item in requested)
-    if provisioning.get("state") in ("pending", "applying"):
-        return ["", "## Initial integrations",
-                f"- Requested at creation, set up once at the first container start (not done yet): {names}."]
-    return ["", "## Initial integrations",
-            f"- Provisioned once, at the first container start: {names}" + (f" ({result})" if isinstance(result, str) and result else "") + ".",
-            "- They may have been changed or removed since; check the OpenCode configuration before relying on them."]
 
 
 def directory(m: dict, env_dir) -> Path:

@@ -9,9 +9,9 @@ from opencode_sandbox import core as c
 ASSETS = c.distros.IMAGES
 
 
-def test_image_system_config_lists_only_the_agent_context():
+def test_image_system_config_is_neutral():
     config = json.loads((ASSETS / "common" / "opencode-system.json").read_text())
-    assert config == {"instructions": [ac.CONTAINER_PATH]}
+    assert config == {"instructions": []}
 
 
 def test_interactive_refreshes_verified_guidance_before_launch(monkeypatch):
@@ -26,7 +26,7 @@ def test_interactive_refreshes_verified_guidance_before_launch(monkeypatch):
     assert c.interactive(m) == 0
     assert ac.verify(m, c.env_dir, image=c.env_image(m), runtime=c.runtime_settings(m))
     args = next(a for a in commands if a[0] == "exec")
-    assert args[0] == "exec" and args[-3:-1] == (ac.CONTAINER_PATH, ac.SYSTEM_CONFIG)
+    assert args[0] == "exec" and args[-4:-2] == (ac.CONTAINER_PATH, ac.SYSTEM_CONFIG) and args[-1] == "1"
 
 
 def test_launch_guidance_describes_the_observed_container(monkeypatch):

@@ -2,7 +2,7 @@
 
 - Arch + AUR + direct workspace + recreation (rows K01, L01, D04)
 - backup and restore of a direct-workspace environment, without and with the workspace (E01, L01)
-- OpenCode update and rollback with the user's OpenCode configuration and initial integrations (G03, G06, G10)
+- OpenCode update and rollback with the user's OpenCode configuration (G03, G06)
 - settings changes while a shell session is open: in place keeps it, recreation ends it (C05, H05)
 - cleanup next to Docker objects the manager does not own (J02, C06)
 
@@ -56,7 +56,7 @@ def test_arch_aur_package_in_a_direct_workspace_survives_recreation(campaign, ch
     root, folder = outside(camp, "rf-arch-direct")
     name = "ocs-test-rf-arch-direct"
     eid = camp.create(name, "--distro", "arch", "--workspace-mode", "direct", "--workspace", str(folder),
-                      "--yes", "--no-integrations")
+                      "--yes")
     camp.ocs("start", name)
     before = listing(folder)
     aur = camp.sh(eid, "ocs-aur -S --noconfirm bash-pipes > /tmp/aur.log 2>&1", check=False, timeout=1800)
@@ -82,7 +82,7 @@ def test_backup_and_restore_of_a_direct_workspace_environment(campaign, checks):
     camp, ck = campaign, checks
     root, folder = outside(camp, "rf-direct-backup")
     name = "ocs-test-rf-dbk"
-    eid = camp.create(name, "--workspace-mode", "direct", "--workspace", str(folder), "--yes", "--no-integrations")
+    eid = camp.create(name, "--workspace-mode", "direct", "--workspace", str(folder), "--yes")
     camp.ocs("start", name)
     camp.sh(eid, WRITE_MARKERS)
     before = listing(folder)
@@ -125,14 +125,13 @@ def test_backup_and_restore_of_a_direct_workspace_environment(campaign, checks):
 def test_opencode_update_and_rollback_keep_the_user_configuration(campaign, checks):
     camp, ck = campaign, checks
     name = "ocs-test-rf-ocup"
-    eid = camp.create(name)  # default integrations (Context7), written once at the first start
+    eid = camp.create(name)
     camp.ocs("start", name)
-    camp.sh(eid, f"python3 -c \"import json; p='{CONFIG}'; c=json.load(open(p)); c['theme']='opencode'; "
+    camp.sh(eid, f"mkdir -p /root/.config/opencode && python3 -c \"import json; p='{CONFIG}'; c={{'username':'ocs-test'}}; "
                  "json.dump(c, open(p, 'w'), indent=1)\" && mkdir -p /root/.config/opencode/agent "
                  "&& printf 'ocs-test agent\\n' > /root/.config/opencode/agent/ocs-test.md")
     files = f"{CONFIG} /root/.config/opencode/agent/ocs-test.md"
     digest = camp.sh(eid, f"sha256sum {files}").stdout
-    ck("context7" in camp.sh(eid, f"cat {CONFIG}").stdout, "G10 Context7 written at the first start")
     camp.ocs("stop", name)
     update = camp.ocs("opencode", "update", name, "--version", "2.1.4", "--yes", check=False, timeout=1800)
     ck(update.returncode == 0, f"G03 update to 2.1.4 ({update.stdout.strip()[-200:]} {update.stderr.strip()[-200:]})")
@@ -143,7 +142,7 @@ def test_opencode_update_and_rollback_keep_the_user_configuration(campaign, chec
     camp.ocs("opencode", "rollback", name, "--yes")
     camp.ocs("start", name)
     ck(camp.sh(eid, "opencode --version").stdout.strip().endswith("2.2.0"), "G03 rollback returns to 2.2.0")
-    ck(camp.sh(eid, f"sha256sum {files}").stdout == digest, "G06/G10 configuration unchanged by the rollback; integrations not re-applied")
+    ck(camp.sh(eid, f"sha256sum {files}").stdout == digest, "G06 configuration unchanged by the rollback")
     ck(camp.ocs("agent-context", "verify", name, check=False).returncode == 0, "G05 Agent Context current after update and rollback")
     camp.delete(name)
 
@@ -151,7 +150,7 @@ def test_opencode_update_and_rollback_keep_the_user_configuration(campaign, chec
 def test_settings_change_during_an_open_shell_session(campaign, checks):
     camp, ck = campaign, checks
     name = "ocs-test-rf-session"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("start", name)
     camp.sh(eid, WRITE_MARKERS)
     t = Term([*MANAGER, "shell", name], 100, 30, env=camp.env, log=camp.log)
@@ -254,7 +253,7 @@ def test_host_commands_ignore_the_workspace_git_configuration(campaign, checks):
     camp.note(f"host dir {marker_dir} (E08 marker)")
     marker = marker_dir / "marker"
     name = "ocs-test-rf-e08"
-    eid = camp.create(name, "--source", str(src), "--no-integrations")
+    eid = camp.create(name, "--source", str(src))
     camp.ocs("start", name)
     program = f"touch {marker} 2>/dev/null; cat"
     camp.sh(eid, "cd /workspace && printf 'a.txt filter=ocs diff=ocs\\n' > .gitattributes "

@@ -117,6 +117,9 @@ def check(m, *, expected=None):
         result = None
         try:
             guard.start()
+            from . import agent_context as ac
+            ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
+            ac.reconcile(m)
             result = v.environment_version(m, check=True)
         finally:
             # A cancellation BaseException must not skip or cancel restoration.

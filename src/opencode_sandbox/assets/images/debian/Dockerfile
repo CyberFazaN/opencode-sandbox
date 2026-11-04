@@ -16,8 +16,10 @@ ARG OPENCODE_VERSION
 COPY common/install-opencode.sh /tmp/install-opencode.sh
 RUN sh /tmp/install-opencode.sh "${OPENCODE_VERSION:?build with --build-arg OPENCODE_VERSION}" \
  && rm /tmp/install-opencode.sh
-# Manager-owned system config: only lists the Agent Context file (D-008). OpenCode combines
-# `instructions` from all config documents; user config in /root/.config/opencode stays untouched.
+# Neutral system config; the manager reconciles per-environment Agent Context activation.
 COPY common/opencode-system.json /etc/opencode/opencode.json
+COPY --chmod=0755 common/ocs_opencode.py /usr/local/bin/ocs-opencode
+COPY common/ocs-shell-hint.sh /usr/local/lib/ocs-shell-hint.sh
+RUN printf '\n. /usr/local/lib/ocs-shell-hint.sh\n' >> /etc/bash.bashrc
 WORKDIR /workspace
 CMD ["sleep", "infinity"]

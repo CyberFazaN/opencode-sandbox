@@ -13,13 +13,15 @@ The current checkpoint below records fresh verification; older sections retain t
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
-| Images | Debian 13/default (`node:24-trixie`, revision 3); Arch rolling (`archlinux:base-devel`, revision 2) |
+| Images | Debian 13/default (`node:24-trixie`, revision 4); Arch rolling (`archlinux:base-devel`, revision 3) |
 
 The release includes component Updates views, optional default-off daily discovery,
 environment/base actions and independent manager update/recovery. These are implemented, not a
 pending roadmap. Published 6.2.0 kept the schemas/image definitions; unreleased changes advance the
 image definitions so every base build upgrades system packages, and environment OpenCode updates
-offer a default-off package upgrade (D-063), without changing environment/backup schemas. Availability,
+offer a default-off package upgrade (D-063). Explicit global-config profile/file transfers and optional
+Agent Context activation replace initial integration provisioning (D-064/D-065), without changing
+environment/backup schemas. Availability,
 consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
 The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
 declined a reboot. Acceptance is not verification; original frozen recovery inputs remain retained.
@@ -40,6 +42,50 @@ declined a reboot. Acceptance is not verification; original frozen recovery inpu
 - OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
 
 ## Verification
+
+### Unreleased global configuration and activation — 2026-11-04
+
+Full default checkpoint: **2294 passed / 101 opt-in integration skips each** on Python
+3.11.18/Typer 0.16.0/Textual 4.0.0 and Python 3.14.8/Typer 0.27.3/Textual 8.2.8. Final localized
+creation-publication/transaction-cleanup/export-publication hardening and additional regressions then passed **217
+affected tests on each endpoint**, including config trees/services, context/CLI, creation/lifecycle
+consumers, backups, compact TUI, quality and document contracts. The full counts precede those
+last changes; unchanged subsystems reuse that evidence, not a claimed fresh final-tree full run.
+Missing/disappearing sources, unavailable-volume admission, canceled-review metadata, expected
+codec-error privacy, bounded archive metadata/enumeration and export publication/rollback failures
+have explicit regressions.
+Dependency checks passed; lowest Typer retains its two known Click deprecations.
+
+Real rootless evidence on both distributions covers initial Copy before any environment launch,
+source/nested symlinks, executable modes and root:root/host-UID conversion, stopped Apply, drift
+Cancel/override/repeated Apply, Reload/Empty boundaries, recreation/source independence, home
+backup/restore and stable export rediscovery. Direct executable, interactive/noninteractive/login
+shell hints, saved/toggled context, every-start targeted reconciliation, malformed JSON refusal
+and actual V2 config/data paths passed. Initial Copy retains image-provided home data, refuses a
+nonfresh image-seeded global tree, and rejects overlapping image-volume declarations before IO.
+Abrupt helper death at directory exchange **and during
+committed cleanup** passed on actual volumes; recovery preserves the correct old/new tree and
+normal start refuses the pending journal. Ten distinct feature cases are covered by the scoped
+incremental runs, including final Copy (2), shell/context (2), switch/cleanup fault (4) and image-home
+initialization/overlap (2) checks.
+Earlier still-applicable real fake-provider first prompts passed on both new images, and the
+configuration-preserving OpenCode 2.1.4 update/2.2.0 rollback passed. These are scripted pty/host/
+Docker/OpenCode checks with dummy keys, not manual visual review or paid-provider testing.
+
+Both changed image definitions built and passed OS/tool/exact-binary verification under isolated
+test tags. The initial diagnostic test incorrectly used `ocs-opencode debug paths`; OpenCode
+2.2.0 rejects `--standalone` for that local-only subcommand, so the diagnostic uses plain OpenCode
+while private-server launches retain the approved wrapper semantics. Final sdist/wheel builds,
+strict Twine checks, product-file/asset byte comparison and installed-wheel import/helper/CLI
+construction passed. The dashboard illustration was regenerated. Detailed logs/manifests stay
+under `.work/logs/future-20261104-*`.
+
+Guarded product cleanup left no run-owned containers/volumes/images/exports. Outside normal
+environment cleanup, only four manifested definition-build tags, ten home-seed/overlap fixture
+tags and validated empty test export namespaces were removed; all four
+pre-existing image tags/IDs, persistent protocol locks and shared build cache were retained.
+This is scoped feature verification, not a full campaign, four-way matrix or release qualification;
+privileged/socket-activation/reboot rows were not rerun and B15 remains unchanged.
 
 ### Unreleased system package correction — 2026-11-03
 

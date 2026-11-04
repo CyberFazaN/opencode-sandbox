@@ -66,7 +66,7 @@ class Distro:
 
 
 REGISTRY: dict[str, Distro] = {d.id: d for d in (
-    Distro(id="debian", name="Debian", version="13", revision=3, package_manager="apt",
+    Distro(id="debian", name="Debian", version="13", revision=4, package_manager="apt",
            os_release=(("ID", "debian"), ("VERSION_ID", "13")),
            install_hint="`apt-get update && apt-get install -y PACKAGE` as root (needs network).",
            build_upgrade="apt-get update, then apt-get upgrade",
@@ -75,9 +75,9 @@ REGISTRY: dict[str, Distro] = {d.id: d for d in (
                            " && apt-get clean && rm -rf /var/lib/apt/lists/*"),
            system_upgrade_summary=("apt-get update, then apt-get upgrade. It never removes or newly installs packages, "
                                    "so upgrades that need that are held back; locally changed configuration files are kept."),
-           tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "rg", "jq", "curl",
+           tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "ocs-opencode", "rg", "jq", "curl",
                   "gcc", "cmake")),
-    Distro(id="arch", name="Arch Linux", version="rolling", revision=2, package_manager="pacman",
+    Distro(id="arch", name="Arch Linux", version="rolling", revision=3, package_manager="pacman",
            os_release=(("ID", "arch"), ("BUILD_ID", "rolling")),
            install_hint="`pacman -Syu --needed PACKAGE` as root (needs network; Arch does not support partial "
                         "upgrades, so this also upgrades the container's other packages).",
@@ -86,7 +86,7 @@ REGISTRY: dict[str, Distro] = {d.id: d for d in (
                            " && rm -rf /var/cache/pacman/pkg/*"),
            system_upgrade_summary=("pacman -Sy archlinux-keyring, then a full pacman -Su. AUR/foreign packages, including "
                                    "paru, are not rebuilt; a pacman/libalpm change can break paru in this environment."),
-           tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "rg", "jq", "curl",
+           tools=("bash", "git", "git-lfs", "python3", "pip3", "node", "npm", "opencode", "ocs-opencode", "rg", "jq", "curl",
                   "gcc", "cmake", "makepkg", "paru", "ocs-aur"),
            smoke=("paru --version", "ocs-aur --version"),
            notes=(("- AUR packages: `ocs-aur -S PACKAGE` (as root) runs paru as the unprivileged build user "

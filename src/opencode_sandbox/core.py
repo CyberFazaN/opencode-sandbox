@@ -4,7 +4,6 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
-import logging
 import os
 import re
 import secrets
@@ -25,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from . import build_output, diagnostics, distros, runtime_identity
+from .assets.images.common.ocs_opencode import validate_profile
 
 APP = "opencode-sandbox"
 BASE = Path(os.getenv("OPENCODE_SANDBOX_HOME", Path.home()/".local/share"/APP)).expanduser()
@@ -471,7 +471,7 @@ def runtime_usage(m):
             "memory_percent":data.get("MemPerc"),"network_io":data.get("NetIO"),
             "processes":data.get("PIDs")}
 
-def reconfigure_runtime(m, settings, profile=None):
+def reconfigure_runtime(m, settings, profile=None, agent_context_enabled=None):
     """Replace a stopped container, retaining /root volume, workspace and committed layer.
     The recreate step of config_plan.apply(); `settings` is the complete target runtime and
     `profile` (when given) the provider profile the new container mounts.
@@ -487,6 +487,7 @@ def reconfigure_runtime(m, settings, profile=None):
         settings=validate_runtime_settings({**runtime_settings(m), **settings})  # merged under the lock
         if m.get("operation"): raise pending_operation(m)
         if profile is not None: m["profile"]=profile
+        if agent_context_enabled is not None: m["agent_context_enabled"]=agent_context_enabled
         conflicts=port_conflicts(m,settings)
         if conflicts: raise SandboxError("Port conflict: "+", ".join(conflicts))
         state=inspect_container(m)
@@ -595,7 +596,22 @@ def creation_options(name, kind=None, source=None, *, distro=None, image=None, w
     return kind, distros.get(distros.DEFAULT if distro is None else distro).id
 
 def create(name, kind=None, source=None, profile="default", *, distro=None, image=None,
-           workspace_mode="managed", workspace=None, consent=False, provisioning=None, journal=None):
+           workspace_mode="managed", workspace=None, consent=False, agent_context_enabled=True,
+           opencode_config=None, journal=None):
+    from . import opencode_configs as oc
+    options = {"distro":distro, "image":image, "workspace_mode":workspace_mode, "workspace":workspace,
+               "consent":consent, "agent_context_enabled":agent_context_enabled,
+               "opencode_config":opencode_config, "journal":journal}
+    if opencode_config is not None:
+        with oc.prepared_profile(opencode_config) as archive:
+            ensure_runtime(distros.get(distro or distros.DEFAULT) if image is None else None)
+            return _create(name, kind, source, profile, _config_archive=archive, **options)
+    return _create(name, kind, source, profile, **options)
+
+
+def _create(name, kind=None, source=None, profile="default", *, distro=None, image=None,
+            workspace_mode="managed", workspace=None, consent=False, agent_context_enabled=True,
+            opencode_config=None, journal=None, _config_archive=None):
     """`distro` selects a registry image (default distribution); `image` a custom image instead.
     `kind` None: see creation_options.
 
@@ -603,12 +619,12 @@ def create(name, kind=None, source=None, profile="default", *, distro=None, imag
     needs `consent` (the caller has shown workspaces.LABEL and the preflight), a verified daemon
     and a passing preflight in the environment's image; nothing is copied or created in it.
 
-    `provisioning` is an `integrations.request()` record; None requests the default integrations.
     `journal`: fields written with the first save, so the environment never exists without them
     (a restore's journal and settings).
     """
-    from . import integrations, workspaces
-    if provisioning is None: provisioning=integrations.request()
+    from . import workspaces
+    if not isinstance(agent_context_enabled, bool): raise SandboxError("Agent Context setting must be true or false")
+    profile_read(profile)
     kind,distro=creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace)
     if source is not None:
         try: source=Path(source).expanduser().resolve(strict=True)
@@ -666,13 +682,28 @@ def create(name, kind=None, source=None, profile="default", *, distro=None, imag
             else: workspace.mkdir()
             m={"id":eid,"name":name,"kind":kind,"source":str(source) if source else None,"base_commit":origin,"profile":profile,"created":now(),"status":"ready","schema":METADATA_SCHEMA,"runtime":validate_runtime_settings({}),
                "distro":distro,"workspace":{"mode":workspace_mode,"path":str(direct) if direct else None},
-               "provisioning":provisioning}
+               "agent_context_enabled":agent_context_enabled,"opencode_config_source":opencode_config}
             if image is not None: m["image"]=m["custom_image"]=image  # custom_image never changes
             if journal:
                 m.update(journal,runtime=validate_runtime_settings(journal.get("runtime",{})))
+            if _config_archive is not None: m["operation"] = "opencode-config"
             save(m)
+            if _config_archive is not None:
+                from . import opencode_configs as oc
+                with lock(eid):
+                    oc.initialize(m, _config_archive)
+                    try:
+                        mark(m, "ready", operation=None, last_error=None)
+                    except BaseException as exc:
+                        # The profile is installed; retain the durable pending intent if final
+                        # publication fails, rather than orphaning its home volume.
+                        exc.preserve_environment = True
+                        raise
             return m
-        except BaseException:
+        except BaseException as exc:
+            if getattr(exc, "preserve_environment", False):
+                mark(m, "error", operation="opencode-config", last_error=str(exc))
+                raise
             shutil.rmtree(d,ignore_errors=True); raise
 
 def cname(m): return "ocs-"+m["id"]
@@ -705,9 +736,8 @@ def profile_read(name):
     return values
 
 def _validate_profile(values):
-    for k,v in values.items():
-        if not isinstance(k,str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*",k) or not isinstance(v,str) or "\0" in v:
-            raise SandboxError("Invalid environment variable or value")
+    try: validate_profile(values)
+    except ValueError as exc: raise SandboxError(str(exc)) from None
 
 def profile_set(name, values):
     init_dirs(); p=profile_path(name)
@@ -922,7 +952,7 @@ def start(m, *, _resume_recreate=False, precondition=None):
         if precondition is not None: precondition(m)
         if m.get("operation")=="delete" or m.get("status")=="deleting":
             raise SandboxError("Environment deletion pending; retry delete --yes")
-        if m.get("operation") in ("runtime-recreate","config-update","restore","opencode-update") \
+        if m.get("operation") in ("runtime-recreate","config-update","restore","opencode-update","opencode-config") \
                 or (m.get("operation")=="recreate" and not _resume_recreate):
             raise pending_operation(m)
         state=inspect_container(m)
@@ -957,8 +987,7 @@ def start(m, *, _resume_recreate=False, precondition=None):
                     # No container yet: the configured values are what docker run applies below.
                     inputs = guidance_inputs(m, observe=False)
                     # The selected image is local and the base-tag lock is held. Capture its
-                    # provenance even when this environment has no pending integrations to
-                    # trigger a post-start refresh (e.g. a retained/restored environment).
+                    # provenance for retained/restored environments as well as fresh ones.
                     inputs["definition"] = image_definition(m)
                     guidance = ac.refresh(m, env_dir, **inputs)
                     # Never pull a manager image (its name is local); drop capabilities an agent
@@ -1001,16 +1030,14 @@ def start(m, *, _resume_recreate=False, precondition=None):
             except Exception as exc:
                 mark(m,"error",last_error=f"Start failed: {exc}")
                 raise
-        from . import integrations
-        # Once, at the first start (D-009); a failure is recorded, never retried, and never fails start.
-        provisioned=integrations.provision(m)
-        if provisioned is not None:
-            from . import agent_context as ac
-            # Not fatal: every launch regenerates it, and the container runs.
-            try: ac.refresh(m, env_dir, **guidance_inputs(m))
-            except (SandboxError, OSError) as exc: logging.getLogger(APP).warning("Agent Context refresh failed: %s", exc)
+        from . import agent_context as ac
+        try:
+            ac.refresh(m, env_dir, **guidance_inputs(m))
+            ac.reconcile(m)
+        except Exception as exc:
+            mark(m,"error",last_error=f"Agent Context reconciliation failed: {exc}")
+            raise
         mark(m,"running",last_error=None,operation=None)
-        return provisioned
 
 def repair(m, *, cleanup=False):
     """Reconcile metadata against Docker without destroying user data.
@@ -1024,7 +1051,7 @@ def repair(m, *, cleanup=False):
         state=inspect_container(m)
         if m.get("operation")=="delete" or m.get("status")=="deleting":
             raise SandboxError("Deletion pending; retry explicit delete --yes (repair will not resurrect it)")
-        if m.get("operation") in ("runtime-recreate","recreate","config-update","restore","opencode-update"):
+        if m.get("operation") in ("runtime-recreate","recreate","config-update","restore","opencode-update","opencode-config"):
             raise pending_operation(m)  # repair never publishes partial data or discards a journal
         if state is None:
             mark(m,"ready",last_error=None,operation=None)
@@ -1073,34 +1100,17 @@ def profile_mismatch(m):
             + ("" if expected else " (profile file does not exist)")
             + f". A restart keeps the mounted profile; apply with: opencode-sandbox container recreate {m['name']} --yes")
 
-# Runs inside the container as `python3 -c LAUNCHER CONTEXT SYSTEM_CONFIG TOKEN`. Provider variables
+# Runs inside the container as `python3 -c LAUNCHER --ocs-managed CONTEXT SYSTEM_CONFIG TOKEN ENABLED`. Provider variables
 # from the profile go into the environment of the process that runs the OpenCode server.
 # `--standalone` gives every managed launch its own server: the V2 background service keeps the
 # environment of whichever client started it first (provider keys of a later launch were not
 # applied) and outlives the terminal.
-LAUNCHER = """import json,os,pathlib,sys
-context,system,token=sys.argv[1],sys.argv[2],sys.argv[3]
-p=pathlib.Path('/run/secrets/ocs-provider.json')
-raw=p.read_text() if p.exists() else ''
-try: d=json.loads(raw) if raw.strip() else {}  # empty = mountpoint stub kept by docker commit
-except ValueError: d=None
-if not isinstance(d,dict) or not all(isinstance(k,str) and k.isidentifier() and isinstance(v,str) for k,v in d.items()):
-    sys.exit('Invalid provider profile')
-os.environ.update(d)
-try: configured=context in pathlib.Path(system).read_text()
-except OSError: configured=False
-if not configured:
-    print('WARNING: '+system+' does not list '+context+'; OpenCode will not receive the sandbox Agent Context in this image.',file=sys.stderr)
-argv=['bash'] if os.environ.get('OCS_SHELL')=='1' else ['opencode','--standalone']
-os.environ['OCS_RUN_TOKEN']=token  # lets the host hang up exactly this session
-os.umask(0o022)  # docker exec inherits rootless dockerd's umask (0000)
-os.execvp(argv[0],argv)"""
+LAUNCHER = (distros.IMAGES / "common" / "ocs_opencode.py").read_text()
 
 def interactive(m, shell=False):
     if not _tty():
         raise SandboxError("run/shell need an interactive terminal; use 'exec NAME -- COMMAND' for scripts")
-    provisioned = start(m)
-    if provisioned: print(f"Initial integrations: {provisioned}", file=sys.stderr)
+    start(m)
     from . import agent_context as ac
     m = resolve(m["id"])
     warning = profile_mismatch(m)
@@ -1113,7 +1123,8 @@ def interactive(m, shell=False):
     watchdog = session_watchdog(m, token)
     try:
         rc = docker_attached("exec", "-it", "-e", f"OCS_SHELL={int(shell)}", cname(m),
-                             "python3", "-c", LAUNCHER, ac.CONTAINER_PATH, ac.SYSTEM_CONFIG, token,
+                             "python3", "-c", LAUNCHER, "--ocs-managed", ac.CONTAINER_PATH, ac.SYSTEM_CONFIG, token,
+                             str(int(ac.enabled(m))),
                              on_start=lambda pid: _tell(watchdog, f"{pid}\n"))
     except BaseException:
         hangup_session(m, token)
@@ -1235,7 +1246,7 @@ def exec_cmd(m,cmd):
     return docker("exec",*flags,cname(m),"/bin/sh","-c",'umask 022 && exec "$@"',"ocs-exec",*cmd,check=False).returncode
 
 # Interrupted operations whose journal only their recovery command may close.
-JOURNALS = frozenset({"runtime-recreate","recreate","config-update","delete","restore","opencode-update"})
+JOURNALS = frozenset({"runtime-recreate","recreate","config-update","delete","restore","opencode-update","opencode-config"})
 
 def stop(m, *, precondition=None):
     """True if this call stopped a running container."""
@@ -1367,6 +1378,9 @@ def recreate_recover(m):
                         f"The running container is the old container (image {image!r}), not the replacement from "
                         f"{env_image(m)!r}; changes made in it after the snapshot are not in that snapshot. Stop it with "
                         f"'opencode-sandbox stop {m['name']}', then rerun 'opencode-sandbox container recreate-recover {m['name']}'.")
+                from . import agent_context as ac
+                ac.refresh(m, env_dir, **guidance_inputs(m))
+                ac.reconcile(m)
                 mark(m,"running",operation=None,last_error=None)
                 return "replacement already running"
             if not m.get("image") or image != m["image"]:
@@ -1381,6 +1395,9 @@ def recreate_recover(m):
             except Exception as exc:
                 mark(m,"error",operation="recreate",last_error=f"Recreation start failed: {exc}")
                 raise
+            from . import agent_context as ac
+            ac.refresh(m, env_dir, **guidance_inputs(m))
+            ac.reconcile(m)
             mark(m,"running",operation=None,last_error=None)
             return "replacement started"
         # Preserve the journal through container creation. A crash at any point

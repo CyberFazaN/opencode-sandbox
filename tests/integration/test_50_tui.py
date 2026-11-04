@@ -55,7 +55,7 @@ def test_dashboard_against_real_docker(campaign, checks):
     folder.mkdir(parents=True, exist_ok=True)
     camp.note(f"host dir {folder} (direct workspace)")
     (folder / "host-file.txt").write_text("from the host\n")
-    pid_ = camp.create(PLAIN, "--source", str(src), "--no-integrations")
+    pid_ = camp.create(PLAIN, "--source", str(src))
 
     t = Term([*MANAGER, "tui"], 100, 30, env=camp.env, log=camp.log)
     try:
@@ -170,7 +170,7 @@ def test_cli_signal_ends_attached_shell(campaign, checks, sig):
     """H05: a graceful manager signal ends/reaps its real client and token-scoped shell."""
     camp, ck = campaign, checks
     name = f"ocs-test-session-{sig.name.lower()}"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("config", "apply", name, "--network", "none", "--yes")
     t = Term([*MANAGER, "shell", name], 100, 30, env=camp.env, log=camp.log)
     try:

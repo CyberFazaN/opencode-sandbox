@@ -830,6 +830,9 @@ def update_environment(m, version, *, plan=None, system_packages=False):
         step = "OpenCode update"
         try:
             c.docker("start", c.cname(m), capture=True)
+            from . import agent_context as ac
+            ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
+            ac.reconcile(m)
             try:
                 record["from"] = _exec_version(m, container_id=identity["container"])
                 verified_at = time.time()

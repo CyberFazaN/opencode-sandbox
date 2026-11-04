@@ -105,8 +105,10 @@ def test_ruff_reports_nothing_in_sources_and_tests():
     assert p.returncode == 0, p.stdout + p.stderr
 
 
-def test_shellcheck_reports_nothing_in_the_shell_scripts():
+@pytest.mark.parametrize("extra, scripts", [((), SHELL_SCRIPTS),
+                                           (("--shell=bash",), [SRC / "assets/images/common/ocs-shell-hint.sh"])])
+def test_shellcheck_reports_nothing_in_the_shell_scripts(extra, scripts):
     shellcheck = _tool("shellcheck", "SHELLCHECK")
-    p = subprocess.run([shellcheck, "--format=gcc", *map(str, SHELL_SCRIPTS)], cwd=ROOT,
+    p = subprocess.run([shellcheck, "--format=gcc", *extra, *map(str, scripts)], cwd=ROOT,
                        capture_output=True, text=True, check=False)
     assert p.returncode == 0, p.stdout + p.stderr

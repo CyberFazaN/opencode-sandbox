@@ -279,6 +279,7 @@ def test_update_refused_without_network(monkeypatch):
 
 
 def test_npm_install_is_bounded(monkeypatch):
+    monkeypatch.setattr(c, "guidance_inputs", lambda m, **k: {"image": c.env_image(m), "runtime": c.runtime_settings(m)})
     m = c.create("online", "scratch")
     calls = []
     versions = iter(["2.1.2\n", "2.1.3\n"])

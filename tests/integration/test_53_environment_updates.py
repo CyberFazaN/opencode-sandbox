@@ -19,7 +19,7 @@ fault = test_30_faults.fault
 
 
 def fixture_environment(camp, name, distro):
-    eid = camp.create(name, '--distro', distro, '--no-integrations')
+    eid = camp.create(name, '--distro', distro)
     camp.ocs('start', name)
     camp.sh(eid, "umask 022; mkdir -p /root/.config/opencode; echo '{}' > /root/.config/opencode/opencode.json; "
                  "echo system-before > /etc/ocs-test-update; echo home-kept > /root/ocs-test-update; "

@@ -13,7 +13,6 @@ from typer.testing import CliRunner
 from opencode_sandbox import agent_context as ac
 from opencode_sandbox import core as c
 from opencode_sandbox import distros
-from opencode_sandbox import integrations as ig
 from opencode_sandbox import readiness as r
 from opencode_sandbox import runtime_identity as rid
 from opencode_sandbox.cli import app
@@ -117,7 +116,7 @@ def host(monkeypatch):
 
 
 def env(name="ocs-qa-ready", **fields):
-    m = c.create(name, "scratch", provisioning=ig.request([]))
+    m = c.create(name, "scratch")
     m.update(fields)
     c.save(m)
     return m
@@ -365,7 +364,7 @@ def test_agent_context_file_and_delivery(monkeypatch):
     assert checks(m)["agent-context"]["status"] == "passed"
     fake.system_config = json.dumps({"instructions": []})
     check = checks(m)["agent-context-delivery"]
-    assert check["status"] == "failed" and "does not list /run/ocs-agent/context.md" in check["detail"]
+    assert check["status"] == "failed" and "does not match saved Agent Context activation" in check["detail"]
     fake.system_config = None
     assert "is missing or unreadable" in checks(m)["agent-context-delivery"]["detail"]
     fake.running = False

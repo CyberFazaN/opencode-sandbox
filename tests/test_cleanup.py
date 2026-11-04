@@ -9,7 +9,6 @@ from typer.testing import CliRunner
 from opencode_sandbox import backup as b
 from opencode_sandbox import cleanup as cl
 from opencode_sandbox import core as c
-from opencode_sandbox import integrations as ig
 from opencode_sandbox.cli import app
 
 runner = CliRunner()
@@ -129,7 +128,7 @@ class Daemon:
 
 
 def env(name, **fields):
-    m = c.create(name, "scratch", provisioning=ig.request([]))
+    m = c.create(name, "scratch")
     m.update(fields)
     c.save(m)
     return m

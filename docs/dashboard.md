@@ -48,7 +48,7 @@ Metadata-only refresh does not recheck or clear these advisories.
 |---|---|---|---|
 | `Enter` / `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
 | `F5` / `F6` | Start / Stop | `x` | Delete (confirmation) |
-| `n` | New environment (`create`; distribution, workspace mode, provider profile and integrations under "More options") | `c` | Create a project from the current folder (the confirmation shows what is copied) |
+| `n` | New environment (`create`; distribution, workspace mode, provider, Local/Copy config and Agent Context under "More options") | `c` | Create a project from the current folder (the confirmation shows what is copied) |
 | `/` | Filter | `r` | Refresh |
 | `t` | Settings (`config apply`; shows the change plan first) | `u` | Usage (`container usage`) |
 | `i` | Check (`check NAME`; the details pane shows the last result) | `a` | Agent Context preview |
@@ -57,6 +57,7 @@ Metadata-only refresh does not recheck or clear these advisories.
 | `B` | Backups (`backup list`, `backup restore`) | `v` | Updates (local/cached inventory; explicit version Check) |
 | `p` / `g` | Provider profiles / dashboard preferences | `F8` | Recovery Center (interrupted operations and the command that finishes each) |
 | `D` | Disk (`disk usage` / `disk cleanup`; removal only after a confirmation listing every object) | `?` | All keys |
+| `O` | OpenCode Configs (user-maintained directories, not an in-app source editor) | | |
 | `Esc` | Close a dialog or screen | `q` | Quit |
 
 Dialogs default to Cancel. Dashboard keys are inactive while a sub-screen is open. Promotion to a
@@ -78,6 +79,12 @@ does not rewrite the saved file or start the environment; guidance is regenerate
 OpenCode launch. Agent Context, Updates Details, readiness and cleanup-result reports are scrollable;
 use Tab to reach Close, or Esc to return to the dashboard.
 
+Environment Settings (`t`) contains **Include specialized Agent Context**, **OpenCode Config
+Editor** and separate **Reload Config**. The editor displays No export/Export available and the
+exact private `/tmp` path; Export/Apply/Delete are file transfers for host editing. Replacement,
+deletion and Reload/Empty confirm data loss; container drift offers Cancel/Overwrite Anyway.
+Close retains the export. CLI equivalents and boundaries are in [OpenCode Configs](opencode-configs.md).
+
 ## Updates
 
 `v` opens **Updates**, with three tabs: **Manager**, **Base Images** and **Environments**.
@@ -95,8 +102,8 @@ environments show dated last verification or Unknown, never their base's build l
 In either OpenCode view, Check queries npm availability once and inspects the selected installed
 binary; Check All inspects all listed eligible objects. Overlapping requests are not duplicated.
 A running environment stays running. An existing stopped environment is temporarily started,
-inspected and stopped again; no interactive launch, integration provisioning or configuration
-refresh occurs. Single Check needs no confirmation. Check All confirms its fixed target set if
+inspected and stopped again; no interactive launch or global-config import occurs. Like every
+managed start, it refreshes/reconciles saved Agent Context activation. Single Check needs no confirmation. Check All confirms its fixed target set if
 any environment is stopped; changed identities/state require a new review. Missing containers
 are not created. Owned base images use bounded helper probes, never labels as runtime proof.
 Source and installed-version results/errors remain separate; a failed npm request does not
@@ -240,7 +247,7 @@ retains the phase/result. Details includes a bounded tail of build output; outpu
 directly over Textual. No invented percentage or short build timeout. After process death, inspect
 the actual base/copies and any named candidate; there is no new base recovery journal.
 
-Existing containers/writable layers, their pins, home/workspace/configuration and integrations do
+Existing containers/writable layers, their pins and home/workspace/configuration do
 not migrate. Future base-based creation and file-only restores use the changed base, with
 not-yet-created pins still enforced. The CLI retains both rollback-preserving
 `opencode update-base` and deliberately no-copy `build`, each with explicit `--refresh`; see

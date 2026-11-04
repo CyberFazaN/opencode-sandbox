@@ -29,9 +29,9 @@ from . import workspaces
 
 CATEGORIES = ("none", "saved", "dynamic", "restart", "recreate")
 LIMITS = ("cpus", "memory", "pids")
-FIELDS = (*LIMITS, "network", "ports", "profile")
+FIELDS = (*LIMITS, "network", "ports", "profile", "agent_context_enabled")
 LABELS = {"cpus": "CPU limit", "memory": "memory limit", "pids": "process limit", "network": "network",
-          "ports": "published ports", "profile": "provider profile"}
+          "ports": "published ports", "profile": "provider profile", "agent_context_enabled": "specialized Agent Context"}
 
 
 @dataclass(frozen=True)
@@ -81,7 +81,7 @@ def parse_ports(specs) -> list[dict]:
 
 
 def current(m: dict) -> dict:
-    return {**c.runtime_settings(m), "profile": m.get("profile", "default")}
+    return {**c.runtime_settings(m), "profile": m.get("profile", "default"), "agent_context_enabled": ac.enabled(m)}
 
 
 def check_profile(name: str) -> str:
@@ -111,8 +111,11 @@ def plan(m: dict, changes: dict) -> Plan:
         raise c.SandboxError("Unknown setting: " + ", ".join(sorted(unknown)))
     m = c.resolve(m["id"])
     now = current(m)
-    runtime = c.validate_runtime_settings({**c.runtime_settings(m), **{k: v for k, v in changes.items() if k != "profile"}})
-    target = {**runtime, "profile": check_profile(changes["profile"]) if "profile" in changes else now["profile"]}
+    runtime = c.validate_runtime_settings({**c.runtime_settings(m), **{k: v for k, v in changes.items() if k in (*LIMITS, "network", "ports")}})
+    include = changes.get("agent_context_enabled", now["agent_context_enabled"])
+    if not isinstance(include, bool): raise c.SandboxError("Agent Context setting must be true or false")
+    target = {**runtime, "profile": check_profile(changes["profile"]) if "profile" in changes else now["profile"],
+              "agent_context_enabled": include}
     state = c.inspect_container(m)
     container = "missing" if state is None else ("running" if state.get("Running") else "stopped")
     running = container == "running"
@@ -122,6 +125,8 @@ def plan(m: dict, changes: dict) -> Plan:
             continue
         if container == "missing":
             category, reason = "saved", "applies when the container is created"
+        elif key == "agent_context_enabled":
+            category, reason = "dynamic", "targeted system config reconciliation; no session is interrupted"
         elif key == "memory":
             category, reason = _memory_category(now[key], target[key], running)
         elif key in LIMITS:
@@ -137,6 +142,10 @@ def plan(m: dict, changes: dict) -> Plan:
         blockers.append(f"CPU limit {float(target['cpus']):g} exceeds the {c.host_cpus()} CPUs on this host")
     blockers += ["Port conflict: " + conflict for conflict in c.port_conflicts(m, runtime)]
     changed = {ch.field for ch in out}
+    if "agent_context_enabled" in changed:
+        warnings.append("The context file remains mounted. " + (
+            "An active OpenCode process may need a new launch to observe the activation change; no session is interrupted."
+            if running else "System config activation is reconciled before the next managed launch."))
     if "network" in changed or "ports" in changed:
         warnings.append("Network none: no internet or LAN, so model provider APIs and OpenCode updates in the container "
                         "are unavailable." if target["network"] == "none" else
@@ -167,6 +176,11 @@ def plan(m: dict, changes: dict) -> Plan:
                         else " /workspace and the /root volume are kept."),
                      *(["Start the new container."] if running else [])],
     }[category]
+    if category == "dynamic" and not changed.intersection(LIMITS):
+        steps = []  # A context-only change does not call docker update.
+    if "agent_context_enabled" in changed and category != "saved":
+        steps.append("Reconcile only the specialized Agent Context system instruction "
+                     + ("without interrupting sessions." if running else "at the next managed start; save the choice now."))
     if category != "none":
         steps.append("Regenerate the Agent Context.")
     return Plan(m["id"], m["name"], container, now, target, tuple(out), tuple(warnings), tuple(blockers), tuple(steps))
@@ -201,7 +215,8 @@ def apply(m: dict, changes: dict, *, confirmed: Plan | None = None) -> dict:
     category = p.category
     # Only the planned changes, merged under the lock into the settings as they are then: a
     # change another process made after the plan is kept.
-    changed = {ch.field: ch.new for ch in p.changes if ch.field != "profile"}
+    changed = {ch.field: ch.new for ch in p.changes if ch.field not in ("profile", "agent_context_enabled")}
+    include = p.target["agent_context_enabled"] if any(ch.field == "agent_context_enabled" for ch in p.changes) else None
     profile = p.target["profile"] if any(ch.field == "profile" for ch in p.changes) else None
     if category == "none":
         return {"category": "none", "applied": False}
@@ -213,6 +228,8 @@ def apply(m: dict, changes: dict, *, confirmed: Plan | None = None) -> dict:
             m["runtime"] = c.validate_runtime_settings({**c.runtime_settings(m), **changed})
             if profile is not None:
                 m["profile"] = profile
+            if include is not None:
+                m["agent_context_enabled"] = include
             c.save(m)
     elif category in ("dynamic", "restart"):
         c.ensure_runtime(False)
@@ -224,14 +241,16 @@ def apply(m: dict, changes: dict, *, confirmed: Plan | None = None) -> dict:
             # Journal first: a crash leaves the intent for `config recover`. "start": running now,
             # under the lock, so a container stopped after the plan is not started.
             c.mark(m, m.get("status", "ready"), operation="config-update",
-                   pending_config={"runtime": c.validate_runtime_settings({**c.runtime_settings(m), **changed}),
-                                   "restart": category == "restart", "start": bool(state and state.get("Running"))})
+                    pending_config={"runtime": c.validate_runtime_settings({**c.runtime_settings(m), **changed}),
+                                    "agent_context_enabled": include if include is not None else ac.enabled(m),
+                                    "limits_changed": bool(changed),
+                                    "restart": category == "restart", "start": bool(state and state.get("Running"))})
             _update_container(m)
     else:
         c.ensure_runtime(False)
         # Started again only if this call stopped it: one stopped by someone else stays stopped.
         stopped = p.container == "running" and c.stop(m)
-        c.reconfigure_runtime(c.resolve(p.env_id), changed, profile=profile)
+        c.reconfigure_runtime(c.resolve(p.env_id), changed, profile=profile, agent_context_enabled=include)
         if stopped:
             c.start(c.resolve(p.env_id))
     _refresh_guidance(p.env_id)
@@ -250,15 +269,20 @@ def _update_container(m):
             if pending["restart"] and state.get("Running"):
                 c.docker("stop", c.cname(m), capture=True)
             # docker run gives a container swap = 2 x memory; keep that when the limit changes.
-            c.docker("update", "--cpus", limits["cpus"], "--memory", limits["memory"],
-                     "--memory-swap", str(2 * c.memory_bytes(limits["memory"])), "--pids-limit", str(limits["pids"]),
-                     c.cname(m), capture=True)
+            if pending.get("limits_changed", True):
+                c.docker("update", "--cpus", limits["cpus"], "--memory", limits["memory"],
+                         "--memory-swap", str(2 * c.memory_bytes(limits["memory"])), "--pids-limit", str(limits["pids"]),
+                         c.cname(m), capture=True)
             if pending["start"] and not c.inspect_container(m).get("Running"):
                 c.docker("start", c.cname(m), capture=True)
+            if c.inspect_container(m).get("Running"):
+                ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
+                ac.reconcile(m, include=pending.get("agent_context_enabled", ac.enabled(m)))
     except Exception as exc:
         c.mark(m, "error", last_error=f"Configuration change: {exc}")
         raise
     m["runtime"] = c.validate_runtime_settings({**c.runtime_settings(m), **limits})
+    m["agent_context_enabled"] = pending.get("agent_context_enabled", ac.enabled(m))
     m.pop("pending_config", None)
     state = c.inspect_container(m)
     c.mark(m, "ready" if state is None else ("running" if state.get("Running") else "stopped"),

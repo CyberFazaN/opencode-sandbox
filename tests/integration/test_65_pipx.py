@@ -103,7 +103,7 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
     ck(doctor.returncode == 0 and "Daemon identity: verified" in doctor.stdout, f"B09 doctor of the installed manager (exit {doctor.returncode})")
 
     # B10 an environment through the installed manager
-    ocs("create", NAME, "--no-integrations")
+    ocs("create", NAME)
     camp.adopt(NAME)
     ocs("start", NAME)
     os_release = ocs("exec", NAME, "--", "cat", "/etc/os-release", check=False)

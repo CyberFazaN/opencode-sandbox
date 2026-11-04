@@ -34,7 +34,6 @@ release blockers. A supported design limitation is not evidence that an untested
 | Behaviour | Effect on OpenCode Sandbox |
 |---|---|
 | OpenCode releases publish the main npm package before its platform packages | For some minutes the registry's `latest` cannot be installed; a build or update then fails cleanly and leaves the image untouched, and `opencode check` may report an update that cannot be built yet. Retry later or name a version |
-| OpenCode's `mcp add --global` replaces a server of the same name and corrupts an unparseable global configuration | Avoided: the initial integrations are written only when no global OpenCode configuration exists (D-009) |
 | `opencode upgrade` inside a container leaves world-writable files and large caches, and on Arch a broken binary | Avoided: OpenCode's self-update is disabled in every container; `opencode-sandbox opencode update NAME` repairs a broken installation (D-019) |
 | pacman downloads from a mirror can stall during Arch image builds | Mitigated: the builds retry pacman three times |
 | Retained Debian 12 environments receive LTS security support only (until 2028-06-30) | The current default definition is Debian 13; manager/base upgrades do not upgrade retained containers. A system backup keeps the old OS; only an explicit new environment or no-system restore chooses the new local base |

@@ -511,7 +511,7 @@ class UpdatesScreen(Screen):
         if stopped:
             message = ('Check All installed OpenCode versions?\n\n'
                        f'{len(stopped)} stopped environment(s) will be temporarily started, inspected and stopped again:\n'
-                       + '\n'.join(stopped) + '\n\nAlready-running environments stay running. No new containers or integrations are created. '
+                       + '\n'.join(stopped) + '\n\nAlready-running environments stay running. No new containers are created. '
                        'If state or identity changes after this review, that check is refused.')
             self.app.push_screen(EnvironmentConsentScreen(message),
                                  lambda yes: self._begin_checks('environments', list(targets), targets) if yes else None)

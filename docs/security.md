@@ -83,6 +83,22 @@ Do not delete this directory while any manager instance might be running. A cras
 releases its locks automatically; its lock files are not stale locks to remove. Older managers,
 manual Docker commands and a hostile process of your own user are outside this advisory protocol.
 
+## OpenCode global-config transfers
+
+Config sources and exports can contain credentials or executable plugins. The manager copies
+data without executing profile code on the host; using imported config inside OpenCode is still
+a trust decision. Temporary host exports have own-UID `0700` parent directories, validated
+identity markers and symlink-safe traversal/cleanup. This excludes ordinary other users, not
+host root or processes of your own UID. No recursive symlink dereference or arbitrary host mount
+is used. Whole-tree imports do not touch system/project config or auth/state outside the defined
+global config directory. See [transfer boundaries and recovery](opencode-configs.md).
+
+Sampling/final checks, same-volume staging and recoverable exchange protect normal file-transfer
+failures and observed concurrent changes. Manager/volume locks coordinate the manager, not
+arbitrary writers inside a container. Prefer Apply/Reload while stopped; no hot-reload or hostile
+same-UID transaction guarantee is claimed. Host transport also bounds untrusted container output
+and archive metadata before decoding; file contents/credentials are not diagnostic output.
+
 ## Host Git
 
 The repository inside a managed workspace is controlled by the agent. The `changes` commands

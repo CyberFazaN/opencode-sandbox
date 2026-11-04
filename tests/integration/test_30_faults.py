@@ -50,7 +50,7 @@ def fault(campaign):
 def env(campaign):
     camp = campaign
     name = "ocs-test-fault"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("start", name)
     camp.sh(eid, "echo ocs-test-marker > /workspace/ws-marker.txt; echo ocs-test-marker > /root/home-marker.txt; "
                  "echo ocs-test-marker > /etc/ocs-test-system-marker")
@@ -258,7 +258,7 @@ def test_opencode_update_killed_then_rolled_back(campaign, checks, fault, env, m
 def test_delete_killed_midway_can_be_repeated(campaign, checks, fault):
     camp, ck = campaign, checks
     name = "ocs-test-fdel"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("start", name)
     rc = fault(["delete", name, "--yes"], "*-H * rm -f *", "after")
     ck(rc == -signal.SIGKILL, f"manager SIGKILLed after removing the container (exit {rc})")
@@ -332,7 +332,7 @@ def test_concurrent_operations_serialize(campaign, checks, env):
     camp.ocs("start", name)
     ck(intact(camp, eid), "data intact")
     ck(camp.metadata(name)["runtime"]["pids"] == camp.inspect(eid)["HostConfig"]["PidsLimit"], "metadata and container agree on the settings")
-    same = [camp.popen("create", "ocs-test-twin", "--no-integrations") for _ in range(3)]
+    same = [camp.popen("create", "ocs-test-twin") for _ in range(3)]
     codes = [p.wait(timeout=300) for p in same]
     listed = [line for line in camp.ocs("list").stdout.splitlines() if line.startswith("ocs-test-twin ")]
     ck(codes.count(0) == 1 and len(listed) == 1, f"the same name created once ({codes}, {len(listed)} listed)")

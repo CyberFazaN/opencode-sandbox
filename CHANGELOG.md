@@ -6,6 +6,18 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- User-maintained **OpenCode Configs**, one-time Local/Copy creation, and shared CLI/dashboard
+  global-config Export/Apply/Delete/Reload/Empty workflows. Private temporary exports survive
+  screen closure; whole-tree fingerprints detect container drift; recoverable volume replacement
+  preserves the original tree on failure and works while environments are stopped.
+- Optional specialized Agent Context per environment, default on, retained through lifecycle and
+  backups. Neutral base-image system config is reconciled at every managed start without replacing
+  unrelated instructions/config; disabled contexts remain generated and mounted.
+- Both base images provide `ocs-opencode`, sharing safe provider validation with managed launches,
+  preserving arguments and using a private server. Interactive direct shells get a conditional hint.
+
 ### Changed
 
 - Cleaner Updates views with a Manager summary, consistent shortcut footer, visible
@@ -18,7 +30,8 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   installations receive a version-specific, settings-preserving command to copy.
 - Every base build, cached or refresh, upgrades system packages with fresh indexes (Debian
   `apt-get upgrade`, Arch full `pacman -Syu`); there is no opt-out. Rebuild forms separate the
-  OpenCode version and cache/refresh mode. Debian/Arch image definitions advance to revisions 3/2.
+  OpenCode version and cache/refresh mode. With the new neutral config/launcher assets,
+  Debian/Arch image definitions advance to revisions 4/3.
 - Environment OpenCode updates add opt-in **Update system packages**
   (`opencode update --update-system-packages`), off by default: installed packages are upgraded
   inside the update checkpoint first, and a failed upgrade stops before OpenCode. Package
@@ -29,6 +42,13 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 - Dashboard and Updates button rows use one menu strip per row: unfilled, separated labels, a
   full-width selection-colored focus, underline on hover and red-text Delete. Wrapped rows no
   longer merge into tiles; Updates tabs use the default underline with an accent active label.
+- Provider profiles reject `OPENCODE_CONFIG_CONTENT`, `OPENCODE_CONFIG` and `OPENCODE_CONFIG_DIR`
+  at write/read/launch boundaries; native config files/profiles remain the configuration route.
+
+### Removed
+
+- Built-in MCP integration catalogs, creation controls and once-only provisioning metadata/logic.
+  Existing user-authored OpenCode/MCP configuration is not proactively changed.
 
 ## 6.2.0 — 2026-11-02
 
@@ -209,7 +229,7 @@ Arch Linux only. See README for the tested versions and the known limitations.
   container recreation; journalled operations with explicit recovery commands.
 - OpenCode version policies (notify, manual, pinned), per-environment update and rollback,
   base image updates with rollback copies; OpenCode's own self-update is disabled.
-- One-time initial integrations (Context7 by default) and injected sandbox guidance (Agent
+- One-time initial integrations and injected sandbox guidance (Agent
   Context).
 - Read-only readiness checks (`check`, `doctor`) including measured network reachability; disk
   usage and conservative cleanup.

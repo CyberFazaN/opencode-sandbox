@@ -32,7 +32,7 @@ def test_first_prompt_delivers_the_agent_context(campaign, checks, distro):
     for args in (["init", "-q", "-b", "main"], ["commit", "-q", "--allow-empty", "-m", "init"]):
         camp._run(["git", "-C", str(src), "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args], check=True)
     name = f"ocs-test-oc-{distro}"
-    eid = camp.create(name, "--source", str(src), "--distro", distro, "--profile", "ocs-test-oc", "--no-integrations")
+    eid = camp.create(name, "--source", str(src), "--distro", distro, "--profile", "ocs-test-oc")
     camp.ocs("config", "apply", name, "--network", "none", "--cpus", "1.5", "--memory", "3g", "--pids", "600", "--yes")
     camp.ocs("start", name)
     camp.docker("exec", "-i", f"ocs-{eid}", "sh", "-c", "umask 022; mkdir -p /root/.config/opencode; cat > /root/.config/opencode/opencode.json",

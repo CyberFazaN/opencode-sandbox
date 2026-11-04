@@ -210,7 +210,7 @@ def test_explicit_start_stays_running_and_check_remains_separate(sources, runtim
         assert 'remains running' in app.screen.message
         app.screen.query_one('#environment-confirm', Button).press()
         await until(pilot, lambda: screen.operation_result and not app._operation_pending)
-        assert runtime.running and not any(a[0] == 'exec' for a in runtime.calls)
+        assert runtime.running and not any(a[0] == 'exec' and a[-2:] == ('opencode', '--version') for a in runtime.calls)
         await pilot.press('c')
         screen = app.screen
         await until(pilot, lambda: not screen._active)

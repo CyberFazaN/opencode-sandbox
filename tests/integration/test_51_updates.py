@@ -23,7 +23,7 @@ pytestmark = [pytest.mark.real_session, pytest.mark.real_identity]
 def test_manual_updates_terminal(campaign, checks, distro, size):
     camp, ck = campaign, checks
     name = f"ocs-test-updates-{distro}-{size[0]}"
-    eid = camp.create(name, "--distro", distro, "--no-integrations")
+    eid = camp.create(name, "--distro", distro)
     camp.ocs("start", name)
     camp.ocs("opencode", "versions")
     camp.ocs("stop", name)

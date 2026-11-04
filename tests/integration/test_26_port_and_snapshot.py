@@ -8,7 +8,7 @@ import socket
 def test_failed_first_start_then_config_apply(campaign, checks):
     camp, ck = campaign, checks
     name = "ocs-test-port-taken"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     holder.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     holder.bind(("127.0.0.1", 0))

@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import pytest
 
 from opencode_sandbox import core as c
-from opencode_sandbox import integrations as ig
 
 EXISTING = {"opencode-sandbox:debian", "mine:taken"}
 
@@ -22,7 +21,7 @@ def env(monkeypatch):
     monkeypatch.setattr(c, "ensure_runtime", lambda *a, **k: None)
     monkeypatch.setattr(c, "inspect_container", lambda m: {"Running": True})
     monkeypatch.setattr(c, "require_docker_space", lambda what: None)
-    m = c.create("ocs-qa-snaptag", "scratch", provisioning=ig.request([]))
+    m = c.create("ocs-qa-snaptag", "scratch")
     return m, calls
 
 

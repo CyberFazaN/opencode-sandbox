@@ -8,13 +8,12 @@ from typer.core import TyperGroup
 from typer.testing import CliRunner
 
 from opencode_sandbox import core as c
-from opencode_sandbox import integrations as ig
 from opencode_sandbox.cli import app
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "opencode_sandbox"
-GROUPS = {"changes", "backup", "container", "disk", "config", "opencode", "manager", "agent-context", "providers"}
+GROUPS = {"changes", "backup", "container", "disk", "config", "opencode", "opencode-configs", "manager", "agent-context", "providers"}
 
 
 @pytest.fixture
@@ -42,7 +41,7 @@ def test_top_level_is_small_and_grouped(command_tree):
     commands = command_tree.commands
     groups = {n for n, x in commands.items() if isinstance(x, TyperGroup)}
     assert groups == GROUPS
-    assert len(commands) <= 25, sorted(commands)
+    assert len(commands) <= 26, sorted(commands)
     removed = {"diff", "export", "snapshot", "recreate", "recreate-recover", "runtime-usage", "backups", "restore",
                "backup-verify", "backup-prune", "restore-check", "restore-resume", "restore-rollback", "cleanup", "images",
                "images-prune", *(f"changes-{x}" for x in ("export", "review", "apply", "inspect", "stage", "diff", "unstage"))}
@@ -129,7 +128,7 @@ def test_every_command_in_the_user_documents_exists(command_tree):
             words = code.split()
             if words[0] not in command_tree.commands or words[1:2] == ["..."]:
                 continue
-            if words[0] == "opencode" and words[1:2] in (["mcp"], ["upgrade"]):
+            if words[0] == "opencode" and words[1:2] in (["mcp"], ["upgrade"], ["debug"]):
                 continue  # OpenCode's own commands inside the container
             alternatives = words[1].split("|") if len(words) > 1 else [None]
             named += [(code, [words[0], *([a] if a else []), *words[2:]]) for a in alternatives]
@@ -153,12 +152,12 @@ def test_create_defaults_and_shared_kind_rules(tmp_path, monkeypatch):
     project = tmp_path / "proj"
     project.mkdir()
     (project / "a.txt").write_text("x")
-    result = runner.invoke(app, ["create", "ocs-qa-plain", "--no-integrations"])
+    result = runner.invoke(app, ["create", "ocs-qa-plain"])
     assert result.exit_code == 0, result.output
     assert c.resolve("ocs-qa-plain")["kind"] == "scratch"
     assert "Workspace: managed, started empty" in result.output and "Next: opencode-sandbox run ocs-qa-plain" in result.output
-    assert "Distribution: Debian (OS version not inspected)" in result.output and "Integrations (set up once at the first start): none" in result.output
-    result = runner.invoke(app, ["create", "ocs-qa-copy", "--source", str(project), "--no-integrations"])
+    assert "Distribution: Debian (OS version not inspected)" in result.output and "OpenCode config: Local; Agent Context: enabled" in result.output
+    result = runner.invoke(app, ["create", "ocs-qa-copy", "--source", str(project)])
     assert result.exit_code == 0, result.output
     assert c.resolve("ocs-qa-copy")["kind"] == "project"
     assert f"managed copy of {project}" in result.output
@@ -178,7 +177,7 @@ def test_create_defaults_and_shared_kind_rules(tmp_path, monkeypatch):
             raise AssertionError(kwargs)
     assert c.creation_options("x", workspace_mode="direct", workspace=project) == ("project", "debian")
     assert c.creation_options("x", image="example.org/a:1") == ("scratch", None)
-    assert c.create("ocs-qa-api", provisioning=ig.request([]))["kind"] == "scratch"
+    assert c.create("ocs-qa-api")["kind"] == "scratch"
 
 
 def test_every_command_has_help_text(command_tree):

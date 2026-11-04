@@ -141,7 +141,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
         ck(step is not None and step.group(1) + ' CACHED' not in second.stderr, 'Cached: package layer ran instead of using cached result')
         ck('CACHED' in second.stderr, 'Cached: actual Docker build reused earlier cached layers')
         name = f'ocs-test-{camp.run}-{distro}-retained'
-        run('create', name, '--distro', distro, '--no-integrations')
+        run('create', name, '--distro', distro)
         camp.adopt(name); names.append(name)
         run('opencode', 'policy-set', name, 'pinned', '--version', '2.1.4')
         run('start', name)
@@ -161,7 +161,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
            and camp.metadata(name) == metadata, 'Refresh: retained running container/image/pin/metadata unchanged')
         ck('retained-layer' in camp.sh(eid, 'cat /etc/ocs-test-base-update').stdout, 'Refresh: retained writable layer preserved')
         fresh = f'ocs-test-{camp.run}-{distro}-fresh'
-        run('create', fresh, '--distro', distro, '--no-integrations'); camp.adopt(fresh); names.append(fresh)
+        run('create', fresh, '--distro', distro); camp.adopt(fresh); names.append(fresh)
         run('opencode', 'policy-set', fresh, 'pinned', '--version', '2.1.4'); run('start', fresh)
         ck(camp.inspect(camp.ids[fresh])['Image'] == new and '2.1.4' in camp.sh(camp.ids[fresh], 'opencode --version').stdout,
            'Refresh: future pinned creation uses exactly the new verified base')
