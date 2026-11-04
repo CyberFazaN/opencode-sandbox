@@ -48,6 +48,7 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   longer merge into tiles; Updates tabs use the default underline with an accent active label.
 - Provider profiles reject `OPENCODE_CONFIG_CONTENT`, `OPENCODE_CONFIG` and `OPENCODE_CONFIG_DIR`
   at write/read/launch boundaries; native config files/profiles remain the configuration route.
+  `providers list` reports an unusable profile and continues with the others (exit status 1).
 
 ### Removed
 

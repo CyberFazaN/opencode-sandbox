@@ -202,6 +202,8 @@ def describe(p: Plan) -> str:
 def _show(value):
     if isinstance(value, list):
         return ", ".join(f"{p['host']}:{p['container']}/{p['protocol']}" for p in value) or "none"
+    if isinstance(value, bool):
+        return "enabled" if value else "disabled"
     return str(value)
 
 

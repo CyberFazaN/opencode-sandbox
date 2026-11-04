@@ -580,7 +580,7 @@ def creation_options(name, kind=None, source=None, *, distro=None, image=None, w
     if workspace_mode not in (workspaces.MANAGED, workspaces.DIRECT): raise SandboxError("Workspace mode must be managed or direct")
     if not isinstance(include_working_changes, bool): raise SandboxError("Include working changes must be true or false")
     if include_working_changes and (source is None or workspace_mode != workspaces.MANAGED or kind != "project"):
-        raise SandboxError("Include working changes requires a managed Project Environment with --source pointing to a local Git repository root")
+        raise SandboxError("Include working changes requires a managed Project Environment whose source folder (--source) is a local Git repository root")
     if workspace_mode == workspaces.MANAGED:
         if workspace is not None:
             raise SandboxError("--workspace needs --workspace-mode direct; use --source to copy a directory")
@@ -608,9 +608,10 @@ def create(name, kind=None, source=None, profile="default", *, distro=None, imag
                "opencode_config":opencode_config, "journal":journal,
                "include_working_changes":include_working_changes, "import_fingerprint":import_fingerprint}
     if opencode_config is not None:
-        with oc.prepared_profile(opencode_config) as archive:
+        bounds = oc.limits()
+        with oc.prepared_profile(opencode_config, bounds) as archive:
             ensure_runtime(distros.get(distro or distros.DEFAULT) if image is None else None)
-            return _create(name, kind, source, profile, _config_archive=archive, **options)
+            return _create(name, kind, source, profile, _config_archive=(archive, bounds), **options)
     return _create(name, kind, source, profile, **options)
 
 
@@ -703,7 +704,7 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
             if _config_archive is not None:
                 from . import opencode_configs as oc
                 with lock(eid):
-                    oc.initialize(m, _config_archive)
+                    oc.initialize(m, *_config_archive)
                     try:
                         mark(m, "ready", operation=None, last_error=None)
                     except BaseException as exc:

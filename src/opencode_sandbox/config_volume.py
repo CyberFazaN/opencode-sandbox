@@ -49,6 +49,13 @@ def recover(parent, binding):
         return
     checked_directory(transaction, private=True)
     marker = transaction + "/state.json"
+    for name in os.listdir(transaction):
+        # write_json's own temporary marker from an interrupted durable update; the previous
+        # state.json (if any) still describes the transaction.
+        if name.startswith(".ocs-"):
+            st = os.stat(transaction + "/" + name, follow_symlinks=False)
+            if stat.S_ISREG(st.st_mode) and st.st_uid == os.getuid() and st.st_nlink == 1 and st.st_size <= 8192:
+                os.unlink(transaction + "/" + name)
     entries = set(os.listdir(transaction))
     if not entries:
         # The only unmarked case safe to remove: a private, empty reserved staging

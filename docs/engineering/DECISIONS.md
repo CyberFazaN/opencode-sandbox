@@ -488,7 +488,8 @@ other home auth/state. Preserve internal symlink text, modes and file bytes; rej
 entries. Private deterministic /tmp exports bind UID/data-root/stable environment identity and a
 validated external marker, not a stored path/session. Baselines hash original/current container
 trees, never host edits; overwrite consent binds one observed digest and retains final checks.
-Same-volume staging, atomic directory exchange, durable commit/recovery and manager/volume locks
+An own private export with a missing/invalid marker disables Apply; only a confirmed Export or
+Delete replaces/removes it, while unsafe or foreign workspaces are never adopted. Same-volume staging, atomic directory exchange, durable commit/recovery and manager/volume locks
 protect replacement across process death. No blanket transaction guarantee against arbitrary
 OpenCode writers or hostile same-UID processes is claimed.
 

@@ -21,7 +21,8 @@ opencode-sandbox create webapp --source ~/code/webapp --profile work
   rejected, including in existing/manually edited profiles and the container launcher. Use native
   OpenCode config files or [OpenCode Configs](opencode-configs.md), not provider variables, to
   select configuration. Other valid provider variables, including unrelated `OPENCODE_*` keys,
-  remain usable. Errors never show credential values.
+  remain usable. Errors never show credential values. `providers list` marks such a profile as
+  unusable; remove the reserved key from its `0600` JSON file with an editor.
 
 ## How a profile reaches OpenCode
 

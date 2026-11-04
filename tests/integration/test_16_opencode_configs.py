@@ -94,7 +94,8 @@ def test_direct_wrapper_context_reconciliation_and_actual_runtime_paths(campaign
     name = "ocs-test-wrapper-" + distro
     eid = camp.create(name, "--distro", distro, "--profile", profile)
     camp.ocs("start", name)
-    ck(camp.sh(eid, "ocs-opencode --version").stdout.strip().endswith("2.2.0"), "Discoverable executable runs actual standalone OpenCode")
+    wrapped, plain = (camp.sh(eid, command + " --version").stdout.strip() for command in ("ocs-opencode", "opencode"))
+    ck(wrapped.startswith("opencode v2.") and wrapped == plain, "Discoverable executable runs actual standalone OpenCode")
     hint = camp.docker("exec", "ocs-" + eid, "bash", "-ic", "exit").stdout
     ck(hint.count("plain opencode does not load it") == 1, "Direct interactive shell shows one accurate hint")
     login = camp.docker("exec", "ocs-" + eid, "bash", "-lic", "exit").stdout

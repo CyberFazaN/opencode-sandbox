@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from test_opencode_configs import service as service  # noqa: PLC0414 — explicit pytest fixture re-export
 from test_tui import run, settle
@@ -31,6 +33,7 @@ def test_editor_reopens_export_confirms_delete_and_drift_cancel(service, size):
         await pilot.press("escape")
         await settle(pilot)
         assert (live / "opencode.json").read_text() == "container drift"
+        assert editor.query_one("#oc-editor-text", TextArea).text.startswith("Apply canceled")
         editor.query_one("#oc-apply", Button).press()
         await settle(pilot, 0.5)
         app.screen.query_one("#oc-drift-overwrite", Button).press()
@@ -85,7 +88,7 @@ def test_main_configs_settings_editor_and_local_reload_empty(service, size):
         app.screen.query_one("#confirm", Button).press()
         await settle(pilot, 0.5)
         assert list(live.iterdir()) == []
-        assert "complete" in app.screen.query_one("#oc-reload-text", TextArea).text
+        assert app.screen.query_one("#oc-reload-text", TextArea).text.startswith("Reloaded: Empty.")
     run(scenario, size)
 
 
@@ -103,4 +106,42 @@ def test_creation_local_copy_requires_selection_and_keeps_default_context():
         form.query_one("#oc-config-mode", Select).value = "local"
         await settle(pilot)
         assert not form.query_one("#oc-config-profile", Select).display
+    run(scenario)
+
+
+def test_unreadable_profiles_location_is_reported_not_a_crash(service):
+    m, _, _ = service
+    root = oc.profiles_directory()
+    root.mkdir(parents=True)
+    root.chmod(0)
+    try:
+        async def scenario(app, pilot):
+            app.push_screen(ReloadConfigScreen(m))
+            await settle(pilot)
+            assert "Cannot read OpenCode profiles" in app.screen.query_one("#oc-reload-text", TextArea).text
+            await pilot.press("escape")
+            app.push_screen(CreateScreen())
+            await settle(pilot)
+            assert "Cannot read OpenCode profiles" in str(app.screen.query_one("#oc-config-hint").render())
+        assert run(scenario).return_code in (None, 0)
+    finally:
+        root.chmod(0o700)
+
+
+def test_invalid_export_offers_replacement_and_delete_not_apply(service):
+    m, _, _ = service
+    exported = Path(oc.export(m))
+    (exported.parent / oc.MARKER).write_text("{}")
+    async def scenario(app, pilot):
+        app.push_screen(ConfigEditorScreen(m))
+        await settle(pilot)
+        editor = app.screen
+        assert "Invalid export" in str(editor.query_one("#oc-editor-status").render())
+        assert not editor.query_one("#oc-apply", Button).display and editor.query_one("#oc-delete", Button).display
+        editor.query_one("#oc-export", Button).press()
+        await settle(pilot)
+        assert type(app.screen).__name__ == "ConfirmScreen"
+        app.screen.query_one("#confirm", Button).press()
+        await settle(pilot, 0.5)
+        assert editor.available and editor.query_one("#oc-apply", Button).display
     run(scenario)

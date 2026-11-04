@@ -297,7 +297,7 @@ def opencode_config_delete(name: str, yes: bool=typer.Option(False,"--yes",help=
 
 
 @opencode_configs_app.command("reload")
-def opencode_config_reload(name: str, profile: str | None=typer.Option(None,"--profile",help="Freshly copy this whole profile; omitted selects the original profile if still available"),
+def opencode_config_reload(name: str, profile: str | None=typer.Option(None,"--profile",help="Freshly copy this whole profile; omitted selects the original profile (Empty for Local) and refuses if it is gone"),
                            empty: bool=typer.Option(False,"--empty",help="Completely clear the global config directory"),
                            yes: bool=typer.Option(False,"--yes",help="Confirm whole-directory replacement")):
     """Replace global config from a profile or Empty; system, Agent Context, workspace and auth/state outside it stay untouched."""
@@ -305,7 +305,9 @@ def opencode_config_reload(name: str, profile: str | None=typer.Option(None,"--p
     if empty and profile is not None: raise c.SandboxError("Choose --profile or --empty, not both")
     m=c.resolve(name)
     source=profile if profile is not None else (None if empty else m.get("opencode_config_source"))
-    if profile is None and source not in oc.profiles(): source=None
+    if profile is None and source is not None and source not in oc.profiles():
+        # Never turn a vanished original into an implicit Empty, especially with --yes.
+        raise c.SandboxError(f"Original OpenCode config profile {source} is no longer available; choose --profile NAME or --empty")
     if source is not None: oc.profile_path(source)
     typer.echo(oc.REPLACE_WARNING + "\n" + oc.SCOPE)
     typer.echo(f"Selected: {source or 'Empty — completely clear local configuration'}")
@@ -611,7 +613,9 @@ def status(name:str):
     m=c.resolve(name); msg(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Provider profile: {m.get('profile')}\nContainer: {c.cname(m)}\n"
-               f"Image: {c.env_image(m)}")
+               f"Image: {c.env_image(m)}\n"
+               f"Agent Context: {'enabled' if m.get('agent_context_enabled', True) is True else 'disabled'}; "
+               f"initial OpenCode config: {m.get('opencode_config_source') or 'Local'}")
     c.ensure_runtime(False)
     typer.echo("Running: "+str(c.running(m)))
     from . import readiness as r
@@ -835,7 +839,11 @@ def delete(name:str,export_first:bool=typer.Option(False,"--export-first",help="
     if not yes:
         if not c._tty(): raise c.SandboxError(f"No terminal to confirm the deletion of {m['name']}; confirm with --yes")
         if typer.prompt(f"Type {m['name']} to delete")!=m["name"]: raise typer.Abort()
+    from . import opencode_configs as oc
+    exported=oc.export_path(m)
     c.delete(m,force=True)
+    note=oc.retained_export_note(exported)
+    if note: typer.echo(note)
 
 @app.command(rich_help_panel=SESSIONS)
 def quick(source:Path | None=typer.Option(None,"--source",help="Folder to copy into the disposable workspace"),shell:bool=typer.Option(False,"--shell",help="Open a root shell instead of OpenCode")):
@@ -860,7 +868,14 @@ def quick(source:Path | None=typer.Option(None,"--source",help="Folder to copy i
 @profiles.command("list")
 def provider_list():
     """Provider profiles and their variable names (never the values)."""
-    for n in c.profile_list(): typer.echo(n+": "+", ".join(c.profile_keys(n)))
+    unusable=False
+    for n in c.profile_list():
+        # One unusable profile must not hide the others; errors never contain values.
+        try: typer.echo(n+": "+", ".join(c.profile_keys(n)))
+        except c.SandboxError as exc:
+            unusable=True
+            typer.echo(f"{n}: unusable ({c.error_text(exc)})")
+    if unusable: raise typer.Exit(1)
 
 @profiles.command("set")
 def provider_set(name:str,key:str=typer.Option(...,"--key",prompt="Environment variable name",help="Variable name, e.g. OPENROUTER_API_KEY (asked if omitted)")):

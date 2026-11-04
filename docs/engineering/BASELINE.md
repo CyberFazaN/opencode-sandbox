@@ -43,6 +43,31 @@ declined a reboot. Acceptance is not verification; original frozen recovery inpu
 
 ## Verification
 
+### Independent pre-release review — 2026-11-04
+
+An independent review of all changes since 6.2.0 corrected: working-state imports that left
+cache-tree/resolve-undo objects missing (destination `fsck`/`gc` failed), refused ordinary
+file/directory type changes, were invalidated by a read-only host `git status`, or ignored
+included global excludes; exports with read-only directories that could not be replaced/deleted
+(leaving partial or hidden copies); an invalid own export marker that blocked every action instead
+of offering a fresh Export; recovery refusing a transaction interrupted inside its marker write;
+transfer limits recomputed after the operation's own archive used `/tmp`; CLI Reload silently
+choosing Empty for a vanished original profile; profile-location errors crashing dashboard
+screens; and misleading TUI/CLI texts (stale "Working…" after drift Cancel, raw Reload records,
+`True -> False` plans, disabled-context readiness, first-error-only `providers list`). Each has a
+regression; the list of profiles is shown first in OpenCode Configs and deletion reports a
+retained export path.
+
+Full default suites: **2362 passed / 107 opt-in skips** on Python 3.14.8/current and Python
+3.11.18/Typer 0.16.0/Textual 4.0.0; 249 affected checks passed on both crossed combinations.
+Real rootless Debian and Arch (run-owned `ocs-test-rv1104` images with OpenCode 2.2.5):
+`test_16_opencode_configs.py` and `test_12_git_import.py` **12 passed / 104 checks** (`rv1104c`),
+after fixing that row's hard-coded OpenCode version. Scripted 80x24 pty sessions against real
+Docker exercised creation with working changes and Copy, the editor (Export, running-Apply
+warning, drift Cancel/Overwrite), Reload, Agent Context toggle/plan/readiness/start repair,
+Updates and deletion with a retained export. Not run: the complete campaign, privileged,
+socket-activation, pipx and reboot rows, and real OpenCode prompts.
+
 ### Unreleased working-state Git import — 2026-11-04
 
 Full default suites: **2351 passed / 107 opt-in skips each** on Python 3.11/lowest direct and

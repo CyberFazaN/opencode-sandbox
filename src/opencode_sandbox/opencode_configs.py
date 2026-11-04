@@ -46,10 +46,13 @@ def profiles_directory():
 def profiles():
     """User-maintained directories, including one symlink at their root; never create/edit sources."""
     directory = profiles_directory()
-    if not directory.exists(): return []
-    if not directory.is_dir(): raise c.SandboxError("OpenCode profiles location is not a directory")
-    return sorted(p.name for p in directory.iterdir() if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", p.name)
-                  and p.is_dir())
+    try:
+        if not directory.exists(): return []
+        if not directory.is_dir(): raise c.SandboxError(f"OpenCode profiles location {directory} is not a directory")
+        return sorted(p.name for p in directory.iterdir() if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", p.name)
+                      and p.is_dir())
+    except OSError as exc:
+        raise c.SandboxError(f"Cannot read OpenCode profiles location {directory} ({exc.strerror})") from None
 
 
 def profile_path(name):
@@ -87,12 +90,12 @@ def _tree_call(function, *args, **kwargs):
 
 
 @contextmanager
-def prepared_profile(name):
+def prepared_profile(name, bounds=None):
     """Immutable byte snapshot; no persistent environment changes precede source validation."""
     source = profile_path(name)
     with tempfile.TemporaryFile(dir=TMP) as archive:
         try:
-            tree.snapshot(source, archive, allow_missing=False, **limits())
+            tree.snapshot(source, archive, allow_missing=False, **(bounds or limits()))
         except (OSError, ValueError, tree.TreeError, tarfile.TarError, RecursionError) as exc:
             raise c.SandboxError(str(exc) if isinstance(exc, tree.TreeError) else
                                  "Cannot safely read the entire OpenCode profile; source left unchanged") from None
@@ -107,6 +110,13 @@ def binding(m):
 def export_path(m):
     c.env_dir(m["id"])
     return TMP / f"ocs-occonfig-{os.getuid()}-{c.data_id()}" / m["id"]
+
+
+def retained_export_note(path):
+    """After environment deletion: a host export is never deleted implicitly, so say where it is."""
+    if not os.path.lexists(path): return None
+    return (f"Global config export retained at {path} (may contain credentials); "
+            "remove it with host tools when no longer needed.")
 
 
 def _read_marker(fd, name):
@@ -133,53 +143,108 @@ def _open_private(path):
     return fd
 
 
+def _remove_tree(path):
+    """Host-user removal of an exported tree. Container root may have created directories
+    without owner write permission (for example 0555 package directories); grant owner rwx to
+    own directories through no-follow descriptors first, then remove without following links."""
+    def opened(name, parent=None):
+        # O_PATH needs no permission on the directory itself (it may be 0000); the chmod goes
+        # through that exact inode, and the readable descriptor must be the same inode.
+        handle = os.open(name, os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
+        try:
+            st = os.fstat(handle)
+            if st.st_uid == os.getuid() and stat.S_IMODE(st.st_mode) & 0o700 != 0o700:
+                os.chmod(f"/proc/self/fd/{handle}", stat.S_IMODE(st.st_mode) | 0o700)
+            fd = os.open(name, tree.DIR_FLAGS, dir_fd=parent)
+            if (os.fstat(fd).st_dev, os.fstat(fd).st_ino) != (st.st_dev, st.st_ino):
+                os.close(fd)
+                raise c.SandboxError("Export changed during removal; remaining files preserved")
+            return fd
+        finally:
+            os.close(handle)
+
+    def writable(fd):
+        with os.scandir(fd) as entries:
+            names = [e.name for e in entries if e.is_dir(follow_symlinks=False)]
+        for name in names:
+            child = opened(name, fd)
+            try: writable(child)
+            finally: os.close(child)
+    fd = opened(path)
+    try: writable(fd)
+    finally: os.close(fd)
+    shutil.rmtree(path)
+
+
 def _same_identity(actual, expected):
     return isinstance(actual, dict) and actual.keys() == expected.keys() and all(
         type(actual[key]) is type(value) and actual[key] == value for key, value in expected.items())
+
+
+def _validated_record(fd, m):
+    """The export's own marker and config tree, or None: an own private export whose marker or
+    config is missing/invalid disables Apply; a confirmed Export or Delete may replace it."""
+    try:
+        record = _read_marker(fd, MARKER)
+        if not isinstance(record, dict) or set(record) != {"binding", "fingerprint"} \
+                or not _same_identity(record.get("binding"), binding(m)) \
+                or not isinstance(record.get("fingerprint"), str) \
+                or not re.fullmatch(r"[0-9a-f]{64}", record["fingerprint"]):
+            return None
+        config_fd = os.open("config", tree.DIR_FLAGS, dir_fd=fd)
+        try: owned = os.fstat(config_fd).st_uid == os.getuid()
+        finally: os.close(config_fd)
+        return record if owned else None
+    except (OSError, UnicodeError, c.SandboxError):
+        return None
+
+
+INVALID = "Invalid export (ownership/baseline marker or config missing); Apply disabled. Export again or Delete it"
 
 
 @contextmanager
 def workspace(m, *, create=False):
     path = export_path(m)
     parent = path.parent
+    namespace = {"schema": 1, "uid": os.getuid(), "data": c.data_id()}
     if create:
         try:
             parent.mkdir(mode=0o700)
         except FileExistsError:
-            pass
+            # Only an own, private and EMPTY directory is adopted (an interrupted creation before
+            # its marker). A nonempty unmarked collision is never adopted.
+            try:
+                fd = _open_private(parent)
+                try:
+                    if not os.listdir(fd): tree.write_json(parent / MARKER, namespace)
+                finally: os.close(fd)
+            except (OSError, c.SandboxError):
+                pass  # reported by the validation below
         else:
-            # A collision without the namespace marker is deliberately not adopted later.
-            tree.write_json(parent / MARKER, {"schema": 1, "uid": os.getuid(), "data": c.data_id()})
+            tree.write_json(parent / MARKER, namespace)
     try:
         parent_fd = _open_private(parent)
     except FileNotFoundError:
         yield None
         return
     except OSError:
-        raise c.SandboxError("Unsafe export namespace; refusing to follow or replace it") from None
+        raise c.SandboxError(f"Unsafe export namespace {parent}; refusing to follow or replace it") from None
     with ExitStack() as descriptors:
         descriptors.callback(os.close, parent_fd)
         found = None
         try:
-            if not _same_identity(_read_marker(parent_fd, MARKER), {"schema": 1, "uid": os.getuid(), "data": c.data_id()}):
-                raise c.SandboxError("Export namespace identity mismatch; preserved")
+            try: identity = _read_marker(parent_fd, MARKER)
+            except (OSError, c.SandboxError): identity = None
+            if not _same_identity(identity, namespace):
+                raise c.SandboxError(f"Export namespace {parent} has no valid identity marker; preserved. "
+                                     "Inspect it and remove it with host tools if it is not in use")
             try: fd = _open_private(path)
             except FileNotFoundError: fd = None
             if fd is not None:
                 descriptors.callback(os.close, fd)
-                record = _read_marker(fd, MARKER)
-                if not isinstance(record, dict) or set(record) != {"binding", "fingerprint"} \
-                        or not _same_identity(record.get("binding"), binding(m)) \
-                        or not isinstance(record.get("fingerprint"), str) \
-                        or not re.fullmatch(r"[0-9a-f]{64}", record["fingerprint"]):
-                    raise c.SandboxError("Export identity or baseline is invalid; preserved")
-                config_fd = os.open("config", tree.DIR_FLAGS, dir_fd=fd)
-                descriptors.callback(os.close, config_fd)
-                if os.fstat(config_fd).st_uid != os.getuid():
-                    raise c.SandboxError("Export config directory is not owned by this user; preserved")
-                found = (path, record)
+                found = (path, _validated_record(fd, m))
         except (OSError, UnicodeError):
-            raise c.SandboxError("Export workspace is unavailable or unsafe; validation changed neither side") from None
+            raise c.SandboxError(f"Export workspace {path} is unavailable or unsafe; validation changed neither side") from None
         # Do not translate errors from the operation body into a false "nothing changed"
         # claim: publication/baseline persistence may fail after a successful directory switch.
         yield found
@@ -189,6 +254,7 @@ def status(m):
     with c.lock(m["id"]):
         m = c.resolve(m["id"])
         with workspace(m) as found:
+            if found and found[1] is None: return {"state": INVALID, "path": str(found[0])}
             return {"state": "Export available" if found else "No export",
                     "path": str(found[0] / "config") if found else None}
 
@@ -286,10 +352,12 @@ def _volume_ready(m):
     return image
 
 
-def volume_operation(m, action, *, incoming=None, outgoing=None, **options):
-    """Locked service transport. Binary config bytes never enter logs, argv or notifications."""
+def volume_operation(m, action, *, incoming=None, outgoing=None, bounds=None, **options):
+    """Locked service transport. Binary config bytes never enter logs, argv or notifications.
+
+    `bounds`: the limits computed once for this operation, before its host archive used /tmp."""
     image = _volume_ready(m)
-    request = {"action": action, "binding": binding(m), **limits(), **options}
+    request = {"action": action, "binding": binding(m), **(bounds or limits()), **options}
     token = secrets.token_hex(12)
     name = "ocs-config-" + token
     argv = ["docker", "-H", c.docker_endpoint(), "run", "--rm", *c.helper_labels("opencode-config"), "--pull", "never", "--name", name,
@@ -337,13 +405,13 @@ def volume_operation(m, action, *, incoming=None, outgoing=None, **options):
     return result
 
 
-def initialize(m, archive):
+def initialize(m, archive, bounds=None):
     """Creation only: new labelled volume, no destination data to merge or overwrite."""
     if c.volume_state(m) is not None:
         raise c.SandboxError("Initial config copy requires a genuinely new home volume")
     try:
         c.ensure_volume(m)
-        volume_operation(m, "replace", incoming=archive, fresh=True)
+        volume_operation(m, "replace", incoming=archive, fresh=True, bounds=bounds)
     except BaseException:
         # Only the volume created by this invocation; never force removal of a busy helper.
         cleaned = False
@@ -404,14 +472,15 @@ def export(m, *, replace=False):
             if found and not replace:
                 raise c.SandboxError("Export exists: confirm replacement; existing host edits will be lost")
             path = export_path(m)
+            bounds = limits()  # once, before this operation's own archive consumes /tmp space
             stage = Path(tempfile.mkdtemp(prefix=".export-", dir=path.parent))
             keep_stage = False
             try:
                 (stage / "config").mkdir(mode=0o700)
                 with tempfile.TemporaryFile(dir=path.parent) as archive:
-                    result = volume_operation(m, "export", outgoing=archive)
+                    result = volume_operation(m, "export", outgoing=archive, bounds=bounds)
                     archive.seek(0)
-                    _tree_call(tree.unpack, archive, stage / "config", **limits())
+                    _tree_call(tree.unpack, archive, stage / "config", **bounds)
                 tree.write_json(stage / MARKER, {"binding": binding(m), "fingerprint": result["fingerprint"]})
                 keep_stage = True  # Preserve both copies if a signal obscures rename's outcome.
                 try:
@@ -438,7 +507,7 @@ def export(m, *, replace=False):
                     raise
                 keep_stage = False
             finally:
-                if not keep_stage and stage.exists(): shutil.rmtree(stage)
+                if not keep_stage and stage.exists(): _remove_tree(stage)
             return str(path / "config")
 
 
@@ -448,11 +517,14 @@ def apply(m, *, overwrite=None):
         with workspace(m) as found:
             if not found: raise c.SandboxError("No export; Export Config first")
             path, record = found
+            if record is None: raise c.SandboxError(INVALID)
             previous = dict(m)
+            bounds = limits()
             with tempfile.TemporaryFile(dir=path.parent) as archive:
-                _tree_call(tree.snapshot, path / "config", archive, allow_missing=False, **limits())
+                _tree_call(tree.snapshot, path / "config", archive, allow_missing=False, **bounds)
                 archive.seek(0)
-                result = _replacement(m, archive, expected=overwrite if overwrite is not None else record["fingerprint"])
+                result = _replacement(m, archive, bounds=bounds,
+                                      expected=overwrite if overwrite is not None else record["fingerprint"])
             if "conflict" in result:
                 c.save(previous)  # A canceled drift review must not clear errors/change metadata.
                 raise Conflict(result["conflict"])
@@ -468,26 +540,30 @@ def delete_export(m, *, confirmed=False):
         m = _environment(m)
         with workspace(m) as found:
             if not found: raise c.SandboxError("No export to delete")
-            shutil.rmtree(found[0])
+            # Editable data first, ownership marker last: an interrupted removal stays visible.
+            config = found[0] / "config"
+            if config.is_dir() and not config.is_symlink(): _remove_tree(config)
+            _remove_tree(found[0])
             tree.sync_directory(found[0].parent)
 
 
 def reload(m, source, *, confirmed=False):
     if not confirmed: raise c.SandboxError("Confirm Reload: " + REPLACE_WARNING)
     # Validation/snapshot before any persistent destination change, including an unavailable source.
+    bounds = limits()
     if source is not None:
-        with prepared_profile(source) as archive:
-            return _reload(m, source, archive)
+        with prepared_profile(source, bounds) as archive:
+            return _reload(m, source, archive, bounds)
     with tempfile.TemporaryDirectory(dir=TMP) as empty, tempfile.TemporaryFile(dir=TMP) as archive:
-        _tree_call(tree.snapshot, empty, archive, allow_missing=False, **limits())
+        _tree_call(tree.snapshot, empty, archive, allow_missing=False, **bounds)
         archive.seek(0)
-        return _reload(m, None, archive)
+        return _reload(m, None, archive, bounds)
 
 
-def _reload(m, source, archive):
+def _reload(m, source, archive, bounds=None):
     with c.lock(m["id"]):
         m = _environment(m)
         # Reload consent is whole-replacement consent, not a stale Export-based overwrite.
-        result = _replacement(m, archive)
+        result = _replacement(m, archive, bounds=bounds)
         _complete(m)
         return {"source": source or "Empty", "fingerprint": result["fingerprint"]}

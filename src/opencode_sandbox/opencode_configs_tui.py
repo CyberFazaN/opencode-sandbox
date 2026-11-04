@@ -26,14 +26,16 @@ class ConfigProfilesScreen(Screen):
     def refresh_profiles(self):
         try:
             names = oc.profiles()
-            text = (f"Directory: {oc.profiles_directory()}\n\n"
+            # Profiles first: on compact terminals the guidance below needs scrolling.
+            text = ((f"Available profiles ({len(names)}):\n" + "\n".join("  " + name for name in names) if names
+                     else "No profiles yet. Local creation remains available.")
+                    + f"\n\nDirectory: {oc.profiles_directory()}\n\n"
                     "Place named configuration directories here, or a root symlink, for example:\n"
                     f"  mkdir -p {oc.profiles_directory()}\n"
                     f"  ln -s ~/my-opencode-config {oc.profiles_directory()}/work\n\n"
                     "The manager only reads sources. Copy/Reload imports the entire directory once; "
                     "no live links or synchronization. Internal symlinks retain their link text. "
-                    "Profiles may contain secrets and executable plugins.\n\n"
-                    + ("Available profiles:\n" + "\n".join(names) if names else "No profiles yet. Local creation remains available."))
+                    "Profiles may contain secrets and executable plugins.")
         except Exception as exc: text = c.error_text(exc)
         self.query_one("#oc-profiles-text", TextArea).load_text(c.printable(text))
 
@@ -60,6 +62,15 @@ class DriftScreen(ModalScreen[bool]):
     def on_button_pressed(self, event):
         event.stop()
         self.dismiss(event.button.id == "oc-drift-overwrite")
+
+
+def _completed(action, result):
+    """Same outcome wording as the CLI; never raw service records or fingerprints."""
+    if action == "export": return f"Exported. Edit with host tools at:\n{result}"
+    if action == "apply": return f"Applied. Export remains at {result}; its baseline now matches the installed container tree."
+    if action == "delete": return "Export deleted; container config unchanged."
+    if action == "reload": return f"Reloaded: {result['source']}. No container or OpenCode restart."
+    return str(result)
 
 
 def run_transfer(screen, action, *, source=None, overwrite=None, replace=False):
@@ -94,10 +105,15 @@ def run_transfer(screen, action, *, source=None, overwrite=None, replace=False):
         app._set_busy(error or ("Container config changed — review overwrite" if conflict else "OpenCode config operation complete"))
         if screen.is_mounted:
             if conflict:
-                app.push_screen(DriftScreen(), lambda yes: run_transfer(screen, "apply", overwrite=conflict) if yes and screen.is_mounted else None)
+                screen.result_text("Container config changed since the last Export/Apply; review Cancel or Overwrite Anyway.")
+                def reviewed(yes):
+                    if not screen.is_mounted: return
+                    if yes: run_transfer(screen, "apply", overwrite=conflict)
+                    else: screen.result_text("Apply canceled; export, container config and baseline are unchanged.")
+                app.push_screen(DriftScreen(), reviewed)
             elif error: screen.result_text(error)
             else:
-                screen.result_text(f"{action.capitalize()} complete" + (f": {result}" if result else ""))
+                screen.result_text(_completed(action, result))
                 if isinstance(screen, ConfigEditorScreen): screen.refresh_status()
         elif error: app.notify(error, severity="error")
 
@@ -110,7 +126,8 @@ class ConfigEditorScreen(Screen):
 
     def __init__(self, environment):
         super().__init__()
-        self.environment, self.available = environment, False
+        # available: a valid export (Apply). exists: any own export directory (replace/Delete).
+        self.environment, self.available, self.exists = environment, False, False
 
     def compose(self):
         with Vertical(id="oc-editor"):
@@ -143,13 +160,14 @@ class ConfigEditorScreen(Screen):
     def _status(self, result):
         if not self.is_mounted: return
         self.available = result["state"] == "Export available"
+        self.exists = result["path"] is not None
         self.query_one("#oc-editor-status", Static).update(result["state"] + ("\n" + result["path"] if result["path"] else ""))
-        for bid in ("oc-apply", "oc-delete"):
-            self.query_one("#" + bid, Button).display = self.available
+        self.query_one("#oc-apply", Button).display = self.available
+        self.query_one("#oc-delete", Button).display = self.exists
         self.query_one("#oc-recover", Button).display = c.resolve(self.environment["id"]).get("operation") == "opencode-config"
 
     def action_close(self):
-        if self.available:
+        if self.exists:
             self.app.notify("Export remains at " + str(oc.export_path(self.environment) / "config") + "; /tmp cleanup or reboot may remove it.")
         self.app.pop_screen()
 
@@ -161,7 +179,7 @@ class ConfigEditorScreen(Screen):
         elif action == "oc-refresh": self.refresh_status()
         elif action == "oc-recover": run_transfer(self, "recover")
         elif action == "oc-export":
-            if self.available:
+            if self.exists:
                 self.app.push_screen(ConfirmScreen("Replace this export? Existing host-side edits will be lost. Cancel keeps it intact."),
                                      lambda yes: run_transfer(self, "export", replace=True) if yes else None)
             else: run_transfer(self, "export")
@@ -196,13 +214,15 @@ class ReloadConfigScreen(Screen):
         self.environment = environment
 
     def compose(self):
-        names = oc.profiles()
+        try: names, problem = oc.profiles(), ""
+        except c.SandboxError as exc: names, problem = [], c.error_text(exc) + "\n\n"
         original = self.environment.get("opencode_config_source")
         with Vertical(id="oc-reload"):
             yield Static(f"Reload OpenCode Config — {self.environment['name']}", markup=False)
-            yield Select([("Empty — clear the whole global config directory", ""), *((name, name) for name in names)],
+            yield Select([("Empty — clear the whole global config directory", ""),
+                          *((f"Profile: {name}" + (" (original)" if name == original else ""), name) for name in names)],
                          value=original if original in names else "", allow_blank=False, id="oc-reload-source", compact=True)
-            yield TextArea(oc.REPLACE_WARNING + "\nEmpty completely clears this directory's local configuration.\n\n" + oc.SCOPE,
+            yield TextArea(problem + oc.REPLACE_WARNING + "\nEmpty completely clears this directory's local configuration.\n\n" + oc.SCOPE,
                            read_only=True, id="oc-reload-text")
             with Horizontal():
                 yield Button("Reload Config", id="oc-reload-confirm", variant="error", compact=True)

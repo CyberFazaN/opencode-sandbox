@@ -80,7 +80,8 @@ OpenCode launch. Agent Context, Updates Details, readiness and cleanup-result re
 use Tab to reach Close, or Esc to return to the dashboard.
 
 Environment Settings (`t`) contains **Include specialized Agent Context**, **OpenCode Config
-Editor** and separate **Reload Config**. The editor displays No export/Export available and the
+Editor** and separate **Reload Config**. The editor displays No export/Export available (or an
+Invalid export that can only be replaced or deleted) and the
 exact private `/tmp` path; Export/Apply/Delete are file transfers for host editing. Replacement,
 deletion and Reload/Empty confirm data loss; container drift offers Cancel/Overwrite Anyway.
 Close retains the export. CLI equivalents and boundaries are in [OpenCode Configs](opencode-configs.md).

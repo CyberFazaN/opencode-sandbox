@@ -130,8 +130,8 @@ def service(tmp_path, monkeypatch):
         "org.opencode-sandbox.id": m["id"], c.DATA_LABEL: c.data_id(), "org.opencode-sandbox.managed": "true"}})
     monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(returncode=0,
                         stdout="sha256:" + "1" * 64 if a[:2] == ("container", "inspect") else "null", stderr=""))
-    def operation(m, action, *, incoming=None, outgoing=None, **options):
-        return volume.operation(str(home), {"action": action, "binding": oc.binding(m), **oc.limits(), **options},
+    def operation(m, action, *, incoming=None, outgoing=None, bounds=None, **options):
+        return volume.operation(str(home), {"action": action, "binding": oc.binding(m), **(bounds or oc.limits()), **options},
                                 incoming, outgoing)
     monkeypatch.setattr(oc, "volume_operation", operation)
     return m, home, live
@@ -244,10 +244,23 @@ def test_untrusted_predictable_export_path_refused_and_preserved(service, tmp_pa
         exported.rename(root / "retained")
         exported.symlink_to(tmp_path)
     before = tree.sample(live)
-    for operation in (lambda: oc.status(m), lambda: oc.export(m, replace=True),
-                      lambda: oc.delete_export(m, confirmed=True), lambda: oc.apply(m)):
-        with pytest.raises(c.SandboxError): operation()
-    assert root.exists() and tree.sample(live) == before
+    outside = tree.sample(tmp_path / "home")
+    if kind in ("symlink", "mode"):
+        # The directory itself is not a private export of this user: never adopted or deleted.
+        for operation in (lambda: oc.status(m), lambda: oc.export(m, replace=True),
+                          lambda: oc.delete_export(m, confirmed=True), lambda: oc.apply(m)):
+            with pytest.raises(c.SandboxError): operation()
+        assert root.exists() and tree.sample(live) == before
+        return
+    # An own private export with an invalid marker/config disables Apply, never bypassing drift
+    # detection; a confirmed fresh Export replaces it without following its links.
+    assert oc.status(m) == {"state": oc.INVALID, "path": str(root)}
+    with pytest.raises(c.SandboxError, match="Apply disabled"): oc.apply(m)
+    with pytest.raises(c.SandboxError, match="confirm replacement"): oc.export(m)
+    assert tree.sample(live) == before
+    assert Path(oc.export(m, replace=True)) == exported and exported.is_dir() and not exported.is_symlink()
+    assert oc.status(m)["state"] == "Export available"
+    assert tree.sample(live) == before and tree.sample(tmp_path / "home") == outside
 
 
 def test_export_namespaces_stable_across_container_recreation_and_names_not_reused(service, monkeypatch):
@@ -261,7 +274,7 @@ def test_export_namespaces_stable_across_container_recreation_and_names_not_reus
     assert str(oc.export_path(m) / "config") != path
 
 
-@pytest.mark.parametrize("phase", ["exchange", "commit", "cleanup"])
+@pytest.mark.parametrize("phase", ["exchange", "marker", "commit", "cleanup"])
 def test_actual_process_death_recovery_before_and_after_commit(tmp_path, phase):
     home = tmp_path / "home"
     home.mkdir(mode=0o700)
@@ -271,6 +284,9 @@ def test_actual_process_death_recovery_before_and_after_commit(tmp_path, phase):
     request = {"binding": {"id": "fixture"}, "action": "replace", "max_bytes": tree.MAX_BYTES, "max_entries": tree.MAX_ENTRIES}
     hooks = {
         "exchange": "original=exchange\ndef exchange(a,b):\n original(a,b)\n os._exit(77)\n",
+        # Death inside the durable marker update leaves write_json's temporary file behind.
+        "marker": "import tempfile\noriginal=write_json\ndef write_json(p,v):\n if v.get('phase')=='committed':\n"
+                  "  tempfile.mkstemp(prefix='.ocs-',dir=os.path.dirname(p)); os._exit(77)\n original(p,v)\n",
         "commit": "original=write_json\ndef write_json(p,v):\n original(p,v)\n if v.get('phase')=='committed': os._exit(77)\n",
         "cleanup": "original=shutil.rmtree\ndef remove(p):\n original(p)\n os._exit(77)\nshutil.rmtree=remove\n",
     }
@@ -281,7 +297,7 @@ def test_actual_process_death_recovery_before_and_after_commit(tmp_path, phase):
     assert p.returncode == 77, p.stderr
     assert "new" in (live / "opencode.json").read_text()
     volume.operation(str(home), {**request, "action": "recover"}, None, None)
-    assert ("old" if phase == "exchange" else "new") in (live / "opencode.json").read_text()
+    assert ("old" if phase in ("exchange", "marker") else "new") in (live / "opencode.json").read_text()
     assert not (home / ".config" / ".ocs-occonfig-transaction").exists()
 
 
@@ -296,6 +312,47 @@ def test_cli_editor_actions_and_reload_default(service):
     assert conflict.exit_code != 0 and "preserved" in str(conflict.exception)
     assert runner.invoke(app, ["opencode-configs", "apply", m["name"], "--overwrite"]).exit_code == 0
     assert runner.invoke(app, ["opencode-configs", "delete-export", m["name"], "--yes"]).exit_code == 0
+
+
+def test_exports_with_read_only_directories_can_be_replaced_and_deleted(service):
+    m, _, live = service
+    (live / "node_modules/pkg").mkdir(parents=True)
+    (live / "node_modules/pkg/index.js").write_text("x")
+    (live / "node_modules/pkg").chmod(0o555)
+    (live / "node_modules").chmod(0o555)
+    exported = Path(oc.export(m))
+    assert stat.S_IMODE((exported / "node_modules/pkg").stat().st_mode) == 0o555
+    assert Path(oc.export(m, replace=True)) == exported
+    # No hidden previous copy (possibly with credentials) is left in the namespace.
+    assert sorted(p.name for p in exported.parent.parent.iterdir()) == sorted([exported.parent.name, oc.MARKER])
+    (exported / "locked").mkdir(); (exported / "locked/file").write_text("x"); (exported / "locked").chmod(0)
+    oc.delete_export(m, confirmed=True)
+    assert oc.status(m)["state"] == "No export" and not exported.parent.exists()
+    assert stat.S_IMODE((live / "node_modules").stat().st_mode) == 0o555
+
+
+def test_one_operation_uses_the_limits_computed_before_its_own_archive(service, monkeypatch):
+    m, _, live = service
+    real, calls = oc.limits, []
+    def shrinking():
+        # Later calls see /tmp already used by this operation's archive.
+        calls.append(1)
+        return real() if len(calls) == 1 else {**real(), "max_bytes": 1}
+    for action in (lambda: oc.export(m), lambda: oc.apply(m), lambda: oc.reload(m, None, confirmed=True)):
+        calls.clear()
+        monkeypatch.setattr(oc, "limits", shrinking)
+        action()
+        assert len(calls) == 1
+    assert list(live.iterdir()) == []
+
+
+def test_cli_reload_never_defaults_a_vanished_original_profile_to_empty(service):
+    m, _, live = service
+    c.save({**c.resolve(m["id"]), "opencode_config_source": "gone"})
+    before = tree.sample(live)
+    result = CliRunner().invoke(app, ["opencode-configs", "reload", m["name"], "--yes"])
+    assert result.exit_code != 0 and "--empty" in str(result.exception)
+    assert tree.sample(live) == before
 
 
 @pytest.mark.parametrize("channel", ["stdout", "stderr"])
@@ -361,7 +418,7 @@ def test_copy_intent_blocks_start_before_publication_and_retains_completed_volum
     config(root / "work")
     monkeypatch.setattr(c, "ensure_runtime", lambda *a: None)
     observed = []
-    def initialize(m, archive):
+    def initialize(m, archive, bounds=None):
         observed.append(c.resolve(m["id"])["operation"])
         assert observed == ["opencode-config"]
     monkeypatch.setattr(oc, "initialize", initialize)

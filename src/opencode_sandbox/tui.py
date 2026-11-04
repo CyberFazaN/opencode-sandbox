@@ -115,9 +115,13 @@ class CreateScreen(ModalScreen[dict | None]):
                 yield Select([("OpenCode config: Local (no initial import)", "local"),
                               ("OpenCode config: Copy a profile once", "copy")], value="local", allow_blank=False,
                              id="oc-config-mode", compact=True)
-                yield Select([(name, name) for name in oc.profiles()], prompt="Select config profile",
+                try: names, problem = oc.profiles(), None
+                except c.SandboxError as exc: names, problem = [], c.error_text(exc)
+                yield Select([(name, name) for name in names], prompt="Select config profile",
                              id="oc-config-profile", compact=True)
-                yield Static(f"User-maintained directories: {oc.profiles_directory()}\nCopy is independent, not a live link.",
+                hint = [problem or "No profiles found; use Local or add one:"] if problem or not names else []
+                hint += [f"User-maintained directories: {oc.profiles_directory()}", "Copy is independent, not a live link."]
+                yield Static("\n".join(hint),
                              markup=False, classes="hint", id="oc-config-hint")
                 yield Checkbox("Include specialized Agent Context", value=True, id="include-agent-context", compact=True)
             yield Static("", id="create-error")
@@ -1092,8 +1096,10 @@ class Dashboard(App):
                 target = Path(backup(environment, stop_running=False))
                 result = " ".join([f"Backup saved: {target.name} in {target.parent}", *backup_notes(target)])
             elif action == "delete":
+                from . import opencode_configs as oc
+                exported = oc.export_path(environment)
                 c.delete(environment, force=True)
-                result = "Deleted"
+                result = " ".join(filter(None, ["Deleted.", oc.retained_export_note(exported)]))
             else:
                 raise ValueError(action)
             self.app.call_from_thread(self._finished, result)

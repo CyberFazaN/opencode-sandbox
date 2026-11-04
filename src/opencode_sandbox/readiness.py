@@ -634,14 +634,17 @@ def delivery_check(m, state):
         valid = False
     if not valid:
         return Check("agent-context-delivery", title, FAILED,
-                     f"{ac.SYSTEM_CONFIG} does not match saved Agent Context activation; run manager start to reconcile it")
+                     f"{ac.SYSTEM_CONFIG} does not match saved Agent Context activation; start reconciles it",
+                     f"opencode-sandbox start {m['name']}")
     # The configuration and the mounted file are checked; whether OpenCode reads it is not observed
     # here (the real first-prompt test does that, CAMPAIGN G04).
     try:
         host = ac.path(m, c.env_dir).read_text(encoding="utf-8")
     except OSError:
+        state_text = (f"configured ({ac.SYSTEM_CONFIG} lists {ac.CONTAINER_PATH})" if ac.enabled(m)
+                      else "automatic inclusion intentionally disabled")
         return Check("agent-context-delivery", title, WARNING,
-                     f"configured ({ac.SYSTEM_CONFIG} lists {ac.CONTAINER_PATH}); the file is not written yet, so the "
+                     f"{state_text}; the file is not written yet, so the "
                      "mount is not compared (run writes it before every launch)")
     mounted = _exec(m, "cat", ac.CONTAINER_PATH)
     if mounted.returncode != 0:

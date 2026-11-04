@@ -89,14 +89,19 @@ Exports live under a validated own-UID `0700` namespace in `/tmp`, keyed by mana
 identity and the stable environment ID, not the Docker container ID or environment name. Rename
 or recreation finds the same export; deleting/reusing a name does not attach it to a new environment.
 Ownership/identity/baseline metadata lives outside editable `config/`; changing files there cannot
-alter the saved baseline. Unsafe collisions, symlink workspaces or malformed markers are refused,
-not adopted or deleted. No export path is stored in persistent application state.
+alter the saved baseline. Unsafe collisions, symlinked or foreign-owned/non-private workspaces
+are refused, never adopted or deleted. An own private export whose marker or `config/` is missing
+or invalid shows **Invalid export** with its path: Apply is disabled (drift detection is never
+bypassed); a confirmed Export replaces it or Delete Export removes it. No export path is stored in
+persistent application state.
 
 Closing the editor never deletes the export. A reminder explains that it can be reopened while
 the directory remains, but reboot or `/tmp` cleanup may remove it. A missing directory simply
 means No export; there is no missing-export monitoring or cross-reboot recovery promise. Treat
 exports as sensitive: `0700` excludes other ordinary users, not host root or same-UID processes.
-Environment deletion does not silently delete unapplied host exports; Delete Export first if wanted.
+Environment deletion does not silently delete unapplied host exports; it reports a retained
+export's path. Delete Export first if wanted. Read-only directories copied from the container
+(for example `0555` package directories) do not block replacement or deletion.
 
 ## Reload or Empty
 
@@ -110,8 +115,9 @@ opencode-sandbox opencode-configs reload NAME --profile work --yes
 opencode-sandbox opencode-configs reload NAME --empty --yes
 ```
 
-Without either selection option, the CLI chooses the original profile if still available,
-otherwise Empty, and discloses that choice before confirmation. Reload is a new independent
+Without either selection option, the CLI chooses the original profile, or Empty for a Local
+environment, and discloses that choice before confirmation. If the original profile is no longer
+available, it refuses and asks for `--profile` or `--empty`. Reload is a new independent
 copy, not a live link. Existing exports remain available; a later Apply can detect the reload
 as container drift. Neither Reload nor Apply stops/restarts the container or inspects sessions.
 Only running containers get the active-OpenCode warning; no hot-reload guarantee is made.
