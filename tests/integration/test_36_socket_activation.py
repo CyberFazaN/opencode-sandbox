@@ -2,8 +2,8 @@
 
 Opt in with OCS_TEST_DOCKER=1 OCS_TEST_SOCKET_ACTIVATION=1. This starts/stops/removes only
 new ocs-test-act-* user units and a separate no-network rootless daemon. Needs rootlesskit,
-dockerd-rootless.sh, systemd --user and the pre-existing ubuntu:24.04 image. No sudo, package
-installation, default context edit, inbound port, or mutation of the original daemon.
+dockerd-rootless.sh, systemd --user and the run-owned Ubuntu/Python custom-image fixture.
+No sudo, host package installation, default context edit, inbound port, or mutation of the original daemon.
 """
 import json
 import os
@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(os.environ.get("OCS_TEST_SOCKET_ACTIVATION") != 
 
 
 @pytest.fixture(scope="module")
-def activated(campaign):
+def activated(campaign, custom_image):
     camp = campaign
     launcher = shutil.which("dockerd-rootless.sh")
     if not launcher or not shutil.which("rootlesskit"):
@@ -97,10 +97,10 @@ Service={name}.service
         camp._run(["docker", "--config", env["DOCKER_CONFIG"], "context", "create", name,
                    "--docker", f"host={endpoint}"], check=True)
         archive = root / "ubuntu.tar"
-        camp.note(f"C10 image archive {archive}; ubuntu:24.04 loaded only into the isolated daemon")
-        camp._run(["docker", "-H", SOCKET, "image", "save", "-o", str(archive), "ubuntu:24.04"], check=True)
+        camp.note(f"C10 image archive {archive}; {custom_image} loaded only into the isolated daemon")
+        camp._run(["docker", "-H", SOCKET, "image", "save", "-o", str(archive), custom_image], check=True)
         docker("image", "load", "-i", str(archive))
-        ocs("create", "ocs-test-activation", "--image", "ubuntu:24.04")
+        ocs("create", "ocs-test-activation", "--image", custom_image)
         meta = json.loads(next((Path(env["OPENCODE_SANDBOX_HOME"]) / "environments").glob("*/metadata.json")).read_text())
         ids.append(meta["id"])
         camp.note(f"C10 isolated environment ocs-test-activation id={meta['id']}")
@@ -121,8 +121,8 @@ Service={name}.service
             assert not docker("volume", "ls", "-q").stdout.strip()
             # This daemon started empty: remove only the one explicitly loaded test image.
             images = docker("image", "ls", "--format", "{{.Repository}}:{{.Tag}}").stdout.splitlines()
-            assert images == ["ubuntu:24.04"], images
-            docker("image", "rm", "ubuntu:24.04")
+            assert images == [custom_image], images
+            docker("image", "rm", custom_image)
             camp.note(f"C10 guarded product cleanup and empty Docker inventory: {name}")
         finally:
             systemctl("stop", name + ".socket", name + ".service")
