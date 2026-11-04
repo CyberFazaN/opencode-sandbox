@@ -157,11 +157,13 @@ def test_config_apply_killed_then_recover(campaign, checks, fault, env, match, w
 def test_backup_killed_leaves_only_a_temporary_directory(campaign, checks, fault, env):
     camp, ck = campaign, checks
     name, eid = env
+    published = set((camp.data / "backups").glob("*.ocsbackup"))
     rc = fault(["backup", "create", name, "--stop", "--no-system"], "*-H * run *", "after")
     ck(rc == -signal.SIGKILL, f"manager SIGKILLed after the first helper run of a backup (exit {rc})")
     leftovers = list((camp.data / "backups").glob(".backup-*"))
     ck(len(leftovers) == 1, f"one temporary .backup-* directory left ({len(leftovers)})")
-    ck(not list((camp.data / "backups").glob("*.ocsbackup")), "no published (partial) backup")
+    ck(set((camp.data / "backups").glob("*.ocsbackup")) == published,
+       "no new published (partial) backup; earlier complete backups preserved")
     preview = camp.ocs("disk", "cleanup").stdout
     ck(".backup-" in preview, "disk cleanup lists the unfinished backup directory")
     camp.ocs("disk", "cleanup", "--yes")

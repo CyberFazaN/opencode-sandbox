@@ -46,7 +46,7 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
     server = HTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=.01), daemon=True)
     thread.start()
-    directory = camp.tmp("discovery-terminal")
+    directory = camp.tmp(f"discovery-terminal-{distro}-{size[0]}")
     script, calls_path = directory / "dashboard.py", directory / "docker.jsonl"
     script.write_text("import json\nfrom opencode_sandbox import core as c, opencode_versions as v, manager_releases as mr\n"
                       "from opencode_sandbox.tui import Dashboard\n"
@@ -67,14 +67,20 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
         terminal.send("g", .5)
         ck(terminal.wait_for("Daily metadata discovery", 10) and "Save" in terminal.text(), "Daily terminal: opt-in and Save visible")
         terminal.snap("Daily discovery preference before opt-in")
-        terminal.send(TAB * 3 + " " + TAB + ENTER, 1)
-        ck(terminal.wait_for(r"Updates \(1\)", 20), "Daily terminal: keyboard opt-in yields one quiet dated-history indicator")
+        terminal.send(TAB * 3 + " " + TAB * 2 + ENTER, 1)  # skip Copy selected text to Save
+        assert ck(terminal.wait_for(r"Updates \(1\)", 20), "Daily terminal: keyboard opt-in yields one quiet dated-history indicator")
         preferences_path = camp.config / "ui.json"
         ck(preferences_path.exists() and json.loads(preferences_path.read_text())["daily_discovery"], "Daily terminal: preference persisted")
         ck(state["requests"] == 1, "Daily terminal: opt-in attempted npm once, not per environment")
         terminal.send("q", .5)
         ck(terminal.exit_code(15) == 0 and terminal.restored(), "Daily terminal: quit restores terminal")
         terminal.close()
+        passive_calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
+        passive_state = camp.inspect(eid)
+        ck(not any(call[0] in ("run", "start", "exec", "build", "commit", "stop", "rm") for call in passive_calls)
+           and not passive_state["State"]["Running"]
+           and passive_state["State"]["StartedAt"] == before["State"]["StartedAt"],
+           "Daily terminal: automatic scheduling never probes or starts a stopped runtime")
 
         # Same source/data root and a new process must reuse the successful attempt.
         terminal = Term([sys.executable, str(script)], *size, env=camp.env, log=camp.log)
@@ -85,6 +91,7 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
         state["fail"] = True
         terminal.send("c", .5)
         ck(terminal.wait_for("HTTP 503", 15) and state["requests"] == 2, "Daily terminal: explicit early refresh keeps failure visible")
+        assert ck(terminal.wait_for("Check complete", 30), "Daily terminal: explicit installed check completes independently of npm failure")
         terminal.send(ESC, .3)
         terminal.send("q", .5)
         ck(terminal.exit_code(15) == 0 and terminal.restored(), "Daily terminal: failed-discovery quit restores terminal")
@@ -93,16 +100,17 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
         terminal = Term([sys.executable, str(script)], *size, env=camp.env, log=camp.log)
         ck(terminal.wait_for(r"Updates \(1\)", 20) and state["requests"] == 2, "Daily terminal: failure/restart cannot trigger another automatic request")
         terminal.send("g", .3)
-        terminal.send(TAB * 3 + " " + TAB + ENTER, .5)
+        terminal.send(TAB * 3 + " " + TAB * 2 + ENTER, .5)
         ck(terminal.wait_for(name, 10) and "Updates (1)" not in terminal.text(), "Daily terminal: disabling hides unsolicited indicator")
         terminal.send("q", .5)
         ck(terminal.exit_code(15) == 0 and terminal.restored(), "Daily terminal: disabled quit restores terminal")
         after = camp.inspect(eid)
         calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
-        ck(not any(call[0] in ("run", "start", "exec", "build", "commit", "stop", "rm") for call in calls),
-           "Daily terminal: scheduling/manual stopped Check never invokes runtime/image probes or mutation")
-        ck(not after["State"]["Running"] and after["State"]["StartedAt"] == before["State"]["StartedAt"]
-           and metadata_path.read_bytes() == metadata, "Daily terminal: actual stopped state/startup time/metadata unchanged")
+        ck(any(call[0] == "exec" and call[-2:] == ["opencode", "--version"] for call in calls)
+           and not any(call[0] in ("run", "build", "commit", "rm") for call in calls),
+           "Daily terminal: only explicit Check probes the existing runtime; no image helper or replacement")
+        ck(not after["State"]["Running"] and after["State"]["StartedAt"] != before["State"]["StartedAt"]
+           and metadata_path.read_bytes() == metadata, "Daily terminal: explicit Check restores stopped state and preserves metadata")
     finally:
         if terminal: terminal.close()
         server.shutdown(); thread.join(); server.server_close()
