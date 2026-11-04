@@ -20,23 +20,27 @@ CID = 'a' * 64
 def daemon(tmp_path, monkeypatch):
     m = c.create('ocs-test-guard', 'scratch')
     state = tmp_path / 'state.json'
-    state.write_text(json.dumps({'Running': False, 'StartedAt': 'initial', 'fail_stop': False, 'hold_stop': False}))
+    state.write_text(json.dumps({'Running': False, 'StartedAt': 'initial', 'fail_stop': False}))
     binary = tmp_path / 'docker'
-    binary.write_text(f'#!{sys.executable}\n' + '''import json,sys,time
+    binary.write_text(f'#!{sys.executable}\n' + '''import json,os,sys,time
 from pathlib import Path
 path=Path(''' + repr(str(state)) + ''')
+def save(value):
+ temporary=path.with_name('state-'+str(os.getpid())+'.tmp')
+ try:
+  temporary.write_text(json.dumps(value)); temporary.replace(path)
+ finally: temporary.unlink(missing_ok=True)
 value=json.loads(path.read_text())
 args=sys.argv[3:]
 if args[:2]==['container','inspect']:
  print(json.dumps([{'Id':''' + repr(CID) + ''', 'Config':{'Labels':{'org.opencode-sandbox.id':''' + repr(m['id']) + '''}}, 'State':value}]))
 elif args[0]=='start':
- value.update(Running=True,StartedAt='check-start'); path.write_text(json.dumps(value))
+ value.update(Running=True,StartedAt='check-start'); save(value)
 elif args[0]=='stop':
  if value['fail_stop']: sys.exit(71)
- end=time.monotonic()+5
- while value['hold_stop'] and time.monotonic()<end:
-  time.sleep(.02); value=json.loads(path.read_text())
- value['Running']=False; path.write_text(json.dumps(value))
+ path.with_name('stop-entered').touch()
+ while path.with_name('hold-stop').exists(): time.sleep(.02)
+ value['Running']=False; save(value)
 else: sys.exit(72)
 ''')
     binary.chmod(0o700)
@@ -51,7 +55,7 @@ def identity(m):
 def test_guard_starts_stops_and_failure_retains_actionable_marker(daemon):
     m, state = daemon
     for fail in (False, True):
-        state.write_text(json.dumps({'Running': False, 'StartedAt': 'initial', 'fail_stop': fail, 'hold_stop': False}))
+        state.write_text(json.dumps({'Running': False, 'StartedAt': 'initial', 'fail_stop': fail}))
         with c.lock(m['id']) as lock:
             guard = StartGuard(m, identity(m), lock)
             guard.start()
@@ -92,8 +96,10 @@ def test_existing_unknown_check_record_is_never_overwritten_or_deleted(daemon):
 
 def test_parent_sigkill_keeps_lifecycle_lock_until_guardian_restores(daemon, tmp_path):
     m, state = daemon
-    value = json.loads(state.read_text()); value['hold_stop'] = True
-    state.write_text(json.dumps(value))
+    # Control files avoid a host read/modify/write racing the fake daemon's state updates.
+    # The old shared hold_stop JSON flag exposed truncated JSON or restored stale Running=True.
+    hold_stop, stop_entered = state.with_name('hold-stop'), state.with_name('stop-entered')
+    hold_stop.touch()
     source = str(Path(__file__).resolve().parents[1] / 'src')
     code = (f'import sys;sys.path.insert(0,{source!r})\n'
             'from opencode_sandbox import core as c\nfrom opencode_sandbox.environment_checks import StartGuard\n'
@@ -106,10 +112,12 @@ def test_parent_sigkill_keeps_lifecycle_lock_until_guardian_restores(daemon, tmp
         assert process.stdout.readline().strip() == 'ready'
         process.kill()
         process.wait(5)
+        deadline = time.monotonic() + 5
+        while not stop_entered.exists() and time.monotonic() < deadline: time.sleep(.02)
+        assert stop_entered.exists(), 'guardian did not begin restoration after parent death'
         with (c.BASE / 'locks' / (m['id'] + '.lock')).open() as contender:
             with pytest.raises(BlockingIOError): fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            value = json.loads(state.read_text()); value['hold_stop'] = False
-            state.write_text(json.dumps(value))
+            hold_stop.unlink()
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 try: fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB); break
@@ -118,5 +126,6 @@ def test_parent_sigkill_keeps_lifecycle_lock_until_guardian_restores(daemon, tmp
             assert not json.loads(state.read_text())['Running']
             assert not (c.env_dir(m['id']) / 'version-check.json').exists()
     finally:
+        hold_stop.unlink(missing_ok=True)
         if process.poll() is None: process.kill(); process.wait(5)
         process.communicate(timeout=5)
