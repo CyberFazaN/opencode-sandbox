@@ -38,7 +38,8 @@ Consider something else if:
 
 ## Features
 
-- **Environments**: scratch (empty), project (a Git clone or a filtered copy of a folder) and
+- **Environments**: scratch (empty), project (a Git clone, optionally including local working
+  changes, or a filtered copy of a folder) and
   disposable quick sessions; Debian 13 or Arch Linux images (AUR through `ocs-aur`), or a
   custom image.
 - **Managed workspaces** by default, never your original folder; direct host workspaces only with
@@ -153,6 +154,12 @@ opencode-sandbox               # the dashboard
 `doctor` must report `Daemon identity: verified`; otherwise it says what is missing and exits
 with a code that names the problem ([docs/troubleshooting.md](docs/troubleshooting.md)). The
 full walk-through: [docs/getting-started.md](docs/getting-started.md).
+
+Git imports are **Committed only** by default. To hand the agent your in-progress work, use
+`create NAME --source PATH --include-working-changes`, or select **Include working changes**
+in the dashboard's New form. A status/count preview is shown; staged/unstaged changes and
+non-ignored untracked files are copied without changing the source repository. Ignored untracked
+files stay out; non-ignored secrets do not. See [import limits and safety](docs/workspaces.md#git-import-modes).
 
 ## External services
 

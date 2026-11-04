@@ -100,7 +100,10 @@ class CreateScreen(ModalScreen[dict | None]):
             yield Input(placeholder="Name (letters, digits, . _ -)", id="name", compact=True)
             yield Select([("Scratch: empty workspace", "scratch"), ("Project: a copy of a folder", "project"),
                           ("Quick: disposable session", "quick")], value="scratch", allow_blank=False, id="kind", compact=True)
-            yield Input(placeholder="Folder to copy (Git repository: committed files only); empty = none", id="source", compact=True)
+            yield Input(placeholder="Folder to copy (Git: committed only by default); empty = none", id="source", compact=True)
+            yield Select([("Git import: Committed only (default)", False),
+                          ("Git import: Include working changes", True)],
+                         value=False, allow_blank=False, id="git-working-changes", compact=True)
             with Collapsible(title="More options: distribution, workspace, provider, OpenCode config", id="more"):
                 yield Select([(f"Base definition: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
                               for d in distros.REGISTRY.values()], value=distros.DEFAULT, allow_blank=False, id="distro", compact=True)
@@ -127,9 +130,11 @@ class CreateScreen(ModalScreen[dict | None]):
             self.query_one("#oc-config-profile").display = event.value == "copy"
             self.query_one("#oc-config-hint").display = event.value == "copy"
         if event.select.id == "workspace-mode":
+            self.query_one("#git-working-changes").display = event.value != "direct"
+            if event.value == "direct": self.query_one("#git-working-changes", Select).value = False
             self.query_one("#source", Input).placeholder = (
                 "Host folder the agent works in directly (required)" if event.value == "direct"
-                else "Folder to copy (Git repository: committed files only); empty = none")
+                else "Folder to copy (Git: committed only by default); empty = none")
 
     def on_input_changed(self, event: Input.Changed) -> None:
         # A folder to copy makes a project, as in `create --source` without --kind.
@@ -146,8 +151,9 @@ class CreateScreen(ModalScreen[dict | None]):
         distro = self.query_one("#distro", Select).value
         direct = mode == "direct"
         path = Path(folder).expanduser() if folder else None
+        working = self.query_one("#git-working-changes", Select).value
         c.creation_options(name, kind, None if direct else path, distro=distro, workspace_mode=mode,
-                           workspace=path if direct else None)
+                           workspace=path if direct else None, include_working_changes=working)
         if direct:
             # The host checks without the directory scan, so a refused folder is reported here,
             # with the form still open; creation repeats all of them.
@@ -159,6 +165,7 @@ class CreateScreen(ModalScreen[dict | None]):
             raise c.SandboxError("Copy requires a config profile; place user-maintained directories in OpenCode Configs, or use Local")
         return {"name": name, "kind": kind, "source": folder or None, "profile": self.query_one("#profile", Select).value,
                 "mode": mode, "distro": distro, "opencode_config": config if copying else None,
+                "include_working_changes": working,
                 "agent_context_enabled": self.query_one("#include-agent-context", Checkbox).value}
 
     def on_mount(self):
@@ -178,6 +185,30 @@ class CreateScreen(ModalScreen[dict | None]):
             self.query_one("#create-error", Static).update(escape(str(exc)))
             return
         self.dismiss(values)
+
+
+class GitImportPreviewScreen(ModalScreen[bool]):
+    """Scrollable, content-free preview, usable on compact terminals."""
+    CSS = """GitImportPreviewScreen {align: center middle;}
+    #import-panel {width: 84; max-width: 100%; height: 85%; border: round $accent; background: $surface; padding: 0 1;}
+    #import-preview {height: 1fr;} #import-panel Horizontal {height: auto;}"""
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    AUTO_FOCUS = "#import-cancel"
+
+    def __init__(self, preview):
+        super().__init__()
+        self.preview = preview
+
+    def compose(self):
+        with Vertical(id="import-panel"):
+            yield Static("Import local Git working changes", markup=False)
+            yield TextArea(self.preview.describe(), read_only=True, id="import-preview")
+            with Horizontal():
+                yield Button("Cancel", id="import-cancel", compact=True)
+                yield Button("Import", id="import-confirm", variant="primary", compact=True)
+
+    def action_cancel(self): self.dismiss(False)
+    def on_button_pressed(self, event): self.dismiss(event.button.id == "import-confirm")
 
 
 class Dashboard(App):
@@ -1142,9 +1173,35 @@ class Dashboard(App):
             if values["mode"] == "direct":
                 self._confirm_direct(values)
                 return
+            if values.get("include_working_changes"):
+                self._operation_pending = True
+                self._set_busy("Previewing local Git working changes…")
+                self._preview_git_import(values)
+                return
             self._operation_pending = True
             self._set_busy(f"Validating config and creating {values['name']}…")
             self._create_environment(values)
+
+    @work(thread=True, exclusive=True, group="environment-operation")
+    def _preview_git_import(self, values):
+        from . import git_import
+        try:
+            plan = git_import.preview(Path(values["source"]))
+            self.app.call_from_thread(self._show_git_import, values, plan)
+        except Exception as exc:
+            self.app.call_from_thread(self._finished, c.error_text(exc), True)
+
+    def _show_git_import(self, values, plan):
+        self._finished("Review Git import preview")
+        self.push_screen(GitImportPreviewScreen(plan),
+                         lambda yes: self._create_git_import(values, plan.fingerprint) if yes else None)
+
+    def _create_git_import(self, values, fingerprint):
+        if self._operation_pending:
+            self.notify("Another operation is running", severity="warning"); return
+        self._operation_pending = True
+        self._set_busy(f"Importing working changes into {values['name']}…")
+        self._create_environment({**values, "import_fingerprint": fingerprint})
 
     def _confirm_direct(self, values) -> None:
         """Consent for a direct workspace: same text as the CLI; checks first, so refusals come before it."""
@@ -1168,6 +1225,8 @@ class Dashboard(App):
     def _create_environment(self, values: dict) -> None:
         try:
             options = {"opencode_config": values.get("opencode_config"),
+                       "include_working_changes": values.get("include_working_changes", False),
+                       "import_fingerprint": values.get("import_fingerprint"),
                        "agent_context_enabled": values.get("agent_context_enabled", True)}
             source = Path(values["source"]).expanduser() if values.get("source") else None
             if values.get("mode") == "direct":

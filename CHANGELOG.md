@@ -8,6 +8,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ### Added
 
+- Opt-in **Include working changes** for managed Project Git imports, shared by CLI and dashboard:
+  status/count preview, staged/unstaged index fidelity, non-ignored untracked files, binary data,
+  permissions and symlinks, with read-only source access and explicit unsupported-state failures.
+  Committed-only cloning remains the default.
 - User-maintained **OpenCode Configs**, one-time Local/Copy creation, and shared CLI/dashboard
   global-config Export/Apply/Delete/Reload/Empty workflows. Private temporary exports survive
   screen closure; whole-tree fingerprints detect container drift; recoverable volume replacement

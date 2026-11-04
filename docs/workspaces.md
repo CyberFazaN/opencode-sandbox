@@ -17,8 +17,8 @@ opencode-sandbox create tools --distro arch
 
 With `--source DIR` the kind is `project`:
 
-- A Git repository root is **cloned**: committed files only; uncommitted and ignored files are
-  not copied. A subdirectory of a repository is refused (import the root).
+- A Git repository root is **cloned**: committed only by default; optionally include working
+  changes as described below. A subdirectory of a repository is refused (import the root).
 - Any other directory is **copied** without hidden files, symlinks, special files and
   `node_modules`, `target`, `dist`, `build` and `__pycache__`. Everything else becomes readable
   by the agent.
@@ -30,6 +30,55 @@ The copy is the agent's: your original folder is never mounted or changed. Bring
 with `changes` ([changes.md](changes.md)). Do not run host Git, editors or build tools inside a
 managed workspace directory (`environments/<id>/workspace` in the data directory): its `.git` and
 tool configuration are the agent's, and host tools would act on them.
+
+### Git import modes
+
+**Committed only (default)** keeps the existing clean-clone workflow. Local edits, staged changes
+and untracked files are not imported. No new flag or confirmation is required.
+
+**Include working changes** is available for a managed Project Environment from a local repository:
+
+```sh
+opencode-sandbox create webapp-wip --source ~/code/webapp \
+  --include-working-changes
+```
+
+Dashboard: **New → Folder to copy → Git import: Include working changes → Create**, then review
+the preview and choose **Import** (or Cancel). The CLI flag explicitly opts in and prints the same
+preview before creation: changed-path counts, staged/unstaged/untracked counts and up to 12 status
+entries (`index / working tree`). No file contents or patch bodies appear in the preview.
+
+- Keeps history, the current branch (or detached HEAD), the index and working files, including
+  staged versus unstaged changes, additions, deletions, renames, binary data, intent-to-add and
+  regular-file permission/executable bits. Symlink text is copied verbatim; targets are never
+  copied or followed. Hardlinks become independent files; empty directories are not imported.
+- **Ignored untracked files are excluded**, using `.gitignore`, `.git/info/exclude` and user-global
+  Git ignores. Already tracked files, including explicitly force-added files, remain included.
+  Non-ignored hidden files **are included**: review for secrets before opting in. There is no
+  automatic secret detector or size-based silent omission.
+- The source working tree, index and history are read-only inputs. No temporary commits, stash,
+  staging, checkout, source hooks/filters or network fetch occur. The resulting clone is independent;
+  later host changes are not synchronized. Git remotes/hooks, credentials and source Git configuration
+  are not copied (the clone's `origin` identifies the source, as with committed-only import).
+- Keep the repository idle through preview and import. Content/index/HEAD rechecks reject detected
+  concurrent edits; this is not a lock or an atomic snapshot of an actively edited host repository.
+  Failures remove only the new, incomplete environment; the source is left as it was.
+- Unsupported states fail explicitly: no commits, unresolved conflicts or in-progress merge/rebase/
+  cherry-pick/revert, submodules, nested untracked repositories, linked worktrees/gitdir files,
+  redirected/symlinked Git metadata, alternates, shallow/partial clones, sparse/split indexes,
+  assume-unchanged/skip-worktree entries, and repository-local `core.excludesFile` redirections.
+  Repository-local Git include/worktree redirections are refused too; user-global ignores are read
+  separately, without loading source Git configuration.
+  Resolve/finish the state first or use committed-only import where applicable. Sockets, FIFOs,
+  devices, unreadable files and symlinked parents of tracked paths are refused, not skipped.
+- Limits: 100,000 selected paths/visited directories, 256 MiB per file/staged blob, 1 GiB of selected
+  working-file data, 1 GiB of additional staged blobs, and 1 MiB per ignore-rule file (1 GiB total).
+  Large committed history is cloned normally. Custom clean/
+  smudge filters (including Git LFS), host-specific Git settings and filesystem ownership/ACLs/xattrs
+  are not reproduced; literal worktree and index bytes are retained, but status may differ when
+  those settings are essential. Configure tools inside the sandbox yourself.
+
+This option does not apply to plain-folder copies, direct workspaces or Quick sessions.
 
 ### Quick sessions
 

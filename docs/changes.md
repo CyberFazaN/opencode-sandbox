@@ -8,6 +8,10 @@ They apply to project environments imported from Git (also after a restore of on
 keeps the base commit). For a non-Git workspace, `changes export` archives the whole workspace.
 A direct workspace has no `changes`: its changes are already in your directory.
 
+With [Include working changes](workspaces.md#git-import-modes), bundles include the initial imported
+edits as well as the agent's later edits, against the original base commit. The clean-target checks
+below still apply: importing work does not enable applying a bundle over an already dirty host tree.
+
 ```sh
 opencode-sandbox changes show NAME            # commits, diffstat, working tree
 opencode-sandbox changes export NAME          # .tar.gz archive in exports/

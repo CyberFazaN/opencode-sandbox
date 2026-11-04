@@ -43,6 +43,26 @@ declined a reboot. Acceptance is not verification; original frozen recovery inpu
 
 ## Verification
 
+### Unreleased working-state Git import — 2026-11-04
+
+Full default suites: **2351 passed / 107 opt-in skips each** on Python 3.11/lowest direct and
+Python 3.14/current dependencies. The two crossed combinations each passed **99 affected checks**
+(real host Git/files, CLI, compact/large Textual pilots, direct-workspace and Git safety neighbors).
+Final help-panel grouping/documentation changes passed **62 affected checks on each endpoint**;
+the full counts precede that localized CLI-help-only change. Wheel/sdist, strict Twine validation,
+installed-wheel module/CLI/import smoke and private-file exclusion checks passed.
+Ruff, shellcheck and documentation contracts passed. Committed-only import remains the default;
+working-state import preserves index/worktree separation without source writes or temporary commits.
+Unsupported-state, ignore-rule, special-file, source-drift and partial-creation failures have explicit
+regressions; no source hooks/filters/configuration execute.
+
+`test_12_git_import.py`: **2 passed**, real rootless Debian and Arch (`gi-20261104`), confirming
+container-visible branch/status/index bytes, binary content, executable bits, deletions, symlink
+identity, ignored-file omission and source independence across stop/start. Guarded product cleanup
+left no run-owned Docker resources; all pre-existing image tags/IDs were unchanged. Logs/manifests
+remain under `.work/logs/gi-*`. This is scoped import verification, not a complete campaign or release
+qualification; no OpenCode prompts, privileged faults or reboot checks were run for this change.
+
 ### Unreleased global configuration and activation — 2026-11-04
 
 Full default checkpoint: **2294 passed / 101 opt-in integration skips each** on Python

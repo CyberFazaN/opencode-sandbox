@@ -27,7 +27,7 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
 | `base_locks.py` | Daemon/distribution build/publication guards and lock ordering |
 | `distros.py`, `assets/images/` | Declarative distribution definitions, build labels/assets, OpenCode install and AUR broker |
 | `config_plan.py` | Shared settings diff, consent/preconditions and executor |
-| `workspaces.py`, `workspace_io.py`, `gitflow.py` | Managed/direct checks, hardened host access, import/export and Git review/transfer |
+| `workspaces.py`, `workspace_io.py`, `git_import.py`, `gitflow.py` | Managed/direct checks, hardened host access, working-state import and Git review/transfer |
 | `backup.py`, `cleanup.py` | Validated cold backup/staged restore; data-directory-owned usage/removal |
 | `readiness.py`, `diagnostics.py`, `http_probe.py`, `probes.py` | Read-only readiness, finite host/HTTP/container probes and owned-client cleanup |
 | `agent_context.py` | Render/verify/refresh sandbox guidance and reconcile the saved system instruction toggle |
@@ -157,6 +157,16 @@ manager. Direct workspaces need explicit consent, path/owner/mount safety checks
 write-preflight, then rechecks before every start/creation. They are never chowned/chmodded/deleted
 or restore targets. Backups omit them unless explicitly included; restores always create managed
 workspaces. Checks are snapshots, not protection from a socket/mount introduced later.
+
+Project Git creation defaults to a clean clone. Opt-in working-state import (`git_import`) shares
+preview/fingerprints across CLI/TUI and uses `workspace_io`'s private Git view: no source index writes,
+temporary commits, config/hook/filter execution or lazy fetch. Clone without checkout through the
+private Git directory; transfer missing index blobs and the exact index; materialize only tracked
+and non-ignored untracked paths via no-follow directory-FD reads, then run status on that private
+tree, not the source. Recheck source HEAD/index/files before publishing metadata; any failure removes
+only the new environment. Preserve regular-file modes and symlink text, not ownership/ACLs/hardlinks.
+Unsupported states and bounded-transfer limits are listed in [workspaces](../workspaces.md#git-import-modes).
+This is a one-shot copy, not repository management or an atomic host snapshot.
 
 Host Git uses a private manager-written `GIT_DIR` with only storage-format settings, snapshot HEAD/
 index and data links to objects/refs. Workspace config/hooks/drivers/includes never execute.

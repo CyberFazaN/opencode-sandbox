@@ -453,7 +453,8 @@ def _distro_help():
 
 @app.command(rich_help_panel=ENVIRONMENTS)
 def create(name:str,
-           source:Path | None=typer.Option(None,"--source",help="Folder to copy into the workspace: a Git repository root is cloned (committed files only), other folders are copied without hidden files"),
+           source:Path | None=typer.Option(None,"--source",help="Folder to copy: Git roots are cloned (committed only by default); other folders exclude hidden files"),
+           include_working_changes:bool=typer.Option(False,"--include-working-changes",rich_help_panel=WORKSPACE_PANEL,help="Project Git import: include staged, unstaged and non-ignored untracked files; show a status preview"),
            kind:str | None=typer.Option(None,"--kind",help="scratch (empty workspace) | project (a copy of --source) | quick (disposable). Default: project with --source or a direct workspace, otherwise scratch"),
            profile:str=typer.Option("default","--profile",help="Provider profile (see: providers list)"),
            distro:str | None=typer.Option(None,"--distro",rich_help_panel=IMAGE_PANEL,help="Base definitions: "+_distro_help()),
@@ -468,7 +469,14 @@ def create(name:str,
     Without options: the default distribution, Local OpenCode config and Agent Context enabled. The original folder is never touched."""
     from .config_plan import check_profile
     check_profile(profile)  # as config apply: a mistyped name would leave the container without credentials
-    kind,_=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace)
+    kind,_=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
+                             include_working_changes=include_working_changes)
+    fingerprint=None
+    if include_working_changes:
+        from . import git_import
+        plan=git_import.preview(source)
+        typer.echo(plan.describe())
+        fingerprint=plan.fingerprint
     consent=False
     if workspace_mode==workspaces.DIRECT and workspace is not None:
         target=workspaces.check_direct(workspace)  # explain refusals before asking
@@ -482,7 +490,8 @@ def create(name:str,
     if opencode_config is not None:
         typer.echo("Validating/copying the entire OpenCode config profile before creation…", err=True)
     m=c.create(name,kind,source,profile,distro=distro,image=image,workspace_mode=workspace_mode,
-                workspace=workspace,consent=consent,opencode_config=opencode_config,agent_context_enabled=agent_context)
+                workspace=workspace,consent=consent,opencode_config=opencode_config,agent_context_enabled=agent_context,
+                include_working_changes=include_working_changes,import_fingerprint=fingerprint)
     msg(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Distribution: {c.distribution_description(m)}\n"
