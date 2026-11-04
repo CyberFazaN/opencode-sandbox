@@ -15,7 +15,7 @@ Release procedure: [RELEASING](RELEASING.md#2-verify). Applicable evidence/platf
 in `tests/integration/` (the real campaign: every check is logged with the row ID it belongs
 to); files under `tests/` are the unit, host and Textual pilot suite.
 
-There are 87 active rows. Retired installer-only IDs B02–B08 are not reused or counted as passed.
+There are 88 active rows. Retired installer-only IDs B02–B08 are not reused or counted as passed.
 Statuses are **recorded scoped evidence, not a current candidate's release result**: plain real
 PASS refers to retained earlier-release behaviour; rows naming the 6.1.0 candidate/release or a
 later run have that specific scope. I04/I06 and affected rows must be re-established on the release
@@ -25,13 +25,13 @@ a focused run, a private source fixture or a historical PASS.
 ## Updates final integration
 
 The component Updates implementation is published in 6.2.0. Current
-qualification is in [BASELINE](BASELINE.md#620-candidate-qualification): a complete installed-manager
+qualification for that release is in [BASELINE](BASELINE.md#620-candidate-qualification): a complete installed-manager
 campaign passed 86 tests/1643 checks on Python 3.14, plus seven installed-manager floor tests/563
 checks on Python 3.11. This renews the automated real rows, including privileged/socket paths;
 earlier per-row detail below retains its named scope, not a claim of fresh manual/paid-provider proof.
 
 New B13/B14 have real evidence; B15's hard-kill refusal is real PASS but actual post-reboot recovery
-is **BLOCKED with owner-accepted release risk for 6.2.0 (2026-11-02); no reboot authorized**.
+is **BLOCKED with owner-accepted release risk renewed for 6.3.0 (2026-11-04), without testing or a reboot**.
 Acceptance is not a post-reboot PASS. Next step: on an authorized
 disposable VM, retain a named hard-interrupted operation, reboot, perform an explicit manual repair
 only if needed, then run its original frozen verification command and check normal startup/data
@@ -72,7 +72,7 @@ review passed before publication; both-endpoint public GitHub-tag pipx smoke pas
 | B12 | P1 | `pipx uninstall` removes its launcher and keeps environments, containers and volumes; a foreign/legacy launcher and its target are neither replaced nor deleted; after the test removes its own legacy launcher a working pipx launcher can be installed | `test_65_pipx.py`; the transition from a legacy source installation is documented, not automatic | PASS (6.2.0 `r62b`/`r62c`: both endpoints, actual retained container/volume and unchanged foreign target checks) |
 | B13 | P0 | Exact public manager consent, actual process-lifetime usage/worker/session refusal, restored foreground terminal and helper-owned exclusion; no ordinary-CLI bypass | `test_66_manager_inventory.py`, `test_67_installation_exclusion.py`, `test_67_manager_update.py`; host/pilot manager boundary tests | PASS (6.2.0 `r62b`/`r62c`: actual installed CLI/TUI, both pipx layouts/terminal sizes and Python endpoints; source/tool/terminal gates, non-daemon drain and both-distribution session/exec exclusion, including an unrelated-runner control) |
 | B14 | P0 | Exact-tag pipx replacement with durable parked-child admission; independent expected source/commit/version/launcher/runtime/CLI result and explicit failure/manual-reinstall recovery; data retained | `test_67_manager_update.py`; host whole-update/operation/installer tests | PASS (6.2.0 `r62b`/`r62c`: both Python endpoints/layouts, actual force replacement, failed health/startup barrier, manual previous-tag reinstall/frozen verification, handled interruption and durable lost-terminal results; private transports, not public authentication or automatic rollback) |
-| B15 | P1 | Hard interruption never clears pending state from group absence/cache/exit status; independently verified recovery after old-process quiescence | `test_67_manager_update.py`, host interruption/operation tests; authorized post-reboot continuation still required | BLOCKED with owner-accepted release risk for 6.2.0 (2026-11-02): real same-boot hard-kill/escaped-child/empty-group refusal renewed at both Python endpoints; actual reboot/frozen post-boot recovery remains unexecuted, with no reboot authorized. Original inputs retained; reproducible next step above; acceptance is not a PASS |
+| B15 | P1 | Hard interruption never clears pending state from group absence/cache/exit status; independently verified recovery after old-process quiescence | `test_67_manager_update.py`, host interruption/operation tests; authorized post-reboot continuation still required | BLOCKED with owner-accepted release risk for 6.3.0 (2026-11-04), without testing or a reboot: historical real same-boot hard-kill/escaped-child/empty-group refusal at both Python endpoints does not verify actual reboot/frozen post-boot recovery. Original inputs retained; reproducible next step above; acceptance is not a PASS |
 
 ## C. Rootless Docker and images
 
@@ -196,19 +196,19 @@ review passed before publication; both-endpoint public GitHub-tag pipx smoke pas
 
 ## Counts
 
-87 active rows, including C10 (D-052) and B13–B15. Seven
+88 active rows, including C10 (D-052), B13–B15 and G11. Seven
 installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 (three P1). Their removal is not a PASS and does not change the historical 6.0.0 totals.
 
 | Priority | Rows | PASS | PASS in part | BLOCKED | NOT TESTED | FAIL |
 |---|---|---|---|---|---|---|
-| P0 | 48 | 48 | 0 | 0 | 0 | 0 |
+| P0 | 49 | 49 | 0 | 0 | 0 | 0 |
 | P1 | 34 | 33 | 0 | 1 | 0 | 0 |
 | P2 | 5 | 4 | 1 | 0 | 0 | 0 |
-| All | 87 | 85 | 1 | 1 | 0 | 0 |
+| All | 88 | 86 | 1 | 1 | 0 | 0 |
 
 - PASS in part: D09 (the host reboot is BLOCKED with accepted risk and a next step).
-- B15 is BLOCKED with owner-accepted risk for 6.2.0; its post-reboot path is not renewed by same-boot
+- B15 is BLOCKED with owner-accepted risk for 6.3.0; its post-reboot path is not renewed by same-boot
   refusal or unit/host proof. Acceptance alone does not establish the remaining release gates.
 - C10 was re-established on the 6.2.0 candidate through the installed manager and actual isolated
   inherited listener, not just host sockets or warmed direct Docker.

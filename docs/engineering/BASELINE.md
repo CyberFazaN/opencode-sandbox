@@ -1,4 +1,4 @@
-# Baseline — OpenCode Sandbox 6.2.0
+# Baseline — OpenCode Sandbox 6.3.0 candidate
 
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
@@ -9,22 +9,20 @@ The current checkpoint below records fresh verification; older sections retain t
 
 | Item | Current state |
 |---|---|
-| Manager | `6.2.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.3.0` candidate, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
 | Images | Debian 13/default (`node:24-trixie`, revision 4); Arch rolling (`archlinux:base-devel`, revision 3) |
 
-The release includes component Updates views, optional default-off daily discovery,
-environment/base actions and independent manager update/recovery. These are implemented, not a
-pending roadmap. Published 6.2.0 kept the schemas/image definitions; unreleased changes advance the
-image definitions so every base build upgrades system packages, and environment OpenCode updates
-offer a default-off package upgrade (D-063). Explicit global-config profile/file transfers and optional
-Agent Context activation replace initial integration provisioning (D-064/D-065), without changing
-environment/backup schemas. Availability,
-consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
-The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
-declined a reboot. Acceptance is not verification; original frozen recovery inputs remain retained.
+The 6.3.0 candidate adds working-state Git imports, explicit global-config profile/file transfers,
+optional Agent Context activation and revised Updates flows. Initial integration provisioning is
+removed (D-064/D-065). Both image definitions advance so every base build upgrades system packages;
+environment OpenCode updates offer a default-off package upgrade (D-063). Environment/backup
+schemas are unchanged. Availability, consent, mutation and recovery remain separate; no Update All
+or automatic manager restart/rollback. The owner renewed acceptance of B15's unverified post-boot
+recovery and general host-reboot risks for 6.3.0 on 2026-11-04, without testing or a reboot.
+Acceptance is not verification; original frozen recovery inputs remain retained.
 
 ## Supported environments
 
@@ -340,13 +338,13 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 ## Unverified behaviour
 
 - **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
-  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized. Same-boot hard-interruption
+  release risk for 6.3.0 on 2026-11-04**, without testing or a reboot. Same-boot hard-interruption
   refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
   On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
   original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
   verifier and confirm startup/data retention. Never delete state/locks or infer success from an
   empty old group, cache or installer exit.
-- **Host reboot generally (D09):** accepted at the stable release, not executed. Daemon restart,
+- **Host reboot generally (D09):** risk accepted for 6.3.0 on 2026-11-04, not executed. Daemon restart,
   stop/start and daemon-unit SIGKILL passed. Next: authorized reboot, then `start NAME` and
   `check NAME` on a manifested test environment; do not equate this with B15's separate proof.
 - Real rootless Docker on other Linux distributions, without systemd or without delegated
