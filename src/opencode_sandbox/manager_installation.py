@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import stat
 import sys
@@ -199,3 +200,32 @@ def update_reason(installation, release):
         if releases._key(version) <= releases._key(installation['version']): return 'No strictly newer published manager release is selected.'
     except (c.SandboxError, KeyError, TypeError): return 'Release version is unsupported; review manual guidance.'
     return None
+
+
+def newer_release(release):
+    """Availability, independent of automatic-install eligibility; never an execution grant."""
+    try:
+        return releases.version(release['tag']) == release['version'] and releases._key(release['version']) > releases._key(__version__)
+    except (c.SandboxError, KeyError, TypeError):
+        return False
+
+
+def manual_update(release, reason):
+    """Fresh ownership proof before offering a force command, not a conversion recipe."""
+    installation = classify()
+    command = None
+    if installation.get('verified') is True and newer_release(release):
+        evidence = installation['evidence']
+        settings = {'PIPX_HOME': evidence['pipx_home'], 'PIPX_BIN_DIR': evidence['pipx_bin_dir'],
+                    'PIPX_MAN_DIR': evidence['locations']['man_dir'],
+                    'PIPX_COMPLETION_DIR': evidence['locations']['completion_dir'],
+                    'PIPX_SHARED_LIBS': evidence['locations']['shared_libs']}
+        command = shlex.join(['env', *[f'{key}={value}' for key, value in settings.items()],
+                              'pipx', 'install', '--force', '--python', evidence['source_python'],
+                              'git+' + URL + '@' + release['tag']])
+    message = ('Manual update required\n\n' + reason + '\n\n' + installation['reason'] + '\n\n'
+               + ('Close all manager instances and sessions before running this command in your terminal. '
+                  'It replaces this verified pipx installation; it does not restore identical dependencies. '
+                  'Preserve any custom pip/Git/network settings. Confirm copies only; nothing is executed.\n\n' + command
+                  if command else GUIDANCE + '\n\nNo replacement command is offered without verified ownership and settings.'))
+    return message, command

@@ -20,6 +20,8 @@ app=typer.Typer(cls=_HelpOrder,help="Manage isolated OpenCode workspaces on root
 ENVIRONMENTS, SESSIONS, DATA, HOST = "Environments", "Sessions", "Settings, changes and data", "Maintenance"
 profiles=typer.Typer(help="Provider profiles: named credentials for model providers (values never displayed).",no_args_is_help=True)
 app.add_typer(profiles,name="providers",rich_help_panel=DATA)
+opencode_configs_app=typer.Typer(help="User-maintained OpenCode Configs and whole-global-directory file transfers (not an effective-config resolver).",no_args_is_help=True)
+app.add_typer(opencode_configs_app,name="opencode-configs",rich_help_panel=DATA)
 manager_app=typer.Typer(help="Sandbox Manager releases, installation evidence and explicitly reviewed updates (not OpenCode/npm).",no_args_is_help=True)
 app.add_typer(manager_app,name="manager",rich_help_panel=HOST)
 
@@ -129,8 +131,10 @@ def opencode_policy_set(name: str, mode: str, version: str | None = typer.Option
 @opencode_app.command("update-base")
 def opencode_update_base(version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
                          distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
-                         refresh: bool=typer.Option(False,"--refresh",help="Pull current upstream inputs and bypass build cache; never prune it")):
-    """Rebuild a base image with another OpenCode version; keeps a rollback copy of the old one."""
+                         refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image and bypass the build cache; never prune")):
+    """Rebuild a base image with another OpenCode version; keeps a rollback copy of the old one.
+
+    Every build upgrades the image's system packages, in cached and refresh mode."""
     from . import opencode_versions as v
     plan=v.prepare_base_build(version,distro,refresh=refresh)
     typer.echo(v.describe_base_build(plan))
@@ -140,19 +144,24 @@ def opencode_update_base(version: str=typer.Option("latest","--version",help="Ex
     typer.echo(v.update_base(plan.target, distro, refresh=refresh, plan=plan))
 
 @opencode_app.command("update")
-def opencode_update(name: str, version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation")):
+def opencode_update(name: str, version: str=typer.Option("latest","--version",help="Exact OpenCode 2.x version, or latest supported stable"), yes: bool=typer.Option(False,"--yes",help="Do not ask for confirmation"),
+                    update_system_packages: bool=typer.Option(False,"--update-system-packages",help="Upgrade the environment's installed system packages first; OpenCode is not updated if this fails")):
     """Update OpenCode in a stopped environment; on failure its system layer is rolled back to a checkpoint."""
     from . import opencode_versions as v
     m=c.resolve(name)
-    plan=v.prepare_environment_update(m,version)
+    plan=v.prepare_environment_update(m,version,system_packages=update_system_packages)
     typer.echo("Note: a checkpoint (docker commit) of the container's system layer is taken first; a failed update "
                "is rolled back to it, 'opencode rollback' undoes a successful one. /root and /workspace are not touched.")
-    if not yes and not _confirm(f"Temporarily start stopped environment {name}, update OpenCode to {plan.target}, then stop it?", docker=True):
+    for line in v.system_upgrade_lines(m, plan.system_packages): typer.echo(line)
+    if not yes and not _confirm(f"Temporarily start stopped environment {name}, "
+                                f"{'upgrade its system packages, ' if plan.system_packages else ''}update OpenCode to {plan.target}, then stop it?", docker=True):
         raise typer.Abort()
     result=v.update_environment(m,plan.target,plan=plan)
     if result.get("unchanged"): typer.echo(f"OpenCode {result['version']} is already installed; nothing changed")
-    else: typer.echo(f"Updated OpenCode {result['previous_version'] or 'unknown (opencode --version failed)'} -> {result['version']}; "
-                     f"rollback point {result['checkpoint']}")
+    else: typer.echo(("System packages upgraded; " if result.get("system_packages") else "")
+                     + (f"OpenCode {result['version']} unchanged" if result['previous_version']==result['version'] else
+                        f"Updated OpenCode {result['previous_version'] or 'unknown (opencode --version failed)'} -> {result['version']}")
+                     + f"; rollback point {result['checkpoint']}")
 
 @opencode_app.command("update-recover")
 def opencode_update_recover(name: str):
@@ -168,7 +177,10 @@ def opencode_rollback(name: str, yes: bool=typer.Option(False,"--yes",help="Do n
     m=c.resolve(name)
     record=m.get("opencode_update") or {}
     if not yes and not _confirm(f"Recreate {name} from the checkpoint before its last OpenCode update "
-                                f"({record.get('to')} -> {record.get('from')})? The current system layer is kept as a snapshot.",
+                                f"({record.get('to')} -> {record.get('from')})? The current system layer is kept as a snapshot."
+                                + (" That update also upgraded system packages: their checkpointed versions return, but changes "
+                                   "outside the system layer (home volume, workspace, migrated data) are not undone."
+                                   if record.get("system_packages") else ""),
                                 docker=True):
         raise typer.Abort()
     result=v.rollback_environment(m)
@@ -214,11 +226,111 @@ def pick(key:str | None):
 
 def msg(m): typer.echo(f"{m['name']} [{m['id']}] ({m['kind']})")
 
+
+@opencode_configs_app.command("list")
+def opencode_configs_list():
+    """Discover user-maintained directories/root symlinks; never edit a source profile."""
+    from . import opencode_configs as oc
+    typer.echo(f"User-maintained directories: {oc.profiles_directory()}\n"
+               "Copy/Reload imports the whole directory once, never a live link. Profiles may contain secrets or executable plugins.\n"
+               f"Root symlink example: ln -s ~/my-opencode-config {oc.profiles_directory()}/work")
+    names=oc.profiles()
+    for name in names: typer.echo(name)
+    if not names: typer.echo("No profiles. Place named directories here; Local creation remains usable.")
+
+
+@opencode_configs_app.command("status")
+def opencode_config_status(name: str):
+    """OpenCode Config Editor status and exact persistent-on-host temporary export path."""
+    from . import opencode_configs as oc
+    result=oc.status(c.resolve(name))
+    typer.echo(result["state"])
+    if result["path"]: typer.echo(result["path"])
+    typer.echo(oc.SCOPE + "\n" + oc.EXPORT_WARNING)
+
+
+def _config_running_warning(m):
+    from . import opencode_configs as oc
+    if c.running(m): typer.echo(oc.RUNNING_WARNING, err=True)
+
+
+@opencode_configs_app.command("export")
+def opencode_config_export(name: str, yes: bool=typer.Option(False,"--yes",help="Confirm replacement of an existing export; host edits will be lost")):
+    """Export the whole global tree to a private /tmp workspace; keep it across editor/manager closure."""
+    from . import opencode_configs as oc
+    m=c.resolve(name)
+    exists=oc.status(m)["path"] is not None
+    if exists and not yes and not _confirm("Replace Export? Existing host-side edits will be lost. Cancel preserves them.", docker=False):
+        raise typer.Abort()
+    typer.echo("Exporting/validating the entire global config tree…", err=True)
+    typer.echo(oc.export(m,replace=exists and (yes or c._tty())))
+    typer.echo(oc.EXPORT_WARNING)
+
+
+@opencode_configs_app.command("apply")
+def opencode_config_apply(name: str, overwrite: bool=typer.Option(False,"--overwrite",help="Explicitly accept observed container-side drift; never disables staging/recovery")):
+    """Apply an edited export; compare container config with its saved baseline, never with host edits."""
+    from . import opencode_configs as oc
+    m=c.resolve(name)
+    _config_running_warning(m)
+    typer.echo("Staging/validating the entire edited export…", err=True)
+    try: path=oc.apply(m)
+    except oc.Conflict as exc:
+        typer.echo(str(exc), err=True)
+        if not overwrite:
+            if not c._tty(): raise c.SandboxError("Canceled; both trees and baseline preserved. Review, then use --overwrite to choose Overwrite Anyway") from None
+            if not typer.confirm("Overwrite Anyway?",default=False):
+                typer.echo("Canceled; export and container config preserved."); return
+        path=oc.apply(m,overwrite=exc.fingerprint)
+    typer.echo(f"Applied. Export remains at {path}; its baseline now matches the installed container tree.")
+
+
+@opencode_configs_app.command("delete-export")
+def opencode_config_delete(name: str, yes: bool=typer.Option(False,"--yes",help="Confirm loss of unapplied host edits")):
+    """Delete only a validated host export. Never changes the container config."""
+    from . import opencode_configs as oc
+    m=c.resolve(name)
+    if not yes and not _confirm("Delete Export? Unapplied host edits will be lost; container config is untouched.",docker=False):
+        raise typer.Abort()
+    oc.delete_export(m,confirmed=True)
+    typer.echo("Export deleted; container config unchanged.")
+
+
+@opencode_configs_app.command("reload")
+def opencode_config_reload(name: str, profile: str | None=typer.Option(None,"--profile",help="Freshly copy this whole profile; omitted selects the original profile (Empty for Local) and refuses if it is gone"),
+                           empty: bool=typer.Option(False,"--empty",help="Completely clear the global config directory"),
+                           yes: bool=typer.Option(False,"--yes",help="Confirm whole-directory replacement")):
+    """Replace global config from a profile or Empty; system, Agent Context, workspace and auth/state outside it stay untouched."""
+    from . import opencode_configs as oc
+    if empty and profile is not None: raise c.SandboxError("Choose --profile or --empty, not both")
+    m=c.resolve(name)
+    source=profile if profile is not None else (None if empty else m.get("opencode_config_source"))
+    if profile is None and source is not None and source not in oc.profiles():
+        # Never turn a vanished original into an implicit Empty, especially with --yes.
+        raise c.SandboxError(f"Original OpenCode config profile {source} is no longer available; choose --profile NAME or --empty")
+    if source is not None: oc.profile_path(source)
+    typer.echo(oc.REPLACE_WARNING + "\n" + oc.SCOPE)
+    typer.echo(f"Selected: {source or 'Empty — completely clear local configuration'}")
+    _config_running_warning(m)
+    if not yes and not _confirm("Reload and replace the entire global config directory?",docker=True): raise typer.Abort()
+    typer.echo("Staging/validating the whole replacement tree…", err=True)
+    result=oc.reload(m,source,confirmed=True)
+    typer.echo(f"Reloaded: {result['source']}. No container or OpenCode restart.")
+
+
+@opencode_configs_app.command("recover")
+def opencode_config_recover(name: str):
+    """Resolve an interrupted recoverable global-config replacement; never discard an unknown transaction."""
+    from . import opencode_configs as oc
+    typer.echo(oc.recover(c.resolve(name)))
+
 @app.command(rich_help_panel=HOST)
 def build(distro: str=typer.Option(distros.DEFAULT,"--distro",help=DISTRO_HELP),
           opencode_version: str=typer.Option("latest","--opencode-version",help="OpenCode 2.x version (npm @opencode/cli)"),
-          refresh: bool=typer.Option(False,"--refresh",help="Pull current upstream inputs and bypass build cache; never prune it")):
-    """Build/rebuild an agent image without a rollback copy (use opencode update-base to keep one)."""
+          refresh: bool=typer.Option(False,"--refresh",help="Pull upstream image and bypass the build cache; never prune")):
+    """Build/rebuild an agent image without a rollback copy (use opencode update-base to keep one).
+
+    Every build upgrades the image's system packages, in cached and refresh mode."""
     from . import opencode_versions as v
     plan=v.prepare_base_build(opencode_version,distro,refresh=refresh,keep_previous=False)
     typer.echo(v.describe_base_build(plan))
@@ -336,30 +448,15 @@ def list_envs():
     for path in c.invalid_metadata():
         typer.secho(f"WARNING: ignoring {path}: {c.metadata_error(path) or 'invalid metadata'}",fg=typer.colors.YELLOW,err=True)
 
-def _integration_hint(m):
-    """After a failed, skipped or interrupted provisioning: how to add the integrations by hand."""
-    from . import integrations
-    result=(m.get("provisioning") or {}).get("result") or ""
-    if result.startswith(("failed","skipped","interrupted")) or "failed" in result:
-        lines=integrations.hint(m)
-        if lines: typer.echo("To add them yourself (opencode-sandbox shell NAME):\n  "+"\n  ".join(lines))
-
-def _integrations_help():
-    from .integrations import CATALOG, DEFAULT
-    return "; ".join(f"{i.name}{' (default)' if i.name in DEFAULT else ''}: {i.description}" for i in CATALOG.values())
-
-WORKSPACE_PANEL, IMAGE_PANEL, INTEGRATIONS_PANEL = "Workspace", "Distribution or image", "Integrations (set up once at the first start)"
-INTEGRATION=typer.Option(None,"--integration",rich_help_panel=INTEGRATIONS_PANEL,help="Integration from the catalog to set up once at the first start (repeatable; replaces the default). Catalog: "+_integrations_help())
-NO_INTEGRATIONS=typer.Option(False,"--no-integrations",rich_help_panel=INTEGRATIONS_PANEL,help="Set up no integrations (opt out of the default context7)")
-MCP_REMOTE=typer.Option(None,"--mcp-remote",rich_help_panel=INTEGRATIONS_PANEL,help="Custom remote MCP server NAME=URL, set up once (repeatable)")
-MCP_LOCAL=typer.Option(None,"--mcp-local",rich_help_panel=INTEGRATIONS_PANEL,help="Custom local MCP server 'NAME=COMMAND ARGS', set up once (repeatable)")
+WORKSPACE_PANEL, IMAGE_PANEL = "Workspace", "Distribution or image"
 
 def _distro_help():
     return "; ".join(f"{d.id}: {d.name} {d.version}{' (default)' if d.id==distros.DEFAULT else ''}" for d in distros.REGISTRY.values())
 
 @app.command(rich_help_panel=ENVIRONMENTS)
 def create(name:str,
-           source:Path | None=typer.Option(None,"--source",help="Folder to copy into the workspace: a Git repository root is cloned (committed files only), other folders are copied without hidden files"),
+           source:Path | None=typer.Option(None,"--source",help="Folder to copy: Git roots are cloned (committed only by default); other folders exclude hidden files"),
+           include_working_changes:bool=typer.Option(False,"--include-working-changes",rich_help_panel=WORKSPACE_PANEL,help="Project Git import: include staged, unstaged and non-ignored untracked files; show a status preview"),
            kind:str | None=typer.Option(None,"--kind",help="scratch (empty workspace) | project (a copy of --source) | quick (disposable). Default: project with --source or a direct workspace, otherwise scratch"),
            profile:str=typer.Option("default","--profile",help="Provider profile (see: providers list)"),
            distro:str | None=typer.Option(None,"--distro",rich_help_panel=IMAGE_PANEL,help="Base definitions: "+_distro_help()),
@@ -367,18 +464,21 @@ def create(name:str,
            workspace_mode:str=typer.Option("managed","--workspace-mode",rich_help_panel=WORKSPACE_PANEL,help="managed (default: empty or a copy of --source) | direct (not recommended: the agent works in your host folder itself)"),
            workspace:Path | None=typer.Option(None,"--workspace",rich_help_panel=WORKSPACE_PANEL,help="Existing host folder to mount as /workspace with --workspace-mode direct"),
            yes:bool=typer.Option(False,"--yes",rich_help_panel=WORKSPACE_PANEL,help="Consent to a direct workspace and its preflight without asking"),
-           integration:list[str]=INTEGRATION, no_integrations:bool=NO_INTEGRATIONS,
-           mcp_remote:list[str]=MCP_REMOTE, mcp_local:list[str]=MCP_LOCAL):
+            opencode_config:str | None=typer.Option(None,"--opencode-config",help="Copy this user-maintained OpenCode config profile once; omitted = Local"),
+            agent_context:bool=typer.Option(True,"--agent-context/--no-agent-context",help="Include specialized Agent Context; the file remains available when disabled")):
     """Create an environment: an empty scratch workspace, or a copy of a folder with --source.
 
-    Without options: the default distribution and integrations. The original folder is never touched. Integrations are written once into the environment's OpenCode config at the first start and then belong to you (never re-applied or checked)."""
-    from . import integrations
+    Without options: the default distribution, Local OpenCode config and Agent Context enabled. The original folder is never touched."""
     from .config_plan import check_profile
-    if integration and no_integrations: raise typer.BadParameter("--integration and --no-integrations exclude each other")
     check_profile(profile)  # as config apply: a mistyped name would leave the container without credentials
-    provisioning=integrations.request([] if no_integrations else (integration or None),
-                                      integrations.parse_custom(mcp_remote or (), mcp_local or ()))
-    kind,_=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace)
+    kind,_=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
+                             include_working_changes=include_working_changes)
+    fingerprint=None
+    if include_working_changes:
+        from . import git_import
+        plan=git_import.preview(source)
+        typer.echo(plan.describe())
+        fingerprint=plan.fingerprint
     consent=False
     if workspace_mode==workspaces.DIRECT and workspace is not None:
         target=workspaces.check_direct(workspace)  # explain refusals before asking
@@ -389,13 +489,16 @@ def create(name:str,
         elif not c._tty(): raise typer.BadParameter("A direct workspace needs consent; confirm with --yes")
         else: consent=typer.confirm("Use this directory directly?")
         if not consent: raise typer.Exit(1)
+    if opencode_config is not None:
+        typer.echo("Validating/copying the entire OpenCode config profile before creation…", err=True)
     m=c.create(name,kind,source,profile,distro=distro,image=image,workspace_mode=workspace_mode,
-               workspace=workspace,consent=consent,provisioning=provisioning)
+                workspace=workspace,consent=consent,opencode_config=opencode_config,agent_context_enabled=agent_context,
+                include_working_changes=include_working_changes,import_fingerprint=fingerprint)
     msg(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Distribution: {c.distribution_description(m)}\n"
                f"Provider profile: {m['profile']}\n"
-               f"Integrations (set up once at the first start): {', '.join(provisioning['requested']) or 'none'}\n"
+                f"OpenCode config: {opencode_config or 'Local'}; Agent Context: {'enabled' if agent_context else 'disabled'}\n"
                f"Next: opencode-sandbox run {m['name']}")
 
 DIRECT_CONSENT=("The agent in the container can read, change and delete every file in\n  {path}\n"
@@ -408,16 +511,16 @@ DIRECT_CONSENT=("The agent in the container can read, change and delete every fi
                 "Preflight: a temporary container of the environment's image writes, checks and removes one file "
                 "named .ocs-preflight-<random> in that directory, to prove that files there stay yours.")
 
-config_app=typer.Typer(help="Environment settings: resource limits, network, published ports, provider profile (show, plan, apply, recover).",no_args_is_help=True)
+config_app=typer.Typer(help="Environment settings: limits, network, ports, provider profile and Agent Context (show, plan, apply, recover).",no_args_is_help=True)
 app.add_typer(config_app,name="config",rich_help_panel=DATA)
 
-def _config_changes(cpus, memory, pids, network, publish, no_ports, profile):
+def _config_changes(cpus, memory, pids, network, publish, no_ports, profile, agent_context=None):
     """Only the options given; config_plan merges them with the current values."""
     from .config_plan import parse_ports
     if publish and no_ports: raise typer.BadParameter("--publish and --no-ports exclude each other")
     ports=[] if no_ports else (parse_ports(publish) if publish else None)
     return {k: v for k, v in (("cpus", cpus), ("memory", memory), ("pids", pids), ("network", network),
-                              ("ports", ports), ("profile", profile)) if v is not None}
+                              ("ports", ports), ("profile", profile), ("agent_context_enabled", agent_context)) if v is not None}
 
 CPUS=typer.Option(None,"--cpus",help="CPU limit")
 MEMORY=typer.Option(None,"--memory",help="Memory limit, e.g. 8g")
@@ -426,6 +529,7 @@ NETWORK=typer.Option(None,"--network",help="bridge or none")
 PUBLISH=typer.Option(None,"--publish",help="HOST:CONTAINER or HOST:CONTAINER/udp (default tcp); binds to 127.0.0.1; replaces all mappings")
 NO_PORTS=typer.Option(False,"--no-ports",help="Remove all published ports")
 PROFILE=typer.Option(None,"--profile",help="Provider profile")
+AGENT_CONTEXT=typer.Option(None,"--agent-context/--no-agent-context",help="Include specialized Agent Context; file remains mounted either way")
 
 @config_app.command("show")
 def config_show(name: str):
@@ -438,21 +542,21 @@ def config_show(name: str):
 @config_app.command("plan")
 def config_plan_command(name: str, cpus: float | None = CPUS, memory: str | None = MEMORY, pids: int | None = PIDS,
                         network: str | None = NETWORK, publish: list[str] = PUBLISH, no_ports: bool = NO_PORTS,
-                        profile: str | None = PROFILE, as_json: bool = typer.Option(False, "--json", help="Print the plan as JSON")):
+                         profile: str | None = PROFILE, agent_context: bool | None = AGENT_CONTEXT, as_json: bool = typer.Option(False, "--json", help="Print the plan as JSON")):
     """Show what a change would do (category, steps, warnings) without changing anything."""
     from . import config_plan as cp
-    p=cp.plan(c.resolve(name),_config_changes(cpus,memory,pids,network,publish,no_ports,profile))
+    p=cp.plan(c.resolve(name),_config_changes(cpus,memory,pids,network,publish,no_ports,profile,agent_context))
     typer.echo(json.dumps(p.as_dict(),indent=2) if as_json else cp.describe(p))
     if p.blockers: raise typer.Exit(1)
 
 @config_app.command("apply")
 def config_apply(name: str, cpus: float | None = CPUS, memory: str | None = MEMORY, pids: int | None = PIDS,
                  network: str | None = NETWORK, publish: list[str] = PUBLISH, no_ports: bool = NO_PORTS,
-                 profile: str | None = PROFILE, yes: bool = typer.Option(False, "--yes", help="Apply without asking")):
+                  profile: str | None = PROFILE, agent_context: bool | None = AGENT_CONTEXT, yes: bool = typer.Option(False, "--yes", help="Apply without asking")):
     """Plan and apply a change. Changes that stop or recreate a container ask first (or need --yes)."""
     from . import config_plan as cp
     m=c.resolve(name)
-    changes=_config_changes(cpus,memory,pids,network,publish,no_ports,profile)
+    changes=_config_changes(cpus,memory,pids,network,publish,no_ports,profile,agent_context)
     p=cp.plan(m,changes)
     typer.echo(cp.describe(p))
     if p.blockers: raise typer.Exit(1)
@@ -486,20 +590,17 @@ def shell(name:str | None=typer.Argument(None)):
 
 @app.command("exec",rich_help_panel=SESSIONS,context_settings={"allow_extra_args":True,"ignore_unknown_options":True})
 def exec_command(ctx:typer.Context,name:str):
-    """Execute a command: exec NAME -- command \\[args]. Provider profile and Agent Context are NOT applied; use run for OpenCode."""
+    """Execute a command: exec NAME -- command \\[args]. Use ocs-opencode to load the provider profile."""
     if not ctx.args: raise c.SandboxError("Missing command")
     if Path(ctx.args[0]).name=="opencode":
-        typer.secho(f"Note: generic exec does not load the provider profile or Agent Context; use 'opencode-sandbox run {name}' for managed OpenCode.",
+        typer.secho(f"Note: plain opencode does not load the provider profile; use 'exec {name} -- ocs-opencode' or managed run.",
                     fg=typer.colors.YELLOW,err=True)
     raise typer.Exit(c.exec_cmd(c.resolve(name),ctx.args))
 
 @app.command(rich_help_panel=ENVIRONMENTS)
 def start(name:str):
-    """Start or create the persistent container (the first start sets up the requested integrations once)."""
-    provisioned=c.start(c.resolve(name))
-    if provisioned:
-        typer.echo(f"Initial integrations: {provisioned}")
-        _integration_hint(c.resolve(name))
+    """Start or create the persistent container and reconcile Agent Context activation."""
+    c.start(c.resolve(name))
 
 @app.command(rich_help_panel=ENVIRONMENTS)
 def stop(name:str):
@@ -512,7 +613,9 @@ def status(name:str):
     m=c.resolve(name); msg(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Provider profile: {m.get('profile')}\nContainer: {c.cname(m)}\n"
-               f"Image: {c.env_image(m)}")
+               f"Image: {c.env_image(m)}\n"
+               f"Agent Context: {'enabled' if m.get('agent_context_enabled', True) is True else 'disabled'}; "
+               f"initial OpenCode config: {m.get('opencode_config_source') or 'Local'}")
     c.ensure_runtime(False)
     typer.echo("Running: "+str(c.running(m)))
     from . import readiness as r
@@ -523,11 +626,6 @@ def status(name:str):
     typer.echo(f"Distribution: {c.distribution_description(m,definition)}")
     for line in r.network_lines(m,observed): typer.echo(line)
     typer.echo(f"Readiness: {r.cached_line(m)} (full check: opencode-sandbox check {m['name']})")
-    record=m.get("provisioning") or {}
-    if record.get("requested"):
-        state=record.get("result") if record.get("state")=="done" else "pending (first start)"
-        typer.echo(f"Initial integrations (history, not current state): {', '.join(record['requested'])}: {state}")
-        if record.get("state")=="done": _integration_hint(m)
     update=m.get("opencode_update") or {}
     if update:
         typer.echo(f"Last OpenCode update: {update.get('result') or 'in progress'} ({update.get('at')})"
@@ -741,7 +839,11 @@ def delete(name:str,export_first:bool=typer.Option(False,"--export-first",help="
     if not yes:
         if not c._tty(): raise c.SandboxError(f"No terminal to confirm the deletion of {m['name']}; confirm with --yes")
         if typer.prompt(f"Type {m['name']} to delete")!=m["name"]: raise typer.Abort()
+    from . import opencode_configs as oc
+    exported=oc.export_path(m)
     c.delete(m,force=True)
+    note=oc.retained_export_note(exported)
+    if note: typer.echo(note)
 
 @app.command(rich_help_panel=SESSIONS)
 def quick(source:Path | None=typer.Option(None,"--source",help="Folder to copy into the disposable workspace"),shell:bool=typer.Option(False,"--shell",help="Open a root shell instead of OpenCode")):
@@ -766,13 +868,21 @@ def quick(source:Path | None=typer.Option(None,"--source",help="Folder to copy i
 @profiles.command("list")
 def provider_list():
     """Provider profiles and their variable names (never the values)."""
-    for n in c.profile_list(): typer.echo(n+": "+", ".join(c.profile_keys(n)))
+    unusable=False
+    for n in c.profile_list():
+        # One unusable profile must not hide the others; errors never contain values.
+        try: typer.echo(n+": "+", ".join(c.profile_keys(n)))
+        except c.SandboxError as exc:
+            unusable=True
+            typer.echo(f"{n}: unusable ({c.error_text(exc)})")
+    if unusable: raise typer.Exit(1)
 
 @profiles.command("set")
 def provider_set(name:str,key:str=typer.Option(...,"--key",prompt="Environment variable name",help="Variable name, e.g. OPENROUTER_API_KEY (asked if omitted)")):
     """Prompt for a credential (hidden input) and store it in the profile (a 0600 host file)."""
     if not c._tty():
         raise c.SandboxError("providers set reads the value at a hidden prompt and needs an interactive terminal")
+    c._validate_profile({key: ""})  # refuse reserved/invalid names before asking for a secret
     existing=c.profile_read(name)
     existing[key]=typer.prompt("Secret value",hide_input=True)
     c.profile_set(name,existing)

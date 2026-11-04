@@ -74,6 +74,7 @@ def _recreate_hint(m):
 
 
 RECOVERY = {
+    "opencode-config": "opencode-sandbox opencode-configs recover {name}",
     "runtime-recreate": "opencode-sandbox config recover {name}",
     "config-update": "opencode-sandbox config recover {name}",
     "recreate": "opencode-sandbox container recreate-recover {name}",
@@ -622,17 +623,28 @@ def delivery_check(m, state):
     if state is None or not state.get("Running"):
         return Check("agent-context-delivery", title, NOT_CHECKED, "container not running")
     p = _exec(m, "cat", ac.SYSTEM_CONFIG)
-    if p.returncode != 0 or ac.CONTAINER_PATH not in p.stdout:
+    if p.returncode != 0:
         return Check("agent-context-delivery", title, FAILED,
-                     f"{ac.SYSTEM_CONFIG} {'does not list' if p.returncode == 0 else 'is missing or unreadable; it does not list'} "
-                     f"{ac.CONTAINER_PATH}: OpenCode will not receive the Agent Context in this image")
+                     f"{ac.SYSTEM_CONFIG} is missing or unreadable; saved Agent Context activation is not verified")
+    try:
+        document = json.loads(p.stdout) if p.returncode == 0 else None
+        instructions = document.get("instructions", []) if isinstance(document, dict) else None
+        valid = isinstance(instructions, list) and instructions.count(ac.CONTAINER_PATH) == int(ac.enabled(m))
+    except ValueError:
+        valid = False
+    if not valid:
+        return Check("agent-context-delivery", title, FAILED,
+                     f"{ac.SYSTEM_CONFIG} does not match saved Agent Context activation; start reconciles it",
+                     f"opencode-sandbox start {m['name']}")
     # The configuration and the mounted file are checked; whether OpenCode reads it is not observed
     # here (the real first-prompt test does that, CAMPAIGN G04).
     try:
         host = ac.path(m, c.env_dir).read_text(encoding="utf-8")
     except OSError:
+        state_text = (f"configured ({ac.SYSTEM_CONFIG} lists {ac.CONTAINER_PATH})" if ac.enabled(m)
+                      else "automatic inclusion intentionally disabled")
         return Check("agent-context-delivery", title, WARNING,
-                     f"configured ({ac.SYSTEM_CONFIG} lists {ac.CONTAINER_PATH}); the file is not written yet, so the "
+                     f"{state_text}; the file is not written yet, so the "
                      "mount is not compared (run writes it before every launch)")
     mounted = _exec(m, "cat", ac.CONTAINER_PATH)
     if mounted.returncode != 0:
@@ -643,7 +655,8 @@ def delivery_check(m, state):
                      f"{ac.CONTAINER_PATH} in the container differs from the host file (the mount shows another directory)",
                      _recreate_hint(m))
     return Check("agent-context-delivery", title, PASSED,
-                 f"configured: {ac.SYSTEM_CONFIG} lists {ac.CONTAINER_PATH}, and the mounted file matches the host file")
+                 (f"configured: {ac.SYSTEM_CONFIG} lists {ac.CONTAINER_PATH}, and the mounted file matches the host file"
+                  if ac.enabled(m) else "automatic inclusion intentionally disabled; generated file remains mounted and matches the host file"))
 
 
 def opencode_check(m, state, data):

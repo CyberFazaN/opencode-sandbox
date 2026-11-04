@@ -16,8 +16,8 @@
   into the container ([providers.md](providers.md)).
 - **Settings**: CPU, memory and process limits, the network mode, published ports and the
   provider profile, changed through one change plan (`config`, [settings.md](settings.md)).
-- **Initial integrations**: MCP servers written once into the environment's OpenCode
-  configuration at its first start (default: Context7). Afterwards they are yours.
+- **OpenCode config profile**: a user-maintained host directory, copied once on request, not a
+  linked or synchronized config ([opencode-configs.md](opencode-configs.md)).
 - **Agent Context**: guidance the manager gives OpenCode about the sandbox: user, workspace,
   network, limits, operating system ([opencode.md](opencode.md#agent-context)).
 - **OpenCode version**: installed and updated only by the manager, per base image and per
@@ -35,6 +35,8 @@
 | System layer (installed packages, files elsewhere) | the container's writable layer | yes | yes (committed to an image and used for the new container) | yes | yes, unless `--no-system` |
 | Metadata, exports, change bundles, backups, locks | `~/.local/share/opencode-sandbox/` | | | | metadata only |
 | Provider profiles, dashboard preferences | `~/.config/opencode-sandbox/` | | | no | **no** |
+| OpenCode config profile sources | `~/.config/opencode-sandbox/opencode-configs/` | | | no | **no** (the independent copy in `/root` is backed up) |
+| Editable global config export | `/tmp/ocs-occonfig-<uid>-<data-root-key>/<environment-id>/config/` | yes, while `/tmp` exists | yes | no | no |
 
 Containers keep running after a session ends; `stop` stops them. Closing the terminal of `run`
 or `shell` hangs up that session inside the container (jobs started with `nohup` keep
@@ -76,11 +78,12 @@ them.
 | Variable | Default | Meaning |
 |---|---|---|
 | `OPENCODE_SANDBOX_HOME` | `~/.local/share/opencode-sandbox` | Data directory |
-| `OPENCODE_SANDBOX_CONFIG` | `~/.config/opencode-sandbox` | Configuration directory (provider profiles, preferences) |
+| `OPENCODE_SANDBOX_CONFIG` | `~/.config/opencode-sandbox` | Configuration directory (provider profiles, OpenCode config profile sources, preferences) |
 | `OPENCODE_SANDBOX_DOCKER_CONTEXT` | `rootless` | Docker context of your rootless daemon |
 | `OPENCODE_SANDBOX_DOCKER_RESERVE_BYTES` | 2 GiB | Free space Docker must keep for commits, updates and builds |
 | `OPENCODE_SANDBOX_BACKUP_RESERVE_BYTES` | 512 MiB | Free space a backup or restore needs on top of its estimated size |
-| `OPENCODE_SANDBOX_MAX_ARCHIVE_ENTRIES` | 2000000 | Largest number of entries a backup archive may have |
+| `OPENCODE_SANDBOX_MAX_ARCHIVE_ENTRIES` | 2000000 | Backup/config-transfer entry limit |
+| `OPENCODE_SANDBOX_MAX_CONFIG_BYTES` | 64 GiB | Whole-config transfer byte ceiling, additionally bounded by free space |
 
 The manager does not use `XDG_DATA_HOME` or `XDG_CONFIG_HOME`; set the variables above instead.
 It ignores `DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_TLS_VERIFY` and `DOCKER_CERT_PATH`

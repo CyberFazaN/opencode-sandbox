@@ -19,7 +19,7 @@ fault = test_30_faults.fault
 
 
 def fixture_environment(camp, name, distro):
-    eid = camp.create(name, '--distro', distro, '--no-integrations')
+    eid = camp.create(name, '--distro', distro)
     camp.ocs('start', name)
     camp.sh(eid, "umask 022; mkdir -p /root/.config/opencode; echo '{}' > /root/.config/opencode/opencode.json; "
                  "echo system-before > /etc/ocs-test-update; echo home-kept > /root/ocs-test-update; "
@@ -70,8 +70,8 @@ def test_environment_actions_terminal(campaign, checks, distro, size):
         confirm(t, ck, 'Environment Manual policy')
         ck(t.wait_for('OpenCode policy saved', 20) and camp.metadata(name).get('opencode_policy') == 'manual'
            and camp.metadata(name).get('opencode_pin') is None, 'Environment Manual policy: explicit unpin does not install anything')
-        # Start remains running, and never disguises a temporary start/probe/stop workflow.
-        t.send('s', .3)
+        # Explicit F5 Start remains running, unlike temporary version checks.
+        t.send('\x1b[15~', .3)
         confirm(t, ck, 'Explicit Start')
         ck(t.wait_for('Started; remains running', 30) and camp.inspect(eid)['State']['Running'], 'Explicit Start: actual running state preserved')
         t.send(ESC, .2)
@@ -106,7 +106,7 @@ def test_environment_actions_terminal(campaign, checks, distro, size):
         kept = camp.docker('run', '--rm', '--name', helper, '--network', 'none', '--label', f'org.opencode-sandbox.test={camp.run}',
                            '--entrypoint', 'sh', snapshot, '-c', 'cat /etc/ocs-test-after-update; opencode --version').stdout
         ck('later-system-change' in kept and '2.1.4' in kept, 'Environment rollback: actual present snapshot keeps later system changes and updated binary')
-        t.send('s', .3)
+        t.send('\x1b[15~', .3)
         confirm(t, ck, 'Post-rollback Start')
         ck(t.wait_for('Started; remains running', 30), 'Post-rollback Start: explicit recreation completes')
         ck('2.2.0' in camp.sh(eid, 'opencode --version').stdout, 'Environment rollback: actual original OpenCode restored')
@@ -206,4 +206,94 @@ def test_environment_recovery_terminal(campaign, checks, fault, distro):
         if trigger.exists(): trigger.unlink()
         # Never leave this run's temporary alias, even if a prior assertion/operation failed.
         camp.docker('image', 'rm', retained, check=False)
+    camp.delete(name)
+
+
+PACKAGES = {'debian': "dpkg-query -W -f='${Package}=${Version}\\n' | sha256sum", 'arch': 'pacman -Q | sha256sum'}
+# Deterministic local package-manager failures inside this run's system layer; no network fault.
+BROKEN = {'debian': "echo 'deb ocs-test-malformed' > /etc/apt/sources.list.d/ocs-test-broken.list",
+          'arch': "printf '\\n[ocs-test-broken]\\nServer = file:///ocs-test-missing\\n' >> /etc/pacman.conf"}
+REPAIR = {'debian': 'rm /etc/apt/sources.list.d/ocs-test-broken.list',
+          'arch': "sed -i '/^\\[ocs-test-broken\\]$/,$d' /etc/pacman.conf && tail -n 1 /etc/pacman.conf"}
+
+
+def version(camp, eid):
+    return re.search(r'\d+\.\d+\.\d+', camp.sh(eid, 'opencode --version').stdout).group(0)
+
+
+@pytest.mark.parametrize('distro', DISTROS)
+def test_environment_system_package_upgrade(campaign, checks, distro):
+    camp, ck = campaign, checks
+    name = f'ocs-test-envpackages-{distro}'
+    eid, config = fixture_environment(camp, name, distro)
+    camp.ocs('start', name)
+    original = version(camp, eid)
+    target = '2.1.4' if original != '2.1.4' else '2.2.0'
+    camp.sh(eid, BROKEN[distro])
+    packages = camp.sh(eid, PACKAGES[distro]).stdout
+    camp.ocs('stop', name)
+
+    failed = camp.ocs('opencode', 'update', name, '--version', target, '--update-system-packages', '--yes', check=False)
+    output = failed.stdout + failed.stderr
+    ck(failed.returncode != 0 and 'System package upgrade failed' in output and 'OpenCode was not updated' in output,
+       'Package failure: actual package-manager error stops before OpenCode')
+    current = camp.metadata(name)
+    record = current['opencode_update']
+    ck(current.get('operation') is None and record['state'] == 'rolled-back' and record.get('system_packages')
+       and record['result'].startswith('system package upgrade failed'), 'Package failure: journal closed as a rolled-back package failure')
+    camp.ocs('start', name)
+    ck(version(camp, eid) == original and camp.sh(eid, PACKAGES[distro]).stdout == packages,
+       'Package failure: checkpoint restored; OpenCode and installed package set unchanged')
+    camp.sh(eid, REPAIR[distro])
+    packages = camp.sh(eid, PACKAGES[distro]).stdout
+    camp.ocs('stop', name)
+
+    bindir = camp.tmp('package-upgrade-' + distro)
+    shim, log = bindir / 'docker', bindir / 'exec.log'
+    # Actual docker; records only which of this run's in-container steps ran, in order, and their status.
+    shim.write_text('#!/bin/sh\n'
+                    f'case "$*" in *" exec ocs-{eid} sh -c "*ocs-install-opencode*) kind=install;;\n'
+                    f' *" exec ocs-{eid} sh -c "*apt-get*|*" exec ocs-{eid} sh -c "*"pacman -Su"*) kind=upgrade;;\n'
+                    f' *) exec {shutil.which("docker")!r} "$@";;\nesac\n'
+                    f'{shutil.which("docker")!r} "$@"; rc=$?\n'
+                    f'echo "$kind $rc" >> {str(log)!r}\nexit $rc\n')
+    shim.chmod(0o755)
+    camp.note(f'host shim {shim}; passes every docker call through, logs run-owned ocs-{eid} upgrade/install exec status')
+    t = Term([sys.executable, '-m', 'opencode_sandbox.cli', 'tui'], 80, 24,
+             env=dict(camp.env, PATH=f'{bindir}:{camp.env["PATH"]}'), log=camp.log)
+    try:
+        ck(t.wait_for(name, 30), 'Package upgrade: dashboard ready')
+        t.send('v', .3); t.send('3', .5); t.send('u', .4)
+        ck(t.wait_for('Update system packages first', 10) and name in t.text(), 'Package upgrade: opt-in control in the update form')
+        t.snap('Update form with package option')
+        t.send('\x01', .1); t.send('\x0b', .1); t.send(target, .2)
+        t.send(TAB, .2); t.send(' ', .3); t.send(TAB * 2 + ENTER, .4)  # checkbox -> Cancel -> Review
+        ck(t.wait_for('FIRST upgrade installed packages', 30) and 'not fully reversible' in t.text(),
+           'Package upgrade: consent names the upgrade and its limited reversibility')
+        confirm(t, ck, 'Package upgrade')
+        ck(t.wait_for('System package upgrade and OpenCode', 900), 'Package upgrade: real upgrade and install finish')
+        t.send(ESC, .2); t.send('q', .4)
+        ck(t.exit_code(15) == 0 and t.restored(), 'Package upgrade: terminal restored on normal quit')
+    finally: t.close()
+    ck(log.read_text().split('\n')[:2] == ['upgrade 0', 'install 0'], 'Package upgrade: actual upgrade succeeded before the OpenCode install')
+    current = camp.metadata(name)
+    record = current['opencode_update']
+    ck(current.get('operation') is None and record['state'] == 'done' and record.get('system_packages')
+       and record['result'] == f'system packages upgraded; updated {original} -> {target}' and not camp.inspect(eid)['State']['Running'],
+       'Package upgrade: journal done, finishes stopped')
+    camp.ocs('start', name)
+    ck(version(camp, eid) == target, 'Package upgrade: exact OpenCode target verified after packages')
+    markers = camp.sh(eid, 'cat /etc/ocs-test-update /root/ocs-test-update /workspace/ocs-test-update').stdout
+    ck(all(m in markers for m in ('system-before', 'home-kept', 'workspace-kept'))
+       and camp.sh(eid, 'sha256sum /root/.config/opencode/opencode.json').stdout == config,
+       'Package upgrade: system/home/workspace markers and user config kept')
+    upgraded = camp.sh(eid, PACKAGES[distro]).stdout
+    camp.ocs('stop', name)
+    rolled = camp.ocs('opencode', 'rollback', name, '--yes')
+    ck('Rolled back OpenCode' in rolled.stdout and 'pre-upgrade system packages restored' in camp.metadata(name)['opencode_update']['result'],
+       'Package rollback: existing handler reports restored checkpointed packages')
+    camp.ocs('start', name)
+    ck(version(camp, eid) == original and camp.sh(eid, PACKAGES[distro]).stdout == packages,
+       'Package rollback: checkpointed OpenCode and installed package set restored' + ('' if upgraded != packages else ' (no package changed upstream)'))
+    camp.ocs('stop', name)
     camp.delete(name)

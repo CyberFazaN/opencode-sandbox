@@ -8,7 +8,6 @@ import pytest
 from typer.testing import CliRunner
 
 from opencode_sandbox import core as c
-from opencode_sandbox import integrations as ig
 from opencode_sandbox import opencode_versions as v
 from opencode_sandbox.cli import app
 
@@ -77,7 +76,7 @@ class FakeDocker:
 
 
 def env(name="ocs-qa-up", **fields):
-    m = c.create(name, "scratch", provisioning=ig.request([]))
+    m = c.create(name, "scratch")
     m.update(fields)
     c.save(m)
     return m

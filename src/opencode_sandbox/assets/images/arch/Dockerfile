@@ -7,7 +7,10 @@ ENV LANG=C.UTF-8
 # Downloads are retried: mirror transfers stalled repeatedly during image builds;
 # completed files stay in the cache between attempts.
 COPY arch/pacman-retry /usr/local/lib/ocs-build/pacman-retry
-RUN sh /usr/local/lib/ocs-build/pacman-retry -Syu --noconfirm --needed git git-lfs openssh python python-pip \
+# Every build runs a full -Syu (Arch must never perform a partial upgrade): the manager passes a
+# per-build nonce, so this layer runs with fresh databases even when earlier layers are cached.
+ARG SYSTEM_PACKAGE_REFRESH
+RUN test -n "${SYSTEM_PACKAGE_REFRESH:?build with --build-arg SYSTEM_PACKAGE_REFRESH}" && sh /usr/local/lib/ocs-build/pacman-retry -Syu --noconfirm --needed git git-lfs openssh python python-pip \
   cmake jq ripgrep fd unzip zip less nano vim rsync curl wget bind nodejs npm \
  && rm -rf /var/cache/pacman/pkg/* /usr/local/lib/ocs-build \
  && useradd --system --create-home --home-dir /var/lib/aurbuild --shell /usr/bin/nologin aurbuild \
@@ -38,7 +41,10 @@ ARG OPENCODE_VERSION
 COPY common/install-opencode.sh /tmp/install-opencode.sh
 RUN sh /tmp/install-opencode.sh "${OPENCODE_VERSION:?build with --build-arg OPENCODE_VERSION}" \
  && rm /tmp/install-opencode.sh
-# Manager-owned system config: only lists the Agent Context file (D-008).
+# Neutral system config; the manager reconciles per-environment Agent Context activation.
 COPY common/opencode-system.json /etc/opencode/opencode.json
+COPY --chmod=0755 common/ocs_opencode.py /usr/local/bin/ocs-opencode
+COPY common/ocs-shell-hint.sh /usr/local/lib/ocs-shell-hint.sh
+RUN printf '\n. /usr/local/lib/ocs-shell-hint.sh\n' >> /etc/bash.bashrc
 WORKDIR /workspace
 CMD ["sleep", "infinity"]

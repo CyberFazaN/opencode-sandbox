@@ -28,7 +28,7 @@ from .tui_runtime import publish, work
 
 
 class ConfirmScreen(ModalScreen[bool]):
-    CSS = "ConfirmScreen {align: center middle;} #confirm-panel {width: 72; max-width: 100%; height: auto; max-height: 100%; border: round $error; background: $surface; padding: 1 2;} #confirm-panel Horizontal {height: auto;}"
+    CSS = "ConfirmScreen {align: center middle;} ConfirmScreen ToastRack {height: 0; max-height: 0; overflow: hidden;} #confirm-panel {width: 72; max-width: 100%; height: auto; max-height: 100%; border: round $error; background: $surface; padding: 1 2;} #confirm-panel Horizontal {height: auto;}"
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     AUTO_FOCUS = "#cancel"
     def __init__(self, message: str):
@@ -49,9 +49,34 @@ class ConfirmScreen(ModalScreen[bool]):
         self.dismiss(False)
 
 
+class KeysScreen(ModalScreen):
+    """Full-width, scrollable help rather than a split panel that crowds compact terminals."""
+    CSS = """KeysScreen {align: center middle;}
+    KeysScreen ToastRack {height: 0; max-height: 0; overflow: hidden;}
+    #keys-panel {width: 90%; height: 90%; border: round $accent; background: $surface; padding: 0 1;}
+    #keys-text {height: 1fr;} #keys-close {height: 1;}"""
+    BINDINGS = [Binding('question_mark', 'close', 'Close', key_display='?'), Binding('escape', 'close', 'Close')]
+
+    def __init__(self, bindings):
+        super().__init__()
+        self.bindings = bindings
+
+    def compose(self):
+        with Vertical(id='keys-panel'):
+            yield Static('Keys — ? or Esc to close', markup=False)
+            yield TextArea('\n'.join(f'{b.key_display or b.key:14} {b.description}' for b in self.bindings
+                                     if b.description), read_only=True, id='keys-text')
+            yield Button('Close', id='keys-close', compact=True)
+
+    def action_close(self): self.dismiss()
+    def on_button_pressed(self, event):
+        event.stop()
+        self.action_close()
+
+
 class CreateScreen(ModalScreen[dict | None]):
     """New environment. Name, kind and folder first; distribution, workspace mode, provider profile
-    and integrations under "More options" with the defaults of `create` (progressive disclosure).
+    and OpenCode configuration under "More options" with the defaults of `create` (progressive disclosure).
     The checks are core.creation_options, the same as the CLI's."""
     CSS = """CreateScreen {align: center middle;}
     #create-panel {width: 84; max-width: 100%; height: auto; max-height: 100%; border: round $accent; background: $surface; padding: 0 1;}
@@ -67,15 +92,19 @@ class CreateScreen(ModalScreen[dict | None]):
         self.dismiss(None)
 
     def compose(self) -> ComposeResult:
-        from . import distros, integrations
+        from . import distros
+        from . import opencode_configs as oc
         profiles = sorted({"default", *c.profile_list()})
         with Vertical(id="create-panel"):
             yield Static("[b]New environment[/b]  (Tab: next field, Esc: cancel)")
             yield Input(placeholder="Name (letters, digits, . _ -)", id="name", compact=True)
             yield Select([("Scratch: empty workspace", "scratch"), ("Project: a copy of a folder", "project"),
                           ("Quick: disposable session", "quick")], value="scratch", allow_blank=False, id="kind", compact=True)
-            yield Input(placeholder="Folder to copy (Git repository: committed files only); empty = none", id="source", compact=True)
-            with Collapsible(title="More options: distribution, workspace, provider profile, integrations", id="more"):
+            yield Input(placeholder="Folder to copy (Git: committed only by default); empty = none", id="source", compact=True)
+            yield Select([("Git import: Committed only (default)", False),
+                          ("Git import: Include working changes", True)],
+                         value=False, allow_blank=False, id="git-working-changes", compact=True)
+            with Collapsible(title="More options: distribution, workspace, provider, OpenCode config", id="more"):
                 yield Select([(f"Base definition: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
                               for d in distros.REGISTRY.values()], value=distros.DEFAULT, allow_blank=False, id="distro", compact=True)
                 yield Select([("Workspace: managed (empty, or a copy of the folder; default)", "managed"),
@@ -83,20 +112,33 @@ class CreateScreen(ModalScreen[dict | None]):
                              value="managed", allow_blank=False, id="workspace-mode", compact=True)
                 yield Select([(f"Provider profile: {name}", name) for name in profiles], value="default",
                              allow_blank=False, id="profile", compact=True)
-                yield Static("Integrations, set up once at the first start:", classes="hint")
-                for item in integrations.CATALOG.values():
-                    yield Checkbox(item.name, value=item.name in integrations.DEFAULT, id=f"integration-{item.name}", compact=True)
-                    yield Static(f"  {item.description}", classes="hint")
+                yield Select([("OpenCode config: Local (no initial import)", "local"),
+                              ("OpenCode config: Copy a profile once", "copy")], value="local", allow_blank=False,
+                             id="oc-config-mode", compact=True)
+                try: names, problem = oc.profiles(), None
+                except c.SandboxError as exc: names, problem = [], c.error_text(exc)
+                yield Select([(name, name) for name in names], prompt="Select config profile",
+                             id="oc-config-profile", compact=True)
+                hint = [problem or "No profiles found; use Local or add one:"] if problem or not names else []
+                hint += [f"User-maintained directories: {oc.profiles_directory()}", "Copy is independent, not a live link."]
+                yield Static("\n".join(hint),
+                             markup=False, classes="hint", id="oc-config-hint")
+                yield Checkbox("Include specialized Agent Context", value=True, id="include-agent-context", compact=True)
             yield Static("", id="create-error")
             with Horizontal():
                 yield Button("Cancel", id="cancel", compact=True)
                 yield Button("Create", id="create", variant="primary", compact=True)
 
     def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "oc-config-mode":
+            self.query_one("#oc-config-profile").display = event.value == "copy"
+            self.query_one("#oc-config-hint").display = event.value == "copy"
         if event.select.id == "workspace-mode":
+            self.query_one("#git-working-changes").display = event.value != "direct"
+            if event.value == "direct": self.query_one("#git-working-changes", Select).value = False
             self.query_one("#source", Input).placeholder = (
                 "Host folder the agent works in directly (required)" if event.value == "direct"
-                else "Folder to copy (Git repository: committed files only); empty = none")
+                else "Folder to copy (Git: committed only by default); empty = none")
 
     def on_input_changed(self, event: Input.Changed) -> None:
         # A folder to copy makes a project, as in `create --source` without --kind.
@@ -106,7 +148,6 @@ class CreateScreen(ModalScreen[dict | None]):
 
     def values(self) -> dict:
         """The form as `create` arguments, checked with core.creation_options (raises SandboxError)."""
-        from . import integrations
         name = self.query_one("#name", Input).value.strip()
         folder = self.query_one("#source", Input).value.strip()
         mode = self.query_one("#workspace-mode", Select).value
@@ -114,16 +155,26 @@ class CreateScreen(ModalScreen[dict | None]):
         distro = self.query_one("#distro", Select).value
         direct = mode == "direct"
         path = Path(folder).expanduser() if folder else None
+        working = self.query_one("#git-working-changes", Select).value
         c.creation_options(name, kind, None if direct else path, distro=distro, workspace_mode=mode,
-                           workspace=path if direct else None)
+                           workspace=path if direct else None, include_working_changes=working)
         if direct:
             # The host checks without the directory scan, so a refused folder is reported here,
             # with the form still open; creation repeats all of them.
             from . import workspaces
             workspaces.check_direct(path, scan=False)
-        chosen = [n for n in integrations.CATALOG if self.query_one(f"#integration-{n}", Checkbox).value]
+        copying = self.query_one("#oc-config-mode", Select).value == "copy"
+        config = self.query_one("#oc-config-profile", Select).value
+        if copying and (not isinstance(config, str) or not config):
+            raise c.SandboxError("Copy requires a config profile; place user-maintained directories in OpenCode Configs, or use Local")
         return {"name": name, "kind": kind, "source": folder or None, "profile": self.query_one("#profile", Select).value,
-                "mode": mode, "distro": distro, "integrations": chosen}
+                "mode": mode, "distro": distro, "opencode_config": config if copying else None,
+                "include_working_changes": working,
+                "agent_context_enabled": self.query_one("#include-agent-context", Checkbox).value}
+
+    def on_mount(self):
+        self.query_one("#oc-config-profile").display = False
+        self.query_one("#oc-config-hint").display = False
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.query_one("#create", Button).press()  # Enter in a text field creates, as the Create button
@@ -140,6 +191,30 @@ class CreateScreen(ModalScreen[dict | None]):
         self.dismiss(values)
 
 
+class GitImportPreviewScreen(ModalScreen[bool]):
+    """Scrollable, content-free preview, usable on compact terminals."""
+    CSS = """GitImportPreviewScreen {align: center middle;}
+    #import-panel {width: 84; max-width: 100%; height: 85%; border: round $accent; background: $surface; padding: 0 1;}
+    #import-preview {height: 1fr;} #import-panel Horizontal {height: auto;}"""
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    AUTO_FOCUS = "#import-cancel"
+
+    def __init__(self, preview):
+        super().__init__()
+        self.preview = preview
+
+    def compose(self):
+        with Vertical(id="import-panel"):
+            yield Static("Import local Git working changes", markup=False)
+            yield TextArea(self.preview.describe(), read_only=True, id="import-preview")
+            with Horizontal():
+                yield Button("Cancel", id="import-cancel", compact=True)
+                yield Button("Import", id="import-confirm", variant="primary", compact=True)
+
+    def action_cancel(self): self.dismiss(False)
+    def on_button_pressed(self, event): self.dismiss(event.button.id == "import-confirm")
+
+
 class Dashboard(App):
     def __init__(self, *args, **kwargs):
         from .tui_runtime import Activity
@@ -151,12 +226,20 @@ class Dashboard(App):
 
     TITLE = "OpenCode Sandbox"
     # Compact, wrapping button rows: at 80x24 the old layout left one table row and
-    # hid 11 of 20 buttons off-screen.
+    # hid 11 of 20 buttons off-screen. Bar buttons stay unfilled on one strip: filled one-line
+    # buttons merge into tiles across wrapped rows, and borders are unavailable on compact buttons.
     CSS = """
     Screen {layout: vertical;}
     #search {width: 1fr;}
-    .bar {height: auto; grid-gutter: 0 1;}
-    .bar Button {width: 1fr;}
+    .bar {height: auto; grid-gutter: 0 1; background: $panel;}
+    .bar Button {width: 1fr; height: 1; background: transparent; color: $foreground; text-style: none;}
+    #toolbar {grid-rows: 1;}
+    #opencode-configs {column-span: 2;}
+    .bar Button:hover {background: $boost; text-style: underline;}
+    .bar Button:focus {background: $primary; color: $text; text-style: bold;}
+    .bar Button:disabled {background: transparent; color: $text-disabled; text-style: none;}
+    .bar Button.-error {background: transparent; color: $error; text-style: bold;}
+    .bar Button.-error:focus {background: $error; color: $text;}
     #envs {height: 1fr; min-height: 3;}
     #details {height: 9; border: round $accent; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
     #status, #metrics {height: 1; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
@@ -166,10 +249,11 @@ class Dashboard(App):
     BINDINGS = [Binding("q", "quit", "Quit"), Binding("question_mark", "show_help_panel", "Keys"),
                 Binding("slash", "focus_search", "Filter"),
                 Binding("o", "open_selected", "OpenCode"), Binding("s", "shell_selected", "Shell"),
-                Binding("f5", "start_selected", "Start"), Binding("f6", "stop_selected", "Stop"),
+                Binding("f5", "start_selected", "Start", key_display='F5'), Binding("f6", "stop_selected", "Stop", key_display='F6'),
                 Binding("n", "create_environment", "New"), Binding("x", "delete_selected", "Delete"),
                 Binding("r", "refresh_readiness", "Refresh", show=False), Binding("c", "current_folder", "This folder", show=False),
-                Binding("p", "providers", "Provider profiles", show=False), Binding("g", "settings", "Preferences", show=False),
+                 Binding("p", "providers", "Provider profiles", show=False), Binding("g", "settings", "Preferences", show=False),
+                 Binding("O", "opencode_configs", "OpenCode Configs", show=False),
                 Binding("t", "runtime", "Settings", show=False), Binding("u", "usage", "Usage", show=False),
                 Binding("v", "updates", "Updates", show=False), Binding("a", "agent_context", "Agent Context", show=False),
                 Binding("f8", "recovery", "Recovery", show=False), Binding("R", "repair_selected", "Repair", show=False),
@@ -199,7 +283,7 @@ class Dashboard(App):
         with ItemGrid(id="toolbar", classes="bar", min_column_width=16):
             for label, bid in (("New", "new"), ("This folder", "current"), ("Backups", "backups"),
                                ("Providers", "providers"), ("Preferences", "settings"), ("Updates", "ocversions"),
-                               ("Recovery", "recovery"), ("Disk", "disk")):
+                               ("Recovery", "recovery"), ("Disk", "disk"), ("OpenCode Configs", "opencode-configs")):
                 yield Button(label, id=bid, compact=True)
         yield DataTable(id="envs", cursor_type="row")
         yield Static("Select an environment to see details", id="details")
@@ -212,7 +296,79 @@ class Dashboard(App):
             yield Button("Delete", id="delete", variant="error", compact=True)
         yield Static("Resource metrics: select an environment and press Usage", id="metrics", markup=False)
         yield Static("Ready", id="status", markup=False)
-        yield Footer()
+        footer = Footer(show_command_palette=False)
+        footer.compact = True
+        yield footer
+
+    def action_show_help_panel(self):
+        if isinstance(self.screen, KeysScreen):
+            self.screen.action_close()
+            return
+        bindings = self.BINDINGS if len(self.screen_stack) == 1 else [
+            *self.screen.BINDINGS, *[b for b in self.BINDINGS if b.action in self._GLOBAL_ACTIONS]]
+        self.push_screen(KeysScreen(bindings))
+
+    def refresh_clipboard_preferences(self):
+        from . import preferences
+        try: self._copy_selected = preferences.read()['copy_selected_text']
+        except (c.SandboxError, OSError, ValueError): self._copy_selected = False
+
+    def on_mouse_up(self, event):
+        # MouseUp exists on Textual 4 as well as 8; defer until Screen updates its selection.
+        if getattr(self, '_copy_selected', False):
+            screen = self.screen
+            self.call_later(self._copy_selection, screen)
+
+    def on_text_area_selection_changed(self, event):
+        if not getattr(self, '_copy_selected', False) or not event.text_area.read_only: return
+        if getattr(self, '_selection_timer', None): self._selection_timer.stop()
+        area, screen = event.text_area, self.screen
+        self._selection_timer = self.set_timer(.25, lambda: self._copy_selection(screen, area))
+
+    def _copy_selection(self, screen, area=None):
+        if self.screen is not screen or not getattr(self, '_copy_selected', False): return
+        focused = screen.focused
+        if isinstance(focused, Input) or isinstance(focused, TextArea) and not focused.read_only: return
+        text = area.selected_text if area is not None and area.is_mounted else screen.get_selected_text()
+        if text and text.strip() and text != getattr(self, '_last_auto_copy', None):
+            self._last_auto_copy = text
+            self.copy_text(text)
+
+    def copy_text(self, text):
+        """Explicit copies work regardless of the selection preference. No false OSC 52 success."""
+        self._clipboard = text  # Textual's local paste buffer; do not emit two clipboard writes.
+        self._copy_token = token = object()
+        if not hasattr(self, '_clipboard_mutex'):
+            import threading
+            self._clipboard_mutex = threading.Lock()
+        driver = self._driver
+        terminal = driver is not None and not driver.is_headless
+        self._copy_worker(text, token, terminal)
+
+    @work(thread=True, group='clipboard')
+    def _copy_worker(self, text, token, terminal):
+        from .clipboard import native_copy
+        with self._clipboard_mutex:
+            if token is not self._copy_token: return
+            copied = native_copy(text) if terminal else None
+        publish(self, self._copy_finished, text, token, terminal, copied)
+
+    def _copy_finished(self, text, token, terminal, copied):
+        if self._copy_token is not token: return
+        if copied:
+            message = 'Copied to clipboard'
+        elif terminal:
+            try:
+                super().copy_to_clipboard(text)
+                message = 'Clipboard request sent to terminal (OSC 52; acceptance unverified)'
+            except (OSError, RuntimeError):
+                message = 'Clipboard unavailable; text is available for manual copy'
+        else:
+            message = 'System clipboard unavailable; copied only within this application'
+        # Updates intentionally suppresses overlay toasts; use its reserved status line instead.
+        feedback = getattr(self.screen, 'clipboard_feedback', None)
+        if feedback: feedback(message)
+        else: self.notify(message, title='Clipboard', timeout=3)
 
     def on_mount(self) -> None:
         self._operation_pending = False
@@ -244,6 +400,7 @@ class Dashboard(App):
         self._prerequisites_worker()
         self.set_interval(60, self.refresh_discovery_preferences)
         self.refresh_discovery_preferences()
+        self.refresh_clipboard_preferences()
 
     def refresh_discovery_preferences(self):
         if self._manager_update_intent is not None: return
@@ -570,6 +727,10 @@ class Dashboard(App):
         from .management_tui import SettingsScreen
         self.push_screen(SettingsScreen())
 
+    def action_opencode_configs(self) -> None:
+        from .opencode_configs_tui import ConfigProfilesScreen
+        self.push_screen(ConfigProfilesScreen())
+
     def action_runtime(self) -> None:
         m=self.selected()
         if m:
@@ -841,9 +1002,13 @@ class Dashboard(App):
                 if action == "start":
                     c.start(m, precondition=lambda current: v.recheck_environment_start(current, plan))
                     result = "Started; remains running. Use Check for fresh version verification."
+                elif action == 'stop':
+                    c.stop(m, precondition=lambda current: v.recheck_environment_stop(current, plan))
+                    result = 'Stopped; workspace and home volume retained.'
                 elif action == "update":
                     outcome = v.update_environment(m, plan.target, plan=plan)
-                    result = "OpenCode update complete; stopped. " + json.dumps(outcome)
+                    result = ("System package upgrade and OpenCode update complete; stopped. " if outcome.get("system_packages")
+                              else "OpenCode update complete; stopped. ") + json.dumps(outcome)
                 elif action == "policy":
                     result = "OpenCode policy saved. " + json.dumps(v.set_policy(m, plan.mode, plan.version, plan=plan))
                 elif action == "rollback":
@@ -904,7 +1069,7 @@ class Dashboard(App):
         self._set_busy('Base: ' + c.printable(phase))
 
     def _base_finished(self, key, result, failed, callback):
-        self._base_operation.update(result=result, phase='Failed; inspect actual base/copies before retry' if failed else 'Complete')
+        self._base_operation.update(result=result, failed=failed, phase='Failed; inspect actual base/copies before retry' if failed else 'Complete')
         self._updates_mutation_active = False
         self._finished(result, failed)
         callback(key, result, failed)
@@ -931,8 +1096,10 @@ class Dashboard(App):
                 target = Path(backup(environment, stop_running=False))
                 result = " ".join([f"Backup saved: {target.name} in {target.parent}", *backup_notes(target)])
             elif action == "delete":
+                from . import opencode_configs as oc
+                exported = oc.export_path(environment)
                 c.delete(environment, force=True)
-                result = "Deleted"
+                result = " ".join(filter(None, ["Deleted.", oc.retained_export_note(exported)]))
             else:
                 raise ValueError(action)
             self.app.call_from_thread(self._finished, result)
@@ -1012,8 +1179,35 @@ class Dashboard(App):
             if values["mode"] == "direct":
                 self._confirm_direct(values)
                 return
+            if values.get("include_working_changes"):
+                self._operation_pending = True
+                self._set_busy("Previewing local Git working changes…")
+                self._preview_git_import(values)
+                return
             self._operation_pending = True
+            self._set_busy(f"Validating config and creating {values['name']}…")
             self._create_environment(values)
+
+    @work(thread=True, exclusive=True, group="environment-operation")
+    def _preview_git_import(self, values):
+        from . import git_import
+        try:
+            plan = git_import.preview(Path(values["source"]))
+            self.app.call_from_thread(self._show_git_import, values, plan)
+        except Exception as exc:
+            self.app.call_from_thread(self._finished, c.error_text(exc), True)
+
+    def _show_git_import(self, values, plan):
+        self._finished("Review Git import preview")
+        self.push_screen(GitImportPreviewScreen(plan),
+                         lambda yes: self._create_git_import(values, plan.fingerprint) if yes else None)
+
+    def _create_git_import(self, values, fingerprint):
+        if self._operation_pending:
+            self.notify("Another operation is running", severity="warning"); return
+        self._operation_pending = True
+        self._set_busy(f"Importing working changes into {values['name']}…")
+        self._create_environment({**values, "import_fingerprint": fingerprint})
 
     def _confirm_direct(self, values) -> None:
         """Consent for a direct workspace: same text as the CLI; checks first, so refusals come before it."""
@@ -1030,21 +1224,23 @@ class Dashboard(App):
         if self._operation_pending:
             self.notify("Another operation is running", severity="warning"); return
         self._operation_pending = True
-        self._set_busy(f"Preflight and creation of {values['name']}…")
+        self._set_busy(f"Preflight, config validation and creation of {values['name']}…")
         self._create_environment(values)
 
     @work(thread=True, exclusive=True, group="environment-operation")
     def _create_environment(self, values: dict) -> None:
-        from . import integrations
         try:
-            provisioning = integrations.request(values.get("integrations"))  # None = the defaults
+            options = {"opencode_config": values.get("opencode_config"),
+                       "include_working_changes": values.get("include_working_changes", False),
+                       "import_fingerprint": values.get("import_fingerprint"),
+                       "agent_context_enabled": values.get("agent_context_enabled", True)}
             source = Path(values["source"]).expanduser() if values.get("source") else None
             if values.get("mode") == "direct":
                 m = c.create(values["name"], values["kind"], None, profile=values["profile"], distro=values.get("distro"),
-                             workspace_mode="direct", workspace=source, consent=True, provisioning=provisioning)
+                             workspace_mode="direct", workspace=source, consent=True, **options)
             else:
                 m = c.create(values["name"], values["kind"], source, profile=values["profile"], distro=values.get("distro"),
-                             provisioning=provisioning)
+                             **options)
             self.app.call_from_thread(self._created, m)
         except Exception as exc:
             self.app.call_from_thread(self._finished, c.error_text(exc), True)
@@ -1104,6 +1300,7 @@ class Dashboard(App):
         elif action == "current": self.action_current_folder()
         elif action == "refresh": self.action_refresh()
         elif action == "providers": self.action_providers()
+        elif action == "opencode-configs": self.action_opencode_configs()
         elif action == "settings": self.action_settings()
         elif action == "runtime": self.action_runtime()
         elif action == "usage": self.action_usage()
@@ -1182,11 +1379,22 @@ class RuntimeScreen(ModalScreen[dict | None]):
                 with Horizontal(classes="field"):
                     yield Static(label)
                     yield widget
+            yield Checkbox("Include specialized Agent Context", value=cfg["agent_context_enabled"], id="rt-agent-context", compact=True)
+            yield Static("Context file remains available when disabled. Global config transfers:", markup=False)
+            with Horizontal():
+                yield Button("OpenCode Config Editor", id="rt-config-editor", compact=True)
+                yield Button("Reload Config", id="rt-config-reload", compact=True)
             with Horizontal():
                 yield Button("Cancel", id="rt-cancel", compact=True)
                 yield Button("Preview", id="rt-save", variant="primary", compact=True)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id in ("rt-config-editor", "rt-config-reload"):
+            event.stop()
+            from .opencode_configs_tui import ConfigEditorScreen, ReloadConfigScreen
+            self.app.push_screen(ConfigEditorScreen(self.environment) if event.button.id == "rt-config-editor" else
+                                 ReloadConfigScreen(self.environment))
+            return
         if event.button.id == "rt-cancel":
             self.dismiss(None); return
         from .config_plan import parse_ports
@@ -1199,6 +1407,7 @@ class RuntimeScreen(ModalScreen[dict | None]):
                 "network":self.query_one("#rt-network", Select).value,
                 "ports":ports})
             changes["profile"]=self.query_one("#rt-profile", Select).value
+            changes["agent_context_enabled"]=self.query_one("#rt-agent-context", Checkbox).value
         except (ValueError, c.SandboxError) as exc:
             self.notify(str(exc), severity="error"); return
         self.dismiss(changes)

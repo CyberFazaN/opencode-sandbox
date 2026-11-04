@@ -115,7 +115,7 @@ def test_custom_definition_is_unknown_without_probing(monkeypatch):
     assert c.image_definition({"distro": None, "image": "example.invalid/custom:1"}) is None
 
 
-def test_first_start_without_provisioning_captures_the_selected_image(monkeypatch):
+def test_first_start_captures_the_selected_image(monkeypatch):
     import json
     m = c.create("ocs-test-first-definition", "scratch")
     d = distros.get(m["distro"])

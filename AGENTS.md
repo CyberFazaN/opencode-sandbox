@@ -22,8 +22,10 @@ host access. Feature/module details are in [ARCHITECTURE.md](docs/engineering/AR
 not an instruction to inspect or retest every subsystem for every task.
 
 Scope guard: not a general container manager; no repository or package-repository management;
-after the first start the environment's OpenCode configuration (plugins, MCP servers, settings)
-belongs to the user — no ongoing management, drift detection or re-application. Manager-owned
+the environment's OpenCode configuration (plugins, MCP servers, settings) belongs to the user —
+no automatic provisioning, synchronization or re-application. Explicit config-profile Copy,
+Export/Apply and Reload/Empty operate only on the global config tree; Apply detects container
+drift against its export baseline. Manager-owned
 configuration stays separate from OpenCode and user configuration.
 
 Versions are separate and each has one source of truth: manager

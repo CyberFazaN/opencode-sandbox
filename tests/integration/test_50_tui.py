@@ -55,7 +55,7 @@ def test_dashboard_against_real_docker(campaign, checks):
     folder.mkdir(parents=True, exist_ok=True)
     camp.note(f"host dir {folder} (direct workspace)")
     (folder / "host-file.txt").write_text("from the host\n")
-    pid_ = camp.create(PLAIN, "--source", str(src), "--no-integrations")
+    pid_ = camp.create(PLAIN, "--source", str(src))
 
     t = Term([*MANAGER, "tui"], 100, 30, env=camp.env, log=camp.log)
     try:
@@ -65,17 +65,17 @@ def test_dashboard_against_real_docker(campaign, checks):
         t.send(DIRECT, 0.3)
         t.send(TAB + TAB, 0.3)
         t.send(str(folder), 0.3)
-        t.send(TAB + ENTER, 1)                 # expand "More options"
+        t.send(TAB * 2 + ENTER, 1)             # Git import, then expand "More options"
         t.send(TAB + TAB + ENTER, 1)           # workspace mode list
         t.send(DOWN + ENTER, 1)                # direct
         t.snap("form with a direct workspace")
-        ck("direct host folder" in t.text(), "H03 direct workspace chosen in the form")
+        assert ck("direct host folder" in t.text(), "H03 direct workspace chosen in the form")
         t.send(STAB * 6, 0.5)
         t.send(ENTER, 2)
         t.snap("consent dialog")
-        ck(t.wait_for(r"Not recommended", 10), "H03 consent dialog names the risk")
+        assert ck(t.wait_for(r"Not recommended", 10), "H03 consent dialog names the risk")
         confirm(t, 3)
-        ck(t.wait_for(rf"Created {DIRECT}", 90), "H03 created after consent and preflight")
+        assert ck(t.wait_for(rf"Created {DIRECT}", 90), "H03 created after consent and preflight")
         did = camp.adopt(DIRECT)
         ck(camp.metadata(DIRECT)["workspace"] == {"mode": "direct", "path": str(folder)}, "H03 metadata: direct workspace at the folder")
         t.pump(2)
@@ -98,7 +98,7 @@ def test_dashboard_against_real_docker(campaign, checks):
         ck(t.wait_for(rf"Settings of {PLAIN}", 10), "H03 t opens Settings")
         t.send("\x7f" * 8, 0.5)  # the cursor starts at the end of the value
         t.send("2", 0.5)
-        t.send(TAB * 7, 0.3)
+        t.send(TAB * 10, 0.3)                  # context toggle/config actions, then Preview
         t.send(ENTER, 1.5)
         t.snap("settings plan")
         ck(re.search(r"CPU limit: 4\.0 -> 2", t.text()) is not None, "H03 the change plan is shown before applying")
@@ -128,7 +128,7 @@ def test_dashboard_against_real_docker(campaign, checks):
         camp.adopt(RESTORED)
         t.send(ESC, 1)
         t.send("v", 2)
-        ck(t.wait_for(r"Updates —", 15), "H03 v opens local/cached Updates")
+        ck(t.wait_for(r"1 Manager", 15), "H03 v opens local/cached Updates")
         t.send("3", 1)
         ck(t.wait_for(r"2\.2\.0", 60), "H03 Updates shows the dated OpenCode versions")
         t.snap("Updates")
@@ -170,7 +170,7 @@ def test_cli_signal_ends_attached_shell(campaign, checks, sig):
     """H05: a graceful manager signal ends/reaps its real client and token-scoped shell."""
     camp, ck = campaign, checks
     name = f"ocs-test-session-{sig.name.lower()}"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("config", "apply", name, "--network", "none", "--yes")
     t = Term([*MANAGER, "shell", name], 100, 30, env=camp.env, log=camp.log)
     try:

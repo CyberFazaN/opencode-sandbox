@@ -125,14 +125,23 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
         return camp.docker('image', 'inspect', '--format', '{{.Id}}', repo + ':' + distro).stdout.strip()
     names = []
     try:
+        package = 'apt-get update' if distro == 'debian' else 'pacman-retry -Syu'
         first = run('opencode', 'update-base', '--distro', distro, '--version', '2.1.4', '--yes')
-        initial = current()
-        ck('Mode: Cached rebuild' in first.stdout, 'Cached: explicit mode and exact target disclosed')
+        first_image = current()
+        ck('Mode: Cached rebuild' in first.stdout and 'always refreshed and upgraded in both modes' in first.stdout,
+           'Cached: explicit mode, exact target and mandatory package upgrade disclosed')
         second = run('opencode', 'update-base', '--distro', distro, '--version', '2.1.4', '--yes')
-        ck('unchanged' in second.stdout and current() == initial, 'Cached: repeated eligible build verifies unchanged without swapping')
-        ck('CACHED' in second.stderr, 'Cached: actual Docker build reused cached layers')
+        initial = current()
+        ck("'unchanged': True" not in second.stdout and initial != first_image, 'Cached: repeated build upgraded packages and published a new verified image')
+        builds = [json.loads(line[len('build argv '):]) for line in camp.manifest_path.read_text().splitlines() if line.startswith('build argv ')]
+        nonces = [next(arg for arg in args if arg.startswith('SYSTEM_PACKAGE_REFRESH=')) for args in builds[-2:]]
+        ck(len(set(nonces)) == 2 and not any(flag in builds[-1] for flag in ('--pull', '--no-cache')),
+           'Cached: fresh package nonce per build, without pull/no-cache')
+        step = re.search(r'(#\d+) \[[^\n]+RUN [^\n]*' + re.escape(package), second.stderr)
+        ck(step is not None and step.group(1) + ' CACHED' not in second.stderr, 'Cached: package layer ran instead of using cached result')
+        ck('CACHED' in second.stderr, 'Cached: actual Docker build reused earlier cached layers')
         name = f'ocs-test-{camp.run}-{distro}-retained'
-        run('create', name, '--distro', distro, '--no-integrations')
+        run('create', name, '--distro', distro)
         camp.adopt(name); names.append(name)
         run('opencode', 'policy-set', name, 'pinned', '--version', '2.1.4')
         run('start', name)
@@ -145,7 +154,6 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
         ck('Mode: Refresh & Rebuild' in refreshed.stdout and new != initial, 'Refresh: actual full rebuild verified/published a distinct image')
         builds = [json.loads(line[len('build argv '):]) for line in camp.manifest_path.read_text().splitlines() if line.startswith('build argv ')]
         ck('--pull' in builds[-1] and '--no-cache' in builds[-1] and not any('prune' in args for args in builds), 'Refresh: explicit pull/no-cache, never prune')
-        package = 'apt-get update' if distro == 'debian' else 'pacman-retry -Syu'
         step = re.search(r'(#\d+) \[[^\n]+RUN [^\n]*' + re.escape(package), refreshed.stderr)
         ck(step is not None and step.group(1) + ' CACHED' not in refreshed.stderr, 'Refresh: package layer ran instead of using cached result')
         after = camp.inspect(eid)
@@ -153,7 +161,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
            and camp.metadata(name) == metadata, 'Refresh: retained running container/image/pin/metadata unchanged')
         ck('retained-layer' in camp.sh(eid, 'cat /etc/ocs-test-base-update').stdout, 'Refresh: retained writable layer preserved')
         fresh = f'ocs-test-{camp.run}-{distro}-fresh'
-        run('create', fresh, '--distro', distro, '--no-integrations'); camp.adopt(fresh); names.append(fresh)
+        run('create', fresh, '--distro', distro); camp.adopt(fresh); names.append(fresh)
         run('opencode', 'policy-set', fresh, 'pinned', '--version', '2.1.4'); run('start', fresh)
         ck(camp.inspect(camp.ids[fresh])['Image'] == new and '2.1.4' in camp.sh(camp.ids[fresh], 'opencode --version').stdout,
            'Refresh: future pinned creation uses exactly the new verified base')
@@ -175,6 +183,8 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
                 term.send(DOWN if distro == 'arch' else '', .2)
                 term.send('b', .3)
                 ck(term.wait_for('Build / Rebuild', 15), 'Base terminal: target/mode form visible')
+                ck('always upgrade system packages' in term.text() and 'Update system packages' not in term.text(),
+                   'Base terminal: mandatory package upgrade disclosed, no opt-out control')
                 term.send('\x05', .1); term.send('\x15', .1); term.send('2.1.4', .2)
                 term.send(TAB, .1); term.send(ENTER, .2); term.send(DOWN, .1); term.send(ENTER, .2)
                 term.send(TAB * 2 + ENTER, .3)
@@ -184,11 +194,15 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
                 ck(not Path(str(hold) + '.ready').exists(), 'Base terminal: Cancel never built/refreshed')
                 term.send('b', .3)
                 term.send('\x05', .1); term.send('\x15', .1); term.send('2.1.4', .2)
-                term.send(TAB * 3 + ENTER, .3)
+                term.send(TAB * 3 + ENTER, .3)  # target -> mode -> Cancel -> Review
                 consent(term, ck, 'Cached mode consent')
                 ck('Cached rebuild' in term.text(), 'Base terminal: cached mode is independent and explicit')
                 term.send(TAB + ENTER, .3)
-                assert ck(camp.wait_for(lambda hold=hold: Path(str(hold) + '.ready').exists(), timeout=120), 'Base terminal: actual build completes before test hold')
+                # Every build reruns the package step (and paru on Arch), even in cached mode. Keep
+                # draining the pty: unread progress redraws would block Textual, and the build with it.
+                if not camp.wait_for(lambda hold=hold, term=term: term.pump(.2) or Path(str(hold) + '.ready').exists(), timeout=1800):
+                    term.snap('Build hold not reached'); term.send('d', .5); term.snap('Build hold not reached: Details')
+                assert ck(Path(str(hold) + '.ready').exists(), 'Base terminal: actual build completes before test hold')
                 ck(exclusion(camp, sys.prefix, busy=True), 'Base terminal: live approved mutation blocks exclusive installation access')
                 term.send('d', .3)
                 ck(term.wait_for('Bounded build output tail', 15), 'Base terminal: build output disclosed in scrollable Details')

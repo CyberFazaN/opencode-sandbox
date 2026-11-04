@@ -17,6 +17,12 @@ opencode-sandbox create webapp --source ~/code/webapp --profile work
   environment uses the profile `default`, which may be absent (no credentials).
 - Executable `.env` profiles of older tools are refused, never sourced; symlinked files, wrong
   permissions and invalid JSON are refused too.
+- `OPENCODE_CONFIG_CONTENT`, `OPENCODE_CONFIG` and `OPENCODE_CONFIG_DIR` are reserved and
+  rejected, including in existing/manually edited profiles and the container launcher. Use native
+  OpenCode config files or [OpenCode Configs](opencode-configs.md), not provider variables, to
+  select configuration. Other valid provider variables, including unrelated `OPENCODE_*` keys,
+  remain usable. Errors never show credential values. `providers list` marks such a profile as
+  unusable; remove the reserved key from its `0600` JSON file with an editor.
 
 ## How a profile reaches OpenCode
 
@@ -32,7 +38,21 @@ container is created**, and `run` and `shell` load it into the OpenCode process.
   after the container started.
 - A deleted profile file blocks `start` with an explanation; restore the file, or run
   `container recreate NAME --yes` to continue without it.
-- `exec` does not load the profile.
+- Generic `exec` and direct `docker exec` shells do not load the profile. Both base images
+  provide the executable `ocs-opencode`: it reads/validates the mounted JSON safely and launches
+  `opencode --standalone`, preserving arguments. For example:
+
+  ```sh
+  opencode-sandbox exec NAME -- ocs-opencode --version
+  ```
+
+  Interactive Bash shows a brief hint only when a mounted profile has not already been loaded.
+  The manager's `shell` has already injected it and does not show the misleading missing-profile
+  hint. No aliases, shell evaluation or sourcing of credential JSON are involved.
+  Local diagnostic subcommands that reject OpenCode's `--standalone` flag (for example
+  `debug paths` in 2.2.0) use plain `opencode`; they do not start a provider server.
+  Older retained environment layers may lack `ocs-opencode`; rebuilding a base affects future
+  containers, not those layers. Managed `run`/`shell` use the current manager's shared launcher.
 
 ## Choosing a model
 
@@ -40,9 +60,6 @@ Choose the model in OpenCode (`/models`) or in the environment's
 `~/.config/opencode/opencode.json` (in the home volume), for example
 `{"model": "openrouter/z-ai/glm-5.3-flash"}`. The network mode must be `bridge`; with `none` no
 provider is reachable.
-
-A profile may also carry `OPENCODE_CONFIG_CONTENT` (one line of JSON). OpenCode 2.1.4 honours
-it, but OpenCode's V2 documentation does not describe it, so prefer the configuration file.
 
 ## What to keep in mind
 

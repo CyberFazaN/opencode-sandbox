@@ -20,7 +20,7 @@ WORKER = r'''
 import json, os, re, sys
 from pathlib import Path
 from dataclasses import replace
-from opencode_sandbox import core as c, cleanup as cl, distros, integrations as ig, opencode_versions as v, probes
+from opencode_sandbox import core as c, cleanup as cl, distros, opencode_versions as v, probes
 repo, distro, action, manifest, run, mode = sys.argv[1:]
 assert re.fullmatch(r'ocs-test-[a-z0-9-]+', repo)
 retained = distros.get(distro).image
@@ -87,7 +87,7 @@ elif action in ('try-update', 'try-rollback'):
         raise AssertionError('conflicting mutation was not blocked')
 elif action in ('start', 'held-start'):
     name = 'ocs-test-' + run + '-' + distro + '-' + action
-    m = c.create(name,'scratch',distro=distro,provisioning=ig.request([]))
+    m = c.create(name,'scratch',distro=distro)
     note('environment ' + name + ' id=' + m['id'])
     with c.lock(m['id']):
         m['runtime'] = c.validate_runtime_settings({'cpus':'1','memory':'1g','pids':256,'network':'none','ports':[]})
@@ -178,7 +178,10 @@ elif action in ('cleanup', 'final'):
                 info = json.loads(out.stdout)[0]
                 assert info['Id'] in ids and info['Config']['Labels']['org.opencode-sandbox.test'] == run
                 c.docker('image','rm',d.image,capture=True)
-        left = c.docker('image','ls','-q','--filter','label=org.opencode-sandbox.test='+run,capture=True).stdout.split()
+        # The session's independently manifested custom-image fixture shares the run label.
+        # Check all recorded worker IDs (including dangling images), not unrelated fixture IDs.
+        left = set(c.docker('image','ls','--no-trunc','-q','--filter',
+                            'label=org.opencode-sandbox.test='+run,capture=True).stdout.split()) & ids
         assert not left, left
 else:
     raise AssertionError(action)

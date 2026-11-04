@@ -9,7 +9,7 @@ import pytest
 from test_tui import run, settle
 
 from opencode_sandbox import core as c
-from opencode_sandbox import diagnostics, readiness
+from opencode_sandbox import diagnostics, environment_checks, readiness
 from opencode_sandbox import opencode_versions as v
 
 
@@ -42,12 +42,12 @@ def test_pilot_cancellation_reaps_a_real_sleeping_diagnostic_client(tmp_path, mo
         assert marker.exists()
         # The UI remains responsive while the child is blocked.
         await pilot.press("tab")
-        screen.action_cancel_checks()
+        await pilot.press('escape')
         assert await asyncio.to_thread(finished.wait, 1)
         await settle(pilot)
         pid = int(marker.read_text())
         assert not os.path.exists(f"/proc/{pid}")
-        assert "Check canceled" in screen.items["environments"][m["id"]]["notice"]
+        assert len(app.screen_stack) == 1
         assert screen.items["environments"][m["id"]]["version"] is None
         assert c.resolve(m["id"]).get("operation") is None
     run(test, (80, 24))
@@ -65,6 +65,7 @@ def test_cancelled_uncooperative_report_cannot_publish_after_replacement(monkeyp
             return {"state": "stopped", "version": "2.99.0"}
         finally: finished.set()
     monkeypatch.setattr(v, "environment_version", report)
+    monkeypatch.setattr(environment_checks, 'check', lambda m, **kw: report(m, check=True))
     monkeypatch.setattr(v, "latest", lambda: "2.2.0")
     async def test(app, pilot):
         await settle(pilot)

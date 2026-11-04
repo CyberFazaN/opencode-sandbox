@@ -9,7 +9,7 @@ import test_environment_actions
 from test_opencode_lifecycle import Crash, env
 from test_tui import run
 from test_updates_tui import until
-from textual.widgets import Button, Input, Select, TextArea
+from textual.widgets import Button, Checkbox, Input, Select, Static, TextArea
 
 from opencode_sandbox import core as c
 from opencode_sandbox import opencode_versions as v
@@ -98,7 +98,64 @@ def test_exact_update_consent_cancel_then_existing_executor_stops(sources, runti
     run(test, size)
 
 
-@pytest.mark.parametrize('reason', ['running', 'network', 'pin', 'journal', 'absent'])
+@pytest.mark.parametrize('size', [(80, 24), (120, 40)])
+def test_system_package_checkbox_is_off_by_default_and_binds_consent_and_execution(sources, runtime, size, monkeypatch):
+    from test_environment_system_packages import kinds, upgrades
+    seen = upgrades(runtime, monkeypatch)
+    async def test(app, pilot):
+        await pilot.press('v', '3', 'u')
+        screen = app.screen_stack[-2]
+        box = app.screen.query_one('#update-system', Checkbox)
+        assert box.value is False and not box.disabled and '(apt)' in str(box.label)
+        assert 'not fully reversible' in ' '.join(str(w.render()) for w in app.screen.query(Static))
+        for widget in (box, *app.screen.query(Button)):
+            assert widget.region.bottom <= size[1] and widget.region.right <= size[0]
+        await pilot.press('enter')
+        await until(pilot, lambda: isinstance(app.screen, EnvironmentConsentScreen))
+        assert 'System packages: not upgraded; only OpenCode is updated.' in app.screen.message
+        await pilot.press('escape', 'u')
+        app.screen.query_one('#update-system', Checkbox).value = True
+        app.screen.query_one('#update-target', Input).value = '2.2.0'
+        await pilot.press('enter')
+        await until(pilot, lambda: isinstance(app.screen, EnvironmentConsentScreen))
+        message = app.screen.message
+        assert 'FIRST upgrade installed packages with apt' in message and 'not fully reversible' in message
+        assert 'OpenCode is not updated' in message and not seen
+        app.screen.query_one('#environment-confirm', Button).press()
+        await until(pilot, lambda: not app._operation_pending and screen.operation_result)
+        assert screen.operation_result.startswith('System package upgrade and OpenCode update complete; stopped.')
+        ops = kinds(runtime)
+        assert seen == ['debian'] and ops.index('upgrade') < ops.index('install') and not runtime.running
+    run(test, size)
+
+
+def test_failed_package_upgrade_is_reported_as_such_in_the_tui(sources, runtime, monkeypatch):
+    from test_environment_system_packages import kinds, upgrades
+    upgrades(runtime, monkeypatch, 'fail')
+    async def test(app, pilot):
+        await pilot.press('v', '3', 'u')
+        screen = app.screen_stack[-2]
+        app.screen.query_one('#update-system', Checkbox).value = True
+        await pilot.press('enter')
+        await until(pilot, lambda: isinstance(app.screen, EnvironmentConsentScreen))
+        app.screen.query_one('#environment-confirm', Button).press()
+        await until(pilot, lambda: not app._operation_pending and screen.operation_result)
+        assert screen.operation_failed and 'System package upgrade failed' in screen.operation_result
+        assert 'OpenCode was not updated' in screen.operation_result and 'install' not in kinds(runtime)
+    run(test, (80, 24))
+
+
+def test_custom_image_update_form_disables_the_package_upgrade(sources):
+    m = c.create('ocs-qa-custom-form', 'scratch', image='example.org/custom:1')
+    async def test(app, pilot):
+        app.push_screen(TargetScreen(m))
+        await pilot.pause()
+        box = app.screen.query_one('#update-system', Checkbox)
+        assert box.disabled and box.value is False and 'custom image' in str(box.label)
+    run(test, (80, 24))
+
+
+@pytest.mark.parametrize('reason', ['network', 'pin', 'journal', 'absent'])
 def test_live_refusals_never_start_stop_install_or_change_policy(sources, runtime, reason):
     m = sources
     if reason == 'running': runtime.running = True
@@ -146,14 +203,14 @@ def test_changed_selection_and_container_do_not_redirect_or_execute_confirmed_up
 
 def test_explicit_start_stays_running_and_check_remains_separate(sources, runtime):
     async def test(app, pilot):
-        await pilot.press('v', '3', 's')
+        await pilot.press('v', '3', 'f5')
         screen = app.screen_stack[-2] if isinstance(app.screen, EnvironmentConsentScreen) else app.screen
         await until(pilot, lambda: isinstance(app.screen, EnvironmentConsentScreen))
         await pilot.pause()
         assert 'remains running' in app.screen.message
         app.screen.query_one('#environment-confirm', Button).press()
         await until(pilot, lambda: screen.operation_result and not app._operation_pending)
-        assert runtime.running and not any(a[0] == 'exec' for a in runtime.calls)
+        assert runtime.running and not any(a[0] == 'exec' and a[-2:] == ('opencode', '--version') for a in runtime.calls)
         await pilot.press('c')
         screen = app.screen
         await until(pilot, lambda: not screen._active)
@@ -195,12 +252,10 @@ def test_approved_mutation_survives_cancel_close_and_quit_is_not_cancellation(so
     monkeypatch.setattr(v, 'update_environment', slow)
     async def test(app, pilot):
         await pilot.press('v', '3')
-        screen = app.screen
         await review_update(app, pilot)
         app.screen.query_one('#environment-confirm', Button).press()
         assert await asyncio.to_thread(started.wait, 1)
         await pilot.pause()
-        screen.action_cancel_checks()
         await pilot.press('escape', 'q')
         assert app.is_running and app._operation_pending and app._updates_mutation_active
         app.action_start_selected()
@@ -215,18 +270,17 @@ def test_approved_mutation_survives_cancel_close_and_quit_is_not_cancellation(so
 def test_cancel_or_close_during_read_only_planning_refuses_late_consent(sources, monkeypatch):
     started, release = threading.Event(), threading.Event()
     prepare = v.prepare_environment_update
-    def slow(*a):
+    def slow(*a, **kw):
         started.set()
         assert release.wait(4)
-        return prepare(*a)
+        return prepare(*a, **kw)
     monkeypatch.setattr(v, 'prepare_environment_update', slow)
     async def test(app, pilot):
         await pilot.press('v', '3', 'u', 'enter')
         screen = app.screen
         assert await asyncio.to_thread(started.wait, 1)
-        screen.action_cancel_checks()
-        assert screen._preparing is None
         await pilot.press('escape')
+        assert screen._preparing is None
         release.set()
         await pilot.pause(.2)
         assert len(app.screen_stack) == 1 and not app._operation_pending

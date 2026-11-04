@@ -12,7 +12,8 @@ Engineering records provide design and evidence, not additional routine executio
 OpenCode Sandbox runs OpenCode coding agents in containers on the user's own rootless Docker
 daemon, on Linux hosts; Arch Linux is the development and test host (D-046). It is deliberately not
 a general container manager, does not manage repositories or package repositories, and leaves an
-environment's OpenCode configuration to the user after the first start. Please open an issue to
+environment's OpenCode configuration to the user, with only explicitly requested global-config
+file transfers and no automatic provisioning/synchronization. Please open an issue to
 discuss a larger change or a new feature before writing it; deferred ideas are collected in
 [TODO.md](TODO.md).
 

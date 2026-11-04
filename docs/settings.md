@@ -1,7 +1,7 @@
 # Settings: resources, network, ports
 
 Every environment has CPU, memory and process limits, a network mode, published ports and a
-provider profile. All of them change through one change plan.
+provider profile and optional specialized Agent Context. All change through one shared plan.
 
 ```sh
 opencode-sandbox config show NAME     # configured and actual values
@@ -19,12 +19,16 @@ opencode-sandbox container usage NAME # current usage from Docker
 | `--publish HOST:CONTAINER[/udp]` | published ports; repeatable; replaces all mappings | none |
 | `--no-ports` | remove all published ports | |
 | `--profile` | provider profile ([providers.md](providers.md)) | `default` |
+| `--agent-context` / `--no-agent-context` | automatic specialized context inclusion | enabled |
 
 Omitted options keep their current values. `config plan --json` prints the plan for scripts.
 
 ## How a change is applied
 
 - Without a container, settings are only saved.
+- Agent Context activation changes only its exact system-config instruction, without interrupting
+  sessions. The file stays mounted. Stopped containers reconcile the saved choice on their next
+  managed start; running OpenCode may need a new launch to observe a change.
 - CPU, memory and process limits change in place (`docker update`, running or stopped, no
   restart), except that **lowering memory on a running container** stops, updates and starts it:
   a limit below the current usage would make the kernel kill the whole container.
@@ -37,6 +41,11 @@ Omitted options keep their current values. `config plan --json` prints the plan 
   `config recover NAME` finishes them.
 
 ## Network modes
+
+Global OpenCode configuration has separate **OpenCode Config Editor** and **Reload Config**
+actions in these same environment Settings; CLI equivalents live under `opencode-configs`.
+These whole-directory file transfers never replace the system config, change resource settings,
+or restart anything. See [the config guide](opencode-configs.md).
 
 - **`bridge`** (default): internet **and** your local network. The agent can reach services on
   the host's LAN address and other machines on your network; only the host's loopback

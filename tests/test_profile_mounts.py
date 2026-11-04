@@ -66,13 +66,13 @@ def launcher(monkeypatch, tmp_path, m, show="os.environ.get('QA_KEY')"):
     c.interactive(m)
     argv = seen["argv"]
     i = argv.index("-c")
-    script, context = argv[i + 1], argv[i + 2]
+    script, context = argv[i + 1], argv[i + 3]
     profile = tmp_path / "ocs-provider.json"
     system = tmp_path / "opencode.json"
     system.write_text(json.dumps({"instructions": [context]}))
     script = (script.replace("/run/secrets/ocs-provider.json", str(profile))
-                    .replace("os.execvp(argv[0],argv)", f"print('LAUNCH', {show})"))
-    return profile, lambda: subprocess.run([sys.executable, "-c", script, context, str(system), argv[i + 4]],
+                    .replace("os.execvp(argv[0], argv)", f"print('LAUNCH', {show})"))
+    return profile, lambda: subprocess.run([sys.executable, "-c", script, "--ocs-managed", context, str(system), argv[i + 5], "1"],
                                            capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"}, check=False)
 
 
@@ -112,22 +112,22 @@ def test_start_explains_removed_profile(env, monkeypatch):
     assert not any(a[0] == "start" for a in calls) and c.resolve(env["id"])["status"] == "ready"
 
 
-def test_launcher_leaves_user_opencode_config_alone(env, monkeypatch, tmp_path):
-    """A profile may carry the user's own OPENCODE_CONFIG_CONTENT; the launcher passes it through unchanged."""
-    profile, run = launcher(monkeypatch, tmp_path, env, show="os.environ['OPENCODE_CONFIG_CONTENT'], argv")
+@pytest.mark.parametrize("key", ["OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR"])
+def test_launcher_rejects_reserved_config_variables(env, monkeypatch, tmp_path, key):
+    """Directly mounted JSON cannot bypass the shared provider-profile restriction."""
+    profile, run = launcher(monkeypatch, tmp_path, env)
     user = json.dumps({"model": "qa/model", "instructions": ["AGENTS.md"]})
-    profile.write_text(json.dumps({"OPENCODE_CONFIG_CONTENT": user}))
+    profile.write_text(json.dumps({key: user}))
     result = run()
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == f"LAUNCH {user} ['opencode', '--standalone']"
-    assert "WARNING" not in result.stderr
+    assert result.returncode != 0 and "Invalid provider profile" in result.stderr
+    assert user not in result.stdout + result.stderr and "LAUNCH" not in result.stdout
 
 
-def test_launcher_warns_when_the_image_lacks_the_system_config(env, monkeypatch, tmp_path):
+def test_launcher_refuses_known_mismatched_system_config(env, monkeypatch, tmp_path):
     _, run = launcher(monkeypatch, tmp_path, env)
     (tmp_path / "opencode.json").write_text("{}")
     result = run()
-    assert result.returncode == 0 and "will not receive the sandbox Agent Context" in result.stderr
+    assert result.returncode != 0 and "differs from saved settings" in result.stderr
 
 
 def test_launcher_rejects_unparsable_profile(env, monkeypatch, tmp_path):

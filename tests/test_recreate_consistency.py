@@ -12,6 +12,7 @@ from opencode_sandbox import core as c
 def env(monkeypatch):
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
     monkeypatch.setattr(c, "require_docker_space", lambda what: None)
+    monkeypatch.setattr(c, "guidance_inputs", lambda m, **k: {"image": c.env_image(m), "runtime": c.runtime_settings(m)})
     return c.create("ocs-test-r05", "scratch")
 
 

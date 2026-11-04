@@ -3,22 +3,22 @@
 ## Creating an environment
 
 `create NAME` makes an environment with an empty persistent workspace (kind `scratch`) on the
-default distribution with the default integrations. Everything else is optional;
-`create --help` groups the options (workspace, distribution or image, integrations), and
+default distribution, Local OpenCode config and specialized Agent Context enabled. Everything else is optional;
+`create --help` groups workspace and distribution/image options, and
 `create` prints the choices it made and the next command.
 
 ```sh
 opencode-sandbox create notes
 opencode-sandbox create webapp --source ~/code/webapp --profile work
-opencode-sandbox create tools --distro arch --no-integrations
+opencode-sandbox create tools --distro arch
 ```
 
 ### A copy of a folder (`--source`)
 
 With `--source DIR` the kind is `project`:
 
-- A Git repository root is **cloned**: committed files only; uncommitted and ignored files are
-  not copied. A subdirectory of a repository is refused (import the root).
+- A Git repository root is **cloned**: committed only by default; optionally include working
+  changes as described below. A subdirectory of a repository is refused (import the root).
 - Any other directory is **copied** without hidden files, symlinks, special files and
   `node_modules`, `target`, `dist`, `build` and `__pycache__`. Everything else becomes readable
   by the agent.
@@ -30,6 +30,58 @@ The copy is the agent's: your original folder is never mounted or changed. Bring
 with `changes` ([changes.md](changes.md)). Do not run host Git, editors or build tools inside a
 managed workspace directory (`environments/<id>/workspace` in the data directory): its `.git` and
 tool configuration are the agent's, and host tools would act on them.
+
+### Git import modes
+
+**Committed only (default)** keeps the existing clean-clone workflow. Local edits, staged changes
+and untracked files are not imported. No new flag or confirmation is required.
+
+**Include working changes** is available for a managed Project Environment from a local repository:
+
+```sh
+opencode-sandbox create webapp-wip --source ~/code/webapp \
+  --include-working-changes
+```
+
+Dashboard: **New → Folder to copy → Git import: Include working changes → Create**, then review
+the preview and choose **Import** (or Cancel). The CLI flag explicitly opts in and prints the same
+preview before creation: changed-path counts, staged/unstaged/untracked counts and up to 12 status
+entries (`index / working tree`). No file contents or patch bodies appear in the preview.
+
+- Keeps history, the current branch (or detached HEAD), the index and working files, including
+  staged versus unstaged changes, additions, deletions, renames, binary data, intent-to-add and
+  regular-file permission/executable bits, and file/directory type changes. Symlink text is copied
+  verbatim; targets are never copied or followed. Hardlinks become independent files; empty
+  directories are not imported. Index references such as cache-tree trees are copied, so Git
+  maintenance (`fsck`, `gc`) works in the clone.
+- **Ignored untracked files are excluded**, using `.gitignore`, `.git/info/exclude` and user-global
+  Git ignores. Already tracked files, including explicitly force-added files, remain included.
+  Non-ignored hidden files **are included**: review for secrets before opting in. There is no
+  automatic secret detector or size-based silent omission.
+- The source working tree, index and history are read-only inputs. No temporary commits, stash,
+  staging, checkout, source hooks/filters or network fetch occur. The resulting clone is independent;
+  later host changes are not synchronized. Git remotes/hooks, credentials and source Git configuration
+  are not copied (the clone's `origin` identifies the source, as with committed-only import).
+- Keep the repository idle through preview and import. Content/index/HEAD rechecks reject detected
+  concurrent edits; this is not a lock or an atomic snapshot of an actively edited host repository.
+  Failures remove only the new, incomplete environment; the source is left as it was.
+- Unsupported states fail explicitly: no commits, unresolved conflicts or in-progress merge/rebase/
+  cherry-pick/revert, submodules, nested untracked repositories, linked worktrees/gitdir files,
+  redirected/symlinked Git metadata, alternates, shallow/partial clones, sparse/split indexes,
+  assume-unchanged/skip-worktree entries, and repository-local `core.excludesFile` redirections.
+  Repository-local Git include/worktree redirections are refused too; user-global ignores are read
+  separately, without loading source Git configuration.
+  Resolve/finish the state first or use committed-only import where applicable. Sockets, FIFOs,
+  devices, unreadable files and symlinked parents of tracked paths are refused, not skipped.
+- Limits apply to the **whole working tree** (tracked files too, not only changes): 100,000
+  paths/visited directories, 256 MiB per file/staged blob, 1 GiB of working-file data, 1 GiB of
+  additional staged objects, and 1 MiB per ignore-rule file (1 GiB total). Larger working trees
+  need committed-only import; large committed history is cloned normally. Custom clean/
+  smudge filters (including Git LFS), host-specific Git settings and filesystem ownership/ACLs/xattrs
+  are not reproduced; literal worktree and index bytes are retained, but status may differ when
+  those settings are essential. Configure tools inside the sandbox yourself.
+
+This option does not apply to plain-folder copies, direct workspaces or Quick sessions.
 
 ### Quick sessions
 
@@ -86,7 +138,7 @@ the directory; `delete` removes only the container, the volume and the metadata.
 
 | `--distro` | Base image | Built from | Notes |
 |---|---|---|---|
-| `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | Image revision 2 since 6.1.0; 6.0.0 built Debian 12 (revision 1) |
+| `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | Current definition revision 4; 6.0.0 built Debian 12 (revision 1) |
 | `arch` | `opencode-sandbox:arch` | `archlinux:base-devel` (rolling) | AUR packages through `ocs-aur` |
 
 Build the base image first (`opencode-sandbox build --distro ID`). The distribution is recorded
@@ -130,29 +182,14 @@ inside a container; inspect `/etc/os-release` there when an exact current versio
   `ocs-aur` stops working in that environment until it is created again from a rebuilt base
   image (`opencode-sandbox build --distro arch`).
 
-## Initial integrations
+## Initial OpenCode configuration
 
-By default every new environment (also `quick` and the dashboard's) asks for the **Context7**
-remote MCP server: current library documentation, public, no key, needs network. Options of
-`create`:
-
-| Option | Effect |
-|---|---|
-| `--no-integrations` | No integrations |
-| `--integration NAME` | Choose from the catalog (`create --help`); repeatable; replaces the default |
-| `--mcp-remote NAME=URL` | A custom remote MCP server |
-| `--mcp-local "NAME=COMMAND ARGS"` | A custom local MCP server |
-
-Custom servers take no headers or secrets; add keys yourself later. At the **first start** the
-manager runs `opencode mcp add --global` in the container, which writes
-`/root/.config/opencode/opencode.json` in the home volume. If any global OpenCode configuration
-already exists there, nothing is written ("skipped").
-
-The outcome is recorded once (`status`, and the Agent Context says "configured", never
-"working"; with network `none` remote servers are marked as unable to work offline) and is
-**never applied again**: not on later starts, recreation, settings changes, updates or restores,
-and no drift is checked. After the first start the configuration is yours. A failure does not
-stop the start; `start` and `status` print the `opencode mcp add` commands to run yourself.
+**Local** (default) imports nothing; configure OpenCode natively in the environment.
+**Copy** imports an entire user-maintained profile directory once into the fresh home volume,
+before the first launch. CLI: `create NAME --opencode-config PROFILE`; dashboard: New → More
+options → OpenCode config → Copy. No source profile is needed afterward. See
+[OpenCode Configs](opencode-configs.md) for profiles, exports and explicit Reload/Empty.
+MCP servers and plugins are native OpenCode configuration, not a manager integration catalog.
 
 ## Everyday commands
 
@@ -164,6 +201,6 @@ stop the start; `start` and `status` print the `opencode mcp add` commands to ru
 | `start NAME`, `stop NAME` | Start or stop the container |
 | `run NAME` | OpenCode in `/workspace` with the provider profile ([opencode.md](opencode.md)) |
 | `shell NAME` | A root bash |
-| `exec NAME -- CMD` | One command, for scripts: no provider profile, and the Agent Context is not regenerated |
+| `exec NAME -- CMD` | One command; generic exec does not inject provider variables, but `ocs-opencode` loads them; managed start refreshes/reconciles Agent Context |
 | `delete NAME [--export-first] [--yes]` | Show the changes, optionally export them, delete |
 | `promote NAME scratch\|project` | Keep a quick session |

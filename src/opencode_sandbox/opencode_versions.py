@@ -1,6 +1,6 @@
 """OpenCode version checks and explicitly approved updates.
 
-Never starts stopped environments merely to inspect their versions.
+Passive inventory never starts environments; explicit temporary checks live in environment_checks.
 """
 from __future__ import annotations
 
@@ -517,7 +517,8 @@ def describe_base_build(plan):
         f"Selected definition: {d.name} {d.version}, revision {d.revision}",
         f"Exact OpenCode target: {plan.target}",
         ('Mode: Refresh & Rebuild — pull current upstream inputs and bypass build cache (--pull --no-cache).'
-         if plan.refresh else 'Mode: Cached rebuild — reuse eligible layers; no forced pull/cache bypass.'),
+         if plan.refresh else 'Mode: Cached rebuild — reuse the local upstream image and layers before the package step; no forced pull.'),
+        f'System packages: always refreshed and upgraded in both modes ({d.build_upgrade}).',
         'Network/download/time costs apply; upstream package repositories can change. Shared build cache is never pruned.',
         'A separate candidate must pass OS/tool/OpenCode verification before guarded publication.',
         ('The replaced image is kept as a rollback copy.' if plan.keep_previous else
@@ -549,7 +550,8 @@ def update_base(version, distro=None, *, keep_previous=True, refresh=False, plan
             _unused_base_tag(d, candidate)
         candidate_id = None
         try:
-            build_output.phase('Refresh & Rebuild: pulling upstream and bypassing build cache' if refresh else 'Cached rebuild: reusing eligible layers')
+            build_output.phase('Refresh & Rebuild: pulling upstream, bypassing build cache and upgrading packages' if refresh
+                               else 'Cached rebuild: reusing eligible layers and upgrading packages')
             candidate_id = c.build_image(d, version, candidate, verify=False, **({'refresh': True} if refresh else {}))
             build_output.phase('Verifying candidate OS, tools and exact OpenCode binary')
             c.verify_image(d, candidate_id, version)
@@ -654,17 +656,19 @@ def _exec_version(m, *, container_id=None):
     return normalize(p.stdout)
 
 
-def update_blocker(m, state, target):
+def update_blocker(m, state, target, *, stop_running=False, system_packages=False):
     """Pure shared eligibility, also re-evaluated under the execution lock; no network/start."""
     supported(target)
     if m.get("operation"): return str(c.pending_operation(m))
+    if system_packages and c.env_distro(m) is None:
+        return "System package upgrades need a registry distribution; this custom-image environment's package manager is unknown"
     p = policy(m)
     if p["mode"] == "pinned" and target != p["version"]:
         return f"Environment pinned to OpenCode {p['version']}; change policy first"
     if c.runtime_settings(m)["network"] == "none":
         return ("OpenCode update downloads from npm but this environment has network=none; "
                 "update the base image instead, or temporarily change the network with config apply NAME --network bridge")
-    if state is None or state.get("Running"):
+    if state is None or state.get("Running") and not stop_running:
         return "OpenCode update requires an existing stopped container"
     return None
 
@@ -674,6 +678,18 @@ class EnvironmentUpdatePlan:
     target: str
     identity: tuple[tuple[str, str], ...]
     metadata: str
+    running: bool = False
+    system_packages: bool = False
+
+
+def system_upgrade_lines(m, requested):
+    """Shared CLI/TUI disclosure of the opt-in package upgrade; never claims full reversibility."""
+    if not requested: return ["System packages: not upgraded; only OpenCode is updated."]
+    d = c.env_distro(m)
+    return [f"System packages: FIRST upgrade installed packages with {d.package_manager}: {d.system_upgrade_summary}",
+            "If the package upgrade fails, OpenCode is not updated and the container is restored from the checkpoint.",
+            "Package upgrades are not fully reversible. Rollback restores the checkpointed system layer, not changes",
+            "outside it (home volume, workspace) or data and configuration that upgraded programs migrated."]
 
 
 @dataclass(frozen=True)
@@ -699,15 +715,29 @@ def recheck_environment_start(m, plan):
         raise c.SandboxError("Environment/container changed since confirmation; review again")
 
 
-def prepare_environment_update(m, version):
+def prepare_environment_stop(m):
+    c.ensure_runtime(False)
+    m = c.resolve(m['id'])
+    state = c.inspect_container(m)
+    return EnvironmentStartPlan(_consent_metadata(m), c.docker_endpoint(), c.data_id(),
+                                tuple(sorted(_environment_identity(m).items())) if state is not None else None)
+
+
+def recheck_environment_stop(m, plan):
+    if prepare_environment_stop(m) != plan:
+        raise c.SandboxError('Environment/container changed since Stop review; review again')
+
+
+def prepare_environment_update(m, version, *, stop_running=False, system_packages=False):
     target = resolve_target(version, m)
     c.ensure_runtime(False)
     m = c.resolve(m["id"])
     state = c.inspect_container(m)
-    reason = update_blocker(m, state, target)
+    reason = update_blocker(m, state, target, stop_running=stop_running, system_packages=system_packages)
     if reason: raise c.SandboxError(reason)
     c.assert_volume_owned(m)
-    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())), _consent_metadata(m))
+    return EnvironmentUpdatePlan(target, tuple(sorted(_environment_identity(m).items())), _consent_metadata(m),
+                                 bool(state.get('Running')), bool(system_packages))
 
 
 def _remember_update(m, value, identity, at):
@@ -748,7 +778,7 @@ def _restore_checkpoint_steps(m, result, *, checkpoint=None):
     c._finish_reconfigure(m)
 
 
-def update_environment(m, version, *, plan=None):
+def update_environment(m, version, *, plan=None, system_packages=False):
     """Update OpenCode in a stopped container with the image build's install script (D-019).
 
     Journal `opencode-update` with a docker-commit checkpoint of the container's system layer,
@@ -756,36 +786,53 @@ def update_environment(m, version, *, plan=None):
     container is replaced by one created from that checkpoint (exactly the previous system
     layer; the /root volume and /workspace are not part of it and not touched). After a success
     the checkpoint stays the environment's rollback point (`rollback_environment`).
+
+    Opt-in `system_packages` (the confirmed plan's choice when a plan is given) first runs the
+    distribution's package upgrade inside the same checkpointed transaction; its failure rolls
+    back before OpenCode is touched. A package upgrade keeps the checkpoint even when OpenCode
+    was already current. Restoring the checkpoint cannot undo effects outside the system layer.
     """
     target = supported(version) if plan is not None else resolve_target(version, m)
     if plan is not None and target != plan.target:
         raise c.SandboxError("Update target differs from the confirmed target; review again")
+    if plan is not None: system_packages = plan.system_packages
     c.ensure_runtime(False)
     with c.lock(m["id"]):
         m = c.resolve(m["id"])
         if m.get("operation"):
             raise c.pending_operation(m)
         # Policy/network refusals precede Docker inspection, as in the original executor.
-        reason = update_blocker(m, {"Running": False}, target)
+        reason = update_blocker(m, {"Running": False}, target, system_packages=system_packages)
         if reason: raise c.SandboxError(reason)
         state = c.inspect_container(m)
-        reason = update_blocker(m, state, target)
+        reason = update_blocker(m, state, target, stop_running=bool(plan and plan.running), system_packages=system_packages)
         if reason: raise c.SandboxError(reason)
         if plan is not None and (tuple(sorted(_environment_identity(m).items())) != plan.identity
-                                 or _consent_metadata(m) != plan.metadata):
+                                 or _consent_metadata(m) != plan.metadata or bool(state.get('Running')) != plan.running):
             raise c.SandboxError("Environment/container changed since confirmation; review again")
         c.assert_volume_owned(m)
         c.recheck_mount(m)  # the update starts it
-        c.require_docker_space("an OpenCode update (checkpoint + npm install)")
+        c.require_docker_space("a system package and OpenCode update (checkpoint + downloads)" if system_packages
+                               else "an OpenCode update (checkpoint + npm install)")
         identity = _environment_identity(m)
+        if state.get('Running'):
+            # Explicit exact TUI consent only. Stop before checkpointing; no implicit restart.
+            c.docker('stop', identity['container'], capture=True)
+            if (c.inspect_container(m) or {}).get('Running'):
+                raise c.SandboxError('Environment did not stop; update not started')
         checkpoint = "ocs-checkpoint:" + m["id"] + "-" + __import__("secrets").token_hex(4)
         c.docker("commit", c.cname(m), checkpoint, capture=True)
         before = m.get("opencode_update")
-        record = {"state": "applying", "from": None, "to": target, "checkpoint": checkpoint, "at": c.now(), "result": None}
+        record = {"state": "applying", "from": None, "to": target, "checkpoint": checkpoint, "at": c.now(), "result": None,
+                  **({"system_packages": True} if system_packages else {})}
         m["opencode_update"] = record
         c.mark(m, "updating", operation=UPDATE_OP)  # journal: from here on a crash is rolled back
+        step = "OpenCode update"
         try:
             c.docker("start", c.cname(m), capture=True)
+            from . import agent_context as ac
+            ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
+            ac.reconcile(m)
             try:
                 record["from"] = _exec_version(m, container_id=identity["container"])
                 verified_at = time.time()
@@ -794,7 +841,17 @@ def update_environment(m, version, *, plan=None):
                 # install script below is the repair. Its checkpoint holds the broken state.
                 record["from"] = None
             c.save(m)
-            if record["from"] != target:
+            current = record["from"]
+            if system_packages:
+                step = "System package upgrade"
+                c.docker("exec", c.cname(m), "sh", "-c", c.env_distro(m).system_upgrade, capture=True)
+                step = "OpenCode update"
+                try:
+                    current = _exec_version(m, container_id=identity["container"])
+                    verified_at = time.time()
+                except c.SandboxError:
+                    current = None  # the upgrade broke the binary: the install script repairs it
+            if current != target:
                 c.docker("exec", c.cname(m), *INSTALL, target, capture=True)
                 installed = _exec_version(m, container_id=identity["container"])
                 verified_at = time.time()
@@ -803,15 +860,19 @@ def update_environment(m, version, *, plan=None):
             c.docker("stop", c.cname(m), capture=True)
         except Exception as exc:  # any failure rolls back to the checkpoint, then is raised
             failure = c.error_text(exc)
+            packages = step == "System package upgrade"
             try:
-                _restore_checkpoint(m, f"update to {target} failed ({failure[:300]}); rolled back to the checkpoint")
+                _restore_checkpoint(m, (f"system package upgrade failed ({failure[:300]}); OpenCode not updated; " if packages
+                                        else f"update to {target} failed ({failure[:300]}); ") + "rolled back to the checkpoint")
             except Exception as restore_exc:  # noqa: BLE001 — reported together with the update failure
-                raise c.SandboxError(f"OpenCode update failed: {failure}; rollback failed: {c.error_text(restore_exc)}. "
+                raise c.SandboxError(f"{step} failed: {failure}; rollback failed: {c.error_text(restore_exc)}. "
                                      + str(c.pending_operation(m))) from exc
-            raise c.SandboxError(f"OpenCode update failed: {failure}. Rolled back: the container is recreated from "
-                                 f"checkpoint {checkpoint} at the next start (system layer as before the update; "
-                                 "/root and /workspace untouched).") from exc
-        if record["from"] == target:
+            raise c.SandboxError(f"{step} failed: {failure}. " + ("OpenCode was not updated. " if packages else "")
+                                 + f"Rolled back: the container is recreated from checkpoint {checkpoint} at the next start "
+                                 "(system layer as before the update; "
+                                 + ("/root and /workspace are not part of the checkpoint, so changes made there remain)."
+                                    if system_packages else "/root and /workspace untouched).")) from exc
+        if record["from"] == target and not system_packages:
             m["opencode_update"] = before
             if before is None:
                 m.pop("opencode_update")
@@ -819,10 +880,13 @@ def update_environment(m, version, *, plan=None):
             _remember_update(m, target, identity, verified_at)
             c.docker("image", "rm", checkpoint, capture=True, check=False)
             return {"version": target, "previous_version": target, "unchanged": True}
-        record.update(state="done", at=c.now(), result=f"updated {record['from'] or 'unknown (broken)'} -> {target}")
+        result = (f"OpenCode {target} unchanged" if record["from"] == target
+                  else f"updated {record['from'] or 'unknown (broken)'} -> {target}")
+        record.update(state="done", at=c.now(), result=("system packages upgraded; " if system_packages else "") + result)
         c.mark(m, "stopped", operation=None, last_error=None)
         _remember_update(m, target, identity, verified_at)
-        return {"version": target, "previous_version": record["from"], "checkpoint": checkpoint}
+        return {"version": target, "previous_version": record["from"], "checkpoint": checkpoint,
+                **({"system_packages": True} if system_packages else {})}
 
 
 @dataclass(frozen=True)
@@ -932,7 +996,10 @@ def rollback_environment(m, *, plan=None):
         elif m.get("image"):
             snapshot = c.snapshot_tag(m)
             c.docker("tag", m["image"], snapshot)
-        _restore_checkpoint(m, f"rolled back {record['to']} -> {record['from'] or 'unknown (broken)'}" + (f"; previous system layer kept as {snapshot}" if snapshot else ""),
+        _restore_checkpoint(m, f"rolled back {record['to']} -> {record['from'] or 'unknown (broken)'}"
+                            + ("; checkpointed pre-upgrade system packages restored (changes outside the system layer remain)"
+                               if record.get("system_packages") else "")
+                            + (f"; previous system layer kept as {snapshot}" if snapshot else ""),
                             checkpoint=plan.checkpoint_id if plan else None)
         return {"version": record["from"], "rolled_back_from": record["to"], "snapshot": snapshot, "image": m["image"]}
 

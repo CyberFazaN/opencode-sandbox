@@ -12,8 +12,8 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
   `NET_RAW`/`MKNOD`, no host Docker socket, privileged mode or host networking. Published ports
   bind only to 127.0.0.1. `bridge` can reach the LAN; it is not egress isolation.
 - Manager settings, disposable observation/discovery caches, durable operation state and user
-  OpenCode configuration are separate. Initial integrations run once; the manager never manages
-  user OpenCode settings afterward. No implicit environment/OS/schema migration.
+  OpenCode configuration are separate. Global config changes only through explicit initial Copy,
+  Apply Export or Reload/Empty; no automatic provisioning/synchronization. No implicit environment/OS/schema migration.
 - Unsupported metadata/backup schemas and unknown ownership are refused and preserved, not
   repaired or deleted. Same-user hostile code and arbitrary external Docker/pipx are outside
   the advisory coordination protocol.
@@ -27,10 +27,11 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
 | `base_locks.py` | Daemon/distribution build/publication guards and lock ordering |
 | `distros.py`, `assets/images/` | Declarative distribution definitions, build labels/assets, OpenCode install and AUR broker |
 | `config_plan.py` | Shared settings diff, consent/preconditions and executor |
-| `workspaces.py`, `workspace_io.py`, `gitflow.py` | Managed/direct checks, hardened host access, import/export and Git review/transfer |
+| `workspaces.py`, `workspace_io.py`, `git_import.py`, `gitflow.py` | Managed/direct checks, hardened host access, working-state import and Git review/transfer |
 | `backup.py`, `cleanup.py` | Validated cold backup/staged restore; data-directory-owned usage/removal |
 | `readiness.py`, `diagnostics.py`, `http_probe.py`, `probes.py` | Read-only readiness, finite host/HTTP/container probes and owned-client cleanup |
-| `agent_context.py`, `integrations.py` | Render/verify/refresh sandbox guidance; once-only initial MCP provisioning |
+| `agent_context.py` | Render/verify/refresh sandbox guidance and reconcile the saved system instruction toggle |
+| `opencode_configs.py`, `config_tree.py`, `config_volume.py`, `opencode_configs_tui.py` | Read-only source profiles, canonical no-follow tree codec, recoverable volume replacement, private temporary export and shared file-transfer UI |
 | `opencode_versions.py` | Actual binary evidence, supported versions/policies, environment/base update and rollback |
 | `update_cache.py`, `update_discovery.py` | Private disposable evidence/attempt storage, source coordination and optional daily discovery |
 | `updates.py`, `updates_tui.py`, `environment_updates_tui.py` | Component inventory, independent checks, exact consent and existing environment actions |
@@ -53,7 +54,11 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
   `environments/<id>/` contains `metadata.json`, managed `workspace/`, `agent-context/` and
   `readiness.json`; siblings include `exports/`, `changes/`, `backups/`, `locks/`, `update-cache/`.
 - `OPENCODE_SANDBOX_CONFIG` (default `~/.config/opencode-sandbox`): `profiles/*.json` (0600,
-  data only; executable `.env` refused), `ui.json`. Provider values are never shell-sourced.
+  data only; executable `.env` refused), `ui.json`, user-maintained `opencode-configs/` directories/root
+  symlinks. Provider values are never shell-sourced; configuration path/content variables are reserved.
+- Global config exports: fixed `/tmp/ocs-occonfig-<uid>-<data_id>/<environment-id>/config/`, private
+  validated namespace/workspace and external `.ocs-export.json` identity/baseline marker; no saved
+  export path or missing-export monitoring. Container IDs/names never identify an export.
 - Containers `ocs-<id>`, home volumes `ocs-home-<id>` mounted at `/root`, staging volumes
   `ocs-stage-<id>-<hex>`; images `ocs-snapshot:`, `ocs-runtime:`, `ocs-checkpoint:`, `ocs-backup:`.
   Bases are `opencode-sandbox:<distro>`; rollback copies add `-previous-<hex12>`.
@@ -92,7 +97,7 @@ creation. Cleanup takes build then publication nonblocking, rechecks ownership/r
 releases each item's guards before proceeding. No per-data-directory lock protects a shared base.
 
 Environment mutations hold `core.lock` for guarded steps. Multi-step operations persist an
-`operation` journal (`recreate`, `runtime-recreate`, `config-update`, `restore`, `opencode-update`,
+`operation` journal (`recreate`, `runtime-recreate`, `config-update`, `opencode-config`, `restore`, `opencode-update`,
 `delete`, `start`); a journal can mean running or interrupted while step locks are released.
 `readiness.RECOVERY` names the explicit next handler; `start`/`repair` cannot guess past it.
 Handlers reread metadata under lock and re-mark only their own journal. Delete removes metadata
@@ -153,6 +158,16 @@ write-preflight, then rechecks before every start/creation. They are never chown
 or restore targets. Backups omit them unless explicitly included; restores always create managed
 workspaces. Checks are snapshots, not protection from a socket/mount introduced later.
 
+Project Git creation defaults to a clean clone. Opt-in working-state import (`git_import`) shares
+preview/fingerprints across CLI/TUI and uses `workspace_io`'s private Git view: no source index writes,
+temporary commits, config/hook/filter execution or lazy fetch. Clone without checkout through the
+private Git directory; transfer missing index blobs and the exact index; materialize only tracked
+and non-ignored untracked paths via no-follow directory-FD reads, then run status on that private
+tree, not the source. Recheck source HEAD/index/files before publishing metadata; any failure removes
+only the new environment. Preserve regular-file modes and symlink text, not ownership/ACLs/hardlinks.
+Unsupported states and bounded-transfer limits are listed in [workspaces](../workspaces.md#git-import-modes).
+This is a one-shot copy, not repository management or an atomic host snapshot.
+
 Host Git uses a private manager-written `GIT_DIR` with only storage-format settings, snapshot HEAD/
 index and data links to objects/refs. Workspace config/hooks/drivers/includes never execute.
 Refuse gitlinks, unsupported split indexes and unsafe `.git` structures/links/alternates/grafts;
@@ -171,8 +186,8 @@ custom-image provenance. Home/workspace data is not undone by a system-layer rol
 
 ## OpenCode, image builds and discovery
 
-`distros.REGISTRY` owns distribution-specific assets/tools/smoke checks. Debian 13/revision 2 and
-Arch rolling/revision 1 are verified against `/etc/os-release`, tools and the actual OpenCode
+`distros.REGISTRY` owns distribution-specific assets/tools/smoke checks. Debian 13/revision 4 and
+Arch rolling/revision 3 are verified against `/etc/os-release`, tools and the actual OpenCode
 binary. Existing/derived/restored layers retain inherited provenance; never describe them with
 today's registry OS/tool promises. Unknown/offline labels stay unknown, not an invented current OS.
 
@@ -180,14 +195,17 @@ OpenCode is `@opencode/cli` 2.x only; self-update is disabled. Supported stable 
 fresh to an exact target **before consent**, never silently replaced afterward. Manual policy
 suppresses unsolicited notices, not requested comparisons; pins constrain creation/update.
 Environment update requires a stopped owned network-enabled container, checkpoints its entire
-system layer, journals installation/verification and finishes stopped. Failure/recovery restores
+system layer, journals installation/verification and finishes stopped. Opt-in package upgrades
+run the registry's distribution command first inside that checkpoint (consent-bound plan field,
+journal `system_packages`); failure restores it before OpenCode changes. Failure/recovery restores
 the checkpoint; rollback first snapshots the present layer. A successor recreation failure retains
 `runtime-recreate` and points to `config recover`, not blindly back to `update-recover`.
 
 Base build consent binds daemon, definition/assets, current immutable image or proven absence,
 target, mode and retention. Build a unique candidate, verify its immutable ID, then revalidate
-consent/candidate tags before publication. Cached builds reuse eligible layers; explicit refresh
-uses `--pull --no-cache`, never cache prune. `update-base`/TUI retain replaced bases; CLI `build`
+consent/candidate tags before publication. Every build passes a fresh package-step nonce, so
+packages are always upgraded; cached builds reuse earlier layers, explicit refresh uses
+`--pull --no-cache`, never cache prune. `update-base`/TUI retain replaced bases; CLI `build`
 deliberately permits no-copy replacement and discloses it. No existing container migrates.
 Rollback groups aliases by full image ID: select automatically only for one distinct copy, otherwise
 require an explicit listed tag/full ID even with `--yes`. Dates/order are not replacement history.
@@ -218,25 +236,45 @@ Manual/Pinned/Unknown/pending recovery do not generate unsolicited environment c
 ## Sessions and initial configuration
 
 Managed `run` uses `opencode --standalone` so one session cannot retain a previous client's provider
-environment. `shell` gets the same profile; arbitrary `exec` does not. A per-session token/watchdog
+environment. `shell` gets the same profile; arbitrary `exec` does not. Both images' executable
+`ocs-opencode` shares the manager's stdlib validator, reads mounted JSON without shell evaluation
+and preserves arguments with `--standalone`. Interactive direct Bash hints only when a mounted
+profile was not already loaded. A per-session token/watchdog
 hangs up the exact session after manager death. Defer callable launch signals only until client PID
 and watchdog ownership exist, then deliver inside cleanup; never inherit a blocked signal mask or
 use threaded `preexec_fn`. Reap forced termination and restore the attached input tty in `finally`.
 
-Agent Context is a read-only directory mount at `/run/ocs-agent/`; the system OpenCode configuration
-adds `instructions: ["/run/ocs-agent/context.md"]` without replacing user configuration. Atomic
-refreshes are visible live; regenerate before run/shell from configured/observed settings and base
-provenance. A failed inspection yields a qualified preview, not verification of the saved file.
-Custom images without the system instruction entry get a warning, not fallback injection.
+Agent Context is always generated and mounted read-only at `/run/ocs-agent/`. Neutral base system
+JSON is reconciled at every managed start to persisted `agent_context_enabled` (default true): only
+the exact context instruction is deduplicated/removed; unrelated fields/list order are retained.
+Malformed config is preserved and blocks managed launch. Atomic host refreshes remain visible;
+preview failure is qualified, not verification of saved guidance. Stopped setting changes reconcile
+at the next start; live changes never interrupt a session. Native user references are outside the toggle.
 
-Initial integrations use `opencode mcp add --global` only at the first start and only if no existing
-global config exists: the upstream command can overwrite same-name entries or corrupt unparseable
-files. Persist `applying` before the attempt; record success/failure/skip and never automatically
-retry/reapply, including after restore. Context7 is the default, not a promise it works offline.
+Config profiles are immutable inputs from the manager's perspective; an initial creation snapshot
+is copied into a fresh labelled home volume. Afterward config is independent of the source. The
+source identifier in metadata/backups is convenience only, never a runtime dependency or replay request.
+Initial Copy preserves normal image-home initialization and refuses a seeded nonempty global
+tree. Later helpers use volume-nocopy; overlapping image-volume declarations are rejected rather
+than sampling a different anonymous tree or re-seeding user home data.
+Whole-tree sampling uses sorted length-delimited path/type/mode/data/target hashing, no symlink
+traversal, bounded entries/bytes/disk, and a repeated sample to reject observed concurrent changes.
+Only directories, regular files and symlinks are supported; hard links copy as independent files.
+The export baseline comes from the original container snapshot, never editable host bytes.
+
+Transfer helpers run as container root on the same home volume with network none, no profile or
+workspace mounts, no image pull, a finite safety deadline and a volume flock. Apply/Reload stage
+on that filesystem, sample/check drift inside the transaction, journal inode identities, atomically
+exchange directories, verify installed fingerprint and fsync commit. An uncommitted exchange is
+rolled back on recovery; a committed new tree is retained. Unknown recovery state is preserved.
+The `opencode-config` environment journal blocks lifecycle work after client death, while the volume
+flock serializes still-running helpers. `opencode-configs recover` and the editor's Recover resolve
+only this journal. Config source code never runs on the host. No locking scheme freezes arbitrary
+in-container writers; final digest comparison detects ordinary races, not hostile same-UID behavior.
 
 ## Updates UI
 
-`v` opens independent Manager/Base Images/Environment OpenCode views. Opening renders local/cached
+`v` opens independent Manager/Base Images/Environments views. Opening renders local/cached
 facts before bounded inspections; it does not discover, probe binaries or start environments.
 Explicit Check and Details keep source/local errors separate, bind selection/generation and reject
 late results. Shared `ReportScreen` is titled plain scrollable text, not component-specific logic.
@@ -248,6 +286,20 @@ object identities and revalidate in existing handlers. No universal updater or m
 Recovery Center rereads authoritative journals, routes OpenCode/configuration recovery to their
 handlers and retains CLI guidance for other journals. Small-terminal forms use bounded text;
 dashboard notices are disclosed in Details rather than covering 80x24 controls.
+
+`environment_checks` owns explicit temporary checks, separately from passive version reports and
+normal interactive launch/global import. It holds the environment flock across inspection/start/probe/restoration,
+including Agent Context start reconciliation.
+`temporary_check_guard` inherits that open lock description, owns start/stop of the exact container
+and restores on pipe EOF, including parent death. Fresh state/identity revalidation refuses changed
+batch consent; originally-running containers are never stopped. Failed cleanup retains a private
+`version-check.json` alongside metadata and actionable feedback, not a success or a new environment
+schema. Explicit Stop reconciles it. Normal interactive startup/configuration flows are not called.
+
+The Manager tab uses a summary card. Unsupported automatic review opens manual guidance; an exact
+pipx command is generated only from fresh verified ownership/settings, never by converting unknown
+installations. Clipboard writes prefer available local Linux transports, then Textual OSC 52 with
+explicitly unverified terminal acceptance. Selection copy is opt-in, deduplicated and excludes inputs.
 
 Base build output drains continuously into a 32 KiB tail with throttled UI publication and explicit
 truncation, no percentage or build deadline. After process death, inspect actual images/copies/

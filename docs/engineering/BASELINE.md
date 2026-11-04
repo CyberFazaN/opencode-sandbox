@@ -1,4 +1,4 @@
-# Baseline — OpenCode Sandbox 6.2.0 candidate
+# Baseline — OpenCode Sandbox 6.3.0 candidate
 
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
@@ -9,18 +9,20 @@ The current checkpoint below records fresh verification; older sections retain t
 
 | Item | Current state |
 |---|---|
-| Manager | `6.2.0` candidate, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.3.0` candidate, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
-| Images | Debian 13/default (`node:24-trixie`, revision 2); Arch rolling (`archlinux:base-devel`, revision 1) |
+| Images | Debian 13/default (`node:24-trixie`, revision 4); Arch rolling (`archlinux:base-devel`, revision 3) |
 
-The candidate includes component Updates views, optional default-off daily discovery,
-environment/base actions and independent manager update/recovery. These are implemented, not a
-pending roadmap. Schemas and image definitions have not changed. Availability,
-consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
-The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
-declined a reboot. Acceptance is not verification; final candidate release gates still apply.
+The 6.3.0 candidate adds working-state Git imports, explicit global-config profile/file transfers,
+optional Agent Context activation and revised Updates flows. Initial integration provisioning is
+removed (D-064/D-065). Both image definitions advance so every base build upgrades system packages;
+environment OpenCode updates offer a default-off package upgrade (D-063). Environment/backup
+schemas are unchanged. Availability, consent, mutation and recovery remain separate; no Update All
+or automatic manager restart/rollback. The owner renewed acceptance of B15's unverified post-boot
+recovery and general host-reboot risks for 6.3.0 on 2026-11-04, without testing or a reboot.
+Acceptance is not verification; original frozen recovery inputs remain retained.
 
 ## Supported environments
 
@@ -38,6 +40,184 @@ declined a reboot. Acceptance is not verification; final candidate release gates
 - OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
 
 ## Verification
+
+### 6.3.0 candidate qualification
+
+Approved implementation: `80cce001019ecd4b409fc1f63bf3390d37c4e808`; release-tree harness
+checkpoint: `f3a685fb33a3a8693b95935ff92b1783c250981c`. All 72 product files match the
+both-endpoint private-tag package checkpoint `6ad634d`; later changes are test/release evidence only.
+Detailed logs, input hashes, failed/pass XML and manifests remain in ignored
+`.work/agents/release-6.3.0/` and `.work/logs/r63*`.
+
+| Layer | Executed result and scope |
+|---|---|
+| Complete default Python/dependency matrix | **2362 passed / 107 real opt-in skips** in each 3.11/3.14 current/lowest-direct combination; 387.98/393.23/401.35/407.91 s. These full runs precede test-only campaign/package-oracle corrections; **65 affected checks passed on all four combinations**, and **72 final quality/CLI/document/release contracts** passed on both checkpoint endpoints. No product implementation changed |
+| Packaging and installed pipx | Both endpoints: isolated sdist/wheel, strict Twine/content checks, fresh private-tag install/version/help/doctor and source-free smoke; **72 product files match source**, all eight image assets included, no shipped test hooks or bytecode. Fresh Typer/Textual resolution is 0.27.3/8.2.8; dependency health clean |
+| Complete real installed-manager campaign | `r63b`: **108 tests / 1890 checks passed**, no failures/errors/skips, 4534.58 s, Python 3.14; both packaged definitions, retained Debian 12 containers/backups, cached/full-refresh builds, real OpenCode/fake-provider first prompts, config/import/terminal paths, actual manager replacement/recovery, privileged and isolated socket activation |
+| Python 3.11 installed-manager floor | `r63floor`: **7 tests / 567 checks passed**, no failures/errors/skips, 338.15 s; actual pipx lifecycle, both-layout manager inventory/update/recovery and both-distribution session exclusion, not a second complete campaign |
+| Static/privacy | Ruff/shellcheck, actionlint and offline zizmor pass. Gitleaks history/tree: zero findings; offline detect-secrets candidates are 13 reviewed deliberate test fixtures, not real credentials; privacy candidates are reserved example addresses/rootlesskit IPs and public Arch image names |
+| Cleanup | Guarded product cleanup passed. Only five manifested setup tags and two validated empty export namespaces were removed, plus the created empty runtime unit directory. Original four full image IDs are unchanged; no containers, volumes or activation units remain. Frozen recovery inputs, persistent protocol locks and shared build cache are retained |
+
+Qualification found stale campaign assumptions about plain Ubuntu's missing Python, imported
+launcher bytecode, pre-existing complete backups, shared-fixture image labels, keyboard focus,
+explicit temporary checks and manual-update text. Narrow test/tool corrections retain exact image,
+data, source and refusal assertions; the unprepared-image row now explicitly checks refusal. The
+first complete attempt (`r63a`) remains failed evidence, not a retry waiver; affected real checks
+then passed before the fresh complete `r63b` pass. No application safeguard was relaxed.
+
+Lowest Typer retains its two known Click deprecations; the complete 3.14 campaign reports 99
+multi-threaded `forkpty` warnings, not suppressed. No reboot, paid-provider call or manual human
+observation was performed. B15 and general reboot risk remain explicitly accepted but unverified
+for 6.3.0. Local qualification is complete; protected PR/main/tag CI, draft review and public-tag
+pipx smoke remain mandatory publication gates, not a production-readiness claim.
+
+### Independent pre-release review — 2026-11-04
+
+An independent review of all changes since 6.2.0 corrected: working-state imports that left
+cache-tree/resolve-undo objects missing (destination `fsck`/`gc` failed), refused ordinary
+file/directory type changes, were invalidated by a read-only host `git status`, or ignored
+included global excludes; exports with read-only directories that could not be replaced/deleted
+(leaving partial or hidden copies); an invalid own export marker that blocked every action instead
+of offering a fresh Export; recovery refusing a transaction interrupted inside its marker write;
+transfer limits recomputed after the operation's own archive used `/tmp`; CLI Reload silently
+choosing Empty for a vanished original profile; profile-location errors crashing dashboard
+screens; and misleading TUI/CLI texts (stale "Working…" after drift Cancel, raw Reload records,
+`True -> False` plans, disabled-context readiness, first-error-only `providers list`). Each has a
+regression; the list of profiles is shown first in OpenCode Configs and deletion reports a
+retained export path.
+
+Full default suites: **2362 passed / 107 opt-in skips** on Python 3.14.8/current and Python
+3.11.18/Typer 0.16.0/Textual 4.0.0; 249 affected checks passed on both crossed combinations.
+Real rootless Debian and Arch (run-owned `ocs-test-rv1104` images with OpenCode 2.2.5):
+`test_16_opencode_configs.py` and `test_12_git_import.py` **12 passed / 104 checks** (`rv1104c`),
+after fixing that row's hard-coded OpenCode version. Scripted 80x24 pty sessions against real
+Docker exercised creation with working changes and Copy, the editor (Export, running-Apply
+warning, drift Cancel/Overwrite), Reload, Agent Context toggle/plan/readiness/start repair,
+Updates and deletion with a retained export. Not run: the complete campaign, privileged,
+socket-activation, pipx and reboot rows, and real OpenCode prompts.
+
+### Unreleased working-state Git import — 2026-11-04
+
+Full default suites: **2351 passed / 107 opt-in skips each** on Python 3.11/lowest direct and
+Python 3.14/current dependencies. The two crossed combinations each passed **99 affected checks**
+(real host Git/files, CLI, compact/large Textual pilots, direct-workspace and Git safety neighbors).
+Final help-panel grouping/documentation changes passed **62 affected checks on each endpoint**;
+the full counts precede that localized CLI-help-only change. Wheel/sdist, strict Twine validation,
+installed-wheel module/CLI/import smoke and private-file exclusion checks passed.
+Ruff, shellcheck and documentation contracts passed. Committed-only import remains the default;
+working-state import preserves index/worktree separation without source writes or temporary commits.
+Unsupported-state, ignore-rule, special-file, source-drift and partial-creation failures have explicit
+regressions; no source hooks/filters/configuration execute.
+
+`test_12_git_import.py`: **2 passed**, real rootless Debian and Arch (`gi-20261104`), confirming
+container-visible branch/status/index bytes, binary content, executable bits, deletions, symlink
+identity, ignored-file omission and source independence across stop/start. Guarded product cleanup
+left no run-owned Docker resources; all pre-existing image tags/IDs were unchanged. Logs/manifests
+remain under `.work/logs/gi-*`. This is scoped import verification, not a complete campaign or release
+qualification; no OpenCode prompts, privileged faults or reboot checks were run for this change.
+
+### Unreleased global configuration and activation — 2026-11-04
+
+Full default checkpoint: **2294 passed / 101 opt-in integration skips each** on Python
+3.11.18/Typer 0.16.0/Textual 4.0.0 and Python 3.14.8/Typer 0.27.3/Textual 8.2.8. Final localized
+creation-publication/transaction-cleanup/export-publication hardening and additional regressions then passed **217
+affected tests on each endpoint**, including config trees/services, context/CLI, creation/lifecycle
+consumers, backups, compact TUI, quality and document contracts. The full counts precede those
+last changes; unchanged subsystems reuse that evidence, not a claimed fresh final-tree full run.
+Missing/disappearing sources, unavailable-volume admission, canceled-review metadata, expected
+codec-error privacy, bounded archive metadata/enumeration and export publication/rollback failures
+have explicit regressions.
+Dependency checks passed; lowest Typer retains its two known Click deprecations.
+
+Real rootless evidence on both distributions covers initial Copy before any environment launch,
+source/nested symlinks, executable modes and root:root/host-UID conversion, stopped Apply, drift
+Cancel/override/repeated Apply, Reload/Empty boundaries, recreation/source independence, home
+backup/restore and stable export rediscovery. Direct executable, interactive/noninteractive/login
+shell hints, saved/toggled context, every-start targeted reconciliation, malformed JSON refusal
+and actual V2 config/data paths passed. Initial Copy retains image-provided home data, refuses a
+nonfresh image-seeded global tree, and rejects overlapping image-volume declarations before IO.
+Abrupt helper death at directory exchange **and during
+committed cleanup** passed on actual volumes; recovery preserves the correct old/new tree and
+normal start refuses the pending journal. Ten distinct feature cases are covered by the scoped
+incremental runs, including final Copy (2), shell/context (2), switch/cleanup fault (4) and image-home
+initialization/overlap (2) checks.
+Earlier still-applicable real fake-provider first prompts passed on both new images, and the
+configuration-preserving OpenCode 2.1.4 update/2.2.0 rollback passed. These are scripted pty/host/
+Docker/OpenCode checks with dummy keys, not manual visual review or paid-provider testing.
+
+Both changed image definitions built and passed OS/tool/exact-binary verification under isolated
+test tags. The initial diagnostic test incorrectly used `ocs-opencode debug paths`; OpenCode
+2.2.0 rejects `--standalone` for that local-only subcommand, so the diagnostic uses plain OpenCode
+while private-server launches retain the approved wrapper semantics. Final sdist/wheel builds,
+strict Twine checks, product-file/asset byte comparison and installed-wheel import/helper/CLI
+construction passed. The dashboard illustration was regenerated. Detailed logs/manifests stay
+under `.work/logs/future-20261104-*`.
+
+Guarded product cleanup left no run-owned containers/volumes/images/exports. Outside normal
+environment cleanup, only four manifested definition-build tags, ten home-seed/overlap fixture
+tags and validated empty test export namespaces were removed; all four
+pre-existing image tags/IDs, persistent protocol locks and shared build cache were retained.
+This is scoped feature verification, not a full campaign, four-way matrix or release qualification;
+privileged/socket-activation/reboot rows were not rerun and B15 remains unchanged.
+
+### Unreleased system package correction — 2026-11-03
+
+The full default suites passed on Python 3.11.18/Typer 0.16.0/Textual 4.0.0 and Python
+3.14.8/Typer 0.27.3/Textual 8.2.8: **2256 passed, 96 opt-in integration skips each**. Later edits
+touched only `tests/integration/` and passed Ruff/collection.
+
+Real Debian/Arch checks: `test_53_environment_updates.py` **8 passed** (`pkg53a`), including the
+new package-upgrade rows. Deterministic in-layer apt/pacman faults were refused before OpenCode
+with the checkpoint restored; a real dashboard upgrade changed the installed package sets before
+the exact OpenCode install; rollback restored the previous OpenCode and package set; markers and
+user configuration were kept. `test_54_base_updates.py` **2 passed / 118 checks** (`pkg54d`, 27 min):
+repeated cached builds reran the package step with distinct nonces and published new verified
+images, refresh/failed-candidate/rollback rows passed, and the Rebuild form has no opt-out.
+Earlier runs `pkg54a`–`c` exposed two harness defects (a substring check matching consent text and
+an undrained pty that stalled Textual and the build); they were fixed and are not product failures.
+Logs and manifests are local under `.work/logs/pkg5*`; guarded cleanup left no resources and
+pre-existing image tags unchanged. Arch cached builds now rebuild `paru` each time. This is not a
+complete campaign or release qualification and does not certify package freshness.
+
+### Unreleased TUI and explicit-check changes — 2026-11-02
+
+The full default suites passed on Python 3.11.18/Typer 0.16.0/Textual 4.0.0 and Python
+3.14.8/Typer 0.27.3/Textual 8.2.8: **2236 passed, 94 opt-in integration skips each**. Subsequent
+small base-eligibility refresh/manager-status refinements passed final focused suites: 82 current
+and 58 lowest-dependency tests, including compact UI, manual guidance, clipboard, docs and quality
+checks as applicable. The earlier full results cover unchanged subsystems, not a fresh full run
+after those refinements.
+
+Scoped real Debian/Arch checks passed for cached/full-refresh candidate builds, rollback/copy and
+existing-environment preservation, update/checkpoint recovery, temporary-check state restoration,
+failed-stop evidence and explicit reconciliation, parent SIGKILL, running-update stop consent,
+Check All/F5/F6 at 80x24 and 120x40, and exact single OSC 52 output. The final recovery/check/terminal
+subset was 10 passed; unchanged build/action evidence is reused from the preceding scoped run.
+An advisory covering recovery consent was reproduced and fixed, then the real recovery cases passed.
+Manifests and detailed logs are local under `.work/logs/tui-ux-20261102{a,b,c}*`; all runs finished
+guarded cleanup without resource leaks or changes to pre-existing image tags. Native clipboard
+backend behavior is unit-tested; actual desktop/terminal clipboard acceptance and manual visual
+observation are not claimed. This is not a complete campaign, four-way matrix or release qualification.
+
+### Published 6.2.0
+
+[6.2.0](https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.2.0) was published on
+2026-11-02 as the latest stable GitHub release (not a draft or prerelease, no binary assets).
+Annotated `v6.2.0` targets protected [PR #3](https://github.com/CyberFazaN/opencode-sandbox/pull/3)
+merge commit `e343e35c1aff2d7d6e2754427abc960f3821bb47`; its product/test bytes match the
+qualification below. All ten [final PR checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41470002579)
+and ten [main checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41471779232)
+passed. All 14 [release-workflow jobs](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41473435213)
+passed, including both Python tag installations, before review/publication of the automated draft.
+Published notes match CHANGELOG; no package-index or container-image upload was performed.
+
+Fresh **public GitHub-tag** pipx installations on Python 3.11.18 and 3.14.8 passed version/help,
+installed-asset and missing-context checks, and actual rootless `doctor` (exit 0). PEP 610 records
+identify the official source/tag/merge commit; all **63 installed product files** match the tag,
+with no test hooks. Doctor verified the user's own rootless daemon and reported the expected older
+retained Debian-base revision warning; neither existing base was rebuilt. This is installation
+proof, not real public-network manager self-replacement, reboot recovery or a production-readiness
+claim. B15 remains BLOCKED with the owner's accepted risk.
 
 ### 6.2.0 candidate qualification
 
@@ -81,8 +261,9 @@ Hosted qualification supplements these local results: all ten jobs passed on the
 ([candidate CI](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41468038565)).
 The owner authorized the protected merge, annotated tag and publication. CAMPAIGN I06's reviewed
 decision is **READY WITH ACCEPTED RISKS**, retaining B15 as BLOCKED, not PASS. Evidence-only edits
-do not change the qualified product/test bytes. Required final-tree PR, `main` and tag checks and
-automated draft review remain mandatory under RELEASING; this is not a production-readiness claim.
+do not change the qualified product/test bytes. The required final-tree PR, `main` and tag checks
+and automated draft review subsequently passed as recorded above; this is not a
+production-readiness claim.
 
 ### Test-quality checkpoint before 6.2.0 preparation
 
@@ -187,13 +368,13 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 ## Unverified behaviour
 
 - **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
-  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized. Same-boot hard-interruption
+  release risk for 6.3.0 on 2026-11-04**, without testing or a reboot. Same-boot hard-interruption
   refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
   On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
   original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
   verifier and confirm startup/data retention. Never delete state/locks or infer success from an
   empty old group, cache or installer exit.
-- **Host reboot generally (D09):** accepted at the stable release, not executed. Daemon restart,
+- **Host reboot generally (D09):** risk accepted for 6.3.0 on 2026-11-04, not executed. Daemon restart,
   stop/start and daemon-unit SIGKILL passed. Next: authorized reboot, then `start NAME` and
   `check NAME` on a manifested test environment; do not equate this with B15's separate proof.
 - Real rootless Docker on other Linux distributions, without systemd or without delegated

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from opencode_sandbox import core as c
+from opencode_sandbox import distros
 from opencode_sandbox import opencode_versions as v
 
 OLD, NEW = "sha256:" + "a" * 64, "sha256:" + "b" * 64
@@ -142,7 +143,7 @@ def test_update_base_latest_builds_explicit_version(monkeypatch):
     assert "OPENCODE_VERSION=2.1.4" in build and "OPENCODE_VERSION=latest" not in build
     assert result["version"] == "2.1.4" and result["previous_image"].startswith("opencode-sandbox:debian-previous-")
     assert build[build.index("-t") + 1].startswith("opencode-sandbox:debian-candidate-")
-    for label in ("distro=debian", "distro-version=13", "image-revision=2", "opencode-version=2.1.4",
+    for label in ("distro=debian", "distro-version=13", f"image-revision={distros.get('debian').revision}", "opencode-version=2.1.4",
                   "opencode-package=@opencode/cli", "managed=true"):
         assert "org.opencode-sandbox." + label in build
     assert build[-3:] == ("-f", str(c.distros.IMAGES / "debian" / "Dockerfile"), str(c.distros.IMAGES))
@@ -278,6 +279,7 @@ def test_update_refused_without_network(monkeypatch):
 
 
 def test_npm_install_is_bounded(monkeypatch):
+    monkeypatch.setattr(c, "guidance_inputs", lambda m, **k: {"image": c.env_image(m), "runtime": c.runtime_settings(m)})
     m = c.create("online", "scratch")
     calls = []
     versions = iter(["2.1.2\n", "2.1.3\n"])

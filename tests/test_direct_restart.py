@@ -20,7 +20,7 @@ class Recorder:
         monkeypatch.setattr(c, "assert_volume_owned", lambda m: None)
         monkeypatch.setattr(c, "mounted_profile", lambda m: None)
         monkeypatch.setattr(c, "require_docker_space", lambda what: None)
-        monkeypatch.setattr("opencode_sandbox.integrations.provision", lambda m: None)
+        monkeypatch.setattr(c, "guidance_inputs", lambda m, **k: {"image": c.env_image(m), "runtime": c.runtime_settings(m)})
 
     def __call__(self, *args, capture=False, check=True):
         self.calls.append(args)

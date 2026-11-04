@@ -19,7 +19,7 @@ fault = test_30_faults.fault
 def test_observations_follow_actual_binary_and_lifecycle(campaign, checks, fault, distro):
     camp, ck = campaign, checks
     name = f"ocs-test-evidence-{distro}"
-    eid = camp.create(name, "--distro", distro, "--no-integrations")
+    eid = camp.create(name, "--distro", distro)
     camp.ocs("start", name)
     camp.sh(eid, "umask 022; mkdir -p /root/.config/opencode; echo '{}' > /root/.config/opencode/opencode.json; "
                  "echo evidence-marker > /etc/ocs-test-evidence; echo home-marker > /root/ocs-test-evidence; "

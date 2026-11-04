@@ -50,7 +50,7 @@ def fault(campaign):
 def env(campaign):
     camp = campaign
     name = "ocs-test-fault"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("start", name)
     camp.sh(eid, "echo ocs-test-marker > /workspace/ws-marker.txt; echo ocs-test-marker > /root/home-marker.txt; "
                  "echo ocs-test-marker > /etc/ocs-test-system-marker")
@@ -157,11 +157,13 @@ def test_config_apply_killed_then_recover(campaign, checks, fault, env, match, w
 def test_backup_killed_leaves_only_a_temporary_directory(campaign, checks, fault, env):
     camp, ck = campaign, checks
     name, eid = env
+    published = set((camp.data / "backups").glob("*.ocsbackup"))
     rc = fault(["backup", "create", name, "--stop", "--no-system"], "*-H * run *", "after")
     ck(rc == -signal.SIGKILL, f"manager SIGKILLed after the first helper run of a backup (exit {rc})")
     leftovers = list((camp.data / "backups").glob(".backup-*"))
     ck(len(leftovers) == 1, f"one temporary .backup-* directory left ({len(leftovers)})")
-    ck(not list((camp.data / "backups").glob("*.ocsbackup")), "no published (partial) backup")
+    ck(set((camp.data / "backups").glob("*.ocsbackup")) == published,
+       "no new published (partial) backup; earlier complete backups preserved")
     preview = camp.ocs("disk", "cleanup").stdout
     ck(".backup-" in preview, "disk cleanup lists the unfinished backup directory")
     camp.ocs("disk", "cleanup", "--yes")
@@ -258,7 +260,7 @@ def test_opencode_update_killed_then_rolled_back(campaign, checks, fault, env, m
 def test_delete_killed_midway_can_be_repeated(campaign, checks, fault):
     camp, ck = campaign, checks
     name = "ocs-test-fdel"
-    eid = camp.create(name, "--no-integrations")
+    eid = camp.create(name)
     camp.ocs("start", name)
     rc = fault(["delete", name, "--yes"], "*-H * rm -f *", "after")
     ck(rc == -signal.SIGKILL, f"manager SIGKILLed after removing the container (exit {rc})")
@@ -332,7 +334,7 @@ def test_concurrent_operations_serialize(campaign, checks, env):
     camp.ocs("start", name)
     ck(intact(camp, eid), "data intact")
     ck(camp.metadata(name)["runtime"]["pids"] == camp.inspect(eid)["HostConfig"]["PidsLimit"], "metadata and container agree on the settings")
-    same = [camp.popen("create", "ocs-test-twin", "--no-integrations") for _ in range(3)]
+    same = [camp.popen("create", "ocs-test-twin") for _ in range(3)]
     codes = [p.wait(timeout=300) for p in same]
     listed = [line for line in camp.ocs("list").stdout.splitlines() if line.startswith("ocs-test-twin ")]
     ck(codes.count(0) == 1 and len(listed) == 1, f"the same name created once ({codes}, {len(listed)} listed)")

@@ -77,9 +77,9 @@ def test_start_refuses_world_readable_or_symlinked_profile(monkeypatch, tmp_path
     with pytest.raises(c.SandboxError, match="0600"):
         _start_until_run(monkeypatch, m)
     p.unlink()
+    m2 = c.create("ocs-qa-perm2", "scratch")
     (tmp_path / "elsewhere").write_text("{}")
     p.symlink_to(tmp_path / "elsewhere")
-    m2 = c.create("ocs-qa-perm2", "scratch")
     with pytest.raises(c.SandboxError, match="Unsafe profile"):
         _start_until_run(monkeypatch, m2)
 
@@ -93,16 +93,16 @@ def test_start_mounts_valid_profile_read_only(monkeypatch):
     assert "dummy" not in " ".join(argv)
 
 
-def test_exec_opencode_warns_that_managed_context_is_not_applied(monkeypatch):
-    """G07: generic exec of opencode gets neither provider profile nor Agent Context."""
+def test_exec_opencode_explains_the_provider_wrapper(monkeypatch):
+    """G07: generic exec of plain opencode does not inject provider variables."""
     c.create("ocs-qa-g07", "scratch")
     monkeypatch.setattr(c, "exec_cmd", lambda m, cmd: 0)
     result = runner.invoke(app, ["exec", "ocs-qa-g07", "--", "opencode", "run", "x"])
-    assert result.exit_code == 0 and "use 'opencode-sandbox run ocs-qa-g07'" in result.output
+    assert result.exit_code == 0 and "exec ocs-qa-g07 -- ocs-opencode" in result.output
     result = runner.invoke(app, ["exec", "ocs-qa-g07", "--", "ls"])
     assert "Agent Context" not in result.output
     help_text = runner.invoke(app, ["exec", "--help"], terminal_width=200).output
-    assert "[args]" in help_text and "NOT applied" in help_text
+    assert "[args]" in help_text and "ocs-opencode" in help_text
 
 
 def test_quick_without_terminal_creates_nothing(monkeypatch):
@@ -184,12 +184,12 @@ def test_partial_runtime_updates_do_not_lose_each_other(monkeypatch):
 
 def test_create_refuses_a_profile_that_does_not_exist():
     """A mistyped --profile created the environment, and its container then had no credentials."""
-    result = runner.invoke(app, ["create", "ocs-qa-prof", "--profile", "nosuch", "--no-integrations"])
+    result = runner.invoke(app, ["create", "ocs-qa-prof", "--profile", "nosuch"])
     assert result.exit_code != 0 and "opencode-sandbox providers set nosuch" in str(result.exception)
     assert "ocs-qa-prof" not in {m["name"] for m in c.all_envs()}
     # The default profile may be absent (an environment without credentials), as for config apply.
-    assert runner.invoke(app, ["create", "ocs-qa-prof", "--no-integrations"]).exit_code == 0
+    assert runner.invoke(app, ["create", "ocs-qa-prof"]).exit_code == 0
     c.CONFIG.joinpath("profiles").mkdir(parents=True, exist_ok=True)
     c.CONFIG.joinpath("profiles", "work.json").write_text("{}")
     c.CONFIG.joinpath("profiles", "work.json").chmod(0o600)
-    assert runner.invoke(app, ["create", "ocs-qa-prof2", "--profile", "work", "--no-integrations"]).exit_code == 0
+    assert runner.invoke(app, ["create", "ocs-qa-prof2", "--profile", "work"]).exit_code == 0

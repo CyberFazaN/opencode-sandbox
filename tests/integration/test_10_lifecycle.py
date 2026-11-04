@@ -80,7 +80,7 @@ def test_lifecycle_settings_changes_backup(campaign, checks, distro):
                 "c.init_dirs(); c.profile_set('ocs-test-fake', {'QA_API_KEY': 'not-a-real-key'})")
     src = source_repo(camp, distro)
     name = f"ocs-test-life-{distro}"
-    eid = camp.create(name, "--source", str(src), "--distro", distro, "--no-integrations", "--profile", "ocs-test-fake")
+    eid = camp.create(name, "--source", str(src), "--distro", distro, "--profile", "ocs-test-fake")
     ws = camp.data / "environments" / eid / "workspace"
 
     # D02 import: committed files only, names, modes and symlinks kept, nothing outside copied
@@ -275,36 +275,50 @@ def test_lifecycle_settings_changes_backup(campaign, checks, distro):
     shutil.rmtree(camp.base / "config2", ignore_errors=True)
 
 
-CUSTOM = "ubuntu:24.04"  # pre-existing local image; only used, never removed
-
-
-def test_custom_image_provenance(campaign, checks):
+def test_custom_image_provenance(campaign, checks, custom_image):
     """E11: a custom-image environment keeps its original image through a reconfiguration,
     a backup without the system layer and its restore."""
     camp, ck = campaign, checks
-    if camp.docker("image", "inspect", CUSTOM, check=False).returncode:
-        pytest.skip(f"{CUSTOM} is not present locally")
     name = "ocs-test-custom"
-    eid = camp.create(name, "--image", CUSTOM, "--no-integrations")
+    eid = camp.create(name, "--image", custom_image)
     camp.ocs("start", name)
     camp.ocs("stop", name)
     camp.ocs("config", "apply", name, "--network", "none", "--yes")
     meta = camp.metadata(name)
-    ck(meta["image"].startswith(f"ocs-runtime:{eid}-") and meta["custom_image"] == CUSTOM,
+    ck(meta["image"].startswith(f"ocs-runtime:{eid}-") and meta["custom_image"] == custom_image,
        f"E11 after the reconfiguration: image {meta['image']}, custom image {meta.get('custom_image')}")
     camp.ocs("backup", "create", name, "--no-system")
     backup = max((camp.data / "backups").glob(f"{name}-{eid}-*.ocsbackup"))
     camp.note(f"backup {backup}")
     env = json.loads((backup / "manifest.json").read_text())["environment"]
-    ck(env["custom_image"] == CUSTOM, f"E11 the backup records the original image ({env['custom_image']})")
+    ck(env["custom_image"] == custom_image, f"E11 the backup records the original image ({env['custom_image']})")
     restored = "ocs-test-custom-rest"
     camp.ocs("backup", "restore", str(backup), restored, "--no-system")
     camp.adopt(restored)
     meta = camp.metadata(restored)
-    ck(meta["image"] == CUSTOM and meta["custom_image"] == CUSTOM, f"E11 restore --no-system uses the original image ({meta['image']})")
+    ck(meta["image"] == custom_image and meta["custom_image"] == custom_image, f"E11 restore --no-system uses the original image ({meta['image']})")
     camp.ocs("start", restored)
-    ck(camp.inspect(meta["id"])["Config"]["Image"] == CUSTOM, "E11 the restored container runs the original image")
+    ck(camp.inspect(meta["id"])["Config"]["Image"] == custom_image, "E11 the restored container runs the original image")
     shutil.rmtree(backup)
     camp.note(f"removed backup {backup}")
     camp.delete(restored)
+    camp.delete(name)
+
+
+def test_custom_image_without_python_refuses_managed_start(campaign, checks):
+    """The prepared fixture must not conceal refusal of an unprepared custom image."""
+    camp, ck = campaign, checks
+    name = "ocs-test-custom-unprepared"
+    eid = camp.create(name, "--image", "ubuntu:24.04")
+    workspace = camp.data / "environments" / eid / "workspace"
+    (workspace / "preserved").write_text("custom-start-data")
+    result = camp.ocs("start", name, check=False)
+    ck(result.returncode != 0 and "Cannot reconcile system Agent Context activation" in result.stderr
+       and "Traceback" not in result.stdout + result.stderr,
+       "E11 unprepared custom image refuses managed-start success without weakening reconciliation")
+    ck(camp.sh(eid, "command -v python3", check=False).returncode != 0
+       and camp.metadata(name)["status"] == "error", "E11 missing Python is the actual refusal cause")
+    ck((workspace / "preserved").read_text() == "custom-start-data"
+       and camp.sh(eid, "test ! -e /etc/opencode/opencode.json").returncode == 0,
+       "E11 failed reconciliation preserves workspace and does not replace system config with defaults")
     camp.delete(name)

@@ -6,17 +6,18 @@
 `opencode --standalone`, a private OpenCode server per launch. (The V2 background service would
 keep the environment of whichever client started it first, so the provider keys of later
 launches would be ignored.) `shell NAME` opens a root bash with the same variables; OpenCode
-started from there, or from `exec`, also reads the Agent Context, but `exec` does not load the
-provider profile.
+started from there, or from `exec`, reads the system config's saved Agent Context setting.
+Generic `exec` does not load the provider profile: use `ocs-opencode` for a validated profile
+and private server from shells/scripts. Plain `opencode` does not load the mounted profile itself.
 
 If the terminal closes or the manager process ends (also by `SIGKILL`, through a per-session
 watchdog), the manager hangs up the session inside the container, like a real terminal would;
 jobs started with `nohup` survive.
 
-Your own OpenCode configuration is left alone: `~/.config/opencode/` in the home volume,
-project `opencode.json` and `AGENTS.md` files, and an `OPENCODE_CONFIG_CONTENT` value in the
-provider profile. The manager writes OpenCode's configuration only once, for the
-[initial integrations](workspaces.md#initial-integrations).
+Your own global/project OpenCode configuration belongs to you. The manager changes the global
+tree only through an explicitly selected creation Copy, Apply Export or Reload/Empty operation
+([OpenCode Configs](opencode-configs.md)); there is no automatic provisioning or synchronization.
+Provider profiles cannot override config paths/content.
 
 ## Agent Context
 
@@ -43,22 +44,37 @@ states only what the manager configures or verifies:
   promises. Missing/offline provenance is unknown. Labels describe the base, not later changes
   inside the container; inspect `/etc/os-release` only when needed. Custom images get no OS or
   tool claims.
-- **Initial integrations:** the names requested at creation and the recorded outcome of the
-  one-time setup (or "not done yet"), always followed by "may have been changed or removed
-  since"; never what is configured now.
 - **Working behaviour:** start with the task, no system inventory, follow the project's
   `AGENTS.md`; OpenCode's own update check is off, so do not run `opencode upgrade`.
 
 **Delivery.** The guidance lives on the host in the environment's `agent-context/` directory,
 which every container mounts read-only at `/run/ocs-agent/` (file `context.md`). The managed
-images contain the system configuration `/etc/opencode/opencode.json` with only
-`"instructions": ["/run/ocs-agent/context.md"]`. OpenCode combines `instructions` from all its
-configuration files, so the guidance is added to your configuration, never replaces it. A
-custom image without that file gets no guidance; `run` warns.
+images ship a neutral `/etc/opencode/opencode.json`. **Include specialized Agent Context**
+defaults on at creation and can be changed in environment Settings or the CLI:
 
-**Freshness.** `run` and `shell` regenerate the guidance from current metadata and the
-container's settings before every launch, and a refresh is visible in a running container at
-once. Commands:
+```sh
+opencode-sandbox create NAME --no-agent-context
+opencode-sandbox config apply NAME --no-agent-context
+opencode-sandbox config apply NAME --agent-context
+```
+
+The file is always generated/refreshed and mounted, even when automatic inclusion is disabled.
+At every managed start (including recreation, update and temporary version-check starts), the
+manager reconciles only the exact `/run/ocs-agent/context.md` entry in the system `instructions`
+array: once when enabled, absent when disabled. All other fields and instructions retain their
+values/order. Malformed JSON or a non-array `instructions` fails without resetting the document;
+managed OpenCode must not launch with a known mismatched activation. Running setting changes
+do not interrupt sessions; an existing process may need a new launch to observe activation.
+For stopped containers the saved choice is reconciled at the next managed start.
+
+User global/project configuration and `AGENTS.md` are never rewritten for this setting. Native
+OpenCode precedence/merging still applies: disabling automatic inclusion cannot stop your own
+config explicitly referencing the file. Starts outside manager control (`docker start`) cannot
+be intercepted; use manager Start before launching OpenCode after changing settings or drift.
+Custom images need Python and GNU timeout for safe reconciliation and managed launches.
+
+**Freshness.** Managed Start, `run` and `shell` regenerate guidance from current metadata and
+container settings; an atomic refresh is visible through the directory mount at once. Commands:
 
 ```sh
 opencode-sandbox agent-context show NAME     # preview
@@ -97,10 +113,10 @@ that environment's OS and system layer.
 | `opencode versions [--check]` | Running versions or dated last verification/Unknown for stopped containers; `--check` compares every policy with npm's latest supported stable release |
 | `opencode status NAME` | One environment's actual/last-verified version, source, time and immutable object identity |
 | `opencode policy NAME`, `opencode policy-set NAME notify\|manual\|pinned [--version X]` | The update policy |
-| `opencode update NAME [--version X] --yes` | Update a stopped environment |
+| `opencode update NAME [--version X] [--update-system-packages] --yes` | Update a stopped environment; optionally upgrade its system packages first |
 | `opencode rollback NAME --yes` | Undo its last update |
 | `opencode update-recover NAME` | Finish an interrupted update (rolls back) |
-| `opencode update-base [--version X] [--distro ID] [--refresh]` | Build/rebuild a base image, keep a rollback copy; default cached, explicit pull/no-cache with refresh |
+| `opencode update-base [--version X] [--distro ID] [--refresh]` | Build/rebuild a base image, keep a rollback copy; every build upgrades system packages, refresh also pulls/bypasses cache |
 | `opencode rollback-base [--distro ID] --list` | List distinct managed rollback images, full IDs and tag aliases (read-only) |
 | `opencode rollback-base [--distro ID] [--copy TAG_OR_FULL_IMAGE_ID] [--yes]` | Verify and swap the selected copy; default only when there is one distinct image |
 
@@ -112,7 +128,8 @@ stderr; any report error gives exit status 2. Without `--check`, the command nev
 Neither mode starts stopped or not-yet-created containers, changes policy, or installs updates.
 The dashboard's [Updates views](dashboard.md#updates), opened with `v`, are separate from this
 CLI report: opening them reads local/cached information only. **Check** explicitly queries npm
-and checks the selected object; it does not start stopped containers. Base labels, installed
+and checks the selected object; stopped existing containers are temporarily started and restored.
+Check All confirms stopped targets. Ordinary CLI version reports still never start containers. Base labels, installed
 runtime evidence, registry discovery and recovery state remain distinct.
 
 **Evidence and cache.** Successful runtime checks record the version, source, time, environment,
@@ -122,7 +139,7 @@ verified** with its time, or **Unknown**; creation labels and old update records
 present binary. Replacement, restore, rollback and update journals invalidate or qualify earlier
 observations. A failed probe retains older evidence with its original time, never a fresh success.
 If Docker cannot be inspected, history is explicitly unverified against the current container.
-For a fresh stopped-container check, start it explicitly, then check; it remains running.
+For a fresh stopped-container check without leaving it running, use the dashboard's explicit Check.
 
 npm success and the latest attempt are stored separately. Without `--check`, an existing cached
 comparison is visibly dated and no network request is made. Explicit discovery failures still
@@ -168,6 +185,19 @@ It never substitutes a newer release after consent. It commits a checkpoint
 `ocs-checkpoint:<id>-*` of the container's system layer, journals the update, and on any
 failure replaces the container with one created from the checkpoint (the system layer exactly
 as before; `/root` and `/workspace` are not touched). It also repairs a broken installation.
+
+`--update-system-packages` (off by default; **Update system packages** in the dashboard) first
+upgrades the environment's installed packages inside that same checkpointed update: Debian runs
+`apt-get update` and `apt-get upgrade` (no removals or new packages, so such upgrades are held
+back; changed configuration files are kept), Arch runs `pacman -Sy archlinux-keyring` and a full
+`pacman -Su`. A failed upgrade stops **before** OpenCode is touched and restores the checkpoint.
+After the upgrade, OpenCode is verified again and reinstalled if the upgrade broke it; an already
+current OpenCode then keeps the checkpoint as the rollback point. Custom-image environments
+refuse the option: their package manager is unknown. Package upgrades are **not fully
+reversible**: rollback restores the checkpointed system layer, but not changes outside it (the
+`/root` home volume, `/workspace`) or data and configuration that upgraded programs migrated.
+On Arch, AUR/foreign packages such as `paru` are not rebuilt (see the libalpm limitation).
+Without the option, packages are left unchanged.
 `opencode rollback` undoes the last successful update the same way, keeping the current system
 layer as an `ocs-snapshot:*` image first; the last update's checkpoint is kept as the rollback
 point (`disk cleanup --superseded` keeps it).
@@ -199,14 +229,19 @@ retrying `disk cleanup`. This is not a durable base-build journal or an automati
 
 Choose the mode explicitly:
 
-- **Cached rebuild** (default): reuse eligible Docker layers with the selected definition and
-  exact OpenCode version. It may reuse OS/package layers; definition or cache changes may rerun
-  them. It does **not** guarantee fresh packages or an offline build.
+- **Cached rebuild** (default): reuse the local upstream image and the eligible Docker layers
+  before the package step, with the selected definition and exact OpenCode version. It is not
+  an offline build.
 - **Refresh & Rebuild** (`--refresh`): request current upstream inputs and bypass the build cache
-  (`--pull --no-cache`). This downloads/rebuilds package layers, can take substantially longer
-  and use more disk, and **never prunes the shared build cache**. Repositories and upstream tags
-  can change during a build; this is not reproducibility, a security certification or a separate
-  upstream-freshness assessment.
+  (`--pull --no-cache`). This can take substantially longer and use more disk, and **never prunes
+  the shared build cache**. Repositories and upstream tags can change during a build; this is not
+  reproducibility, a security certification or a separate upstream-freshness assessment.
+
+**Every build upgrades system packages**, in both modes and for the `build` command too: a
+per-build value forces the package layer to run with fresh indexes, so it and the later layers
+are never reused from the cache. Debian runs `apt-get update` and `apt-get upgrade`; Arch runs a
+full `pacman -Syu` (never a partial upgrade) and therefore also rebuilds `paru`. A repeated build
+publishes a new image even with the same OpenCode version. There is no option to skip this.
 
 ```sh
 opencode-sandbox opencode update-base --distro debian --version 2.1.4 --yes
@@ -218,6 +253,7 @@ The dashboard [Base Images view](dashboard.md#base-image-actions) offers both mo
 keeps a rollback copy on replacement. The existing `build` command deliberately keeps **no**
 rollback copy, discloses that distinction, and also accepts `--refresh` (its target option remains
 `--opencode-version`). Base changes affect future base-based container creation and file-only
-restores, not existing containers, writable layers, home/workspace/configuration or integrations.
+restores, not existing containers, writable layers or home/workspace/configuration.
 Not-yet-created pinned environments must still match the new base. To upgrade packages in an
-existing environment, use that environment's package manager instead.
+existing environment, use `opencode update NAME --update-system-packages` or the environment's
+package manager.

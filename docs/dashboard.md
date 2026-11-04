@@ -48,7 +48,7 @@ Metadata-only refresh does not recheck or clear these advisories.
 |---|---|---|---|
 | `Enter` / `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
 | `F5` / `F6` | Start / Stop | `x` | Delete (confirmation) |
-| `n` | New environment (`create`; distribution, workspace mode, provider profile and integrations under "More options") | `c` | Create a project from the current folder (the confirmation shows what is copied) |
+| `n` | New environment (`create`; distribution, workspace mode, provider, Local/Copy config and Agent Context under "More options") | `c` | Create a project from the current folder (the confirmation shows what is copied) |
 | `/` | Filter | `r` | Refresh |
 | `t` | Settings (`config apply`; shows the change plan first) | `u` | Usage (`container usage`) |
 | `i` | Check (`check NAME`; the details pane shows the last result) | `a` | Agent Context preview |
@@ -57,11 +57,20 @@ Metadata-only refresh does not recheck or clear these advisories.
 | `B` | Backups (`backup list`, `backup restore`) | `v` | Updates (local/cached inventory; explicit version Check) |
 | `p` / `g` | Provider profiles / dashboard preferences | `F8` | Recovery Center (interrupted operations and the command that finishes each) |
 | `D` | Disk (`disk usage` / `disk cleanup`; removal only after a confirmation listing every object) | `?` | All keys |
+| `O` | OpenCode Configs (user-maintained directories, not an in-app source editor) | | |
 | `Esc` | Close a dialog or screen | `q` | Quit |
 
 Dialogs default to Cancel. Dashboard keys are inactive while a sub-screen is open. Promotion to a
 project, `backup restore-check`, `backup restore-rollback` and custom images are only available
 in the CLI.
+
+Press `?` again, Esc, or Close to dismiss Keys. Manager Settings (`g`, the Preferences button)
+includes **Copy selected text**, off by default. Completed selections in displayed text and
+read-only reports are copied once; editable/password fields keep normal editing behavior.
+Available local Linux clipboard tools are used without installing anything. Otherwise the
+terminal receives an OSC 52 request: the notification says acceptance is unverified because
+terminals and multiplexers can reject it. Without a usable system clipboard, the application
+retains its local copy buffer and reports the limitation; use your terminal's manual copy action.
 
 The read-only Agent Context preview is titled **Agent Context — NAME**. If container inspection
 fails, it shows the reason and previews the configured settings with unknown base OS provenance.
@@ -70,14 +79,20 @@ does not rewrite the saved file or start the environment; guidance is regenerate
 OpenCode launch. Agent Context, Updates Details, readiness and cleanup-result reports are scrollable;
 use Tab to reach Close, or Esc to return to the dashboard.
 
+Environment Settings (`t`) contains **Include specialized Agent Context**, **OpenCode Config
+Editor** and separate **Reload Config**. The editor displays No export/Export available (or an
+Invalid export that can only be replaced or deleted) and the
+exact private `/tmp` path; Export/Apply/Delete are file transfers for host editing. Replacement,
+deletion and Reload/Empty confirm data loss; container drift offers Cancel/Overwrite Anyway.
+Close retains the export. CLI equivalents and boundaries are in [OpenCode Configs](opencode-configs.md).
+
 ## Updates
 
-`v` opens **Updates**, with three compact views: **Sandbox Manager**, **Base Images** and
-**Environment OpenCode**. Press `1`, `2` or `3` to change views; use Up/Down to select an item,
-`c` for **Check**, `d` or Enter for **Details**, and Esc to close. Tab reaches the primary
-buttons; **Cancel check** cancels this screen's read-only checks, not an installation or another
-dashboard operation. Close cancels owned checks and rejects late results. Selection survives
-view changes, and returning from Details restores focus to the inventory.
+`v` opens **Updates**, with three tabs: **Manager**, **Base Images** and **Environments**.
+Press `1`, `2` or `3` to change views; use Up/Down to select an item, `c` for **Check**, `C`
+for **Check All**, `d` or Enter for **Details**, and Esc to close. Tab reaches buttons. Close
+cancels owned checks and rejects late results, but temporary-start cleanup still completes.
+Selection survives view changes; returning from Details restores the previous focus.
 
 Opening Updates does **not** trigger npm/GitHub discovery, execute OpenCode, start an environment or run
 an image helper. Installed manager/local metadata and cached evidence appear first; bounded
@@ -85,13 +100,15 @@ Docker inspections arrive independently. Saved environment status is not treated
 container state. Before identity can be inspected, history is explicitly unverified; stopped
 environments show dated last verification or Unknown, never their base's build label as proof.
 
-In either OpenCode view, Check queries npm for the latest supported stable release and checks
-only the selected object. A running environment gets a bounded runtime probe; a stopped one
-is **not** started. An owned base image gets an explicit bounded helper probe; its build label
-alone is not a runtime verification. The two views share discovery, including dated cached
-success after a failed request. Source/row errors and progress remain independent. A missing
-registry result means availability unknown, not "up to date"; Manual/Pinned still allow requested
-comparisons without changing policy or authorizing execution.
+In either OpenCode view, Check queries npm availability once and inspects the selected installed
+binary; Check All inspects all listed eligible objects. Overlapping requests are not duplicated.
+A running environment stays running. An existing stopped environment is temporarily started,
+inspected and stopped again; no interactive launch or global-config import occurs. Like every
+managed start, it refreshes/reconciles saved Agent Context activation. Single Check needs no confirmation. Check All confirms its fixed target set if
+any environment is stopped; changed identities/state require a new review. Missing containers
+are not created. Owned base images use bounded helper probes, never labels as runtime proof.
+Source and installed-version results/errors remain separate; a failed npm request does not
+discard successful local checks or imply "up to date". Manual/Pinned allow requested comparisons.
 
 Details discloses complete identities, observation source/time, provenance, definition revision,
 errors and pending recovery, plus existing CLI guidance. Base OS/package freshness is not
@@ -119,7 +136,7 @@ recovery journals. Automatic discovery never starts containers or probes binarie
 
 ### Manager release and installation checks
 
-In **Sandbox Manager** (`1`), opening shows the running version, cached release evidence and an
+In **Manager** (`1`), opening shows the running version, cached release evidence and an
 independent local installation inspection. **Check** queries published full releases from the
 official GitHub repository and repeats that inspection. No GitHub login/token is needed or sent;
 drafts, prereleases, invalid tags and unpublished checkouts are not release targets. Tags must be
@@ -136,6 +153,12 @@ source authentication, install permission or guaranteed rollback. Unsupported/cu
 shadowed installations need manual review; sensitive option values are never displayed and foreign
 launchers are not taken over. Details shows source, time, bounded notes and the refusal reason.
 
+When a newer version exists, Update remains available even if automatic updating is unsupported.
+The manual-update dialog explains the reason. Only freshly verified official-tag pipx ownership
+and settings produce an exact-tag command preserving Python and recognized locations. Confirm
+copies that command and closes the dialog; it does not install anything. Other installation
+methods receive guidance without an unsafe generic replacement command.
+
 For a supported install and newer target, **Update** (`u`) prepares fresh exact source/tool/impact
 review. Cancel is focused first; read it, accept the public-default policy and choose **Update &
 close**. Finish active operations/sessions first. An independent helper waits for actual process
@@ -149,19 +172,27 @@ and any previous-tag reinstall is a separate manual action, not a guaranteed bac
 
 ### Environment actions
 
-In **Environment OpenCode** (`3`), use **Start** (`s`), **Update** (`u`), **Policy** (`p`),
-**Rollback** (`r`) or **Recover** (`e`). These buttons request a review, not permission inferred
+In **Environments** (`3`), use **F5 Start**, **F6 Stop**, **Update** (`u`), **Policy** (`p`),
+**Rollback** (`r`) or **Recover** (`e`). Actions request a review, not permission inferred
 from cached versions, availability or readiness. Target selection and live eligibility checks
 run off the UI thread. The scrollable confirmation shows the exact operation and identities;
 Cancel is focused first. Changed metadata, policy, container or checkpoint requires a new review.
 
 - **Start** is explicit, may create a container, and **leaves it running**. Use Check afterward
-  for fresh binary verification. It does not temporarily start/probe/stop. Normal pin, direct
+  for fresh binary verification. Normal pin, direct
   workspace, profile, ownership and pending-operation checks remain in force.
-- **Update** resolves an exact compatible target before consent and requires an owned stopped
-  network-enabled container and matching pin. It checkpoints the full system layer, temporarily
+- **Stop** honors Manager Settings' stop-confirmation preference and preserves home/workspace.
+- **Update** resolves an exact compatible target before consent and requires an owned,
+  network-enabled container and matching pin. A running target gets **Caution** consent: it will
+  be stopped and **will not restart afterward**, on success or rollback. After stopping, the
+  update checkpoints the full system layer, temporarily
   starts for installation/verification and finishes stopped; failure restores that checkpoint.
-  An identical target verifies without reinstalling. No implicit stop/network/policy change.
+  An identical target verifies without reinstalling. No implicit network/policy change.
+  **Update system packages** (off by default) first upgrades installed packages with the
+  environment's package manager inside the same checkpoint; consent names the exact commands.
+  If the upgrade fails, OpenCode is not updated and the checkpoint is restored. Package upgrades
+  are **not fully reversible**: rollback restores the system layer, not home/workspace changes
+  or migrated data. Unavailable for custom images. Unchecked, packages stay unchanged.
 - **Policy** changes Notify/Manual/Pinned and an exact pin only after separate confirmation.
   It installs nothing and does not bypass update, rollback or first-creation restrictions.
 - **Rollback** restores the **entire system layer**, snapshotting the present layer first.
@@ -178,8 +209,14 @@ container-recreation failure needs `opencode-sandbox config recover NAME`, not a
 update-recover. Details reads authoritative journals independently of delayed Docker inventory.
 Full version/data-boundary rules: [OpenCode versions](opencode.md#versions).
 
-**Cancel check** cancels read-only checks and operation-plan preparation, not an approved mutation.
-Closing Updates also does not cancel an approved operation: it is owned by the dashboard, which
+Temporary checks retain the environment lock through restoration and target immutable container
+IDs. A separate guardian also restores stopped state after manager death. Failed/unconfirmed
+restoration is an error, not a successful check; inspect actual state and use F6 or the indicated
+`stop` command. A manager-owned `version-check.json` beside metadata retains unresolved cleanup
+evidence; explicit successful Stop reconciles it. Already-running environments are never stopped
+by a version check. External Docker commands do not honor manager lifecycle locks.
+
+Closing Updates does not cancel an approved operation: it is owned by the dashboard, which
 refuses conflicting operations and normal Quit until it finishes. If the manager is killed, use
 the saved journal and indicated recovery command. Notifications remain owned by the dashboard but
 do not cover operation forms or Updates Details at 80x24.
@@ -191,8 +228,11 @@ In **Base Images** (`2`), **Build/Rebuild** (`b` or `u`) opens the target/mode f
 build, pull or package-freshness assessment. Opening the view still inspects only local metadata.
 
 Choose an exact compatible target or let latest resolve before consent. **Cached rebuild** reuses
-eligible layers; **Refresh & Rebuild** explicitly pulls/bypasses cache with extra network/time/disk,
-never pruning it. Neither certifies package freshness/security or reproducibility. Cancel-first
+the local upstream image and layers before the package step; **Refresh & Rebuild** explicitly
+pulls/bypasses cache with extra network/time/disk, never pruning it. **Both modes always upgrade
+system packages** with fresh indexes (Debian `apt-get update` plus `apt-get upgrade`, Arch a full
+`pacman -Syu`); there is no option to skip it. Neither certifies package freshness/security or
+reproducibility. Cancel-first
 consent names distribution/definition/target/current image/mode; unknown ownership or changed
 identities refuse. The verified immutable candidate is published only after live revalidation.
 The dashboard keeps a rollback copy on replacement; identical verified results make no extra copy.
@@ -202,13 +242,13 @@ several need explicit selection, **never a default newest copy**. Review full ID
 The current manager's OS/tool/binary verification must pass, and the replaced base is retained.
 Old-definition copies can be listed yet fail verification: this is not an OS downgrade mechanism.
 
-Approved work belongs to the dashboard, not this screen. Close/Cancel check cannot cancel a build
+Approved work belongs to the dashboard, not this screen. Closing cannot cancel a build
 or rollback, conflicting operations and normal Quit refuse while it runs, and reopening Updates
 retains the phase/result. Details includes a bounded tail of build output; output never writes
 directly over Textual. No invented percentage or short build timeout. After process death, inspect
 the actual base/copies and any named candidate; there is no new base recovery journal.
 
-Existing containers/writable layers, their pins, home/workspace/configuration and integrations do
+Existing containers/writable layers, their pins and home/workspace/configuration do
 not migrate. Future base-based creation and file-only restores use the changed base, with
 not-yet-created pins still enforced. The CLI retains both rollback-preserving
 `opencode update-base` and deliberately no-copy `build`, each with explicit `--refresh`; see

@@ -9,6 +9,35 @@ from . import core as c
 from . import manager_review as review
 
 
+class ManualUpdateScreen(ModalScreen):
+    CSS = """ManualUpdateScreen {align: center middle;}
+    ManualUpdateScreen ToastRack {height: 0; max-height: 0; overflow: hidden;}
+    #manual-update {width: 94%; height: 90%; border: round $warning; background: $surface; padding: 0 1;}
+    #manual-update-text {height: 1fr;} #manual-update Horizontal {height: auto;}"""
+    BINDINGS = [Binding('escape', 'cancel', 'Cancel')]
+    AUTO_FOCUS = '#manual-update-cancel'
+
+    def __init__(self, message, command):
+        super().__init__()
+        self.message, self.command = c.printable(message), command
+
+    def compose(self):
+        with Vertical(id='manual-update'):
+            yield Static('Manual update required', markup=False)
+            yield TextArea(self.message, read_only=True, id='manual-update-text')
+            with Horizontal():
+                yield Button('Cancel', id='manual-update-cancel', compact=True)
+                yield Button('Confirm' if self.command else 'Close', id='manual-update-confirm', compact=True)
+
+    def action_cancel(self): self.dismiss()
+
+    def on_button_pressed(self, event):
+        event.stop()
+        copy = event.button.id == 'manual-update-confirm' and self.command
+        self.dismiss()
+        if copy: self.app.copy_text(self.command)
+
+
 class ManagerReviewScreen(ModalScreen[review.Approval | None]):
     CSS = """ManagerReviewScreen {align: center middle;}
     ManagerReviewScreen ToastRack {height: 0; max-height: 0; overflow: hidden;}

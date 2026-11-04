@@ -5,7 +5,8 @@
 | [install.md](install.md) | Requirements; installing, upgrading and uninstalling with pipx; preparing rootless Docker and the base images; installing from a source checkout |
 | [getting-started.md](getting-started.md) | From `doctor` to a first OpenCode session and back to your repository |
 | [concepts.md](concepts.md) | Terms, where data lives, names, labels, environment variables |
-| [workspaces.md](workspaces.md) | Environment kinds, managed and direct workspaces, distributions, initial integrations |
+| [workspaces.md](workspaces.md) | Environment kinds, managed and direct workspaces, distributions, initial config |
+| [opencode-configs.md](opencode-configs.md) | User-maintained profiles, global-config host exports, Apply/Reload/Empty and recovery |
 | [providers.md](providers.md) | Provider profiles and model credentials |
 | [settings.md](settings.md) | Resource limits, network modes, published ports, the change plan |
 | [opencode.md](opencode.md) | Sessions, the Agent Context, OpenCode versions and updates |

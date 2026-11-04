@@ -13,7 +13,7 @@ the OpenCode project, and it is unrelated to other projects with similar names.
 
 > [!IMPORTANT]
 > **Beta, written by an AI agent.** The code, tests and documentation were written with
-> OpenCode and Claude Opus 5.5, with minimal human review. The evidence for its behaviour is
+> OpenCode with Claude Opus 5.5 and GPT-6.1 Sol, with minimal human review. The evidence for its behaviour is
 > the automated test suite and a test campaign on real rootless Docker, run on Arch Linux only (see [Tested environment](#tested-environment)); there has been no
 > independent human security review. Expect defects, read the [security model](docs/security.md),
 > and do not rely on it as your only protection against code you consider hostile.
@@ -38,7 +38,8 @@ Consider something else if:
 
 ## Features
 
-- **Environments**: scratch (empty), project (a Git clone or a filtered copy of a folder) and
+- **Environments**: scratch (empty), project (a Git clone, optionally including local working
+  changes, or a filtered copy of a folder) and
   disposable quick sessions; Debian 13 or Arch Linux images (AUR through `ocs-aur`), or a
   custom image.
 - **Managed workspaces** by default, never your original folder; direct host workspaces only with
@@ -46,6 +47,9 @@ Consider something else if:
 - **Change review**: export, bundle, inspect and stage the agent's changes as a review branch;
   host Git never uses the sandbox's Git configuration or hooks.
 - **Provider profiles**: named credentials, stored with mode `0600`, mounted read-only.
+- **OpenCode Configs**: copy user-maintained directories once at creation; export the global
+  config to a private temporary host workspace, apply edits with drift detection, or reload a
+  profile/Empty. Shared CLI/dashboard actions work with stopped environments too.
 - **Settings** for CPU, memory, processes, network and published ports (`127.0.0.1` only)
   through one change plan.
 - **Backups and recovery**: verified cold backups, restores into new environments, snapshots,
@@ -65,9 +69,11 @@ Consider something else if:
   Base Build/Rebuild and Rollback preserve copies; cached builds and explicit Refresh & Rebuild
   stay separate, without migrating existing environments or pruning Docker's build cache.
   [Current capabilities and limits](docs/dashboard.md#updates).
-- **Agent Context**: OpenCode is told what the sandbox is (user, workspace, network, limits,
-  operating system); [preview it in the dashboard](docs/dashboard.md) with `a`.
-  One-time initial integrations (Context7 by default).
+- **Optional Agent Context**: enabled by default per environment; OpenCode is told what the
+  sandbox is (user, workspace, network, limits, operating system). The file remains available
+  when automatic inclusion is off; [preview it in the dashboard](docs/dashboard.md) with `a`.
+- **Direct container launches**: `ocs-opencode` safely loads the mounted provider profile and
+  starts a private OpenCode server, including from scripts or a direct Docker shell.
 - **Diagnostics**: `doctor` for the host, read-only `check NAME` per environment including
   measured network reachability, disk usage and conservative cleanup.
 
@@ -119,7 +125,7 @@ You need Linux with Python 3.11 or newer, pipx and Git; install them using your 
 documentation. Install the application from a release tag:
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.2.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.3.0
 opencode-sandbox --version
 ```
 
@@ -149,6 +155,12 @@ opencode-sandbox               # the dashboard
 with a code that names the problem ([docs/troubleshooting.md](docs/troubleshooting.md)). The
 full walk-through: [docs/getting-started.md](docs/getting-started.md).
 
+Git imports are **Committed only** by default. To hand the agent your in-progress work, use
+`create NAME --source PATH --include-working-changes`, or select **Include working changes**
+in the dashboard's New form. A status/count preview is shown; staged/unstaged changes and
+non-ignored untracked files are copied without changing the source repository. Ignored untracked
+files stay out; non-ignored secrets do not. See [import limits and safety](docs/workspaces.md#git-import-modes).
+
 ## External services
 
 The manager sends no telemetry. These services are contacted:
@@ -161,7 +173,6 @@ The manager sends no telemetry. These services are contacted:
 | Debian or Arch package mirrors | Base image builds, and packages you install in an environment |
 | AUR, GitHub, crates.io | The Arch image build (the AUR helper `paru` and its sources); AUR packages you install |
 | npm registry | OpenCode installs and updates; version checks (`opencode check`, `opencode versions --check`) from the host; the internet probe of `check NAME` from inside the container |
-| Context7 (`mcp.context7.com`) | Configured once in every new environment by default, then used by OpenCode when the agent asks for library documentation; opt out with `create --no-integrations` |
 | Your model provider | Whatever your provider profile and OpenCode configuration use |
 
 OpenCode itself, and anything the agent runs, can contact other services when the network mode
@@ -175,6 +186,7 @@ is `bridge`.
 - [Environments and workspaces](docs/workspaces.md),
   [provider profiles](docs/providers.md), [settings](docs/settings.md)
 - [OpenCode and the Agent Context](docs/opencode.md)
+- [OpenCode Configs and the host export editor](docs/opencode-configs.md)
 - [Backups](docs/backup.md), [change review](docs/changes.md),
   [maintenance](docs/maintenance.md)
 - [Dashboard](docs/dashboard.md), [security model](docs/security.md),

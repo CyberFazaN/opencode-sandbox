@@ -149,7 +149,7 @@ def test_background_and_explicit_updates_check_share_one_real_request(metadata_s
             await until(pilot, joined.is_set)
             release.set()
             await until(pilot, lambda: not screen._active and app._discovery_status is not None)
-            assert "npm: 2.2.0" in screen.discovery_text()
+            assert "Available OpenCode: 2.2.0" in screen.discovery_text()
             assert screen.remote["success"] == v.discovery()["success"]  # never retimestamp shared evidence
             assert len(registry["requests"]) == 1 and not metadata_sources
             await pilot.press("d")
@@ -171,7 +171,7 @@ def test_background_results_reach_an_already_open_updates_view(metadata_sources,
         assert not registry["requests"]
         preferences.write({**preferences.DEFAULTS, "daily_discovery": True})
         app.refresh_discovery_preferences()
-        await until(pilot, lambda: "npm: 2.2.0" in screen.discovery_text())
+        await until(pilot, lambda: "Available OpenCode: 2.2.0" in screen.discovery_text())
         assert not screen._active and len(registry["requests"]) == 1
     run(test, (80, 24))
 
@@ -245,7 +245,7 @@ def test_unavailable_scheduling_is_disclosed_without_disabling_manual_ui(metadat
         await pilot.press("v", "3", "c")
         screen = app.screen
         await until(pilot, lambda: not screen._active)
-        assert "npm: 2.2.0" in screen.discovery_text() and len(registry["requests"]) == 1
+        assert "Available OpenCode: 2.2.0" in screen.discovery_text() and len(registry["requests"]) == 1
         await pilot.press("d")
         assert "Automatic discovery unavailable" in app.screen.report
     run(test, (80, 24))

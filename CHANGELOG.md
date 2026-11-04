@@ -4,6 +4,78 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 6.3.0 — 2026-11-05
+
+Configuration and working-state import release (Beta). Python 3.11 or newer; environment and
+backup schemas are unchanged. Upgrading does not rebuild images or migrate existing environments.
+Actual post-reboot manager recovery and host reboot behaviour remain unverified, with the
+owner's accepted release risk; no automatic reboot or recovery is performed.
+
+### Upgrade notes
+
+- Creation no longer accepts `--integration`, `--no-integrations`, `--mcp-remote` or
+  `--mcp-local`, and new environments no longer provision Context7. Configure MCP/plugins natively
+  or explicitly copy an OpenCode config profile. Existing global configuration is preserved.
+- Existing provider profiles containing `OPENCODE_CONFIG_CONTENT`, `OPENCODE_CONFIG` or
+  `OPENCODE_CONFIG_DIR` are now refused. Move configuration to native files or an OpenCode config
+  profile, then remove those keys from the provider JSON; credential values are never printed.
+- Debian/Arch base definitions are revisions 4/3. When `doctor` reports an older definition,
+  explicitly rebuild with `opencode-sandbox build --distro debian` or
+  `opencode-sandbox build --distro arch`. Existing environment layers keep their OS and files;
+  rebuilding does not add `ocs-opencode` to them or require migrating them to clear a warning.
+- Every managed start now reconciles the saved Agent Context system instruction. Custom images
+  need Python and GNU timeout; malformed system OpenCode JSON is preserved and blocks the start
+  until repaired. User global/project config is not rewritten by context reconciliation.
+
+### Added
+
+- Opt-in **Include working changes** for managed Project Git imports, shared by CLI and dashboard:
+  status/count preview, staged/unstaged index fidelity, non-ignored untracked files, binary data,
+  permissions and symlinks, with read-only source access and explicit unsupported-state failures.
+  Committed-only cloning remains the default.
+- User-maintained **OpenCode Configs**, one-time Local/Copy creation, and shared CLI/dashboard
+  global-config Export/Apply/Delete/Reload/Empty workflows. Private temporary exports survive
+  screen closure; whole-tree fingerprints detect container drift; recoverable volume replacement
+  preserves the original tree on failure and works while environments are stopped.
+- Optional specialized Agent Context per environment, default on, retained through lifecycle and
+  backups. Neutral base-image system config is reconciled at every managed start without replacing
+  unrelated instructions/config; disabled contexts remain generated and mounted.
+- Both base images provide `ocs-opencode`, sharing safe provider validation with managed launches,
+  preserving arguments and using a private server. Interactive direct shells get a conditional hint.
+
+### Changed
+
+- Cleaner Updates views with a Manager summary, consistent shortcut footer, visible
+  operation results and Check All. Cancel Check controls are removed; closing still cleans up checks.
+- Explicit environment version checks temporarily start existing stopped containers, then restore
+  their stopped state under lifecycle locks, including independent cleanup after manager death.
+  Check All confirms stopped targets; F5/F6 provide explicit Start/Stop. Running updates require
+  caution consent and finish stopped, without an automatic restart.
+- Unsupported automatic manager updates offer manual guidance; only freshly verified GitHub pipx
+  installations receive a version-specific, settings-preserving command to copy.
+- Every base build, cached or refresh, upgrades system packages with fresh indexes (Debian
+  `apt-get upgrade`, Arch full `pacman -Syu`); there is no opt-out. Rebuild forms separate the
+  OpenCode version and cache/refresh mode. With the new neutral config/launcher assets,
+  Debian/Arch image definitions advance to revisions 4/3.
+- Environment OpenCode updates add opt-in **Update system packages**
+  (`opencode update --update-system-packages`), off by default: installed packages are upgraded
+  inside the update checkpoint first, and a failed upgrade stops before OpenCode. Package
+  upgrades are not fully reversible by rollback; custom-image environments refuse the option.
+- Manager Settings adds opt-in selected-text copying with accurate native/OSC 52 feedback.
+  Editable inputs are excluded. Keys toggles with `?` and supports Esc/Close; compact-terminal
+  feedback is more consistent.
+- Dashboard and Updates button rows use one menu strip per row: unfilled, separated labels, a
+  full-width selection-colored focus, underline on hover and red-text Delete. Wrapped rows no
+  longer merge into tiles; Updates tabs use the default underline with an accent active label.
+- Provider profiles reject `OPENCODE_CONFIG_CONTENT`, `OPENCODE_CONFIG` and `OPENCODE_CONFIG_DIR`
+  at write/read/launch boundaries; native config files/profiles remain the configuration route.
+  `providers list` reports an unusable profile and continues with the others (exit status 1).
+
+### Removed
+
+- Built-in MCP integration catalogs, creation controls and once-only provisioning metadata/logic.
+  Existing user-authored OpenCode/MCP configuration is not proactively changed.
+
 ## 6.2.0 — 2026-11-02
 
 Component Updates and recovery release (Beta). Python 3.11 or newer; environment/backup schemas
@@ -183,7 +255,7 @@ Arch Linux only. See README for the tested versions and the known limitations.
   container recreation; journalled operations with explicit recovery commands.
 - OpenCode version policies (notify, manual, pinned), per-environment update and rollback,
   base image updates with rollback copies; OpenCode's own self-update is disabled.
-- One-time initial integrations (Context7 by default) and injected sandbox guidance (Agent
+- One-time initial integrations and injected sandbox guidance (Agent
   Context).
 - Read-only readiness checks (`check`, `doctor`) including measured network reachability; disk
   usage and conservative cleanup.

@@ -25,14 +25,15 @@ class BaseTargetScreen(ModalScreen[tuple | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id='base-target-panel'):
             yield Static(f'Build / Rebuild — {self.distro.name}', markup=False)
-            yield Static('Exact OpenCode 2.x target, or latest supported stable:', markup=False)
+            yield Static('OpenCode version (exact 2.x version or latest):', markup=False)
             yield Input(value='latest', id='base-target', compact=True)
+            yield Static('Build mode:', markup=False)
             yield Select([('Cached rebuild (reuse eligible layers)', False),
                           ('Refresh & Rebuild (pull + no-cache)', True)],
                          value=False, allow_blank=False, compact=True, id='base-refresh')
-            yield Static('Refresh downloads current upstream/package inputs and can take much longer.\n'
-                         'No cache pruning. Neither mode migrates existing environments.\n'
-                         'Next: resolve exact target and review current image, mode and rollback.', markup=False)
+            yield Static('Cached: no upstream pull. Refresh: pull and bypass the build cache.\n'
+                         f'Both modes always upgrade system packages:\n  {self.distro.build_upgrade}.\n'
+                         'Existing environments are unchanged.', markup=False)
             with Horizontal():
                 yield Button('Cancel', id='base-target-cancel', compact=True)
                 yield Button('Review', id='base-target-review', compact=True)
@@ -119,8 +120,8 @@ def rollback_consent(plan):
         f'Required definition: {d.name} {d.version}, revision {d.revision}.',
         'The copy must pass current OS/tool/OpenCode checks before publication; a legacy copy may be refused.',
         'The replaced current image is kept as a rollback copy. Selected aliases are consumed after the swap.',
-        'Existing containers, writable layers, home/workspace/configuration and integrations are unchanged.',
+        'Existing containers, writable layers and home/workspace/configuration are unchanged.',
         'Future base-based creation and file-only restores use this base; not-yet-created pins remain enforced.',
         'This is not an upstream package-freshness or security assessment.',
-        'Consent is revalidated under shared base guards. Close/Cancel check never cancels an approved operation.',
+        'Consent is revalidated under shared base guards. Closing the screen never cancels an approved operation.',
     ])

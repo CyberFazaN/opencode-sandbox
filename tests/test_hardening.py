@@ -1,7 +1,7 @@
 """Hardening details: OpenCode major version and probe options, the Agent Context delivery check,
 links below the top level of `.git`, data-directory permissions, container capabilities, the pin
 check versus a base-image swap, `ocs-aur` option parsing, output inside a workspace, a journal's
-image removed outside the manager and the Agent Context refresh after provisioning. Docker is mocked."""
+image removed outside the manager and Agent Context startup reconciliation. Docker is mocked."""
 import json
 import os
 import subprocess
@@ -191,7 +191,6 @@ def first_start(monkeypatch):
     monkeypatch.setattr(c, "inspect_container", lambda m: state["value"])
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
     monkeypatch.setattr(c, "host_cpus", lambda: 8)
-    monkeypatch.setattr("opencode_sandbox.integrations.provision", lambda m: None)
     return fake, held
 
 
@@ -329,11 +328,10 @@ def test_manager_images_are_run_with_pull_never(first_start):
     assert "--pull" in run and run[run.index("--pull") + 1] == "never"
 
 
-# --- Agent Context refresh after provisioning -----------------------------------------------------
+# --- Agent Context start reconciliation ----------------------------------------------------------
 
-def test_a_failed_refresh_after_provisioning_still_marks_running(first_start, monkeypatch):
+def test_failed_start_refresh_never_reports_success(first_start, monkeypatch):
     m = c.create("ocs-qa-prov", "scratch")
-    monkeypatch.setattr("opencode_sandbox.integrations.provision", lambda env: {"context7": "done"})
     refreshes = []
 
     def refresh(env, env_dir, **inputs):
@@ -342,6 +340,7 @@ def test_a_failed_refresh_after_provisioning_still_marks_running(first_start, mo
             raise OSError(28, "No space left on device")
         return ac.directory(env, env_dir) / "context.md"
     monkeypatch.setattr(ac, "refresh", refresh)
-    c.start(m)
+    with pytest.raises(OSError, match="No space"):
+        c.start(m)
     now = c.resolve(m["id"])
-    assert (now["status"], now.get("operation")) == ("running", None) and len(refreshes) == 2
+    assert now["status"] == "error" and len(refreshes) == 2

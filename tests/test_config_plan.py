@@ -133,7 +133,7 @@ def test_apply_saved_writes_metadata_only(monkeypatch, env):
 def test_apply_dynamic_updates_in_place(monkeypatch, env):
     fake = FakeContainer(monkeypatch, "running")
     assert cp.apply(env, {"cpus": 1.5, "memory": "8g", "pids": 900})["category"] == "dynamic"
-    assert fake.calls == [("update", "--cpus", "1.5", "--memory", "8g", "--memory-swap", str(16 * 2**30),
+    assert fake.calls[:-1] == [("update", "--cpus", "1.5", "--memory", "8g", "--memory-swap", str(16 * 2**30),
                            "--pids-limit", "900", c.cname(env))]
     m = c.resolve(env["id"])
     assert (c.runtime_settings(m)["cpus"], c.runtime_settings(m)["memory"], c.runtime_settings(m)["pids"]) == ("1.5", "8g", 900)
@@ -144,7 +144,7 @@ def test_apply_dynamic_updates_in_place(monkeypatch, env):
 def test_apply_restart_stops_updates_starts(monkeypatch, env):
     fake = FakeContainer(monkeypatch, "running")
     assert cp.apply(env, {"memory": "1g"})["category"] == "restart"
-    assert [a[0] for a in fake.calls] == ["stop", "update", "start"] and fake.state == "running"
+    assert [a[0] for a in fake.calls] == ["stop", "update", "start", "exec"] and fake.state == "running"
     assert c.runtime_settings(c.resolve(env["id"]))["memory"] == "1g"
 
 
@@ -153,7 +153,7 @@ def test_apply_recreate_uses_the_journalled_recreation(monkeypatch, env):
     c.profile_set("work", {"QA_KEY": "dummy"})
     order = []
     monkeypatch.setattr(c, "stop", lambda m: order.append("stop") or True)  # True: it stopped the container
-    monkeypatch.setattr(c, "reconfigure_runtime", lambda m, runtime, profile=None: order.append(("recreate", runtime["network"], profile)))
+    monkeypatch.setattr(c, "reconfigure_runtime", lambda m, runtime, profile=None, **kwargs: order.append(("recreate", runtime["network"], profile)))
     monkeypatch.setattr(c, "start", lambda m: order.append("start"))
     assert cp.apply(env, {"network": "none", "profile": "work"})["category"] == "recreate"
     assert order == ["stop", ("recreate", "none", "work"), "start"]
@@ -184,7 +184,8 @@ def test_interrupted_update_is_journalled_and_recoverable(monkeypatch, env):
         cp.apply(env, {"memory": "1g"})
     m = c.resolve(env["id"])
     assert m["operation"] == "config-update" and m["status"] == "error" and "Configuration change" in m["last_error"]
-    assert m["pending_config"] == {"runtime": {**c.runtime_settings(env), "memory": "1g"}, "restart": True, "start": True}
+    assert m["pending_config"] == {"runtime": {**c.runtime_settings(env), "memory": "1g"}, "restart": True, "start": True,
+                                   "agent_context_enabled": True, "limits_changed": True}
     assert c.runtime_settings(m)["memory"] == "4g"  # metadata says what the container still has
     assert fake.state == "stopped"  # crashed between stop and update
     for blocked in (lambda: c.start(m), lambda: c.repair(m), lambda: cp.apply(m, {"cpus": 1})):
@@ -194,7 +195,7 @@ def test_interrupted_update_is_journalled_and_recoverable(monkeypatch, env):
     fake.calls.clear()
     result = runner.invoke(app, ["config", "recover", m["name"]])
     assert result.exit_code == 0, result.output
-    assert [a[0] for a in fake.calls] == ["update", "start"] and fake.state == "running"
+    assert [a[0] for a in fake.calls] == ["update", "start", "exec"] and fake.state == "running"
     m = c.resolve(env["id"])
     assert m.get("operation") is None and c.runtime_settings(m)["memory"] == "1g" and m["status"] == "running"
 

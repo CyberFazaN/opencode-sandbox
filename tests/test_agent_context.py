@@ -100,17 +100,6 @@ def test_observed_runtime_wins_and_the_difference_is_stated():
     assert "CPU limit: 2.0" in text and "cpu" not in text.split("current configuration", 1)[1].split(")")[0].lower()
 
 
-def test_initial_integrations_are_history():
-    m = {**M, 'provisioning': {'requested': ['context7'], 'result': 'configured', 'at': '2026-10-27T00:00:00Z', 'state': 'done'}}
-    text = a.render(m, image='i', runtime=R)
-    assert "## Initial integrations" in text and "Provisioned once, at the first container start: context7 (configured)." in text
-    assert "may have been changed or removed since" in text
-    pending = a.render({**m, 'provisioning': {**m['provisioning'], 'state': 'pending'}}, image='i', runtime=R)
-    assert "(not done yet): context7." in pending and "changed or removed since" not in pending
-    for bad in ({'requested': []}, {'requested': 'context7'}, 'context7', None):
-        assert "Initial integrations" not in a.render({**M, 'provisioning': bad}, image='i', runtime=R)
-
-
 def test_refresh_verify(tmp_path):
     def env_dir(eid):
         return tmp_path/eid

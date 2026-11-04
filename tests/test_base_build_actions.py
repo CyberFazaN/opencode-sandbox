@@ -1,5 +1,6 @@
 """Base build consent and refresh are independent from inventory/discovery and environment state."""
 import json
+import re
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -43,6 +44,36 @@ def test_both_modes_build_verify_and_preserve_copy_without_cache_pruning(runtime
     assert not any('prune' in a for a in runtime)
     probe = next(a for a in runtime if a[0] == 'run')
     assert NEW in probe and not any('candidate' in value for value in probe)
+
+
+@pytest.mark.parametrize('distro', list(distros.REGISTRY))
+@pytest.mark.parametrize('refresh', [False, True])
+def test_every_build_upgrades_packages_with_a_fresh_package_layer(runtime, monkeypatch, distro, refresh):
+    monkeypatch.setattr(c, 'docker', fake_docker(runtime, os_release='ID=arch\nBUILD_ID=rolling' if distro == 'arch' else 'ID=debian\nVERSION_ID=13'))
+    plan = v.prepare_base_build('2.1.4', distro, refresh=refresh)
+    assert 'always refreshed and upgraded in both modes' in v.describe_base_build(plan)
+    assert distros.get(distro).build_upgrade in v.describe_base_build(plan)
+    for _ in range(2): v.update_base(plan.target, distro, refresh=refresh)
+    builds = [a for a in runtime if a[0] == 'build']
+    assert len(builds) == 2 and not any('UPGRADE_SYSTEM' in arg for a in builds for arg in a)
+    assert all(('--pull' in a) == refresh and ('--no-cache' in a) == refresh for a in builds)
+    nonces = [next(arg for arg in a if arg.startswith('SYSTEM_PACKAGE_REFRESH=')) for a in builds]
+    assert nonces[0] != nonces[1] and all(re.fullmatch(r'SYSTEM_PACKAGE_REFRESH=[0-9a-f]{24}', value) for value in nonces)
+
+
+@pytest.mark.parametrize('distro', list(distros.REGISTRY))
+def test_package_layer_always_upgrades_and_requires_the_nonce(distro):
+    text = distros.get(distro).dockerfile.read_text()
+    assert 'UPGRADE_SYSTEM' not in text and 'ARG SYSTEM_PACKAGE_REFRESH\n' in text
+    step = next(block for block in text.split('\nRUN ')[1:] if 'SYSTEM_PACKAGE_REFRESH' in block)
+    assert '${SYSTEM_PACKAGE_REFRESH:?' in step and ' if ' not in step
+    assert ('apt-get update' in step and 'apt-get upgrade -y' in step) if distro == 'debian' else '-Syu' in step
+
+
+@pytest.mark.parametrize('command', [['opencode', 'update-base'], ['build']])
+def test_base_package_upgrade_is_not_optional_on_the_cli(command):
+    result = CliRunner().invoke(cli.app, [*command, '--update-system-packages'])
+    assert result.exit_code == 2 and 'No such option' in result.output
 
 
 @pytest.mark.parametrize('when,change', [(when, change) for when in ('before', 'during')
@@ -183,5 +214,5 @@ def test_newer_managed_definition_is_explicitly_disclosed_not_silently_assumed_c
     plan = v.prepare_base_build('2.1.4')
     text = v.describe_base_build(plan)
     assert 'Current definition: debian 13, revision 99' in text
-    assert 'Selected definition: Debian 13, revision 2' in text and OLD in text
+    assert f'Selected definition: Debian 13, revision {distros.get("debian").revision}' in text and OLD in text
     assert not any(a[0] == 'build' for a in runtime)

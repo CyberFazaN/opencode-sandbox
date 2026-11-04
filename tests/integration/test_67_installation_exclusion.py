@@ -20,7 +20,7 @@ def test_real_attached_session_and_exec_exclude_replacement(campaign, checks, di
     if INSTALLED:
         assert (prefix / 'bin/opencode-sandbox').samefile(MANAGER[0])
     name = f'ocs-test-installation-lease-{distro}'
-    eid = camp.create(name, '--distro', distro, '--no-integrations')
+    eid = camp.create(name, '--distro', distro)
     camp.ocs('start', name)
     term = Term([*MANAGER, 'shell', name], env=camp.env, log=camp.log)
     try:

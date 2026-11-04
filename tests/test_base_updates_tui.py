@@ -7,7 +7,7 @@ import test_base_rollback
 from test_opencode_versions import OLD, fake_docker
 from test_tui import run
 from test_updates_tui import until
-from textual.widgets import Button, Select
+from textual.widgets import Button, Checkbox, Select, Static
 
 from opencode_sandbox import build_output, distros, readiness, updates
 from opencode_sandbox import core as c
@@ -35,6 +35,7 @@ def sources(monkeypatch):
 async def review(app, pilot, refresh=False):
     await pilot.press('b')
     assert isinstance(app.screen, BaseTargetScreen)
+    assert not app.screen.query(Checkbox) and 'always upgrade system packages' in ' '.join(str(w.render()) for w in app.screen.query(Static))
     app.screen.query_one('#base-refresh', Select).value = refresh
     app.screen.query_one('#base-target-review', Button).press()
     await until(pilot, lambda: isinstance(app.screen, BaseConsentScreen))
@@ -56,6 +57,7 @@ def test_build_exact_mode_consent_cancel_then_preserving_executor(sources, monke
         message = app.screen.message
         assert OLD in message and 'Exact OpenCode target: 2.1.4' in message
         assert ('Refresh & Rebuild' if refresh else 'Cached rebuild') in message
+        assert 'System packages: always refreshed and upgraded in both modes (apt-get update, then apt-get upgrade)' in message
         assert 'kept as a rollback copy' in message and 'pins remain enforced' in message
         assert app.focused.id == 'base-cancel'
         for button in app.screen.query(Button): assert button.region.bottom <= size[1]
@@ -115,11 +117,9 @@ def test_base_mutation_survives_close_cancel_and_normal_quit_with_bounded_detail
     monkeypatch.setattr(c, 'build_image', build)
     async def test(app, pilot):
         await pilot.press('v', '2')
-        screen = app.screen
         await review(app, pilot)
         app.screen.query_one('#base-confirm', Button).press()
         assert await asyncio.to_thread(started.wait, 1)
-        screen.action_cancel_checks()
         await pilot.press('escape', 'q')
         assert app.is_running and app._operation_pending and app._updates_mutation_active
         await pilot.press('v', '2', 'd')
@@ -178,10 +178,8 @@ def test_canceled_late_base_planning_cannot_publish_consent_or_start_a_build(sou
     monkeypatch.setattr(v, 'prepare_base_build', slow)
     async def test(app, pilot):
         await pilot.press('v', '2', 'b')
-        screen = app.screen_stack[-2]
         app.screen.query_one('#base-target-review', Button).press()
         assert await asyncio.to_thread(started.wait, 1)
-        screen.action_cancel_checks()
         await pilot.press('escape')
         release.set()
         await pilot.pause(.2)

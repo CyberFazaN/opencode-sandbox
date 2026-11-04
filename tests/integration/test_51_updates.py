@@ -13,7 +13,7 @@ import pytest
 from campaign import DISTROS
 
 pytest.importorskip("pyte")
-from pty_term import ENTER, ESC, TAB, Term
+from pty_term import ESC, Term
 
 pytestmark = [pytest.mark.real_session, pytest.mark.real_identity]
 
@@ -23,7 +23,7 @@ pytestmark = [pytest.mark.real_session, pytest.mark.real_identity]
 def test_manual_updates_terminal(campaign, checks, distro, size):
     camp, ck = campaign, checks
     name = f"ocs-test-updates-{distro}-{size[0]}"
-    eid = camp.create(name, "--distro", distro, "--no-integrations")
+    eid = camp.create(name, "--distro", distro)
     camp.ocs("start", name)
     camp.ocs("opencode", "versions")
     camp.ocs("stop", name)
@@ -64,36 +64,36 @@ def test_manual_updates_terminal(campaign, checks, distro, size):
         t.send("v", .5)
         ck(t.wait_for("Installation: manual review", 15), "Updates terminal: local Manager classification, no invented execution eligibility")
         t.send("3", .5)
-        ck(t.wait_for("last verified", 20) and "stopped" in t.text(), "Updates terminal: dated stopped version, actual state")
+        ck(t.wait_for("cached", 20) and "stopped" in t.text(), "Updates terminal: cached stopped version, actual state")
         ck(state["requests"] == 0, "Updates terminal: opening/views made zero HTTP requests")
         ck("Close" in t.text() and "Details" in t.text() and "Check" in t.text(), "Updates terminal: primary controls visible")
         t.snap("Updates local/cached view")
         t.send("c", .5)
-        ck(t.wait_for("npm: 2.2.1", 20) and state["requests"] == 1, "Updates terminal: explicit bounded real HTTP lookup")
+        ck(t.wait_for("Available OpenCode: 2.2.1", 20) and state["requests"] == 1, "Updates terminal: explicit bounded real HTTP lookup")
         ck(t.wait_for("update available", 10), "Updates terminal: selected stopped evidence compared with exact supported target")
         t.send("d", .5)
-        ck(t.wait_for("Environment OpenCode — Details", 10), "Updates terminal: progressive read-only Details")
+        ck(t.wait_for("Environments — Details", 10), "Updates terminal: progressive read-only Details")
         t.send(ESC, .3)
         t.send("2", .5)
-        ck(t.wait_for("Upstream OS/package freshness not assessed", 20), "Updates terminal: base freshness is not inferred from labels")
+        ck(t.wait_for("availability comes from npm", 20), "Updates terminal: installed binary inspection is distinct from npm availability")
         t.send("c", .5)
-        ck(t.wait_for("OpenCode: 2.2.0; last verified", 30), "Updates terminal: explicit immutable base probe verified")
+        ck(t.wait_for("Check complete", 30) and '2.2.0' in t.text(), "Updates terminal: explicit immutable base probe verified")
         t.snap("Updates explicit base check")
         state["fail"] = True
         t.send("3c", .5)
-        ck(t.wait_for("Check failed:", 20) and "HTTP 503" in t.text() and "cached" in t.text(), "Updates terminal: HTTP failure retains dated cached discovery")
+        ck(t.wait_for("Check failed:", 20) and "HTTP 503" in t.text() and "stale" in t.text(), "Updates terminal: HTTP failure retains dated cached discovery")
+        assert ck(t.wait_for('Check complete', 30), 'Updates terminal: installed check finishes independently of failed npm')
         state.update(fail=False, delay=3)
         t.send("c", .2)
-        ck(t.wait_for("Checking npm", 5), "Updates terminal: truthful independent progress")
-        t.send(TAB * 3 + ENTER, .5)
-        ck(t.wait_for("npm check canceled", 5), "Updates terminal: keyboard Cancel remains responsive")
+        ck(t.wait_for("Checking available version on npm", 5), "Updates terminal: truthful independent progress")
         t.send(ESC, .3)
+        ck(t.wait_for('Resource metrics', 5), 'Updates terminal: Close remains responsive during a source request')
         t.send("q", .5)
         code = t.exit_code(15)
         ck(code == 0 and t.restored(), "Updates terminal: Close/Q restores terminal, no automatic restart")
         after = camp.inspect(eid)
-        ck(not after["State"]["Running"] and after["State"]["StartedAt"] == before["State"]["StartedAt"]
-           and metadata_path.read_bytes() == metadata, "Updates terminal: stopped Check never starts or mutates metadata")
+        ck(not after["State"]["Running"] and after['Id'] == before['Id'] and after["State"]["StartedAt"] != before["State"]["StartedAt"]
+           and metadata_path.read_bytes() == metadata, "Updates terminal: stopped Check temporarily starts and restores without changing metadata")
         containers = camp.docker("ps", "-a", "--format", "{{.Names}}").stdout.splitlines()
         ck(containers == [f"ocs-{eid}"], "Updates terminal: explicit image helper left no extra container")
     finally:

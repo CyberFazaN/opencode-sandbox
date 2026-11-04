@@ -511,7 +511,7 @@ def _visible(app, selector, size):
 
 @pytest.mark.parametrize("size", [(80, 24), (120, 40)])
 def test_create_form_discloses_options_progressively(size):
-    from opencode_sandbox import distros, integrations
+    from opencode_sandbox import distros
     async def t(app, pilot):
         await pilot.press("n")
         await settle(pilot)
@@ -521,10 +521,10 @@ def test_create_form_discloses_options_progressively(size):
         assert app.screen.query_one("#more").collapsed and not _visible(app, "#distro", size)
         app.screen.query_one("#more").collapsed = False
         await settle(pilot)
-        for sel in ("#distro", "#workspace-mode", "#profile", *(f"#integration-{n}" for n in integrations.CATALOG), "#create"):
+        for sel in ("#distro", "#workspace-mode", "#profile", "#oc-config-mode", "#include-agent-context", "#create"):
             assert _visible(app, sel, size), sel
         assert app.screen.query_one("#distro").value == distros.DEFAULT
-        assert app.screen.query_one("#integration-context7").value is True
+        assert app.screen.query_one("#include-agent-context").value is True
     run(t, size)
 
 
@@ -556,13 +556,13 @@ def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
         form.query_one("#more").collapsed = False
         form.query_one("#distro").value = "arch"
         form.query_one("#profile").value = "work"
-        form.query_one("#integration-context7").value = False
+        form.query_one("#include-agent-context").value = False
         await settle(pilot)
         form.query_one("#create").press()
         await settle(pilot, 1.0)
         m = c.resolve("ocs-qa-form")
         assert app.selected()["id"] == m["id"]  # The new environment is selected
-        assert (m["kind"], m["distro"], m["profile"], m["provisioning"]["requested"]) == ("project", "arch", "work", [])
+        assert (m["kind"], m["distro"], m["profile"], m["agent_context_enabled"]) == ("project", "arch", "work", False)
         assert m["source"] == str(folder.resolve())
         details = str(app.query_one("#details").render())
         for text in ("Distribution: Arch Linux (OS version not inspected)", "Provider profile: work", f"managed copy of {folder.resolve()}",
@@ -575,7 +575,7 @@ def test_bars_separate_global_and_environment_actions_with_cli_terms():
     async def t(app, pilot):
         top = [str(b.label) for b in app.query_one("#toolbar").query(Button)]
         bottom = [str(b.label) for b in app.query_one("#actions").query(Button)]
-        assert top == ["New", "This folder", "Backups", "Providers", "Preferences", "Updates", "Recovery", "Disk"]
+        assert top == ["New", "This folder", "Backups", "Providers", "Preferences", "Updates", "Recovery", "Disk", "OpenCode Configs"]
         assert bottom == ["OpenCode", "Shell", "Start", "Stop", "Check", "Settings", "Usage", "Agent Context",
                           "Changes", "Export", "Backup", "Repair", "Promote", "Delete"]
         descriptions = {b.key: b.description for b in app.BINDINGS}

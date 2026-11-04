@@ -15,7 +15,7 @@ def test_direct_workspace_is_rechecked_at_every_start(campaign, checks):
     (folder / "host-file.txt").write_text("from the host\n")
     (other / "other-file.txt").write_text("other\n")
     name = "ocs-test-direct"
-    eid = camp.create(name, "--workspace-mode", "direct", "--workspace", str(folder), "--yes", "--no-integrations")
+    eid = camp.create(name, "--workspace-mode", "direct", "--workspace", str(folder), "--yes")
     camp.ocs("start", name)
     ck(camp.sh(eid, "cat /workspace/host-file.txt").stdout == "from the host\n", "L02 the container sees the folder")
     camp.ocs("stop", name)
