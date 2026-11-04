@@ -50,8 +50,10 @@ entries (`index / working tree`). No file contents or patch bodies appear in the
 
 - Keeps history, the current branch (or detached HEAD), the index and working files, including
   staged versus unstaged changes, additions, deletions, renames, binary data, intent-to-add and
-  regular-file permission/executable bits. Symlink text is copied verbatim; targets are never
-  copied or followed. Hardlinks become independent files; empty directories are not imported.
+  regular-file permission/executable bits, and file/directory type changes. Symlink text is copied
+  verbatim; targets are never copied or followed. Hardlinks become independent files; empty
+  directories are not imported. Index references such as cache-tree trees are copied, so Git
+  maintenance (`fsck`, `gc`) works in the clone.
 - **Ignored untracked files are excluded**, using `.gitignore`, `.git/info/exclude` and user-global
   Git ignores. Already tracked files, including explicitly force-added files, remain included.
   Non-ignored hidden files **are included**: review for secrets before opting in. There is no
@@ -71,9 +73,10 @@ entries (`index / working tree`). No file contents or patch bodies appear in the
   separately, without loading source Git configuration.
   Resolve/finish the state first or use committed-only import where applicable. Sockets, FIFOs,
   devices, unreadable files and symlinked parents of tracked paths are refused, not skipped.
-- Limits: 100,000 selected paths/visited directories, 256 MiB per file/staged blob, 1 GiB of selected
-  working-file data, 1 GiB of additional staged blobs, and 1 MiB per ignore-rule file (1 GiB total).
-  Large committed history is cloned normally. Custom clean/
+- Limits apply to the **whole working tree** (tracked files too, not only changes): 100,000
+  paths/visited directories, 256 MiB per file/staged blob, 1 GiB of working-file data, 1 GiB of
+  additional staged objects, and 1 MiB per ignore-rule file (1 GiB total). Larger working trees
+  need committed-only import; large committed history is cloned normally. Custom clean/
   smudge filters (including Git LFS), host-specific Git settings and filesystem ownership/ACLs/xattrs
   are not reproduced; literal worktree and index bytes are retained, but status may differ when
   those settings are essential. Configure tools inside the sandbox yourself.

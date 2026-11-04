@@ -6,6 +6,7 @@ The source is checked again before publication; concurrent edits invalidate the 
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 import stat
@@ -108,13 +109,22 @@ def _entry(source, name):
         for part in parts[:-1]:
             try: nfd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
             except FileNotFoundError: return None
+            except OSError as exc:
+                if exc.errno not in (errno.ENOTDIR, errno.ELOOP): raise
+                # A tracked directory replaced by a regular file is an ordinary deletion.
+                if stat.S_ISREG(os.stat(part, dir_fd=fd, follow_symlinks=False).st_mode): return None
+                raise c.SandboxError(f"Working-state import refuses symlinked or special parents of tracked paths at {name!a}") from None
             os.close(fd); fd = nfd
         try: st = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False)
         except FileNotFoundError: return None
         if stat.S_ISLNK(st.st_mode):
             return os.fsencode(os.readlink(parts[-1], dir_fd=fd)), 0o120000
+        if stat.S_ISDIR(st.st_mode):
+            # Only index paths reach here (the scan descends into directories): a tracked file
+            # replaced by a directory is a deletion; the directory's own files are scanned separately.
+            return None
         if not stat.S_ISREG(st.st_mode):
-            raise c.SandboxError(f"Working-state import refuses directories, nested repositories or special files at {name!a}")
+            raise c.SandboxError(f"Working-state import refuses special files at {name!a}")
         ffd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
         try:
             before = os.fstat(ffd)
@@ -136,7 +146,7 @@ def _ignores(pgd, source):
     """Honor user-global ignores without loading executable host/repository Git settings."""
     env = wio._clean_env()
     env.pop("GIT_CONFIG_GLOBAL", None)
-    p = c.run_program(["git", "config", "--global", "--path", "--get", "core.excludesFile"],
+    p = c.run_program(["git", "config", "--global", "--includes", "--path", "--get", "core.excludesFile"],
                       cwd="/", env=env, capture_output=True, check=False)
     if p.returncode not in (0, 1): raise c.SandboxError("Cannot read global Git ignore configuration safely")
     default = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "git/ignore"
@@ -224,11 +234,15 @@ def _capture(pgd, source, destination=None):
             return _capture(pgd, source, Path(tmp))
     head, blobs = _validate(pgd, source)
     index = (pgd / "index").read_bytes()
-    digest = hashlib.sha256(head + b"\0" + (pgd / "HEAD").read_bytes() + b"\0" + index)
+    # Logical index content, not raw bytes: a read-only host `git status` (IDE, prompt) may
+    # rewrite cached stat data between preview and import without changing anything imported.
+    digest = hashlib.sha256(head + b"\0" + (pgd / "HEAD").read_bytes() + b"\0")
+    digest.update(_git(pgd, source, "ls-files", "--stage", "-z") + b"\0")
+    digest.update(_git(pgd, source, "ls-files", "-v", "-z") + b"\0")
     digest.update(_git(pgd, source, "rev-parse", "--symbolic-full-name", "HEAD"))
     ignores = _ignores(pgd, source)
     paths = _paths(pgd, source, ignores)
-    if len(paths) > MAX_PATHS: raise c.SandboxError("Working-state import exceeds 100,000 paths; commit or reduce the working tree first")
+    if len(paths) > MAX_PATHS: raise c.SandboxError("Working-state import exceeds 100,000 working-tree paths; use committed-only import")
     total = 0
     for raw_name in paths:
         name = os.fsdecode(raw_name)
@@ -238,7 +252,7 @@ def _capture(pgd, source, destination=None):
             digest.update(b"missing\0"); continue
         data, mode = entry
         total += len(data)
-        if total > MAX_TOTAL: raise c.SandboxError("Working-state import exceeds 1 GiB; commit or reduce the working tree first")
+        if total > MAX_TOTAL: raise c.SandboxError("Working-state import exceeds 1 GiB of working-tree files; use committed-only import")
         digest.update(str(mode).encode() + b"\0" + hashlib.sha256(data).digest())
         target = destination.joinpath(*_path(name))
         # Destination starts empty, and parents must never be links from an earlier entry.
@@ -262,12 +276,33 @@ def _capture(pgd, source, destination=None):
     return Preview(digest.hexdigest(), tuple(statuses)), head, blobs, index
 
 
+def _copy_index_extensions(pgd, source, dstgd, destination, staged_size):
+    """Cache-tree trees and resolve-undo blobs are index references too; without them the
+    imported repository fails fsck/gc. Copy only missing trees/blobs, verifying each object ID."""
+    for _ in range(1024):  # one round per newly reachable tree level
+        listed = _git(dstgd, destination, "rev-list", "--objects", "--indexed-objects", "--missing=print",
+                      "--no-object-names")
+        missing = [line[1:].decode() for line in listed.splitlines() if line.startswith(b"?")]
+        if not missing: return
+        for oid in missing:
+            kind = _git(pgd, source, "cat-file", "-t", oid).strip().decode()
+            if kind not in ("blob", "tree"): raise c.SandboxError("Working-state index references an unsupported object")
+            staged_size += int(_git(pgd, source, "cat-file", "-s", oid))
+            if staged_size > MAX_TOTAL: raise c.SandboxError("Working-state staged objects exceed 1 GiB")
+            data = _git(pgd, source, "cat-file", kind, oid)
+            if _git(dstgd, destination, "hash-object", "-t", kind, "-w", "--stdin", input=data).strip().decode() != oid:
+                raise c.SandboxError("Working-state staged object verification failed")
+    raise c.SandboxError("Working-state index object references are too deeply nested")
+
+
 def preview(source):
     try:
         source = Path(source).expanduser().resolve(strict=True)
         home = Path.home().resolve()
         if source == Path(source.anchor) or source == home or source in home.parents:
             raise c.SandboxError("Choose a project repository, not the home directory or a parent of it")
+        if not os.path.lexists(source / ".git"):
+            raise c.SandboxError("Include working changes requires a local Git repository root; import the repository root instead")
         gd = wio.check_repository(source)
         with wio._private_git_dir(gd) as pgd:
             return _capture(pgd, source)[0]
@@ -310,6 +345,7 @@ def clone(source, destination, *, expected=None):
                 if _git(dstgd, destination, "hash-object", "-w", "--stdin", input=data).strip() != oid:
                     raise c.SandboxError("Working-state staged blob verification failed")
             (dstgd / "index").write_bytes(index)
+            _copy_index_extensions(pgd, source, dstgd, destination, staged_size)
             copied = _capture(pgd, source, destination)[0]
             if copied != plan or preview(source) != plan:
                 raise c.SandboxError("Source changed during import; retry with the repository idle")

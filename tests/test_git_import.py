@@ -289,3 +289,47 @@ def test_cli_preview_and_default(repo):
 def test_mode_requires_managed_project(options):
     with pytest.raises(c.SandboxError, match="managed Project"):
         c.create("invalid", include_working_changes=True, **options)
+
+
+def test_index_extension_objects_are_copied_so_the_clone_passes_fsck_and_gc(repo):
+    # An aborted commit (empty message) leaves cache-tree trees that only exist as loose objects.
+    (repo / "dir").mkdir(); (repo / "dir/new").write_text("staged only")
+    git(repo, "add", "dir")
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", ""], capture_output=True, check=False)
+    assert git(repo, "rev-list", "--objects", "--indexed-objects", "--missing=print").strip()
+    dest = imported(repo)
+    git(dest, "fsck", "--no-progress")
+    git(dest, "gc", "--quiet")
+    assert git(dest, "status", "--porcelain=v1") == git(repo, "status", "--porcelain=v1")
+
+
+@pytest.mark.parametrize("swap", ["file-to-directory", "directory-to-file"])
+def test_type_changes_between_file_and_directory_are_imported(repo, swap):
+    if swap == "file-to-directory":
+        (repo / "modified").unlink(); (repo / "modified").mkdir(); (repo / "modified/inner").write_text("x")
+    else:
+        (repo / "tree").mkdir(); (repo / "tree/file").write_text("base")
+        git(repo, "add", "tree"); git(repo, "commit", "-qm", "tree")
+        (repo / "tree/file").unlink(); (repo / "tree").rmdir(); (repo / "tree").write_text("now a file")
+    dest = imported(repo)
+    status = ["status", "--porcelain=v1", "-z", "--untracked-files=all"]
+    assert git(dest, *status) == git(repo, *status)
+
+
+def test_read_only_host_status_refresh_does_not_invalidate_the_preview(repo):
+    os.utime(repo / "modified", ns=(10**18, 10**18))  # stale cached stat data
+    (repo / "new").write_text("untracked")
+    plan = gi.preview(repo)
+    before = (repo / ".git/index").read_bytes()
+    git(repo, "status", "--porcelain")  # an IDE or prompt refreshes the index
+    assert (repo / ".git/index").read_bytes() != before
+    imported(repo, import_fingerprint=plan.fingerprint)
+
+
+def test_global_ignores_set_through_global_includes_are_honoured(repo, tmp_path):
+    ignore = tmp_path / "ignore-included"; ignore.write_text(".env.local\n")
+    included = tmp_path / "included-config"; included.write_text(f"[core]\n\texcludesFile = {ignore}\n")
+    git(repo, "config", "--global", "include.path", str(included))
+    (repo / ".env.local").write_text("DUMMY=do-not-copy")
+    assert ".env.local" not in gi.preview(repo).describe()
+    assert not (imported(repo) / ".env.local").exists()
