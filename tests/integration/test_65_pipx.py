@@ -88,7 +88,8 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
     ck(p.returncode == 0 and launcher.is_symlink() and version() == v1, f"B09 pipx install @v{v1}: launcher, --version {version()}")
     venv_python = pipx_home / "venvs" / "opencode-sandbox" / "bin" / "python"
     where = camp._run([str(venv_python), "-I", "-c", ("import json, sys, opencode_sandbox, opencode_sandbox.distros as d; print(json.dumps("
-                       "[opencode_sandbox.__file__, sorted(str(p.relative_to(d.IMAGES)) for p in d.IMAGES.rglob('*') if p.is_file()), "
+                       "[opencode_sandbox.__file__, sorted(str(p.relative_to(d.IMAGES)) for p in d.IMAGES.rglob('*') "
+                       "if p.is_file() and '__pycache__' not in p.parts and p.suffix not in ('.pyc','.pyo')), "
                        "list(sys.version_info[:2])]))")],
                       check=True, env=env)
     module, assets, python_version = json.loads(where.stdout)
@@ -96,7 +97,8 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
     ck(module.startswith(str(pipx_home)) and not module.startswith(str(ROOT / "src")),
        f"B09 the installed package runs, not the source tree ({module})")
     ck(assets == sorted(str(p.relative_to(ROOT / "src/opencode_sandbox/assets/images"))
-                        for p in (ROOT / "src/opencode_sandbox/assets/images").rglob("*") if p.is_file()),
+                         for p in (ROOT / "src/opencode_sandbox/assets/images").rglob("*")
+                         if p.is_file() and "__pycache__" not in p.parts and p.suffix not in (".pyc", ".pyo")),
        f"B09 every image asset is installed ({len(assets)})")
     ck(ocs("--help", check=False).returncode == 0, "B09 --help")
     doctor = ocs("doctor", check=False)

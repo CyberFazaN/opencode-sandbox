@@ -119,6 +119,26 @@ def test_complete_distributions_pass(tmp_path):
     assert check_dist.check(distributions(tmp_path)) == []
 
 
+def test_runtime_bytecode_does_not_become_an_expected_image_asset(tmp_path, monkeypatch):
+    assets = tmp_path / "assets"
+    (assets / "common/__pycache__").mkdir(parents=True)
+    (assets / "common/ocs_opencode.py").write_text("source")
+    (assets / "common/__pycache__/ocs_opencode.cpython-314.pyc").write_bytes(b"bytecode")
+    (assets / "common/legacy.pyc").write_bytes(b"bytecode")
+    monkeypatch.setattr(check_dist, "ASSETS", assets)
+    assert check_dist.assets() == ["common/ocs_opencode.py"]
+
+
+@pytest.mark.parametrize("kind", ["wheel", "sdist"])
+def test_generated_python_bytecode_is_refused_in_distributions(tmp_path, kind):
+    name = "opencode_sandbox/assets/images/common/__pycache__/ocs_opencode.cpython-314.pyc"
+    dist = distributions(tmp_path, extra=("src/" + name,) if kind == "sdist" else ())
+    if kind == "wheel":
+        with zipfile.ZipFile(next(dist.glob("*.whl")), "a") as archive:
+            archive.writestr(name, b"bytecode")
+    assert f"{kind} contains generated Python bytecode" in check_dist.check(dist)
+
+
 def test_python_requirement_is_checked_against_the_project(tmp_path, monkeypatch):
     root = project(tmp_path / "project", "")
     (root / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.12"\n')
