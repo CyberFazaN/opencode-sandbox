@@ -6,6 +6,29 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+## 6.3.0 — 2026-11-05
+
+Configuration and working-state import release (Beta). Python 3.11 or newer; environment and
+backup schemas are unchanged. Upgrading does not rebuild images or migrate existing environments.
+Actual post-reboot manager recovery and host reboot behaviour remain unverified, with the
+owner's accepted release risk; no automatic reboot or recovery is performed.
+
+### Upgrade notes
+
+- Creation no longer accepts `--integration`, `--no-integrations`, `--mcp-remote` or
+  `--mcp-local`, and new environments no longer provision Context7. Configure MCP/plugins natively
+  or explicitly copy an OpenCode config profile. Existing global configuration is preserved.
+- Existing provider profiles containing `OPENCODE_CONFIG_CONTENT`, `OPENCODE_CONFIG` or
+  `OPENCODE_CONFIG_DIR` are now refused. Move configuration to native files or an OpenCode config
+  profile, then remove those keys from the provider JSON; credential values are never printed.
+- Debian/Arch base definitions are revisions 4/3. When `doctor` reports an older definition,
+  explicitly rebuild with `opencode-sandbox build --distro debian` or
+  `opencode-sandbox build --distro arch`. Existing environment layers keep their OS and files;
+  rebuilding does not add `ocs-opencode` to them or require migrating them to clear a warning.
+- Every managed start now reconciles the saved Agent Context system instruction. Custom images
+  need Python and GNU timeout; malformed system OpenCode JSON is preserved and blocks the start
+  until repaired. User global/project config is not rewritten by context reconciliation.
+
 ### Added
 
 - Opt-in **Include working changes** for managed Project Git imports, shared by CLI and dashboard:

@@ -178,7 +178,10 @@ elif action in ('cleanup', 'final'):
                 info = json.loads(out.stdout)[0]
                 assert info['Id'] in ids and info['Config']['Labels']['org.opencode-sandbox.test'] == run
                 c.docker('image','rm',d.image,capture=True)
-        left = c.docker('image','ls','-q','--filter','label=org.opencode-sandbox.test='+run,capture=True).stdout.split()
+        # The session's independently manifested custom-image fixture shares the run label.
+        # Check all recorded worker IDs (including dangling images), not unrelated fixture IDs.
+        left = set(c.docker('image','ls','--no-trunc','-q','--filter',
+                            'label=org.opencode-sandbox.test='+run,capture=True).stdout.split()) & ids
         assert not left, left
 else:
     raise AssertionError(action)

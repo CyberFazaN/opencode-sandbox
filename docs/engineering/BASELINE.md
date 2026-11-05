@@ -1,4 +1,4 @@
-# Baseline — OpenCode Sandbox 6.2.0
+# Baseline — OpenCode Sandbox 6.3.0
 
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
@@ -9,22 +9,20 @@ The current checkpoint below records fresh verification; older sections retain t
 
 | Item | Current state |
 |---|---|
-| Manager | `6.2.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.3.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
 | Images | Debian 13/default (`node:24-trixie`, revision 4); Arch rolling (`archlinux:base-devel`, revision 3) |
 
-The release includes component Updates views, optional default-off daily discovery,
-environment/base actions and independent manager update/recovery. These are implemented, not a
-pending roadmap. Published 6.2.0 kept the schemas/image definitions; unreleased changes advance the
-image definitions so every base build upgrades system packages, and environment OpenCode updates
-offer a default-off package upgrade (D-063). Explicit global-config profile/file transfers and optional
-Agent Context activation replace initial integration provisioning (D-064/D-065), without changing
-environment/backup schemas. Availability,
-consent, mutation and recovery remain separate; no Update All or automatic manager restart/rollback.
-The owner accepted B15's unverified post-reboot recovery risk for 6.2.0 on 2026-11-02 and explicitly
-declined a reboot. Acceptance is not verification; original frozen recovery inputs remain retained.
+Release 6.3.0 adds working-state Git imports, explicit global-config profile/file transfers,
+optional Agent Context activation and revised Updates flows. Initial integration provisioning is
+removed (D-064/D-065). Both image definitions advance so every base build upgrades system packages;
+environment OpenCode updates offer a default-off package upgrade (D-063). Environment/backup
+schemas are unchanged. Availability, consent, mutation and recovery remain separate; no Update All
+or automatic manager restart/rollback. The owner renewed acceptance of B15's unverified post-boot
+recovery and general host-reboot risks for 6.3.0 on 2026-11-04, without testing or a reboot.
+Acceptance is not verification; original frozen recovery inputs remain retained.
 
 ## Supported environments
 
@@ -42,6 +40,59 @@ declined a reboot. Acceptance is not verification; original frozen recovery inpu
 - OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
 
 ## Verification
+
+### Published 6.3.0
+
+[6.3.0](https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.3.0) was published on
+2026-11-05 as the latest stable GitHub release, not a draft or prerelease, with no binary assets.
+Annotated `v6.3.0` targets protected [PR #5](https://github.com/CyberFazaN/opencode-sandbox/pull/5)
+merge commit `c64c29cc9aa97333b2e0216943b893e677c8b6e9`; its tree matches qualified `9876fb5`.
+All ten [PR checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41933846852),
+ten [main checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41935417419) and
+14 [release-workflow jobs](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41955389879)
+passed before the automated draft was reviewed and published. Notes match the exact CHANGELOG
+section; no package-index or container-image upload was performed. The final hosted main matrix
+passed **2365 tests / 108 opt-in skips** in each Python/dependency combination. Rolling Arch passed
+2364 with 109 skips; its additional direct-workspace skip records missing `/run/user`.
+
+Fresh **public GitHub-tag** pipx installations on Python 3.11.18 and 3.14.8 passed version/help,
+installed-asset and missing-context checks, dependency health and actual rootless `doctor` (exit 0).
+Official PEP 610 source/tag/merge-commit records and all **72 installed product files** match the
+tag; no test hooks are present. Fresh Typer/Textual resolution is 0.27.3/8.2.8. Doctor verified the
+user's own rootless daemon and reported expected older Debian/Arch base revisions; neither base
+was rebuilt, and the Docker container/volume/image inventories are unchanged. This is public
+installation proof, not public-network manager self-replacement, reboot recovery or production
+readiness. B15 and general host-reboot risk remain accepted but unverified.
+
+### 6.3.0 candidate qualification
+
+Approved implementation: `80cce001019ecd4b409fc1f63bf3390d37c4e808`; release-tree harness
+checkpoint: `f3a685fb33a3a8693b95935ff92b1783c250981c`. All 72 product files match the
+both-endpoint private-tag package checkpoint `6ad634d`; later changes are test/release evidence only.
+Detailed logs, input hashes, failed/pass XML and manifests remain in ignored
+`.work/agents/release-6.3.0/` and `.work/logs/r63*`.
+
+| Layer | Executed result and scope |
+|---|---|
+| Complete default Python/dependency matrix | **2362 passed / 107 real opt-in skips** in each 3.11/3.14 current/lowest-direct combination; 387.98/393.23/401.35/407.91 s. These full runs precede test-only campaign/package-oracle corrections; **65 affected checks passed on all four combinations**, and **72 final quality/CLI/document/release contracts** passed on both checkpoint endpoints. No product implementation changed |
+| Packaging and installed pipx | Both endpoints: isolated sdist/wheel, strict Twine/content checks, fresh private-tag install/version/help/doctor and source-free smoke; **72 product files match source**, all eight image assets included, no shipped test hooks or bytecode. Fresh Typer/Textual resolution is 0.27.3/8.2.8; dependency health clean |
+| Complete real installed-manager campaign | `r63b`: **108 tests / 1890 checks passed**, no failures/errors/skips, 4534.58 s, Python 3.14; both packaged definitions, retained Debian 12 containers/backups, cached/full-refresh builds, real OpenCode/fake-provider first prompts, config/import/terminal paths, actual manager replacement/recovery, privileged and isolated socket activation |
+| Python 3.11 installed-manager floor | `r63floor`: **7 tests / 567 checks passed**, no failures/errors/skips, 338.15 s; actual pipx lifecycle, both-layout manager inventory/update/recovery and both-distribution session exclusion, not a second complete campaign |
+| Static/privacy | Ruff/shellcheck, actionlint and offline zizmor pass. Gitleaks history/tree: zero findings; offline detect-secrets candidates are 13 reviewed deliberate test fixtures, not real credentials; privacy candidates are reserved example addresses/rootlesskit IPs and public Arch image names |
+| Cleanup | Guarded product cleanup passed. Only five manifested setup tags and two validated empty export namespaces were removed, plus the created empty runtime unit directory. Original four full image IDs are unchanged; no containers, volumes or activation units remain. Frozen recovery inputs, persistent protocol locks and shared build cache are retained |
+
+Qualification found stale campaign assumptions about plain Ubuntu's missing Python, imported
+launcher bytecode, pre-existing complete backups, shared-fixture image labels, keyboard focus,
+explicit temporary checks and manual-update text. Narrow test/tool corrections retain exact image,
+data, source and refusal assertions; the unprepared-image row now explicitly checks refusal. The
+first complete attempt (`r63a`) remains failed evidence, not a retry waiver; affected real checks
+then passed before the fresh complete `r63b` pass. No application safeguard was relaxed.
+
+Lowest Typer retains its two known Click deprecations; the complete 3.14 campaign reports 99
+multi-threaded `forkpty` warnings, not suppressed. No reboot, paid-provider call or manual human
+observation was performed. B15 and general reboot risk remain explicitly accepted but unverified
+for 6.3.0. Local qualification alone is not a production-readiness claim; completed protected
+PR/main/tag CI, draft review and public-tag pipx smoke are recorded above.
 
 ### Independent pre-release review — 2026-11-04
 
@@ -340,13 +391,13 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 ## Unverified behaviour
 
 - **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
-  release risk for 6.2.0 on 2026-11-02**, with no reboot authorized. Same-boot hard-interruption
+  release risk for 6.3.0 on 2026-11-04**, without testing or a reboot. Same-boot hard-interruption
   refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
   On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
   original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
   verifier and confirm startup/data retention. Never delete state/locks or infer success from an
   empty old group, cache or installer exit.
-- **Host reboot generally (D09):** accepted at the stable release, not executed. Daemon restart,
+- **Host reboot generally (D09):** risk accepted for 6.3.0 on 2026-11-04, not executed. Daemon restart,
   stop/start and daemon-unit SIGKILL passed. Next: authorized reboot, then `start NAME` and
   `check NAME` on a manifested test environment; do not equate this with B15's separate proof.
 - Real rootless Docker on other Linux distributions, without systemd or without delegated

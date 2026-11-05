@@ -7,6 +7,7 @@ and the product's `disk cleanup --yes` behind a guard, then a leak check.
 
 Environment: OCS_TEST_RUN (run id, default run-<UTC time>), OCS_TEST_DISTROS (default
 "debian arch")."""
+import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -71,3 +72,34 @@ def campaign():
     assert after == before, f"tagged images changed: {sorted(set(before) ^ set(after))}"
     assert guard == 0, "cleanup guard refused: see the log"
     assert left == {"container": [], "volume": [], "image": []}, left
+
+
+@pytest.fixture(scope="session")
+def custom_image(campaign):
+    """Run-owned Ubuntu with the documented managed-start tools; never retag the user's base."""
+    camp = campaign
+    tag = f"ocs-test-{camp.run}-custom:ubuntu"
+    probe = camp.docker("image", "inspect", tag, check=False)
+    assert probe.returncode and "no such image" in probe.stderr.lower(), "Refusing a pre-existing/unknown custom fixture"
+    context = camp.tmp("custom-image")
+    (context / "Dockerfile").write_text(
+        "FROM ubuntu:24.04\n"
+        "RUN apt-get update && apt-get install -y --no-install-recommends python3 coreutils "
+        "&& rm -rf /var/lib/apt/lists/*\n")
+    camp.note(f"planned custom fixture image {tag}; pre-existing ubuntu:24.04 remains unchanged")
+    camp.docker("build", "--pull=false", "--label", f"org.opencode-sandbox.test={camp.run}",
+                "-t", tag, str(context), timeout=1200)
+    (created,) = json.loads(camp.docker("image", "inspect", tag).stdout)
+    camp.note(f"custom fixture image {tag} id={created['Id']}")
+    try:
+        yield tag
+    finally:
+        # A failed body may leave a manifested environment. Delete only this run's users of
+        # the fixture before untagging it; campaign cleanup handles the remaining own objects.
+        for name in list(camp.ids):
+            if camp.metadata(name).get("custom_image") == tag:
+                camp.delete(name)
+        (current,) = json.loads(camp.docker("image", "inspect", tag).stdout)
+        assert current["Id"] == created["Id"] and current["Config"]["Labels"]["org.opencode-sandbox.test"] == camp.run
+        camp.docker("image", "rm", tag)
+        camp.note(f"removed custom fixture image {tag} id={created['Id']}")

@@ -22,7 +22,10 @@ def version():
 
 
 def assets():
-    return sorted(p.relative_to(ASSETS).as_posix() for p in ASSETS.rglob("*") if p.is_file())
+    # Importing the shared Python launcher creates interpreter-specific caches in a checkout
+    # or installed package. They are runtime artifacts, not distributable image assets.
+    return sorted(p.relative_to(ASSETS).as_posix() for p in ASSETS.rglob("*")
+                  if p.is_file() and "__pycache__" not in p.parts and p.suffix not in (".pyc", ".pyo"))
 
 
 def check(dist):
@@ -68,6 +71,8 @@ def check(dist):
             problems.append(f"wheel image assets {packaged} differ from the source tree {assets()}")
         if any(n.startswith("tests/") for n in names):
             problems.append("wheel contains tests")
+        if any("__pycache__" in Path(n).parts or n.endswith((".pyc", ".pyo")) for n in names):
+            problems.append("wheel contains generated Python bytecode")
 
     with tarfile.open(sdists[0]) as sdist:
         top = f"opencode_sandbox-{v}/"
@@ -92,6 +97,8 @@ def check(dist):
                 problems.append(f"sdist: {required} missing")
         if any(n.startswith("tests/") for n in names):
             problems.append("sdist contains tests (MANIFEST.in prunes them)")
+        if any("__pycache__" in Path(n).parts or n.endswith((".pyc", ".pyo")) for n in names):
+            problems.append("sdist contains generated Python bytecode")
         for retired in ("install.sh", "setup-rootless.sh"):
             if retired in names:
                 problems.append(f"sdist contains retired installer {retired}")
