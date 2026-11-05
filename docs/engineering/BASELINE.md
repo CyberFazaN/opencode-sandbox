@@ -1,4 +1,4 @@
-# Baseline — OpenCode Sandbox 6.3.0 candidate
+# Baseline — OpenCode Sandbox 6.3.0
 
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
@@ -9,13 +9,13 @@ The current checkpoint below records fresh verification; older sections retain t
 
 | Item | Current state |
 |---|---|
-| Manager | `6.3.0` candidate, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.3.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
 | Images | Debian 13/default (`node:24-trixie`, revision 4); Arch rolling (`archlinux:base-devel`, revision 3) |
 
-The 6.3.0 candidate adds working-state Git imports, explicit global-config profile/file transfers,
+Release 6.3.0 adds working-state Git imports, explicit global-config profile/file transfers,
 optional Agent Context activation and revised Updates flows. Initial integration provisioning is
 removed (D-064/D-065). Both image definitions advance so every base build upgrades system packages;
 environment OpenCode updates offer a default-off package upgrade (D-063). Environment/backup
@@ -40,6 +40,29 @@ Acceptance is not verification; original frozen recovery inputs remain retained.
 - OpenCode `@opencode/cli` 2.x only, tested 2.1.4 and 2.2.0 on both image distributions.
 
 ## Verification
+
+### Published 6.3.0
+
+[6.3.0](https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.3.0) was published on
+2026-11-05 as the latest stable GitHub release, not a draft or prerelease, with no binary assets.
+Annotated `v6.3.0` targets protected [PR #5](https://github.com/CyberFazaN/opencode-sandbox/pull/5)
+merge commit `c64c29cc9aa97333b2e0216943b893e677c8b6e9`; its tree matches qualified `9876fb5`.
+All ten [PR checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41933846852),
+ten [main checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41935417419) and
+14 [release-workflow jobs](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/41955389879)
+passed before the automated draft was reviewed and published. Notes match the exact CHANGELOG
+section; no package-index or container-image upload was performed. The final hosted main matrix
+passed **2365 tests / 108 opt-in skips** in each Python/dependency combination. Rolling Arch passed
+2364 with 109 skips; its additional direct-workspace skip records missing `/run/user`.
+
+Fresh **public GitHub-tag** pipx installations on Python 3.11.18 and 3.14.8 passed version/help,
+installed-asset and missing-context checks, dependency health and actual rootless `doctor` (exit 0).
+Official PEP 610 source/tag/merge-commit records and all **72 installed product files** match the
+tag; no test hooks are present. Fresh Typer/Textual resolution is 0.27.3/8.2.8. Doctor verified the
+user's own rootless daemon and reported expected older Debian/Arch base revisions; neither base
+was rebuilt, and the Docker container/volume/image inventories are unchanged. This is public
+installation proof, not public-network manager self-replacement, reboot recovery or production
+readiness. B15 and general host-reboot risk remain accepted but unverified.
 
 ### 6.3.0 candidate qualification
 
@@ -68,8 +91,8 @@ then passed before the fresh complete `r63b` pass. No application safeguard was 
 Lowest Typer retains its two known Click deprecations; the complete 3.14 campaign reports 99
 multi-threaded `forkpty` warnings, not suppressed. No reboot, paid-provider call or manual human
 observation was performed. B15 and general reboot risk remain explicitly accepted but unverified
-for 6.3.0. Local qualification is complete; protected PR/main/tag CI, draft review and public-tag
-pipx smoke remain mandatory publication gates, not a production-readiness claim.
+for 6.3.0. Local qualification alone is not a production-readiness claim; completed protected
+PR/main/tag CI, draft review and public-tag pipx smoke are recorded above.
 
 ### Independent pre-release review — 2026-11-04
 

@@ -33,9 +33,11 @@ proof. Matrix/package evidence, harness corrections and cleanup are in
 [BASELINE](BASELINE.md#630-candidate-qualification).
 
 B15 post-boot recovery and general host reboot remain unexecuted, with the owner's explicit
-accepted risk for 6.3.0; same-boot refusal is not post-boot proof. All other P0/P1 local gates
-pass. Protected PR/main/tag checks, automated draft review and public-tag smoke still govern
-publication. No reboot, paid provider or human observation is claimed.
+accepted risk for 6.3.0; same-boot refusal is not post-boot proof. All other P0/P1 release gates
+pass. Protected PR/main checks, all 14 tag-workflow jobs and automated draft review passed before
+publication; both-endpoint public-tag pipx smoke passed afterward
+([published evidence](BASELINE.md#published-630)). No reboot, paid provider or human observation
+is claimed.
 
 ## Prior Updates integration
 
@@ -72,7 +74,7 @@ review passed before publication; both-endpoint public GitHub-tag pipx smoke pas
 |---|---|---|---|---|
 | A01 | P0 | Platform inventory: host, kernel, Python, Git, Docker, Python dependencies and OpenCode versions recorded | `BASELINE.md` ("Supported environments"); `opencode-sandbox doctor` at the start of every campaign run (`conftest.py`) | PASS (6.3.0: Arch Linux/kernel 7.2.11, Python 3.11.18/3.14.8, Git 2.56.0, own rootless Docker 29.9.2/RootlessKit 3.3.0, pipx 1.18.7, current/lowest direct dependencies and actual OpenCode 2.1.4/2.2.0 recorded; BASELINE) |
 | A02 | P0 | Code map: `ARCHITECTURE.md` matches the modules, and the code was reviewed against the product contract | Review of `src/opencode_sandbox/` against `ARCHITECTURE.md`; documentation checks are row I05 | PASS (6.3.0 review: complete stable-to-candidate diff, config/import/context and update/consent/lock/recovery boundaries checked against the product contract; unchanged schemas/Python floor, Debian/Arch definitions 4/3. Not an independent human security audit) |
-| A03 | P1 | Unit suite passes; every command's `--help` works | `pytest` without `OCS_TEST_DOCKER` (unit, host, pilot, local-process); `tests/test_cli_structure.py` | PASS (6.3.0: 2362 passed/107 opt-in skips in each complete four-way suite before test-only gate corrections; 65 affected checks on all four combinations plus final contracts. Product unchanged; dependency checks clean; hosted final-tree checks remain publication gates, BASELINE) |
+| A03 | P1 | Unit suite passes; every command's `--help` works | `pytest` without `OCS_TEST_DOCKER` (unit, host, pilot, local-process); `tests/test_cli_structure.py` | PASS (6.3.0: final hosted main four-way matrix 2365 passed/108 opt-in skips each; Arch userland 2364 passed/109 skips, including missing /run/user. Earlier complete local matrix and affected correction checks retain their separate scopes; all protected PR/main/tag jobs and dependency checks pass, BASELINE) |
 | A04 | P1 | Package build and install | `python -m build` and `twine check --strict`; fresh installations with PyPI dependencies; `tests/test_package_metadata.py`; pipx rows B09–B12 | PASS (6.3.0: both-endpoint build/strict metadata/content/fresh private-tag pipx checks; all 72 product files match source, no shipped hooks/bytecode; actual pipx lifecycle on 3.14/3.11, BASELINE) |
 | A05 | P1 | Static security review; linters clean | `tests/test_quality.py` (`ruff check src tests .github/scripts`, shellcheck on packaged shell scripts; D-034/D-048) | PASS (6.3.0 review/static checks, workflow lint and secret/privacy scans; 13 deliberate dummy candidates reviewed without new suppression, BASELINE) |
 
@@ -186,7 +188,7 @@ review passed before publication; both-endpoint public GitHub-tag pipx smoke pas
 | I03 | P1 | Performance baseline | Median durations per command from the campaign log (every command is logged with its duration); small test workspaces; no targets defined | PASS (real; durations recorded in the run log, no targets) |
 | I04 | P0 | Full regression at the release revision | The whole current real campaign, both distributions and packaged image build; retained privileged rows with consent; campaign through a pipx installation of a test tag. Evidence: `BASELINE.md` | PASS (6.3.0 `r63b`: complete installed private-tag campaign, both packaged definitions/cached/full-refresh builds, authorized privileged/C10 and retained Debian 12; 108 tests/1890 checks, no failures/errors/skips. Additional 3.11 floor: 7 tests/567 checks. All product bytes match the selected tree; no paid-provider call, BASELINE) |
 | I05 | P0 | Documentation matches the code: every command and option named in the product, `README.md` and `docs/` exists; relative links and anchors resolve; code blocks fit 80 columns; the install commands name the release tag; active documents are English; new instructions in the guides were measured | `tests/test_cli_structure.py`, `tests/test_user_docs.py`, `tests/test_language.py`, `tests/test_disclosure.py`; review of `README.md`, `CHANGELOG.md` and the guides against the code and `--help` | PASS (review, unit) |
-| I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | PASS (6.3.0 local review: READY WITH ACCEPTED RISKS; all other P0/P1 local gates pass or B15 remains BLOCKED with explicit owner acceptance and a reproducible next step. Protected PR/main/tag checks, automated draft review and public-tag pipx smoke remain mandatory before publication is reported complete; BASELINE) |
+| I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | PASS (6.3.0 review: READY WITH ACCEPTED RISKS; all other P0/P1 gates pass or B15 remains BLOCKED with explicit owner acceptance and a reproducible next step. Protected PR/main CI, all 14 tag-workflow jobs and automated draft review passed; owner-authorized publication and both-endpoint public GitHub-tag pipx smoke completed, BASELINE) |
 
 ## J, K, L. Readiness and cleanup, distributions, direct workspaces
 
@@ -228,8 +230,8 @@ installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 - C10 was re-established on the 6.3.0 candidate through the installed manager and actual isolated
   inherited listener, not just host sockets or warmed direct Docker.
 - I04 passed on the 6.3.0 candidate (`r63b`: 108 tests/1890 checks, no failures/errors/skips).
-  I06's local reviewed decision is READY WITH ACCEPTED RISKS; protected final PR/main/tag checks,
-  automated draft review and public-tag smoke remain mandatory under RELEASING.
+  I06's reviewed decision is READY WITH ACCEPTED RISKS; protected final PR/main/tag checks,
+  automated draft review, owner-authorized publication and public-tag smoke completed under RELEASING.
 - H05: an intermittent session-test failure was traced to a launch-ownership race and fixed
   (D-054); the first real run also found a terminal-restoration defect, retained as failing
   evidence and fixed before the successful scoped rerun.
