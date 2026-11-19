@@ -125,13 +125,13 @@ You need Linux with Python 3.11 or newer, pipx and Git; install them using your 
 documentation. Install the application from a release tag:
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.3.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
 opencode-sandbox --version
 ```
 
-To upgrade, install another tag with `--force`; `pipx upgrade` keeps the installed tag. After
-upgrading from 6.0.0, rebuild the Debian base image (`opencode-sandbox build`) when `doctor`
-reports an older image revision.
+To upgrade, install another tag with `--force`; `pipx upgrade` keeps the installed tag. If
+`doctor` reports an older image revision, [rebuild the affected base](docs/install.md#build-the-sandbox-images)
+explicitly. Existing environments are not rebuilt.
 `pipx uninstall opencode-sandbox` removes the application and keeps your environments and data.
 
 The application does not install or configure Docker. Prepare your rootless Docker daemon and the

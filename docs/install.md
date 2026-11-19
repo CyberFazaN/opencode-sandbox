@@ -31,7 +31,7 @@ either one on any host; they are independent of the distribution your host runs.
 ## Install the application
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.3.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
 opencode-sandbox --version
 ```
 
@@ -45,7 +45,7 @@ needed:
 
 ```sh
 pipx install --python python3.11 \
-  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.3.0
+  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
 ```
 
 `opencode-sandbox --help`, `--version` and `doctor` work without Docker.
@@ -161,8 +161,9 @@ it; some checks require an already running container.
 
 Release 6.0.0 built Debian 12 (image revision 1); 6.1.0 builds Debian 13 (revision 2). After
 upgrading from 6.0.0, explicitly rebuild the Debian base when `doctor` reports revision 1.
-Release 6.3.0 defines Debian revision 4 and Arch revision 3; rebuild when `doctor`
-reports an older definition to obtain the new direct-launch wrapper and neutral system config.
+Release 6.4.0 defines Debian revision 5 and Arch revision 4. Rebuild the affected base with the
+commands above if `doctor` reports an older definition, to get the executable direct-launch
+wrapper and, on Arch, the updated AUR helper.
 Retained environment layers do not acquire new image files merely from a manager/base upgrade.
 Neither upgrading the manager nor rebuilding the base upgrades an existing container.
 Stop/start, recreation and backups with the system layer keep its OS;
