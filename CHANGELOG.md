@@ -6,6 +6,18 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- **Copy entire directory** in the dashboard and `--copy-entire-directory` for managed Project and
+  Quick workspaces. This explicit import includes ignored and hidden files without invoking Git.
+
+### Fixed
+
+- Environment creation shows folder and import controls only for the selected workspace setup.
+  Workspace descriptions distinguish empty, copied, restored, and direct workspaces.
+- The Agent Context screen shows the saved automatic-inclusion status and edits the same setting
+  as Environment Settings. The preview stays available when automatic inclusion is off.
+
 ## 6.3.0 — 2026-11-05
 
 Configuration and working-state import release (Beta). Python 3.11 or newer; environment and

@@ -12,7 +12,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from . import distros
+from . import distros, workspaces
 
 CONTAINER_DIR = "/run/ocs-agent"
 CONTAINER_PATH = CONTAINER_DIR + "/context.md"
@@ -25,6 +25,10 @@ def enabled(m):
         from .core import SandboxError
         raise SandboxError("Invalid saved Agent Context setting")
     return value
+
+
+def activation_status(m):
+    return 'Automatic inclusion in OpenCode instructions: ' + ('enabled' if enabled(m) else 'disabled')
 
 
 def system_document(document, include):
@@ -127,15 +131,14 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
                      "host user who owns this sandbox and other UIDs to unprivileged subordinate IDs.")
     lines += [
         "- The container runs with no-new-privileges: sudo and setuid programs cannot raise privileges. Container root is not root on the host.",
-        ("- There is no Docker socket and no host package manager in the container. Host files are mounted "
-         "only at /workspace (plus read-only files the manager provides under /run). "
+        ("- There is no Docker socket and no host package manager in the container. "
          "Do not try to manage the host, the Docker daemon, hardware or system services."),
         "- Do not assume access to GPU, USB, cameras or audio.",
         "", "## Workspace and persistence",
         f"- Environment: {m['name']} ({m['kind']}). Working directory: /workspace. Work on project files here.",
         *workspace_lines(m),
-        ("- /workspace is a bind mount from the host and /root a persistent Docker volume (OpenCode state, user data): "
-         "both survive stopping, recreating and reconfiguring the container."),
+        ("- The workspace and the persistent /root Docker volume (OpenCode state, user data) survive stopping, "
+         "recreating and reconfiguring the container."),
         ("- Packages and files elsewhere live in the container's system layer: kept across stop/start, recreation and "
          "runtime changes, but lost when the user restores a backup without it. Do not assume they are permanent."),
         "- Keep credentials out of command output, logs, source files and answers.",
@@ -184,17 +187,21 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
 
 def workspace_lines(m: dict) -> list[str]:
     """What /workspace is. Host paths are not named."""
-    if (m.get("workspace") or {}).get("mode") == "direct":
+    setup = workspaces.origin(m)
+    if setup == workspaces.DIRECT:
         lines = [("- /workspace is the user's own host directory, mounted directly (not a copy): every change, "
                   "including deleting or overwriting files, happens at once in the user's files on the host. "
                   "There is no undo through the sandbox and backups do not include it by default; ask before "
                   "large deletions or rewrites, and leave version control to the user unless asked.")]
-    elif m.get("source"):
-        lines = [("- /workspace holds a copy of a host directory, made when the environment was created (Git "
-                  "repository: committed files only; other directories: a filtered copy). The original is not "
-                  "mounted: your edits reach it only when the user exports or applies them with the manager.")]
+    elif setup == "copy":
+        method = workspaces.import_label(m)
+        label = f" ({method})" if method else ""
+        lines = [(f"- /workspace holds a copy of a host directory made at creation{label}. "
+                  "The original is not mounted and edits here do not change it.")]
+    elif setup == "restore":
+        lines = ["- This environment was restored from backup. /workspace is manager-owned; no user host folder is mounted directly."]
     else:
-        lines = ["- /workspace started empty; it is not connected to any host project."]
+        lines = ["- /workspace is manager-owned and started empty; it is not connected to any host project."]
     if m.get("kind") == "quick":
         lines.append("- This is a quick (disposable) session: when it ends, the user decides whether to export, keep, "
                      "promote or delete it. Do not rely on /workspace being kept.")

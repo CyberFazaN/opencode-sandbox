@@ -50,7 +50,8 @@ states only what the manager configures or verifies:
 **Delivery.** The guidance lives on the host in the environment's `agent-context/` directory,
 which every container mounts read-only at `/run/ocs-agent/` (file `context.md`). The managed
 images ship a neutral `/etc/opencode/opencode.json`. **Include specialized Agent Context**
-defaults on at creation and can be changed in environment Settings or the CLI:
+defaults on at creation and can be changed in either dashboard screen, **Agent Context** (`a`)
+or **Environment Settings** (`t`), or in the CLI:
 
 ```sh
 opencode-sandbox create NAME --no-agent-context

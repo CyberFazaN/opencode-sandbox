@@ -4,8 +4,10 @@ The agent works on a copy of your project, so its work reaches your repository o
 move it there. The `changes` commands do that without letting the sandbox's repository act on
 your host.
 
-They apply to project environments imported from Git (also after a restore of one: the restore
-keeps the base commit). For a non-Git workspace, `changes export` archives the whole workspace.
+Git change bundles apply to workspaces with a recorded Git import base (also after a restore with
+the workspace included). For a workspace without a Git base, including **Copy entire directory**,
+`changes export` archives workspace files, not a Git diff. It omits a top-level `.git` directory;
+use a backup if you need to preserve the copied repository metadata.
 A direct workspace has no `changes`: its changes are already in your directory.
 
 With [Include working changes](workspaces.md#git-import-modes), bundles include the initial imported

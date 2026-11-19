@@ -6,6 +6,7 @@ import subprocess
 import pytest
 from typer.testing import CliRunner
 
+from opencode_sandbox import agent_context as ac
 from opencode_sandbox import core as c
 from opencode_sandbox import git_import as gi
 from opencode_sandbox.cli import app
@@ -89,6 +90,25 @@ def test_default_clone_stays_clean(repo):
     dest = c.env_dir(m["id"]) / "workspace"
     assert (dest / "modified").read_bytes() == b"base\n"
     assert not (dest / "new").exists() and git(dest, "status", "--porcelain") == b""
+    assert source_snapshot(repo) == before
+
+
+def test_import_methods_are_distinct_in_files_and_guidance(repo):
+    (repo / 'modified').write_text('working edit')
+    (repo / 'new').write_text('untracked')
+    (repo / 'secret.ignored').write_text('dummy value')
+    before = source_snapshot(repo)
+    for method, label, extra, files in (
+        ('committed', 'Git — committed only', {}, []),
+        ('working', 'Git — include working changes', {'include_working_changes': True}, ['new']),
+        ('entire', 'Copy entire directory', {'copy_entire_directory': True}, ['new', 'secret.ignored']),
+    ):
+        m = c.create(method, source=repo, **extra)
+        m = c.resolve(m['id'])
+        assert m['workspace_import'] == method and label in '\n'.join(ac.workspace_lines(m))
+        dest = c.env_dir(m['id']) / 'workspace'
+        assert [name for name in ('new', 'secret.ignored') if (dest / name).exists()] == files
+        assert (dest / 'modified').read_text() == ('base\n' if method == 'committed' else 'working edit')
     assert source_snapshot(repo) == before
 
 

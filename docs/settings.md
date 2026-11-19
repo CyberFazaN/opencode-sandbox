@@ -22,6 +22,8 @@ opencode-sandbox container usage NAME # current usage from Docker
 | `--agent-context` / `--no-agent-context` | automatic specialized context inclusion | enabled |
 
 Omitted options keep their current values. `config plan --json` prints the plan for scripts.
+`config show` also reports the environment kind, managed/direct workspace record, and how the
+workspace was initialized. The import method is unknown for older copies that did not record it.
 
 ## How a change is applied
 

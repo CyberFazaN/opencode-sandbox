@@ -8,7 +8,8 @@ from opencode_sandbox import agent_context as a
 from opencode_sandbox import core as c
 from opencode_sandbox import distros
 
-M = {'id': '0123456789abcdef', 'name': 'demo', 'kind': 'scratch', 'source': None, 'distro': 'debian'}
+M = {'id': '0123456789abcdef', 'name': 'demo', 'kind': 'scratch', 'source': None, 'distro': 'debian',
+     'workspace': {'mode': 'managed', 'path': None}}
 R = {'network': 'none', 'cpus': '2.0', 'memory': '4g', 'pids': 100, 'ports': []}
 PORT = {'host': 18080, 'container': 8080, 'protocol': 'tcp'}
 
@@ -73,7 +74,10 @@ def test_workspace_lines_follow_kind_and_source():
     copy = a.render({**M, 'kind': 'project', 'source': '/x'}, image='i', runtime=R)
     assert "copy of a host directory" in copy and "The original is not mounted" in copy and "started empty" not in copy
     empty = a.render({**M, 'kind': 'project'}, image='i', runtime=R)
-    assert "started empty" in empty and "copy of a host" not in empty
+    assert "started empty" in empty and "copy of a host" not in empty and "bind mount from the host" not in empty
+    restored = a.render({**M, 'restored_from': '/private/backup'}, image='i', runtime=R)
+    assert "restored from backup" in restored and '/private/backup' not in restored and 'started empty' not in restored
+    assert 'committed only' not in copy  # The old metadata did not record which method was used.
     quick = a.render({**M, 'kind': 'quick', 'source': '/x'}, image='i', runtime=R)
     assert "copy of a host directory" in quick and "quick (disposable) session" in quick
     assert "disposable" not in a.render(M, image='i', runtime=R)

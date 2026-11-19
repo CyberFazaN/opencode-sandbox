@@ -16,6 +16,56 @@ GIT = ["git", "-c", "user.name=ocs-test", "-c", "user.email=ocs-test@example.inv
 MARKERS = "cat /workspace/ws-marker.txt /root/home-marker.txt /etc/ocs-test-system-marker"
 
 
+@pytest.mark.parametrize('distro', DISTROS)
+def test_workspace_modes_and_context_activation(campaign, distro):
+    camp = campaign
+    source = camp.short_dir(f'full-source-{distro}')
+    (source / '.example').write_text('dummy-hidden-file')
+    (source / 'empty').mkdir()
+    modes = (
+        ('scratch', 'scratch', (), 'started empty'),
+        ('project', 'project', ('--source', str(source), '--copy-entire-directory'), 'Copy entire directory'),
+        ('quick', 'quick', (), 'quick (disposable) session'),
+        ('direct', 'project', ('--workspace-mode', 'direct', '--workspace', str(source), '--yes'), 'mounted directly'),
+    )
+    context_path = '/run/ocs-agent/context.md'
+
+    def inspect_mount_and_context(eid, expected, guidance, include):
+        mount, = [m for m in camp.inspect(eid)['Mounts'] if m['Destination'] == '/workspace']
+        assert mount['Type'] == 'bind' and mount['RW'] and mount['Source'] == str(expected)
+        system_config = json.loads(camp.sh(eid, 'cat /etc/opencode/opencode.json').stdout)
+        assert system_config.get('instructions', []).count(context_path) == int(include)
+        context = camp.sh(eid, f'cat {context_path}').stdout
+        assert guidance in context and str(source) not in context
+
+    for mode, kind, opts, guidance in modes:
+        name = f'ocs-test-modes-{mode}-{distro}'
+        eid = camp.create(name, '--distro', distro, '--kind', kind, '--no-agent-context', *opts)
+        expected = source if mode == 'direct' else camp.data / 'environments' / eid / 'workspace'
+        meta = camp.metadata(name)
+        assert meta['kind'] == kind and meta['agent_context_enabled'] is False
+        expected_record = {'mode': 'direct', 'path': str(source)} if mode == 'direct' else {'mode': 'managed', 'path': None}
+        assert meta['workspace'] == expected_record
+        if mode == 'project':
+            assert meta['workspace_import'] == 'entire'
+
+        camp.ocs('start', name)
+        inspect_mount_and_context(eid, expected, guidance, False)
+        if mode == 'project':
+            assert camp.sh(eid, 'test -d /workspace/empty && cat /workspace/.example').stdout == 'dummy-hidden-file'
+            camp.sh(eid, 'printf sandbox-edit > /workspace/.example')
+            assert (source / '.example').read_text() == 'dummy-hidden-file'
+        elif mode in ('scratch', 'quick'):
+            camp.sh(eid, 'test -z "$(ls -A /workspace)"')
+
+        camp.ocs('config', 'apply', name, '--agent-context', '--yes')
+        assert camp.metadata(name)['agent_context_enabled'] is True
+        inspect_mount_and_context(eid, expected, guidance, True)
+        camp.ocs('container', 'recreate', name, '--yes')
+        inspect_mount_and_context(eid, expected, guidance, True)
+        camp.delete(name)
+
+
 def mtimes(root: Path):
     """Whole-second modification times below root (links not followed), without .git."""
     return {p.relative_to(root).as_posix(): int(p.lstat().st_mtime) for p in sorted(root.rglob("*"))

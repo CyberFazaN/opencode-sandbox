@@ -24,6 +24,7 @@ from textual.widgets import (
 from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
 from . import core as c
+from . import workspaces
 from .tui_runtime import publish, work
 
 
@@ -75,7 +76,7 @@ class KeysScreen(ModalScreen):
 
 
 class CreateScreen(ModalScreen[dict | None]):
-    """New environment. Name, kind and folder first; distribution, workspace mode, provider profile
+    """New environment. Name, kind and workspace first; distribution, provider profile
     and OpenCode configuration under "More options" with the defaults of `create` (progressive disclosure).
     The checks are core.creation_options, the same as the CLI's."""
     CSS = """CreateScreen {align: center middle;}
@@ -87,6 +88,15 @@ class CreateScreen(ModalScreen[dict | None]):
     .hint {color: $text-muted;}"""
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     AUTO_FOCUS = "#name"
+    WORKSPACE_OPTIONS = {
+        "scratch": ("empty", "direct"), "project": ("copy", "empty", "direct"), "quick": ("empty", "copy"),
+    }
+    WORKSPACE_LABELS = {"empty": "Workspace: empty (managed)", "copy": "Workspace: copy a folder (managed)",
+                        "direct": "Workspace: direct host folder (not recommended)"}
+
+    @classmethod
+    def workspace_choices(cls, kind):
+        return [(cls.WORKSPACE_LABELS[value], value) for value in cls.WORKSPACE_OPTIONS[kind]]
 
     def action_cancel(self) -> None:
         self.dismiss(None)
@@ -98,18 +108,15 @@ class CreateScreen(ModalScreen[dict | None]):
         with Vertical(id="create-panel"):
             yield Static("[b]New environment[/b]  (Tab: next field, Esc: cancel)")
             yield Input(placeholder="Name (letters, digits, . _ -)", id="name", compact=True)
-            yield Select([("Scratch: empty workspace", "scratch"), ("Project: a copy of a folder", "project"),
+            yield Select([("Scratch: start from an empty workspace", "scratch"), ("Project: persistent project", "project"),
                           ("Quick: disposable session", "quick")], value="scratch", allow_blank=False, id="kind", compact=True)
-            yield Input(placeholder="Folder to copy (Git: committed only by default); empty = none", id="source", compact=True)
-            yield Select([("Git import: Committed only (default)", False),
-                          ("Git import: Include working changes", True)],
-                         value=False, allow_blank=False, id="git-working-changes", compact=True)
-            with Collapsible(title="More options: distribution, workspace, provider, OpenCode config", id="more"):
+            yield Select(self.workspace_choices("scratch"), value="empty", allow_blank=False, id="workspace-mode", compact=True)
+            yield Input(placeholder="Folder to copy", id="source", compact=True)
+            yield Select(self.import_choices("project"), value=workspaces.COPY_COMMITTED,
+                         allow_blank=False, id="import-mode", compact=True)
+            with Collapsible(title="More options: distribution, provider, OpenCode config", id="more"):
                 yield Select([(f"Base definition: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
                               for d in distros.REGISTRY.values()], value=distros.DEFAULT, allow_blank=False, id="distro", compact=True)
-                yield Select([("Workspace: managed (empty, or a copy of the folder; default)", "managed"),
-                              ("Workspace: direct host folder (not recommended)", "direct")],
-                             value="managed", allow_blank=False, id="workspace-mode", compact=True)
                 yield Select([(f"Provider profile: {name}", name) for name in profiles], value="default",
                              allow_blank=False, id="profile", compact=True)
                 yield Select([("OpenCode config: Local (no initial import)", "local"),
@@ -133,35 +140,58 @@ class CreateScreen(ModalScreen[dict | None]):
         if event.select.id == "oc-config-mode":
             self.query_one("#oc-config-profile").display = event.value == "copy"
             self.query_one("#oc-config-hint").display = event.value == "copy"
-        if event.select.id == "workspace-mode":
-            self.query_one("#git-working-changes").display = event.value != "direct"
-            if event.value == "direct": self.query_one("#git-working-changes", Select).value = False
-            self.query_one("#source", Input).placeholder = (
-                "Host folder the agent works in directly (required)" if event.value == "direct"
-                else "Folder to copy (Git: committed only by default); empty = none")
+        if event.select.id == "kind" and event.value in self.WORKSPACE_OPTIONS:
+            self._sync_kind(event.value)
+        elif event.select.id == "workspace-mode":
+            self._sync_workspace()
 
-    def on_input_changed(self, event: Input.Changed) -> None:
-        # A folder to copy makes a project, as in `create --source` without --kind.
-        kind = self.query_one("#kind", Select)
-        if event.input.id == "source" and event.value.strip() and kind.value == "scratch":
-            kind.value = "project"
+    @staticmethod
+    def import_choices(kind):
+        modes = [workspaces.COPY_COMMITTED, workspaces.COPY_ENTIRE]
+        if kind == "project": modes.insert(1, workspaces.COPY_WORKING)
+        return [(workspaces.IMPORT_LABELS[value] + (" / filtered for plain folders" if value == workspaces.COPY_COMMITTED else ""),
+                 value) for value in modes]
+
+    def _sync_kind(self, kind):
+        if getattr(self, "_workspace_kind", None) != kind:
+            self._workspace_kind = kind
+            self.query_one("#workspace-mode", Select).set_options(self.workspace_choices(kind))
+            self.query_one("#import-mode", Select).set_options(self.import_choices(kind))
+            self.query_one("#source", Input).value = ""
+        self._sync_workspace()
+
+    def _sync_workspace(self):
+        setup = self.query_one("#workspace-mode", Select).value
+        field = self.query_one("#source", Input)
+        if getattr(self, "_workspace_setup", None) != setup:
+            self._workspace_setup = setup
+            field.value = ""
+            self.query_one("#import-mode", Select).value = workspaces.COPY_COMMITTED
+        field.display = setup in ("copy", "direct")
+        field.placeholder = "Host folder to mount directly (required)" if setup == "direct" else "Folder to copy (required)"
+        self.query_one("#import-mode").display = setup == "copy"
 
     def values(self) -> dict:
         """The form as `create` arguments, checked with core.creation_options (raises SandboxError)."""
         name = self.query_one("#name", Input).value.strip()
-        folder = self.query_one("#source", Input).value.strip()
-        mode = self.query_one("#workspace-mode", Select).value
+        setup = self.query_one("#workspace-mode", Select).value
         kind = self.query_one("#kind", Select).value
+        if setup not in self.WORKSPACE_OPTIONS[kind]:
+            raise c.SandboxError("Select a workspace setup for this environment kind")
+        folder = self.query_one("#source", Input).value.strip() if setup in ("copy", "direct") else ""
+        if setup == "copy" and not folder:
+            raise c.SandboxError("A workspace copy needs a source folder")
         distro = self.query_one("#distro", Select).value
-        direct = mode == "direct"
+        direct = setup == "direct"
+        mode = workspaces.DIRECT if direct else workspaces.MANAGED
         path = Path(folder).expanduser() if folder else None
-        working = self.query_one("#git-working-changes", Select).value
+        method = self.query_one("#import-mode", Select).value if setup == "copy" else None
+        working, entire = method == workspaces.COPY_WORKING, method == workspaces.COPY_ENTIRE
         c.creation_options(name, kind, None if direct else path, distro=distro, workspace_mode=mode,
-                           workspace=path if direct else None, include_working_changes=working)
+                           workspace=path if direct else None, include_working_changes=working, copy_entire_directory=entire)
         if direct:
             # The host checks without the directory scan, so a refused folder is reported here,
             # with the form still open; creation repeats all of them.
-            from . import workspaces
             workspaces.check_direct(path, scan=False)
         copying = self.query_one("#oc-config-mode", Select).value == "copy"
         config = self.query_one("#oc-config-profile", Select).value
@@ -169,10 +199,11 @@ class CreateScreen(ModalScreen[dict | None]):
             raise c.SandboxError("Copy requires a config profile; place user-maintained directories in OpenCode Configs, or use Local")
         return {"name": name, "kind": kind, "source": folder or None, "profile": self.query_one("#profile", Select).value,
                 "mode": mode, "distro": distro, "opencode_config": config if copying else None,
-                "include_working_changes": working,
+                 "include_working_changes": working, "copy_entire_directory": entire,
                 "agent_context_enabled": self.query_one("#include-agent-context", Checkbox).value}
 
     def on_mount(self):
+        self._sync_kind(self.query_one("#kind", Select).value)
         self.query_one("#oc-config-profile").display = False
         self.query_one("#oc-config-hint").display = False
 
@@ -639,7 +670,6 @@ class Dashboard(App):
     def _details(m) -> str:
         """Seven lines, the pane's height at 80x24 (not wrapped: long values end in an ellipsis; the
         full values: `status NAME`), in the CLI's wording (`status`, `config show`)."""
-        from . import workspaces
         from .config_plan import current
         try:
             cfg = current(m)
@@ -858,6 +888,7 @@ class Dashboard(App):
     def _agent_context_worker(self, m) -> None:
         from . import agent_context as ac
         try:
+            m = c.resolve(m['id'])
             note = ""
             try:
                 inputs = c.guidance_inputs(m)
@@ -870,10 +901,10 @@ class Dashboard(App):
                 on_disk = "not verified (container inspection unavailable)"
             else:
                 on_disk = "current" if ac.verify(m, c.env_dir, **inputs) else "missing/outdated"
-            publish(self, self.push_screen, ReportScreen(
+            screen = AgentContextScreen(m,
                 f"Agent Context: {m['name']}\n{note}On-disk: {on_disk}\n"
-                "Guidance is regenerated before every OpenCode launch.\n\n" + content,
-                title=f"Agent Context — {m['name']}"))
+                "Guidance is regenerated before every OpenCode launch.\n\n" + content)
+            publish(self, self.push_screen, screen, lambda changes: self._save_runtime(m, changes))
         except Exception as exc:
             publish(self, self.notify, c.error_text(exc), severity="error")
 
@@ -1184,9 +1215,18 @@ class Dashboard(App):
                 self._set_busy("Previewing local Git working changes…")
                 self._preview_git_import(values)
                 return
-            self._operation_pending = True
-            self._set_busy(f"Validating config and creating {values['name']}…")
-            self._create_environment(values)
+            if values.get("copy_entire_directory"):
+                self.push_screen(ConfirmScreen("Copy entire directory?\n\n" + workspaces.ENTIRE_WARNING),
+                                 lambda yes: self._create_managed(values) if yes else None)
+                return
+            self._create_managed(values)
+
+    def _create_managed(self, values):
+        if self._operation_pending:
+            self.notify("Another operation is running", severity="warning"); return
+        self._operation_pending = True
+        self._set_busy(f"Validating config and creating {values['name']}…")
+        self._create_environment(values)
 
     @work(thread=True, exclusive=True, group="environment-operation")
     def _preview_git_import(self, values):
@@ -1211,7 +1251,6 @@ class Dashboard(App):
 
     def _confirm_direct(self, values) -> None:
         """Consent for a direct workspace: same text as the CLI; checks first, so refusals come before it."""
-        from . import workspaces
         from .cli import DIRECT_CONSENT
         try:
             target = workspaces.check_direct(Path(values["source"]).expanduser())
@@ -1232,6 +1271,7 @@ class Dashboard(App):
         try:
             options = {"opencode_config": values.get("opencode_config"),
                        "include_working_changes": values.get("include_working_changes", False),
+                       "copy_entire_directory": values.get("copy_entire_directory", False),
                        "import_fingerprint": values.get("import_fingerprint"),
                        "agent_context_enabled": values.get("agent_context_enabled", True)}
             source = Path(values["source"]).expanduser() if values.get("source") else None
@@ -1407,7 +1447,10 @@ class RuntimeScreen(ModalScreen[dict | None]):
                 "network":self.query_one("#rt-network", Select).value,
                 "ports":ports})
             changes["profile"]=self.query_one("#rt-profile", Select).value
-            changes["agent_context_enabled"]=self.query_one("#rt-agent-context", Checkbox).value
+            from .agent_context import enabled
+            include = self.query_one("#rt-agent-context", Checkbox).value
+            if include != enabled(self.environment):
+                changes["agent_context_enabled"] = include
         except (ValueError, c.SandboxError) as exc:
             self.notify(str(exc), severity="error"); return
         self.dismiss(changes)
@@ -1439,6 +1482,45 @@ class DiskScreen(ModalScreen[bool | None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss({"disk-cleanup": False, "disk-cleanup-all": True}.get(event.button.id))
+
+
+class AgentContextScreen(ModalScreen[dict | None]):
+    CSS = """AgentContextScreen {align: center middle;}
+    #context-panel {width: 90%; height: 90%; border: round $accent; padding: 0 1; background: $surface;}
+    #context-status {height: auto;} #context-panel #report-text {height: 1fr;}
+    #context-panel Horizontal {height: auto;}"""
+    BINDINGS = [Binding("escape", "close", "Close")]
+    AUTO_FOCUS = "#context-inclusion"
+
+    def __init__(self, environment, preview):
+        super().__init__()
+        self.environment = environment
+        self.preview = preview
+
+    def compose(self):
+        from . import agent_context as ac
+        with Vertical(id="context-panel"):
+            yield Static(f"Agent Context — {self.environment['name']}", markup=False, id="report-title")
+            yield Static(ac.activation_status(self.environment) + " (saved setting)", markup=False, id="context-status")
+            yield Checkbox("Include specialized Agent Context", value=ac.enabled(self.environment),
+                           id="context-inclusion", compact=True)
+            yield TextArea(self.preview, read_only=True, id="report-text")
+            with Horizontal():
+                yield Button("Close", id="context-close", compact=True)
+                yield Button("Preview change", id="context-save", variant="primary", compact=True, disabled=True)
+
+    def action_close(self):
+        self.dismiss(None)
+
+    def on_checkbox_changed(self, event: Checkbox.Changed):
+        from . import agent_context as ac
+        self.query_one("#context-save", Button).disabled = event.value == ac.enabled(self.environment)
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "context-close":
+            self.action_close()
+        elif event.button.id == "context-save":
+            self.dismiss({"agent_context_enabled": self.query_one("#context-inclusion", Checkbox).value})
 
 
 class ReportScreen(ModalScreen[None]):

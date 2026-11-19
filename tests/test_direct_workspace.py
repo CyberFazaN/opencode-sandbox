@@ -404,7 +404,10 @@ def test_tui_direct_creation_asks_for_consent(monkeypatch, project):
         await pilot.pause()
         app.screen.query_one("#name").value = "ocs-qa-tui"
         app.screen.query_one("#kind").value = "project"
+        await settle(pilot)
         app.screen.query_one("#workspace-mode").value = "direct"
+        await settle(pilot)
+        assert not app.screen.query_one("#import-mode").display
         app.screen.query_one("#source").value = str(project)
         app.screen.query_one("#create").press()
         await settle(pilot)
@@ -434,6 +437,7 @@ def test_tui_form_reports_a_refused_folder_in_place(monkeypatch, tmp_path):
         await settle(pilot)
         app.screen.query_one("#name").value = "ocs-qa-tuihidden"
         app.screen.query_one("#workspace-mode").value = "direct"
+        await settle(pilot)
         app.screen.query_one("#source").value = str(hidden)
         app.screen.query_one("#create").press()
         await settle(pilot)

@@ -20,10 +20,12 @@ def test_working_import_preview_cancel_and_create(repo, size):
     async def t(app, pilot):
         await pilot.press("n")
         form = app.screen
-        assert form.query_one("#git-working-changes", Select).value is False
+        form.query_one("#kind", Select).value = "project"
+        await settle(pilot)
+        assert form.query_one("#import-mode", Select).value == 'committed'
         form.query_one("#name").value = "ocs-qa-working"
         form.query_one("#source").value = str(repo)
-        form.query_one("#git-working-changes", Select).value = True
+        form.query_one("#import-mode", Select).value = 'working'
         await settle(pilot)
         form.query_one("#create", Button).press()
         await settle(pilot, .5)
@@ -64,3 +66,35 @@ def test_preview_drift_and_unsupported_errors_are_visible(repo):
         assert any("in-progress Git" in n.message for n in app._notifications)
         assert not app._operation_pending
     run(t)
+
+
+def test_quick_can_opt_into_full_copy_without_showing_direct_or_working_git(tmp_path):
+    folder = tmp_path / 'folder'
+    folder.mkdir()
+    (folder / '.example').write_text('dummy')
+
+    async def t(app, pilot):
+        await pilot.press('n')
+        await settle(pilot)
+        form = app.screen
+        form.query_one('#kind', Select).value = 'quick'
+        await settle(pilot)
+        setup = form.query_one('#workspace-mode', Select)
+        assert setup.value == 'empty' and not form.query_one('#source').display
+        assert set(dict(form.workspace_choices('quick')).values()) == {'empty', 'copy'}
+        setup.value = 'copy'
+        await settle(pilot)
+        assert set(dict(form.import_choices('quick')).values()) == {'committed', 'entire'}
+        form.query_one('#name').value = 'ocs-qa-full'
+        form.query_one('#source').value = str(folder)
+        form.query_one('#import-mode', Select).value = 'entire'
+        form.query_one('#create', Button).press()
+        await settle(pilot)
+        assert 'Review the folder for credentials' in str(app.screen.query_one('Static').render())
+        assert not c.all_envs()
+        app.screen.query_one('#confirm', Button).press()
+        await settle(pilot, .5)
+        m = c.resolve('ocs-qa-full')
+        assert m['kind'] == 'quick' and m['workspace_import'] == 'entire'
+        assert (c.env_dir(m['id']) / 'workspace' / '.example').read_text() == 'dummy'
+    run(t, (80, 24))
