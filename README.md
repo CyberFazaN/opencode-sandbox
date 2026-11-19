@@ -96,13 +96,13 @@ Details: [docs/security.md](docs/security.md).
 
 | Component | Tested |
 |---|---|
-| Host, real rootless Docker | Arch Linux, kernel 7.2: the full test campaign |
-| Host, hosted CI only | Ubuntu 26.04: simulated-Docker tests, package and pipx checks on Python 3.11/3.14; rolling Arch userland tests as an unprivileged user (recorded for 6.1.0) |
-| Python | Local endpoints 3.11.18 and 3.14.8; hosted 6.1.0 checks used 3.11.17 and 3.14.9. Python 3.12/3.13 are accepted but not tested separately |
-| Docker | 29.9.2, rootless, slirp4netns |
+| Host, real rootless Docker | Arch Linux, kernel 7.3.4: the full test campaign |
+| Host, hosted CI only | Ubuntu 26.04: simulated-Docker tests, package and pipx checks on Python 3.11/3.14; rolling Arch userland tests as an unprivileged user |
+| Python | Local endpoints 3.11.18 and 3.14.10; Python 3.12/3.13 are accepted but not tested separately |
+| Docker | 29.10.0, rootless, slirp4netns |
 | pipx | 1.18.7 |
-| Typer, Textual | 0.27.3, 8.2.8 |
-| OpenCode | 2.1.4 and 2.2.0 (npm `@opencode/cli`; 2.x only) |
+| Typer, Textual | 0.29.2, 8.2.8 |
+| OpenCode | 2.1.4 and 2.2.0 in the real campaign; 2.3.2 in hosted image builds (npm `@opencode/cli`; 2.x only) |
 | Images (inside the containers) | Debian 13 (`node:24-trixie`, the default) and Arch Linux (`archlinux:base-devel`); existing Debian 12 environments from 6.0.0 keep working |
 
 The manager is meant to run on any Linux distribution that meets the
