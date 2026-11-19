@@ -53,7 +53,10 @@ host/application setup script or replacement wizard in the repository.
   fix through the same release gates, then integrate it back into `develop` so it is not lost.
 - CI validates pushes and pull requests targeting both long-lived branches. Ordinary branch
   pushes do not trigger release automation; that workflow accepts version tags only. The weekly
-  image workflow continues to use the repository's default branch and publishes no images.
+  Images workflow checks the published definitions on the default branch (`main`) and publishes
+  no images. Use **Run workflow** on `develop` or a topic branch to check unreleased definitions
+  with the same Debian and Arch matrix. A fix on `develop` reaches the schedule only after it is
+  integrated into `main` through an approved release or stable hotfix PR.
 - Agents need explicit human authorization for remote pushes, remote changes, tags and releases
   (`AGENTS.md`). Only the maintainer creates release tags. Do not bypass branch protection or use
   force pushes; the branch model itself grants no publication permission.

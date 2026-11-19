@@ -381,6 +381,7 @@ def agent_context_show(name: str):
     """Preview exact guidance for an environment (read-only)."""
     from . import agent_context as ac
     m=c.resolve(name)
+    typer.echo(ac.activation_status(m) + ' (saved setting)', err=True)
     typer.echo(ac.render(m,**_guidance_inputs(m)))
 
 @agent_context_app.command("verify")
@@ -455,9 +456,10 @@ def _distro_help():
 
 @app.command(rich_help_panel=ENVIRONMENTS)
 def create(name:str,
-           source:Path | None=typer.Option(None,"--source",help="Folder to copy: Git roots are cloned (committed only by default); other folders exclude hidden files"),
+           source:Path | None=typer.Option(None,"--source",help="Folder to copy: Git roots are cloned (committed only by default); other folders use a filtered copy by default"),
            include_working_changes:bool=typer.Option(False,"--include-working-changes",rich_help_panel=WORKSPACE_PANEL,help="Project Git import: include staged, unstaged and non-ignored untracked files; show a status preview"),
-           kind:str | None=typer.Option(None,"--kind",help="scratch (empty workspace) | project (a copy of --source) | quick (disposable). Default: project with --source or a direct workspace, otherwise scratch"),
+           copy_entire_directory:bool=typer.Option(False,"--copy-entire-directory",rich_help_panel=WORKSPACE_PANEL,help="Copy all of --source without Git, including hidden and ignored files. Review for secrets first."),
+           kind:str | None=typer.Option(None,"--kind",help="scratch (normally empty) | project (typically a folder copy or a direct mount) | quick (disposable, managed only). Default: project with --source or a direct workspace, otherwise scratch"),
            profile:str=typer.Option("default","--profile",help="Provider profile (see: providers list)"),
            distro:str | None=typer.Option(None,"--distro",rich_help_panel=IMAGE_PANEL,help="Base definitions: "+_distro_help()),
            image:str | None=typer.Option(None,"--image",rich_help_panel=IMAGE_PANEL,help="Custom image instead of a distribution (no tool or OS claims in Agent Context)"),
@@ -468,17 +470,19 @@ def create(name:str,
             agent_context:bool=typer.Option(True,"--agent-context/--no-agent-context",help="Include specialized Agent Context; the file remains available when disabled")):
     """Create an environment: an empty scratch workspace, or a copy of a folder with --source.
 
-    Without options: the default distribution, Local OpenCode config and Agent Context enabled. The original folder is never touched."""
+    Without options: the default distribution, Local OpenCode config and Agent Context enabled. Copying does not modify the original folder."""
     from .config_plan import check_profile
     check_profile(profile)  # as config apply: a mistyped name would leave the container without credentials
     kind,_=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
-                             include_working_changes=include_working_changes)
+                             include_working_changes=include_working_changes,copy_entire_directory=copy_entire_directory)
     fingerprint=None
     if include_working_changes:
         from . import git_import
         plan=git_import.preview(source)
         typer.echo(plan.describe())
         fingerprint=plan.fingerprint
+    if copy_entire_directory:
+        typer.echo(workspaces.ENTIRE_WARNING, err=True)
     consent=False
     if workspace_mode==workspaces.DIRECT and workspace is not None:
         target=workspaces.check_direct(workspace)  # explain refusals before asking
@@ -493,7 +497,8 @@ def create(name:str,
         typer.echo("Validating/copying the entire OpenCode config profile before creation…", err=True)
     m=c.create(name,kind,source,profile,distro=distro,image=image,workspace_mode=workspace_mode,
                 workspace=workspace,consent=consent,opencode_config=opencode_config,agent_context_enabled=agent_context,
-                include_working_changes=include_working_changes,import_fingerprint=fingerprint)
+                include_working_changes=include_working_changes,copy_entire_directory=copy_entire_directory,
+                import_fingerprint=fingerprint)
     msg(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Distribution: {c.distribution_description(m)}\n"
@@ -536,7 +541,8 @@ def config_show(name: str):
     """Configured settings and, when a container exists, what Docker reports for it."""
     from .config_plan import current
     m=c.resolve(name)
-    typer.echo(json.dumps({"configured": current(m), "workspace": workspaces.info(m),
+    typer.echo(json.dumps({"configured": current(m), "kind": m["kind"], "workspace": workspaces.info(m),
+                           "workspace_origin": workspaces.origin(m), "workspace_import": m.get("workspace_import"),
                            "container": c.observed_runtime(m)}, indent=2))
 
 @config_app.command("plan")
@@ -610,11 +616,12 @@ def stop(name:str):
 @app.command(rich_help_panel=ENVIRONMENTS)
 def status(name:str):
     """Metadata, container state, network and the last readiness result."""
+    from . import agent_context as ac
     m=c.resolve(name); msg(m)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Provider profile: {m.get('profile')}\nContainer: {c.cname(m)}\n"
                f"Image: {c.env_image(m)}\n"
-               f"Agent Context: {'enabled' if m.get('agent_context_enabled', True) is True else 'disabled'}; "
+               f"Agent Context: {'enabled' if ac.enabled(m) else 'disabled'}; "
                f"initial OpenCode config: {m.get('opencode_config_source') or 'Local'}")
     c.ensure_runtime(False)
     typer.echo("Running: "+str(c.running(m)))
@@ -660,7 +667,7 @@ def repair(name:str | None=typer.Argument(None), cleanup:bool=typer.Option(False
 def changes_show(name:str):
     """Commits, changed files and working tree status since the import (read-only)."""
     m=c.resolve(name)
-    if not workspaces.is_direct(m) and wio.is_git_workspace(workspaces.managed_path(m)):
+    if not workspaces.is_direct(m) and m.get("base_commit") and wio.is_git_workspace(workspaces.managed_path(m)):
         c.require_program("git")  # the preview elsewhere tolerates it; here it is the whole command
     typer.echo(c.printable(c.git_changes(m)))
 
@@ -846,11 +853,15 @@ def delete(name:str,export_first:bool=typer.Option(False,"--export-first",help="
     if note: typer.echo(note)
 
 @app.command(rich_help_panel=SESSIONS)
-def quick(source:Path | None=typer.Option(None,"--source",help="Folder to copy into the disposable workspace"),shell:bool=typer.Option(False,"--shell",help="Open a root shell instead of OpenCode")):
+def quick(source:Path | None=typer.Option(None,"--source",help="Folder to copy into the disposable workspace (Git committed only or filtered plain directory by default)"),
+          copy_entire_directory:bool=typer.Option(False,"--copy-entire-directory",help="Copy all of --source without Git, including hidden and ignored files. Review for secrets first."),
+          shell:bool=typer.Option(False,"--shell",help="Open a root shell instead of OpenCode")):
     """Disposable session; afterwards export, promote, delete or keep it."""
     if not c._tty():  # before create: every scripted call left a preserved quick environment
         raise c.SandboxError("quick needs an interactive terminal; for scripts use create + exec")
-    m=c.create("quick-"+__import__("secrets").token_hex(3), "quick",source)
+    if copy_entire_directory:
+        typer.echo(workspaces.ENTIRE_WARNING, err=True)
+    m=c.create("quick-"+__import__("secrets").token_hex(3), "quick",source,copy_entire_directory=copy_entire_directory)
     try:
         c.interactive(m,shell=shell)
         typer.echo("Session ended. Environment remains until you choose an action.")

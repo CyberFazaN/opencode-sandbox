@@ -16,6 +16,12 @@ from pathlib import Path
 from . import core as c
 
 MANAGED, DIRECT = "managed", "direct"
+COPY_COMMITTED, COPY_WORKING, COPY_ENTIRE, COPY_FILTERED = "committed", "working", "entire", "filtered"
+IMPORT_LABELS = {COPY_COMMITTED: "Git — committed only", COPY_WORKING: "Git — include working changes",
+                 COPY_ENTIRE: "Copy entire directory", COPY_FILTERED: "filtered directory copy"}
+ENTIRE_WARNING = ("This copies hidden, ignored and untracked files, including .git if present. "
+                  "The agent and workspace exports/backups can read copied files. Review the folder for credentials "
+                  "and private configuration before importing.")
 LABEL = "Not recommended — direct access to host files"
 # Equal to or inside one of these: system trees are never a project directory.
 SYSTEM_TREES = tuple(Path(p) for p in ("/bin", "/boot", "/dev", "/etc", "/lib", "/lib32", "/lib64", "/opt", "/proc",
@@ -67,12 +73,29 @@ def refuse_output_inside(destination, what: str) -> None:
                                  f"{other['name']}, where the agent can change it. Choose a directory outside "
                                  "every workspace")
 
+def origin(m: dict) -> str:
+    """Initial contents, independent of kind and of later workspace edits."""
+    if is_direct(m): return DIRECT
+    if m.get("source"): return "copy"
+    if m.get("restored_from"): return "restore"
+    return "empty"
+
+
+def import_label(m: dict) -> str | None:
+    method = m.get("workspace_import")
+    return IMPORT_LABELS.get(method) if isinstance(method, str) else None
+
+
 def describe(m: dict) -> str:
     """One line for the CLI and the dashboard."""
-    w = info(m)
-    if w["mode"] == DIRECT:
-        return f"DIRECT host folder {w['path']} ({LABEL})"
-    return f"managed copy of {m['source']} (the original is not mounted)" if m.get("source") else "managed, started empty"
+    setup = origin(m)
+    if setup == DIRECT:
+        return f"DIRECT host folder {info(m)['path']} ({LABEL})"
+    if setup == "copy":
+        method = import_label(m)
+        return f"managed copy of {m['source']} ({method+'; ' if method else ''}the original is not mounted)"
+    if setup == "restore": return "managed, restored from backup (no direct host folder)"
+    return "managed, started empty"
 
 
 def _inside(p: Path, root: Path) -> bool:

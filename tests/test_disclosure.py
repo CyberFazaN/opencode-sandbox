@@ -5,7 +5,8 @@ from opencode_sandbox import agent_context as a
 from opencode_sandbox import tui, workspaces
 from opencode_sandbox.cli import DIRECT_CONSENT
 
-M = {"id": "0123456789abcdef", "name": "demo", "kind": "scratch", "source": None, "distro": "debian"}
+M = {"id": "0123456789abcdef", "name": "demo", "kind": "scratch", "source": None, "distro": "debian",
+     "workspace": {"mode": "managed", "path": None}}
 R = {"network": "bridge", "cpus": "2.0", "memory": "4g", "pids": 100, "ports": []}
 
 

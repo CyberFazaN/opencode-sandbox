@@ -168,6 +168,12 @@ only the new environment. Preserve regular-file modes and symlink text, not owne
 Unsupported states and bounded-transfer limits are listed in [workspaces](../workspaces.md#git-import-modes).
 This is a one-shot copy, not repository management or an atomic host snapshot.
 
+Explicit full directory import (`directory_import`) does not use Git. It pins source entries with
+Linux directory-relative descriptors, copies symlinks without following them, and rejects nested
+mounts and special files. Initial copy method is recorded separately from the managed/direct mount
+record and the environment kind. Existing imports with no recorded method are described generically;
+restores use managed storage, not the original host source.
+
 Host Git uses a private manager-written `GIT_DIR` with only storage-format settings, snapshot HEAD/
 index and data links to objects/refs. Workspace config/hooks/drivers/includes never execute.
 Refuse gitlinks, unsupported split indexes and unsafe `.git` structures/links/alternates/grafts;

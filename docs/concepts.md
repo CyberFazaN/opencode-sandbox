@@ -3,8 +3,8 @@
 ## Terms
 
 - **Environment**: one named sandbox: a container `ocs-<id>`, its `/workspace`, its home volume
-  and its settings. Kinds: **scratch** (an empty workspace), **project** (a copy of a folder)
-  and **quick** (a disposable session, see `quick`).
+  and its settings. Kinds: **scratch** (normally starts empty), **project** (usually a copy or
+  direct mount of a folder) and **quick** (a disposable session with a managed workspace; see `quick`).
 - **Workspace** (`/workspace`): **managed** (the default): kept in the manager's data directory,
   empty or a copy of a folder, never your original; or **direct** (not recommended): your
   existing folder itself. See [workspaces.md](workspaces.md).

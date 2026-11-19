@@ -353,9 +353,9 @@ def test_agent_context_preview(monkeypatch, observed, size, fake_runtime):
     async def t(app, pilot):
         await pilot.press("a")
         await settle(pilot)
-        assert isinstance(app.screen, tui.ReportScreen)
+        assert isinstance(app.screen, tui.AgentContextScreen)
         assert str(app.screen.query_one("#report-title").render()) == "Agent Context — ocs-qa-acprev"
-        report = app.screen.report
+        report = app.screen.query_one(TextArea).text
         assert "Agent Context: ocs-qa-acprev" in report and "## Network and resources" in report
         assert "Networking mode: bridge" in report
         if observed == "unreachable":
@@ -367,6 +367,64 @@ def test_agent_context_preview(monkeypatch, observed, size, fake_runtime):
         await pilot.press("escape")
         assert stack(app) == ["Screen"]
     run(t, size)
+
+
+def test_agent_context_activation_is_shared_with_settings(monkeypatch):
+    from opencode_sandbox import config_plan as cp
+
+    m = c.create("ocs-qa-context-setting", agent_context_enabled=False)
+
+    async def t(app, pilot):
+        await pilot.press("a")
+        await settle(pilot)
+        assert "disabled" in str(app.screen.query_one("#context-status").render())
+        assert "started empty" in app.screen.query_one(TextArea).text
+        assert app.screen.query_one("#context-inclusion").value is False
+        await pilot.press("space")
+        await settle(pilot)
+        app.screen.query_one("#context-save", Button).press()
+        await settle(pilot)
+        assert stack(app)[-1] == "ConfirmScreen"
+        await pilot.press("escape")
+        assert c.resolve(m['id'])['agent_context_enabled'] is False
+
+        await pilot.press("a")
+        await settle(pilot)
+        await pilot.press("space")
+        await settle(pilot)
+        app.screen.query_one("#context-save", Button).press()
+        await settle(pilot)
+        app.screen.query_one("#confirm", Button).press()
+        await settle(pilot, .5)
+        assert c.resolve(m['id'])['agent_context_enabled'] is True
+        await pilot.press("t")
+        await settle(pilot)
+        box = app.screen.query_one("#rt-agent-context")
+        assert box.value is True
+        box.value = False
+        app.screen.query_one("#rt-save", Button).press()
+        await settle(pilot)
+        app.screen.query_one("#confirm", Button).press()
+        await settle(pilot, .5)
+        await pilot.press("a")
+        await settle(pilot)
+        assert "disabled" in str(app.screen.query_one("#context-status").render())
+        assert app.screen.query_one("#context-inclusion").value is False
+
+        def fail(*args, **kwargs):
+            raise c.SandboxError('test apply failure')
+        monkeypatch.setattr(cp, 'apply', fail)
+        await pilot.press('space')
+        await settle(pilot)
+        app.screen.query_one("#context-save", Button).press()
+        await settle(pilot)
+        app.screen.query_one("#confirm", Button).press()
+        await settle(pilot, .5)
+        assert any('test apply failure' in n.message for n in app._notifications)
+        await pilot.press('t')
+        await settle(pilot)
+        assert app.screen.query_one("#rt-agent-context").value is False
+    run(t, (80, 24))
 
 
 def test_agent_context_preview_does_not_mark_unobserved_guidance_outdated(monkeypatch):
@@ -385,7 +443,7 @@ def test_agent_context_preview_does_not_mark_unobserved_guidance_outdated(monkey
     async def t(app, pilot):
         await pilot.press("a")
         await settle(pilot)
-        report = app.screen.report
+        report = app.screen.query_one(TextArea).text
         assert "On-disk: not verified" in report
         assert "missing/outdated" not in report
         assert "Docker is not reachable [test]" in report and "configured settings" in report
@@ -410,7 +468,7 @@ def test_agent_context_preview_compares_observed_guidance_without_writing(monkey
     async def t(app, pilot):
         await pilot.press("a")
         await settle(pilot)
-        report = app.screen.report
+        report = app.screen.query_one(TextArea).text
         assert f"On-disk: {'current' if current else 'missing/outdated'}" in report
         assert "Networking mode: none" in report and "Operating system (Debian 12)" in report
         assert "inspection unavailable" not in report
@@ -516,8 +574,9 @@ def test_create_form_discloses_options_progressively(size):
         await pilot.press("n")
         await settle(pilot)
         assert stack(app)[-1] == "CreateScreen" and app.focused.id == "name"
-        for sel in ("#name", "#kind", "#source", "#more", "#create", "#cancel"):
+        for sel in ("#name", "#kind", "#workspace-mode", "#more", "#create", "#cancel"):
             assert _visible(app, sel, size), sel
+        assert not app.screen.query_one("#source").display and not app.screen.query_one("#import-mode").display
         assert app.screen.query_one("#more").collapsed and not _visible(app, "#distro", size)
         app.screen.query_one("#more").collapsed = False
         await settle(pilot)
@@ -540,15 +599,18 @@ def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
         await settle(pilot)
         form = app.screen
         form.query_one("#name").value = "ocs-qa-form"
+        form.query_one("#kind").value = "project"
+        await settle(pilot)
+        assert form.query_one("#source").display and form.query_one("#import-mode").display
         form.query_one("#source").value = str(folder)
-        await settle(pilot)
-        assert form.query_one("#kind").value == "project"  # a folder to copy makes a project, as in the CLI
         form.query_one("#kind").value = "scratch"
-        form.query_one("#create").press()
         await settle(pilot)
-        assert stack(app)[-1] == "CreateScreen" and "starts empty" in str(form.query_one("#create-error").render())
+        assert form.values()["kind"] == "scratch" and form.values()["source"] is None
+        assert not form.query_one("#source").display and not form.query_one("#import-mode").display
         form.query_one("#name").value = "bad name!"
         form.query_one("#kind").value = "project"
+        await settle(pilot)
+        form.query_one("#source").value = str(folder)
         form.query_one("#create").press()
         await settle(pilot)
         assert stack(app)[-1] == "CreateScreen" and "name" in str(form.query_one("#create-error").render()).lower()

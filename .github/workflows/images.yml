@@ -4,6 +4,8 @@
 name: Images
 
 on:
+  # GitHub schedules run the default branch (main). To check unreleased definitions,
+  # dispatch this same matrix on develop or a topic branch.
   schedule:
     - cron: "17 4 * * 1"
   workflow_dispatch:
@@ -36,5 +38,7 @@ jobs:
         env:
           DISTRO: ${{ matrix.distro }}
         run: |
+          git log -1 --format='Image definitions: %H'
+          docker version --format 'Docker server: {{.Server.Version}}'
           python -m pip install .
           python .github/scripts/build_image.py "$DISTRO"

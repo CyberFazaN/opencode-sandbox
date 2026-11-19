@@ -43,8 +43,10 @@ opencode-sandbox create webapp --source ~/code/webapp --profile work
 
 For in-progress Git work, add `--include-working-changes`: preview and import staged/unstaged
 changes and non-ignored untracked files, preserving the source. The dashboard offers the same
-**Git import** choice in New. Ignored untracked files stay out; non-ignored secrets do not.
-See [Git import modes and limits](workspaces.md#git-import-modes).
+import choice in New. Ignored untracked files stay out; non-ignored secrets do not.
+See [Git import modes and limits](workspaces.md#git-import-modes). To copy hidden and ignored
+files too, use `--copy-entire-directory` (or **Copy entire directory** in New); review the folder
+for secrets first. See [full directory copy](workspaces.md#copy-entire-directory).
 
 `create` prints its choices and the next command. OpenCode config defaults to **Local** (no
 initial import); `--opencode-config PROFILE` copies a user-maintained directory once. Specialized

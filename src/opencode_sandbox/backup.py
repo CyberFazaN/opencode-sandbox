@@ -520,7 +520,7 @@ def _restore_stages(m, root, manifest, restore_system):
     if workspace.exists(): workspace.rmdir()
     os.replace(stage,workspace)
     m.update(kind=manifest['environment'].get('kind','scratch'),source=None,
-             base_commit=manifest['environment'].get('base_commit'))
+             base_commit=manifest['environment'].get('base_commit') if 'workspace.tar.gz' in manifest['files'] else None)
     c.mark(m,'ready',operation=None,restore_stage=None,last_error=None)
     return m
 

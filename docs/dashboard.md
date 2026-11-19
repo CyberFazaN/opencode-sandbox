@@ -48,10 +48,10 @@ Metadata-only refresh does not recheck or clear these advisories.
 |---|---|---|---|
 | `Enter` / `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
 | `F5` / `F6` | Start / Stop | `x` | Delete (confirmation) |
-| `n` | New environment (`create`; distribution, workspace mode, provider, Local/Copy config and Agent Context under "More options") | `c` | Create a project from the current folder (the confirmation shows what is copied) |
+| `n` | New environment (`create`; choose kind and workspace first, distribution and config under "More options") | `c` | Create a project from the current folder using the default import (the confirmation shows what is copied) |
 | `/` | Filter | `r` | Refresh |
 | `t` | Settings (`config apply`; shows the change plan first) | `u` | Usage (`container usage`) |
-| `i` | Check (`check NAME`; the details pane shows the last result) | `a` | Agent Context preview |
+| `i` | Check (`check NAME`; the details pane shows the last result) | `a` | Agent Context preview and activation |
 | `d` | Changes (`changes show`, `bundle`, `stage`, `branch-diff`) | `e` / `b` | Export changes (`changes export`) / Backup (`backup create`, stopped environment) |
 | `R` | Repair | `k` | Promote a quick session to a scratch environment (`promote`) |
 | `B` | Backups (`backup list`, `backup restore`) | `v` | Updates (local/cached inventory; explicit version Check) |
@@ -72,8 +72,10 @@ terminal receives an OSC 52 request: the notification says acceptance is unverif
 terminals and multiplexers can reject it. Without a usable system clipboard, the application
 retains its local copy buffer and reports the limitation; use your terminal's manual copy action.
 
-The read-only Agent Context preview is titled **Agent Context — NAME**. If container inspection
-fails, it shows the reason and previews the configured settings with unknown base OS provenance.
+**Agent Context — NAME** shows the saved automatic-inclusion status and a read-only preview,
+even when inclusion is disabled. **Include specialized Agent Context** changes the same setting
+as Environment Settings (`t`); **Preview change** opens the standard configuration plan.
+If container inspection fails, the preview uses configured settings with unknown base OS provenance.
 In that fallback, saved guidance is **not verified**, not assumed outdated. Opening the preview
 does not rewrite the saved file or start the environment; guidance is regenerated before every
 OpenCode launch. Agent Context, Updates Details, readiness and cleanup-result reports are scrollable;

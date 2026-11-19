@@ -13,12 +13,18 @@ opencode-sandbox create webapp --source ~/code/webapp --profile work
 opencode-sandbox create tools --distro arch
 ```
 
+The kind and workspace setup are separate. Scratch defaults to empty; an explicitly selected
+direct folder is also supported. Project normally starts from a copy or a direct folder, but
+can start empty. Quick is disposable and uses an empty workspace or a copy, never a direct
+folder. In the dashboard's **New** form, choose the kind and workspace setup first. A folder
+field appears for a copy or direct mount, and import choices appear only for a copy.
+
 ### A copy of a folder (`--source`)
 
-With `--source DIR` the kind is `project`:
+With `--source DIR` the kind defaults to `project`. Without an explicit import flag:
 
 - A Git repository root is **cloned**: committed only by default; optionally include working
-  changes as described below. A subdirectory of a repository is refused (import the root).
+  changes as described below. A subdirectory of a repository is refused in this mode.
 - Any other directory is **copied** without hidden files, symlinks, special files and
   `node_modules`, `target`, `dist`, `build` and `__pycache__`. Everything else becomes readable
   by the agent.
@@ -43,7 +49,7 @@ opencode-sandbox create webapp-wip --source ~/code/webapp \
   --include-working-changes
 ```
 
-Dashboard: **New → Folder to copy → Git import: Include working changes → Create**, then review
+Dashboard: **New → Project → Copy a folder → Git — include working changes → Create**, then review
 the preview and choose **Import** (or Cancel). The CLI flag explicitly opts in and prints the same
 preview before creation: changed-path counts, staged/unstaged/untracked counts and up to 12 status
 entries (`index / working tree`). No file contents or patch bodies appear in the preview.
@@ -83,10 +89,31 @@ entries (`index / working tree`). No file contents or patch bodies appear in the
 
 This option does not apply to plain-folder copies, direct workspaces or Quick sessions.
 
+### Copy entire directory
+
+```sh
+opencode-sandbox create imported --source ~/code/webapp --copy-entire-directory
+```
+
+In the dashboard choose **Copy entire directory** when copying a folder into a Project or Quick
+environment, and confirm the warning. On the CLI the flag is the opt-in; it cannot be combined
+with `--include-working-changes`. No Git commands or Git filters are used. A plain directory,
+Git root or subdirectory is copied literally, including `.git` if present, hidden, ignored and
+untracked files, and empty directories. No Git base commit is recorded for change bundles.
+
+**Review the source for credentials and private configuration before copying.** The agent can
+read the copy, and exports and backups may contain copied secrets. Symlinks are copied as links
+without following their targets; external links can break or resolve differently in the sandbox.
+Ordinary permission bits and timestamps are retained; ownership, ACLs, extended attributes,
+special mode bits and hardlink relationships are not. Unreadable entries, sockets, FIFOs, devices
+and nested mounts fail the import instead of being silently skipped. The manager refuses broad
+or sensitive roots such as the home directory, system trees, hidden paths and paths overlapping
+manager data or configuration. Keep the source idle during the copy; it is not an atomic snapshot.
+
 ### Quick sessions
 
 ```sh
-opencode-sandbox quick [--source DIR] [--shell]
+opencode-sandbox quick [--source DIR [--copy-entire-directory]] [--shell]
 ```
 
 A disposable session. When it ends, choose: export the changes and delete, promote to a scratch

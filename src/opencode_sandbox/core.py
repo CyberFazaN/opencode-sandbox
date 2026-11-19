@@ -18,7 +18,7 @@ import tempfile
 import termios
 import threading
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
@@ -568,7 +568,7 @@ def _copy_untrusted(source, workspace):
 KINDS = ("scratch", "project", "quick")
 
 def creation_options(name, kind=None, source=None, *, distro=None, image=None, workspace_mode="managed", workspace=None,
-                     include_working_changes=False):
+                     include_working_changes=False, copy_entire_directory=False):
     """The checks of `create` that need neither the file system nor Docker, shared by the CLI and
     the dashboard form. Returns (kind, distro id or None): without a kind, a copied source or
     a direct workspace makes a project, nothing an empty scratch environment."""
@@ -579,6 +579,11 @@ def creation_options(name, kind=None, source=None, *, distro=None, image=None, w
     if kind not in KINDS: raise SandboxError("Kind must be scratch, project or quick")
     if workspace_mode not in (workspaces.MANAGED, workspaces.DIRECT): raise SandboxError("Workspace mode must be managed or direct")
     if not isinstance(include_working_changes, bool): raise SandboxError("Include working changes must be true or false")
+    if not isinstance(copy_entire_directory, bool): raise SandboxError("Copy entire directory must be true or false")
+    if copy_entire_directory and include_working_changes:
+        raise SandboxError("Choose either Copy entire directory or Include working changes, not both")
+    if copy_entire_directory and (source is None or workspace_mode != workspaces.MANAGED or kind == "scratch"):
+        raise SandboxError("Copy entire directory requires --source for a managed Project or Quick workspace")
     if include_working_changes and (source is None or workspace_mode != workspaces.MANAGED or kind != "project"):
         raise SandboxError("Include working changes requires a managed Project Environment whose source folder (--source) is a local Git repository root")
     if workspace_mode == workspaces.MANAGED:
@@ -601,12 +606,14 @@ def creation_options(name, kind=None, source=None, *, distro=None, image=None, w
 
 def create(name, kind=None, source=None, profile="default", *, distro=None, image=None,
            workspace_mode="managed", workspace=None, consent=False, agent_context_enabled=True,
-           opencode_config=None, journal=None, include_working_changes=False, import_fingerprint=None):
+           opencode_config=None, journal=None, include_working_changes=False, copy_entire_directory=False,
+           import_fingerprint=None):
     from . import opencode_configs as oc
     options = {"distro":distro, "image":image, "workspace_mode":workspace_mode, "workspace":workspace,
                "consent":consent, "agent_context_enabled":agent_context_enabled,
                "opencode_config":opencode_config, "journal":journal,
-               "include_working_changes":include_working_changes, "import_fingerprint":import_fingerprint}
+               "include_working_changes":include_working_changes, "copy_entire_directory":copy_entire_directory,
+               "import_fingerprint":import_fingerprint}
     if opencode_config is not None:
         bounds = oc.limits()
         with oc.prepared_profile(opencode_config, bounds) as archive:
@@ -618,7 +625,7 @@ def create(name, kind=None, source=None, profile="default", *, distro=None, imag
 def _create(name, kind=None, source=None, profile="default", *, distro=None, image=None,
             workspace_mode="managed", workspace=None, consent=False, agent_context_enabled=True,
             opencode_config=None, journal=None, _config_archive=None, include_working_changes=False,
-            import_fingerprint=None):
+            copy_entire_directory=False, import_fingerprint=None):
     """`distro` selects a registry image (default distribution); `image` a custom image instead.
     `kind` None: see creation_options.
 
@@ -633,23 +640,33 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
     if not isinstance(agent_context_enabled, bool): raise SandboxError("Agent Context setting must be true or false")
     profile_read(profile)
     kind,distro=creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
-                                include_working_changes=include_working_changes)
+                                include_working_changes=include_working_changes, copy_entire_directory=copy_entire_directory)
+    import_method=None
     if source is not None:
         try: source=Path(source).expanduser().resolve(strict=True)
-        except OSError as exc: raise SandboxError(f"Source not accessible: {source} ({exc.strerror})") from None
+        except (OSError, RuntimeError) as exc: raise SandboxError(f"Source not accessible: {source} ({exc})") from None
         if not source.is_dir(): raise SandboxError("Source must be a directory")
         home=Path.home().resolve()
         if source==Path(source.anchor) or source==home or source in home.parents:
             # Would copy every non-hidden personal file into the agent's workspace.
             raise SandboxError(f"Refusing to import {source}: choose a project directory, not the home directory or a parent of it")
-        if not (source/".git").exists():
+        if copy_entire_directory:
+            from . import directory_import
+            directory_import.check_source(source)
+            import_method=workspaces.COPY_ENTIRE
+        elif not (source/".git").exists():
             if include_working_changes:
                 raise SandboxError("Include working changes requires a local Git repository root; import the repository root instead")
             top=call(["git","-C",source,"rev-parse","--show-toplevel"],capture=True,check=False)
             if top.returncode==0:
                 raise SandboxError(f"Source is inside Git repository {top.stdout.strip()}; import the repository root instead")
-        elif not include_working_changes and call(["git","-C",source,"rev-parse","--verify","--quiet","HEAD^{commit}"],capture=True,check=False).returncode:
-            raise SandboxError("Source Git repository has no commits; commit once (only committed files are imported)")
+            import_method=workspaces.COPY_FILTERED
+        elif include_working_changes:
+            import_method=workspaces.COPY_WORKING
+        else:
+            if call(["git","-C",source,"rev-parse","--verify","--quiet","HEAD^{commit}"],capture=True,check=False).returncode:
+                raise SandboxError("Source Git repository has no commits; commit once (only committed files are imported)")
+            import_method=workspaces.COPY_COMMITTED
     init_dirs()
     direct=None
     if workspace_mode==workspaces.DIRECT:
@@ -674,10 +691,12 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
             if direct is not None:
                 pass  # the host directory is used as it is
             elif source:
-                if include_working_changes:
+                if import_method == workspaces.COPY_ENTIRE:
+                    directory_import.copy(source,workspace)
+                elif import_method == workspaces.COPY_WORKING:
                     from . import git_import
                     origin=git_import.clone(source,workspace,expected=import_fingerprint)
-                elif (source/".git").exists() or call(["git","-C",source,"rev-parse","--show-toplevel"],capture=True,check=False).returncode==0:
+                elif import_method == workspaces.COPY_COMMITTED:
                     # Local clone deliberately excludes uncommitted/ignored changes.
                     call(["git","clone","--no-hardlinks","--",str(source),str(workspace)],capture=True)
                     origin=call(["git","-C",workspace,"rev-parse","HEAD"],capture=True).stdout.strip()
@@ -696,6 +715,7 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
             m={"id":eid,"name":name,"kind":kind,"source":str(source) if source else None,"base_commit":origin,"profile":profile,"created":now(),"status":"ready","schema":METADATA_SCHEMA,"runtime":validate_runtime_settings({}),
                "distro":distro,"workspace":{"mode":workspace_mode,"path":str(direct) if direct else None},
                "agent_context_enabled":agent_context_enabled,"opencode_config_source":opencode_config}
+            if import_method is not None: m["workspace_import"]=import_method
             if image is not None: m["image"]=m["custom_image"]=image  # custom_image never changes
             if journal:
                 m.update(journal,runtime=validate_runtime_settings(journal.get("runtime",{})))
@@ -717,6 +737,9 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
             if getattr(exc, "preserve_environment", False):
                 mark(m, "error", operation="opencode-config", last_error=str(exc))
                 raise
+            if import_method == workspaces.COPY_ENTIRE:
+                with suppress(OSError):
+                    directory_import.prepare_cleanup(workspace)
             shutil.rmtree(d,ignore_errors=True); raise
 
 def cname(m): return "ocs-"+m["id"]
@@ -1435,9 +1458,9 @@ def git_changes(m):
     from . import workspaces
     if workspaces.is_direct(m): return DIRECT_CHANGES
     w=workspaces.managed_path(m)
-    if not wio.is_git_workspace(w): return "Not a Git repository; 'changes export' archives the whole workspace."
     base=m.get("base_commit")
-    if not base: return "No base commit recorded"
+    if not wio.is_git_workspace(w): return "Not a Git repository; 'changes export' archives the workspace files."
+    if not base: return "No base commit recorded; 'changes export' archives the workspace files rather than a Git diff."
     try:
         diff=wio.git(w,"diff","--no-ext-diff","--no-textconv","--stat",base,"--",check=False)
         commits=wio.git(w,"log","--oneline",f"{base}..HEAD","--",check=False)
