@@ -18,8 +18,11 @@ RUN sh /tmp/install-opencode.sh "${OPENCODE_VERSION:?build with --build-arg OPEN
  && rm /tmp/install-opencode.sh
 # Neutral system config; the manager reconciles per-environment Agent Context activation.
 COPY common/opencode-system.json /etc/opencode/opencode.json
-COPY --chmod=0755 common/ocs_opencode.py /usr/local/bin/ocs-opencode
+COPY common/ocs_opencode.py /tmp/ocs_opencode.py
 COPY common/ocs-shell-hint.sh /usr/local/lib/ocs-shell-hint.sh
-RUN printf '\n. /usr/local/lib/ocs-shell-hint.sh\n' >> /etc/bash.bashrc
+# Set the executable mode inside the image, independent of the build context's mode or ACLs.
+RUN install -m 0755 /tmp/ocs_opencode.py /usr/local/bin/ocs-opencode \
+ && rm /tmp/ocs_opencode.py \
+ && printf '\n. /usr/local/lib/ocs-shell-hint.sh\n' >> /etc/bash.bashrc
 WORKDIR /workspace
 CMD ["sleep", "infinity"]

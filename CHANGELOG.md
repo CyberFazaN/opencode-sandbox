@@ -6,6 +6,13 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+### Fixed
+
+- Debian and Arch base builds explicitly install the executable `ocs-opencode` launcher, so
+  packaging or build-context permissions cannot make it fail verification. Arch also builds a
+  pinned paru 2.2.1 compatible with the rolling distribution's OpenSSL 4. Base image revisions
+  are now Debian 5 and Arch 4; existing environments are not rebuilt automatically.
+
 ## 6.3.0 — 2026-11-05
 
 Configuration and working-state import release (Beta). Python 3.11 or newer; environment and
