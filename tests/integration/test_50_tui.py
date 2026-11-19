@@ -13,7 +13,7 @@ import pytest
 from campaign import MANAGER
 
 pyte = pytest.importorskip("pyte")
-from pty_term import DOWN, ENTER, ESC, F5, F6, STAB, TAB, UP, Term
+from pty_term import DOWN, ENTER, ESC, F5, F6, TAB, UP, Term
 
 PLAIN, DIRECT, RESTORED = "ocs-test-tui-git", "ocs-test-tui-direct", "ocs-test-tui-rest"
 
@@ -62,16 +62,16 @@ def test_dashboard_against_real_docker(campaign, checks):
         ck(t.wait_for(PLAIN, 30), "H01 dashboard lists the environment")
         # H03 direct workspace from the form, with the consent dialog
         t.send("n", 1)
+        assert ck(t.wait_for(r"New environment", 10), "H03 n opens the creation form")
         t.send(DIRECT, 0.3)
-        t.send(TAB + TAB, 0.3)
-        t.send(str(folder), 0.3)
-        t.send(TAB * 2 + ENTER, 1)             # Git import, then expand "More options"
-        t.send(TAB + TAB + ENTER, 1)           # workspace mode list
+        t.send(TAB * 2 + ENTER, 1)             # kind, then workspace (before More options)
         t.send(DOWN + ENTER, 1)                # direct
         t.snap("form with a direct workspace")
         assert ck("direct host folder" in t.text(), "H03 direct workspace chosen in the form")
-        t.send(STAB * 6, 0.5)
-        t.send(ENTER, 2)
+        assert ck(t.wait_for(r"Host folder to mount directly", 10), "H03 the direct workspace requires a folder")
+        t.send(TAB, 0.3)
+        t.send(str(folder), 0.3)
+        t.send(TAB * 3 + ENTER, 2)             # collapsed More options, Cancel, Create
         t.snap("consent dialog")
         assert ck(t.wait_for(r"Not recommended", 10), "H03 consent dialog names the risk")
         confirm(t, 3)
