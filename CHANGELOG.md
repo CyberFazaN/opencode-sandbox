@@ -17,6 +17,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   Workspace descriptions distinguish empty, copied, restored, and direct workspaces.
 - The Agent Context screen shows the saved automatic-inclusion status and edits the same setting
   as Environment Settings. The preview stays available when automatic inclusion is off.
+- Debian and Arch base builds explicitly install the executable `ocs-opencode` launcher, so
+  packaging or build-context permissions cannot make it fail verification. Arch also builds a
+  pinned paru 2.2.1 compatible with the rolling distribution's OpenSSL 4. Base image revisions
+  are now Debian 5 and Arch 4; existing environments are not rebuilt automatically.
 
 ## 6.3.0 — 2026-11-05
 

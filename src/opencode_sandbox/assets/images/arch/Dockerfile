@@ -20,7 +20,8 @@ ENV NPM_CONFIG_PREFIX=/usr/local
 
 # AUR helper (D-006), built as the unprivileged user; the Rust toolchain stays in this stage.
 FROM base AS paru
-ARG PARU_AUR_COMMIT=329be2113c590046cb29858c23d9b96a8d7bd586
+# Paru 2.2.1 locks an openssl-sys that supports Arch's OpenSSL 4.
+ARG PARU_AUR_COMMIT=f8bb12fcd306aef6a6a8f8790d63e729a76849c9
 COPY arch/pacman-retry /tmp/pacman-retry
 RUN sh /tmp/pacman-retry -S --noconfirm --needed rust
 USER aurbuild
@@ -34,8 +35,10 @@ RUN --mount=type=bind,from=paru,source=/var/lib/aurbuild/paru,target=/tmp/paru \
     pacman -U --noconfirm /tmp/paru/paru-*.pkg.tar.zst && rm -rf /var/cache/pacman/pkg/*
 # makepkg refuses root and no-new-privileges blocks sudo: ocs-aur (run as root) runs paru as
 # aurbuild and performs its pacman calls as root.
-COPY --chmod=0755 arch/ocs-aur /usr/local/bin/ocs-aur
-RUN mkdir -p /usr/local/lib/ocs-aur && ln -s /usr/local/bin/ocs-aur /usr/local/lib/ocs-aur/sudo
+COPY arch/ocs-aur /tmp/ocs-aur
+RUN install -m 0755 /tmp/ocs-aur /usr/local/bin/ocs-aur \
+ && rm /tmp/ocs-aur \
+ && mkdir -p /usr/local/lib/ocs-aur && ln -s /usr/local/bin/ocs-aur /usr/local/lib/ocs-aur/sudo
 # OpenCode V2 (D-007); the manager always passes a concrete version.
 ARG OPENCODE_VERSION
 COPY common/install-opencode.sh /tmp/install-opencode.sh
@@ -43,8 +46,11 @@ RUN sh /tmp/install-opencode.sh "${OPENCODE_VERSION:?build with --build-arg OPEN
  && rm /tmp/install-opencode.sh
 # Neutral system config; the manager reconciles per-environment Agent Context activation.
 COPY common/opencode-system.json /etc/opencode/opencode.json
-COPY --chmod=0755 common/ocs_opencode.py /usr/local/bin/ocs-opencode
+COPY common/ocs_opencode.py /tmp/ocs_opencode.py
 COPY common/ocs-shell-hint.sh /usr/local/lib/ocs-shell-hint.sh
-RUN printf '\n. /usr/local/lib/ocs-shell-hint.sh\n' >> /etc/bash.bashrc
+# Set the executable mode inside the image, independent of the build context's mode or ACLs.
+RUN install -m 0755 /tmp/ocs_opencode.py /usr/local/bin/ocs-opencode \
+ && rm /tmp/ocs_opencode.py \
+ && printf '\n. /usr/local/lib/ocs-shell-hint.sh\n' >> /etc/bash.bashrc
 WORKDIR /workspace
 CMD ["sleep", "infinity"]

@@ -48,7 +48,8 @@ def test_dockerfile_contract():
     assert all(not line.startswith("USER ") for line in lines[makepkg[-1]:])  # final stage starts as root again
     assert re.search(r"ARG PARU_AUR_COMMIT=[0-9a-f]{40}\n", text)  # reviewed PKGBUILD revision
     assert "RUN --mount=type=bind,from=paru," in text and "pacman -U" in text and "rust" not in text.split("FROM base\n")[1]
-    assert "COPY --chmod=0755 arch/ocs-aur /usr/local/bin/ocs-aur" in text
+    assert "COPY arch/ocs-aur /tmp/ocs-aur" in text
+    assert "install -m 0755 /tmp/ocs-aur /usr/local/bin/ocs-aur" in text
     assert f"ln -s /usr/local/bin/ocs-aur {aur.SUDO}" in text
     assert "--home-dir /var/lib/aurbuild" in text and "OPTIONS+=(!debug)" in text
     assert "ENV NPM_CONFIG_PREFIX=/usr/local" in text  # npm -g stays out of pacman's /usr/lib
