@@ -31,8 +31,9 @@ base definitions, the retained Debian 12 case, privileged checks and isolated so
 verified. See [BASELINE](BASELINE.md#640-candidate-qualification) for scope and earlier failures.
 
 B15 passed a separate, actual two-boot recovery check. D09's general environment restart across a
-host reboot remains untested (P2); it is not covered by B15. This qualifies the candidate for the
-protected release PR, not the tag or publication.
+host reboot remains untested (P2); it is not covered by B15. Protected PR/main CI, the tag workflow,
+draft review, publication and both public pipx install checks were completed separately
+([published evidence](BASELINE.md#published-640)).
 
 ## 6.3.0 qualification
 
@@ -200,7 +201,7 @@ review passed before publication; both-endpoint public GitHub-tag pipx smoke pas
 | I03 | P1 | Performance baseline | Median durations per command from the campaign log (every command is logged with its duration); small test workspaces; no targets defined | PASS (real; durations recorded in the run log, no targets) |
 | I04 | P0 | Full regression at the release revision | The whole current real campaign, both distributions and packaged image build; retained privileged rows with consent; campaign through a pipx installation of a test tag. Evidence: `BASELINE.md` | PASS (6.4.0: all 110 collected real tests passed across four installed-manager batches on the same product, plus a seven-test 3.11 floor; both packaged image definitions, privileged and socket-activation rows, BASELINE) |
 | I05 | P0 | Documentation matches the code: every command and option named in the product, `README.md` and `docs/` exists; relative links and anchors resolve; code blocks fit 80 columns; the install commands name the release tag; active documents are English; new instructions in the guides were measured | `tests/test_cli_structure.py`, `tests/test_user_docs.py`, `tests/test_language.py`, `tests/test_disclosure.py`; review of `README.md`, `CHANGELOG.md` and the guides against the code and `--help` | PASS (review, unit) |
-| I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | PASS for 6.4.0 candidate qualification, including actual B15 reboot evidence. Protected PR/main CI, tagging, release publication and public pipx checks are separate gates. |
+| I06 | P0 | Release decision: every P0 and P1 row PASS with real evidence or BLOCKED with accepted risk (`RELEASING.md`) | This matrix and `BASELINE.md` | PASS (6.4.0: candidate qualification including actual B15 reboot evidence; protected PR/main/tag CI, publication and public pipx checks completed, BASELINE) |
 
 ## J, K, L. Readiness and cleanup, distributions, direct workspaces
 
@@ -241,7 +242,7 @@ installer-only rows retired by D-048: B02–B05 (four P0) and B06–B08
 - C10 was re-established on the 6.4.0 candidate through the installed manager and actual isolated
   inherited listener, not just host sockets or warmed direct Docker.
 - I04 passed on the 6.4.0 candidate (110 distinct real test passes and 7 more at the Python floor).
-  I06 qualifies the candidate for protected PR review, not publication.
+  I06 records candidate qualification and the separate completed publication gates.
 - H05: an intermittent session-test failure was traced to a launch-ownership race and fixed
   (D-054); the first real run also found a terminal-restoration defect, retained as failing
   evidence and fixed before the successful scoped rerun.

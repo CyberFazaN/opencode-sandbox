@@ -37,6 +37,21 @@ backup schemas are unchanged. Manager upgrades do not rebuild existing images or
 
 ## Verification
 
+### Published 6.4.0
+
+[6.4.0](https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.4.0) was published on
+2026-11-20 as the stable GitHub release. The annotated `v6.4.0` tag targets the
+[PR #7](https://github.com/CyberFazaN/opencode-sandbox/pull/7) merge commit
+`bab5a3ef4a25ab22e7c870a1f6684f447a94afae`, whose tree matches the qualified `e34de12`.
+The ten [PR checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/44636192152),
+ten [main checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/44637846472) and
+14 [release jobs](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/44642215091) all
+passed. The reviewed draft matched the tagged changelog; no binary assets were uploaded.
+
+Fresh public-tag pipx installations on Python 3.11 and 3.14 passed version/help, installation
+contracts, dependency health and rootless `doctor`. The source/tag/commit metadata and all 73
+product files matched the tag. No test hooks were present, and the Docker inventory was unchanged.
+
 ### 6.4.0 candidate qualification
 
 Approved implementation `b45b603`; installed and packaged product `a4453af`; terminal test
@@ -59,8 +74,8 @@ passed the reserve-sensitive case but stopped at stale terminal test keystrokes.
 correction, the affected terminal file and remaining cases ran separately; neither failure was
 discarded or counted as a pass. General recovery of a running environment across a host reboot
 (D09, P2) remains untested; B15 tested the manager updater, not that environment scenario. No paid
-provider call was made. Protected release PR/main CI, tag workflow and public-tag verification are
-separate from candidate qualification. Detailed logs and manifests remain in ignored `.work/`.
+provider call was made. Candidate qualification is distinct from the completed publication gates
+recorded above. Detailed logs and manifests remain in ignored `.work/`.
 
 ### Published 6.3.0
 
