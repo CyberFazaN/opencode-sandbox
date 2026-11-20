@@ -6,10 +6,24 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+## 6.4.0 — 2026-11-20
+
+Workspace import and Agent Context release (Beta). Python 3.11 or newer; environment and backup
+schemas are unchanged.
+
+### Upgrade notes
+
+- Debian and Arch base definitions are now revisions 5 and 4. If `doctor` reports an older
+  revision, rebuild with `opencode-sandbox build --distro debian` or
+  `opencode-sandbox build --distro arch`. A manager upgrade does not rebuild bases, and a base
+  rebuild does not change existing environments.
+
 ### Added
 
 - **Copy entire directory** in the dashboard and `--copy-entire-directory` for managed Project and
   Quick workspaces. This explicit import includes ignored and hidden files without invoking Git.
+  Review the source for secrets before copying it; the copy is visible to the agent and can be
+  included in workspace exports and backups.
 
 ### Fixed
 
@@ -19,8 +33,7 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   as Environment Settings. The preview stays available when automatic inclusion is off.
 - Debian and Arch base builds explicitly install the executable `ocs-opencode` launcher, so
   packaging or build-context permissions cannot make it fail verification. Arch also builds a
-  pinned paru 2.2.1 compatible with the rolling distribution's OpenSSL 4. Base image revisions
-  are now Debian 5 and Arch 4; existing environments are not rebuilt automatically.
+  pinned paru 2.2.1 compatible with the rolling distribution's OpenSSL 4.
 
 ## 6.3.0 — 2026-11-05
 
