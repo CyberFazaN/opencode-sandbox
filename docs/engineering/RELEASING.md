@@ -3,7 +3,8 @@
 A release is a version tag `vX.Y.Z` on `main` and a GitHub Release whose notes are the version's
 `CHANGELOG.md` section. Users install it with
 `pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@vX.Y.Z` (D-042); nothing is
-uploaded to a package index, and no wheels are attached. Only the maintainer creates tags.
+uploaded to a package index, and no wheels are attached. The maintainer creates the tag unless
+the owner explicitly delegates tagging to an agent under the procedure below.
 
 `main` is the published stable line; `develop` holds unreleased work (D-058). Ordinary development
 and its documentation never land directly on `main`. Verify the current branch and clean/preserved
@@ -101,10 +102,14 @@ rootlesskit's `10.0.2.2` and `example.invalid`/`example.org` addresses are expec
    publish that integration through the protected workflow and wait for CI on `main`. Do not
    bypass safeguards or include unreviewed development. No ordinary `develop` push creates a
    release: `.github/workflows/release.yml` accepts pushed version tags only.
-2. Create and push an annotated tag on that merge commit:
+2. After the required `main` checks pass, confirm the approved merge commit and that the tag
+   does not already exist locally or remotely. The maintainer creates and pushes the annotated
+   tag, or the owner explicitly authorizes an agent to create and push it for the exact version
+   and commit. Approval to prepare or merge the release does not authorize tagging, and tagging
+   does not authorize publication. Use the verified merge commit explicitly:
 
    ```sh
-   git tag -a vX.Y.Z -m "OpenCode Sandbox X.Y.Z"
+   git tag -a vX.Y.Z VERIFIED_MAIN_MERGE_COMMIT -m "OpenCode Sandbox X.Y.Z"
    git push origin vX.Y.Z
    ```
 

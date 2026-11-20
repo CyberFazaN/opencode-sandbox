@@ -58,8 +58,9 @@ host/application setup script or replacement wizard in the repository.
   with the same Debian and Arch matrix. A fix on `develop` reaches the schedule only after it is
   integrated into `main` through an approved release or stable hotfix PR.
 - Agents need explicit human authorization for remote pushes, remote changes, tags and releases
-  (`AGENTS.md`). Only the maintainer creates release tags. Do not bypass branch protection or use
-  force pushes; the branch model itself grants no publication permission.
+  (`AGENTS.md`). The owner may delegate release tagging for an exact version and verified `main`
+  commit under [the release procedure](docs/engineering/RELEASING.md#3-tag-and-publish). Do not
+  bypass branch protection or use force pushes; the branch model grants no publication permission.
 
 User guides on `develop` evolve with the next release; the matching stable guides remain on
 `main` and version tags. Keep release status in `CHANGELOG.md` and engineering records, not

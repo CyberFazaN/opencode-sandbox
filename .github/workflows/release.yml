@@ -1,5 +1,5 @@
-# A pushed version tag vX.Y.Z (created by the maintainer, docs/engineering/RELEASING.md): check the
-# tag and the CHANGELOG, run CI against the tag, install the tag with pipx, then create a draft
+# A pushed version tag vX.Y.Z (see docs/engineering/RELEASING.md): check the tag and the
+# CHANGELOG, run CI against the tag, install the tag with pipx, then create a draft
 # GitHub Release whose notes are the CHANGELOG section. Nothing is uploaded to a package index and
 # no files are attached (D-042); the maintainer reviews and publishes the draft.
 name: Release
