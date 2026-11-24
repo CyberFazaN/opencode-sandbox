@@ -164,13 +164,21 @@ def test_socket_proxy_and_foreign_names_are_refused(campaign, checks):
                       capture_output=True, text=True, check=False).returncode == 0, "the proxy really reaches the daemon")
     p = camp.ocs("doctor", check=False, env=env)
     ck("unverified-proxy" in p.stdout + p.stderr, f"C01 doctor: unverified-proxy ({(p.stdout + p.stderr).strip()[-200:]})")
-    p = camp.ocs("create", "ocs-test-viaproxy", check=False, env=env)
-    q = camp.ocs("start", "ocs-test-viaproxy", check=False, env=env)
-    ck(q.returncode != 0 and "unverified-proxy" in q.stdout + q.stderr, "C01 start through the proxy is refused")
-    if p.returncode == 0:
-        camp.adopt("ocs-test-viaproxy")
-        camp.delete("ocs-test-viaproxy")
-    stop.set()
+    existing = "ocs-test-start-viaproxy"
+    eid = camp.create(existing)
+    try:
+        p = camp.ocs("create", "ocs-test-viaproxy", check=False, env=env)
+        ck(p.returncode != 0 and "unverified-proxy" in p.stdout + p.stderr, "C01 create through the proxy is refused")
+        if p.returncode == 0:
+            camp.adopt("ocs-test-viaproxy")
+            camp.delete("ocs-test-viaproxy")
+        q = camp.ocs("start", existing, check=False, env=env)
+        ck(q.returncode != 0 and "unverified-proxy" in q.stdout + q.stderr, "C01 start through the proxy is refused")
+        ck(camp.docker("container", "inspect", f"ocs-{eid}", check=False).returncode != 0,
+           "C01 the proxy did not create a container on the verified daemon")
+    finally:
+        stop.set()
+        camp.delete(existing)
 
     # C06: a foreign container squatting on the name of a new environment's container
     eid = camp.create("ocs-test-squat")
