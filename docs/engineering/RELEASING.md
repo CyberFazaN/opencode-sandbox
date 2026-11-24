@@ -73,8 +73,9 @@ C10's extra opt-in authorizes temporary `ocs-test-act-*` user units and a separa
 rootless daemon, not a restart of the existing daemon. It needs `dockerd-rootless.sh` and
 `rootlesskit` on PATH, a working user systemd manager/runtime unit directory, and the campaign's
 run-owned Ubuntu/Python custom-image fixture (built from the existing `ubuntu:24.04`, never
-replacing that tag). Managed starts require Python and GNU timeout even for custom images;
-the unprepared-image row separately verifies refusal. The runtime unit directory `$XDG_RUNTIME_DIR/systemd/user`
+replacing that tag). Custom images need Python and GNU timeout for Agent Context reconciliation.
+The unprepared-image row verifies the repair warning when OpenCode is absent and refusal when
+OpenCode is present. The runtime unit directory `$XDG_RUNTIME_DIR/systemd/user`
 is volatile and absent after a reboot until something creates it; create it empty for the run
 and remove it afterwards. The row re-establishes cold state before each manager call;
 the campaign's initial doctor cannot count as cold-start evidence. Without this opt-in C10
