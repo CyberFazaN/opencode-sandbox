@@ -398,4 +398,6 @@ def test_opencode_availability_does_not_start_or_block_lifecycle(campaign, distr
     camp.sh(eid, """printf '#!/bin/sh\\nexit 1\\n' > /usr/local/bin/opencode
 chmod 755 /usr/local/bin/opencode""")
     status("Broken")
+    camp.sh(eid, "printf '#!/bin/sh\\nexec sleep 30\\n' > /usr/local/bin/opencode")
+    status("Unknown")
     camp.delete(name)

@@ -69,16 +69,21 @@ def test_failed_docker_exec_does_not_mean_missing(monkeypatch):
 
 def test_hanging_version_is_unknown_not_broken(monkeypatch, tmp_path):
     binary = tmp_path / "opencode"
-    binary.write_text("#!/bin/sh\nexec /bin/sleep 30\n")
+    binary.write_text('#!/bin/sh\n: > "$0.started"\nexec /bin/sleep 30\n')
     binary.chmod(0o700)
-    monkeypatch.setenv("PATH", str(tmp_path) + ":/usr/bin:/bin")
     monkeypatch.setattr(availability.probes, "EXEC_TIMEOUT", 0.1)
     monkeypatch.setattr(c, "inspect_container", lambda m: {"Running": True})
-    monkeypatch.setattr(c, "docker", lambda *args, **kwargs: subprocess.run(
-        args[2:], capture_output=True, text=True, timeout=2, check=False))
     m = c.create("ocs-test-hanging", image="example.org/custom:1")
-    result = CliRunner().invoke(app, ["opencode", "availability", m["name"]])
+
+    def docker(*args, capture, check):
+        assert args[:6] == ("exec", c.cname(m), "timeout", "--signal=KILL", "0.1s", "sh")
+        return c.call(args[2:], capture=capture, check=check,
+                      env={"PATH": f"{tmp_path}:/usr/bin:/bin"}, timeout=c._DIAGNOSTIC_TIMEOUT.get())
+
+    monkeypatch.setattr(c, "docker", docker)
+    result = CliRunner().invoke(app, ["opencode", "availability", m["name"]], catch_exceptions=False)
     assert (result.exit_code, result.output.strip()) == (2, "Unknown")
+    assert binary.with_suffix(".started").is_file()
 
 
 def test_unexpected_probe_response_is_unknown(monkeypatch):
