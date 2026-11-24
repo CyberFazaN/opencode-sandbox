@@ -133,7 +133,7 @@ class ConfigEditorScreen(Screen):
         with Vertical(id="oc-editor"):
             yield Static(f"OpenCode Config Editor — {self.environment['name']} (host file transfers)", markup=False)
             yield Static("Checking export…", id="oc-editor-status", markup=False)
-            yield TextArea(oc.SCOPE + "\n\n" + oc.EXPORT_WARNING, id="oc-editor-text", read_only=True)
+            yield TextArea(oc.scope(self.environment) + "\n\n" + oc.EXPORT_WARNING, id="oc-editor-text", read_only=True)
             with Horizontal():
                 yield Button("Export Config", id="oc-export", compact=True)
                 yield Button("Apply Export", id="oc-apply", compact=True)
@@ -222,7 +222,7 @@ class ReloadConfigScreen(Screen):
             yield Select([("Empty — clear the whole global config directory", ""),
                           *((f"Profile: {name}" + (" (original)" if name == original else ""), name) for name in names)],
                          value=original if original in names else "", allow_blank=False, id="oc-reload-source", compact=True)
-            yield TextArea(problem + oc.REPLACE_WARNING + "\nEmpty completely clears this directory's local configuration.\n\n" + oc.SCOPE,
+            yield TextArea(problem + oc.REPLACE_WARNING + "\nEmpty completely clears this directory's local configuration.\n\n" + oc.scope(self.environment),
                            read_only=True, id="oc-reload-text")
             with Horizontal():
                 yield Button("Reload Config", id="oc-reload-confirm", variant="error", compact=True)

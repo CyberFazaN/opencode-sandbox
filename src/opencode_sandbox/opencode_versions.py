@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
+from . import backends, distros, probes
 from . import core as c
-from . import distros, probes
 from . import update_cache as cache
 
 # `opencode --version` prints "opencode v2.1.4"; npm metadata and pins use "2.1.4".
@@ -242,6 +242,7 @@ class EnvironmentPolicyPlan:
     data: str
 
 
+@backends.environment
 def prepare_environment_policy(m, mode, version=None):
     version = _policy_target(mode, version)
     m = c.resolve(m["id"])
@@ -249,6 +250,7 @@ def prepare_environment_policy(m, mode, version=None):
     return EnvironmentPolicyPlan(mode, version, _consent_metadata(m), c.data_id())
 
 
+@backends.environment
 def set_policy(m, mode, version=None, *, plan=None):
     version = _policy_target(mode, version)
     with c.lock(m["id"]):
@@ -336,6 +338,7 @@ def environment_version(m, *, check=True):
         return {**result, "error": c.error_text(exc), "attempt": attempt if check else result["attempt"]}
 
 
+@backends.environment
 def _environment_version(m, *, check=True):
     # Re-read metadata: historical completed-update fields do not verify the current binary.
     m = c.resolve(m["id"])
@@ -389,6 +392,7 @@ def _lifecycle(m):
     return hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()
 
 
+@backends.environment
 def _environment_identity(m):
     fmt = '{{.Id}}|{{.Image}}|{{index .Config.Labels "org.opencode-sandbox.id"}}'
     p = c.docker("container", "inspect", "--format", fmt, c.cname(m), capture=True)
@@ -598,6 +602,7 @@ VERSION_LABEL = distros.LABEL + "opencode-version"
 _VERSION_FORMAT = '{{index .Config.Labels "' + VERSION_LABEL + '"}}'
 
 
+@backends.environment
 def check_pin(m):
     """Before a pinned environment gets a container from its registry base image: refuse when the
     image was built with another OpenCode version (its label). Derived images (runtime, snapshot,
@@ -700,6 +705,7 @@ class EnvironmentStartPlan:
     identity: tuple[tuple[str, str], ...] | None
 
 
+@backends.environment
 def prepare_environment_start(m):
     c.ensure_runtime(False)
     m = c.resolve(m["id"])
@@ -710,11 +716,13 @@ def prepare_environment_start(m):
                                 tuple(sorted(_environment_identity(m).items())) if state is not None else None)
 
 
+@backends.environment
 def recheck_environment_start(m, plan):
     if prepare_environment_start(m) != plan:
         raise c.SandboxError("Environment/container changed since confirmation; review again")
 
 
+@backends.environment
 def prepare_environment_stop(m):
     c.ensure_runtime(False)
     m = c.resolve(m['id'])
@@ -723,11 +731,13 @@ def prepare_environment_stop(m):
                                 tuple(sorted(_environment_identity(m).items())) if state is not None else None)
 
 
+@backends.environment
 def recheck_environment_stop(m, plan):
     if prepare_environment_stop(m) != plan:
         raise c.SandboxError('Environment/container changed since Stop review; review again')
 
 
+@backends.environment
 def prepare_environment_update(m, version, *, stop_running=False, system_packages=False):
     target = resolve_target(version, m)
     c.ensure_runtime(False)
@@ -758,7 +768,7 @@ def _restore_checkpoint(m, result, *, checkpoint=None):
 
 def _restore_checkpoint_steps(m, result, *, checkpoint=None):
     """Replace the container by one created (at the next start) from the update's checkpoint: the
-    system layer exactly as before the update; /root volume and /workspace are not touched. Uses the
+    system layer exactly as before the update; home volume and /workspace are not touched. Uses the
     runtime-recreate journal, so a crash here is finished by `config recover`. Caller holds the lock."""
     record = m["opencode_update"]
     checkpoint = checkpoint or record["checkpoint"]
@@ -778,13 +788,14 @@ def _restore_checkpoint_steps(m, result, *, checkpoint=None):
     c._finish_reconfigure(m)
 
 
+@backends.environment
 def update_environment(m, version, *, plan=None, system_packages=False):
     """Update OpenCode in a stopped container with the image build's install script (D-019).
 
     Journal `opencode-update` with a docker-commit checkpoint of the container's system layer,
     taken before anything changes. On a failure, and in `update_recover` after a crash, the
     container is replaced by one created from that checkpoint (exactly the previous system
-    layer; the /root volume and /workspace are not part of it and not touched). After a success
+    layer; the home volume and /workspace are not part of it and not touched). After a success
     the checkpoint stays the environment's rollback point (`rollback_environment`).
 
     Opt-in `system_packages` (the confirmed plan's choice when a plan is given) first runs the
@@ -796,6 +807,7 @@ def update_environment(m, version, *, plan=None, system_packages=False):
     if plan is not None and target != plan.target:
         raise c.SandboxError("Update target differs from the confirmed target; review again")
     if plan is not None: system_packages = plan.system_packages
+    admin_user = ("--user", "0:0") if backends.get(m) == backends.ROOTFUL else ()
     c.ensure_runtime(False)
     with c.lock(m["id"]):
         m = c.resolve(m["id"])
@@ -844,7 +856,7 @@ def update_environment(m, version, *, plan=None, system_packages=False):
             current = record["from"]
             if system_packages:
                 step = "System package upgrade"
-                c.docker("exec", c.cname(m), "sh", "-c", c.env_distro(m).system_upgrade, capture=True)
+                c.docker("exec", *admin_user, c.cname(m), "sh", "-c", c.env_distro(m).system_upgrade, capture=True)
                 step = "OpenCode update"
                 try:
                     current = _exec_version(m, container_id=identity["container"])
@@ -852,7 +864,7 @@ def update_environment(m, version, *, plan=None, system_packages=False):
                 except c.SandboxError:
                     current = None  # the upgrade broke the binary: the install script repairs it
             if current != target:
-                c.docker("exec", c.cname(m), *INSTALL, target, capture=True)
+                c.docker("exec", *admin_user, c.cname(m), *INSTALL, target, capture=True)
                 installed = _exec_version(m, container_id=identity["container"])
                 verified_at = time.time()
                 if installed != target:
@@ -870,8 +882,8 @@ def update_environment(m, version, *, plan=None, system_packages=False):
             raise c.SandboxError(f"{step} failed: {failure}. " + ("OpenCode was not updated. " if packages else "")
                                  + f"Rolled back: the container is recreated from checkpoint {checkpoint} at the next start "
                                  "(system layer as before the update; "
-                                 + ("/root and /workspace are not part of the checkpoint, so changes made there remain)."
-                                    if system_packages else "/root and /workspace untouched).")) from exc
+                                 + ("Home volume and /workspace are not part of the checkpoint, so changes made there remain)."
+                                    if system_packages else "Home volume and /workspace untouched).")) from exc
         if record["from"] == target and not system_packages:
             m["opencode_update"] = before
             if before is None:
@@ -942,6 +954,7 @@ def _checkpoint_action_plan(m, action):
                                      record.get("to"), record.get("from"))
 
 
+@backends.environment
 def prepare_checkpoint_action(m, action):
     """Read-only immutable consent for this component's existing rollback/recovery handlers."""
     c.ensure_runtime(False)
@@ -953,6 +966,7 @@ def _recheck_checkpoint_plan(m, action, plan):
         raise c.SandboxError("Environment/checkpoint changed since confirmation; review again")
 
 
+@backends.environment
 def update_recover(m, *, plan=None):
     """Finish an interrupted update by rolling back to its checkpoint (never by guessing whether
     npm completed). Run `update` again afterwards if wanted."""
@@ -969,6 +983,7 @@ def update_recover(m, *, plan=None):
         return {"image": m["image"], "rolled_back": True}
 
 
+@backends.environment
 def rollback_environment(m, *, plan=None):
     """Undo the last successful update: the container is recreated from its checkpoint. The current
     system layer (also later changes) is kept as an ocs-snapshot first: committed from the container,

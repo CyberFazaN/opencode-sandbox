@@ -1,5 +1,9 @@
 # Backup, restore and snapshots
 
+Backups preserve the environment's Docker backend. A rootful backup requires rootful
+access to restore and the original host username, UID and primary GID. The manager runs
+the restore against the selected daemon and retains numeric ownership in the home archive.
+
 ## Backups
 
 ```sh

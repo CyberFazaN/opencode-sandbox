@@ -1,4 +1,4 @@
-"""Non-secret dashboard preferences, atomically persisted."""
+"""Non-secret manager settings and dashboard preferences, atomically persisted."""
 import json
 import os
 import tempfile
@@ -6,7 +6,7 @@ import tempfile
 from . import core as c
 
 DEFAULTS = {"confirm_stop": True, "show_quick": True, "refresh_on_return": True,
-            "daily_discovery": False, "copy_selected_text": False}
+            "daily_discovery": False, "copy_selected_text": False, "allow_rootful": False}
 
 def read():
     path = c.CONFIG / "ui.json"

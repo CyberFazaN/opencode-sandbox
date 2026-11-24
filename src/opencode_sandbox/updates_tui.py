@@ -18,7 +18,7 @@ from textual.widgets import (
 )
 from textual.widgets.data_table import CellDoesNotExist
 
-from . import __version__, distros, updates
+from . import __version__, backends, distros, updates
 from . import core as c
 from . import manager_installation as mi
 from . import manager_releases as mr
@@ -67,6 +67,12 @@ class UpdatesScreen(Screen):
     def __init__(self, *, environment_id=None):
         super().__init__()
         self.view = "manager"
+        self.base_backend = backends.ROOTLESS
+        if environment_id:
+            try:
+                self.base_backend = backends.get(c.resolve(environment_id))
+            except c.SandboxError:
+                pass
         self.items = {key: {} for key in VIEWS}
         self.selection = {"environments": environment_id}
         self.remote = v.discovery()
@@ -192,7 +198,9 @@ class UpdatesScreen(Screen):
             if section == 'manager':
                 installation = mi.classify()
                 return {'installation': installation, 'state': installation['classification']}
-            if section == "bases": return updates.base_inventory(distros.get(key), check=check)
+            if section == "bases":
+                with backends.use(self.base_backend):
+                    return updates.base_inventory(distros.get(key), check=check)
             from . import environment_checks
             m = c.resolve(key)
             policy = v.policy(m)
@@ -273,7 +281,7 @@ class UpdatesScreen(Screen):
         previous = self.selected_key() or self.selection.get(self.view)
         table.clear(columns=True)
         width = max(50, min(self.size.width, 120) - 10)
-        table.add_column({'manager': 'Manager', 'bases': 'Base Image', 'environments': 'Environment'}[self.view], width=width * 35 // 100)
+        table.add_column({'manager': 'Manager', 'bases': f'Base Image ({self.base_backend})', 'environments': 'Environment'}[self.view], width=width * 35 // 100)
         table.add_column('State', width=width * 30 // 100)
         table.add_column('Version' if self.view == 'manager' else 'OpenCode Version', width=width - width * 35 // 100 - width * 30 // 100)
         for key, item in self.items[self.view].items():
@@ -686,8 +694,9 @@ class UpdatesScreen(Screen):
     @work(thread=True, group='updates-prepare')
     def _prepare_base_worker(self, key, action, value, token):
         try:
-            if action == 'build': plan = v.prepare_base_build(value[0], key, refresh=value[1])
-            else: plan = v.base_rollback_inventory(key)
+            with backends.use(self.base_backend):
+                if action == 'build': plan = v.prepare_base_build(value[0], key, refresh=value[1])
+                else: plan = v.base_rollback_inventory(key)
             publish(self.app, self._base_prepared, token, key, action, plan, None)
         except Exception as exc:
             publish(self.app, self._base_prepared, token, key, action, None, c.error_text(exc))
@@ -717,14 +726,15 @@ class UpdatesScreen(Screen):
         from .base_updates_tui import BaseConsentScreen, rollback_consent
         if not self._alive or self.app._operation_pending: return
         text = v.describe_base_build(plan) if action == 'build' else rollback_consent(plan)
-        self.app.push_screen(BaseConsentScreen(text), lambda yes: self._approved_base(key, action, plan) if yes else None)
+        self.app.push_screen(BaseConsentScreen(f"Docker backend: {self.base_backend}\n" + text), lambda yes: self._approved_base(key, action, plan) if yes else None)
 
     def _approved_base(self, key, action, plan):
         if not self._alive or self.app._operation_pending: return
         self._cancel_readonly()
         self._next('bases', key)
         self.operation_result = None
-        self.app.run_base_update_action(key, action, plan, self._base_finished)
+        options = {"backend": self.base_backend} if self.base_backend == backends.ROOTFUL else {}
+        self.app.run_base_update_action(key, action, plan, self._base_finished, **options)
         self._render_selected()
 
     def _base_finished(self, key, result, failed):

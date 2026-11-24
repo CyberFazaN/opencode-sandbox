@@ -6,11 +6,17 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
 
 ## Boundaries
 
-- One Linux host user, that user's authenticated **rootless** Docker daemon, one container per
-  environment. Not a general container manager or repository/package-repository manager.
-- Container root maps to the host user. Containers have `--init`, `no-new-privileges`, dropped
+- One Linux host user and one container per environment. The authenticated rootless backend is
+  the default. The opt-in rootful backend authenticates the local UID 0 daemon with no user
+  namespace remapping. Environment operations hold an explicit backend scope across subprocesses
+  and child guards. Backend and host runtime identity are immutable once saved.
+- Rootful metadata and backups use separate schema versions so older managers refuse them.
+  Rootful sessions use an explicit numerical UID:GID, a named home volume at `/home/ocs`,
+  and a container-local account and sudo rule initialized from the saved identity.
+  Builds remain independent of the host identity.
+- Container root maps to the host user. Containers have `--init`, dropped
   `NET_RAW`/`MKNOD`, no host Docker socket, privileged mode or host networking. Published ports
-  bind only to 127.0.0.1. `bridge` can reach the LAN; it is not egress isolation.
+  bind only to 127.0.0.1. Rootless also sets `no-new-privileges`. `bridge` can reach the LAN; it is not egress isolation.
 - Manager settings, disposable observation/discovery caches, durable operation state and user
   OpenCode configuration are separate. Global config changes only through explicit initial Copy,
   Apply Export or Reload/Empty; no automatic provisioning/synchronization. No implicit environment/OS/schema migration.

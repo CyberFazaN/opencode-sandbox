@@ -10,6 +10,7 @@ import json
 import re
 import secrets
 
+from . import backends
 from . import core as c
 
 EXEC_TIMEOUT = 5.0
@@ -34,6 +35,7 @@ def _result(p, timeout):
     return p
 
 
+@backends.environment
 def exec(m, *argv, timeout=None, container_id=None):
     timeout = EXEC_TIMEOUT if timeout is None else timeout
     with c.diagnostic_timeout(timeout + CLIENT_GRACE):

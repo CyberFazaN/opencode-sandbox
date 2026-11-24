@@ -4,7 +4,7 @@
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
 Run [OpenCode](https://github.com/anomalyco/opencode) coding agents in per-environment containers on **your own
-rootless Docker daemon**, from a command line or a terminal dashboard. Each environment has its
+rootless Docker daemon** by default, from a command line or a terminal dashboard. Each environment has its
 own workspace, home volume, settings and credentials; the agent's changes reach your repository
 only when you transfer them, for example as a review branch.
 
@@ -38,6 +38,8 @@ Consider something else if:
 
 ## Features
 
+- **Docker backends** include rootless by default and opt-in local rootful Docker.
+  [Backend settings](docs/settings.md#docker-backend)
 - **Environments**: scratch (empty), project (a Git clone, optionally including local working
   changes, or a filtered copy of a folder) and
   disposable quick sessions; Debian 13, Arch Linux (AUR through `ocs-aur`) or Kali Linux rolling images, or a
@@ -79,10 +81,10 @@ Consider something else if:
 
 ## Security in brief
 
-- The agent is **root inside its container**. Container root maps to your user on the host, not
-  to the host's root; rootless Docker reduces the damage of an escape but does not prevent one.
-- The manager verifies that Docker is **your own rootless daemon** before every use and refuses
-  rootful, other users', proxied and remote daemons.
+- In the default **rootless** backend, container root maps to your user on the host.
+  Opted-in rootful environments run as your UID and can use container-local passwordless sudo.
+- The manager authenticates the selected daemon and refuses foreign, proxied and remote endpoints.
+  Access to the rootful socket carries host root authority. [Security model](docs/security.md#rootful-docker)
 - The default network mode `bridge` reaches the internet **and your local network**; only the
   host's loopback is blocked. `none` has no network.
 - The agent **can read the provider keys** mounted into its container: use scoped,

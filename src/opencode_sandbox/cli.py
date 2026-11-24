@@ -5,8 +5,8 @@ from pathlib import Path
 import typer
 from typer.core import TyperGroup
 
+from . import backends, distros, workspaces
 from . import core as c
-from . import distros, workspaces
 from . import workspace_io as wio
 
 
@@ -81,9 +81,12 @@ def _print_version(value: bool):
         raise typer.Exit()
 
 @app.callback()
-def _root(version: bool = typer.Option(False, "--version", callback=_print_version, is_eager=True,
-                                       help="Show the manager version and exit.")):
-    """Manage isolated OpenCode workspaces on rootless Docker."""
+def _root(ctx: typer.Context, version: bool = typer.Option(False, "--version", callback=_print_version, is_eager=True,
+                                       help="Show the manager version and exit."),
+          docker_backend: str | None = typer.Option(None, "--docker-backend", help="Target a backend for Docker maintenance commands")):
+    """Manage isolated OpenCode workspaces. Rootless Docker is the default."""
+    if docker_backend is not None:
+        ctx.with_resource(backends.use(docker_backend))
 
 @opencode_app.command("availability")
 def opencode_availability(name: str):
@@ -159,10 +162,10 @@ def opencode_update(name: str, version: str=typer.Option("latest","--version",he
     m=c.resolve(name)
     plan=v.prepare_environment_update(m,version,system_packages=update_system_packages)
     typer.echo("Note: a checkpoint (docker commit) of the container's system layer is taken first; a failed update "
-               "is rolled back to it, 'opencode rollback' undoes a successful one. /root and /workspace are not touched.")
+               "is rolled back to it, 'opencode rollback' undoes a successful one. The home volume and /workspace stay in place.")
     for line in v.system_upgrade_lines(m, plan.system_packages): typer.echo(line)
-    if not yes and not _confirm(f"Temporarily start stopped environment {name}, "
-                                f"{'upgrade its system packages, ' if plan.system_packages else ''}update OpenCode to {plan.target}, then stop it?", docker=True):
+    if not yes and not _confirm_environment(m, f"Temporarily start stopped environment {name}, "
+                                f"{'upgrade its system packages, ' if plan.system_packages else ''}update OpenCode to {plan.target}, then stop it?"):
         raise typer.Abort()
     result=v.update_environment(m,plan.target,plan=plan)
     if result.get("unchanged"): typer.echo(f"OpenCode {result['version']} is already installed; nothing changed")
@@ -184,12 +187,11 @@ def opencode_rollback(name: str, yes: bool=typer.Option(False,"--yes",help="Do n
     from . import opencode_versions as v
     m=c.resolve(name)
     record=m.get("opencode_update") or {}
-    if not yes and not _confirm(f"Recreate {name} from the checkpoint before its last OpenCode update "
+    if not yes and not _confirm_environment(m, f"Recreate {name} from the checkpoint before its last OpenCode update "
                                 f"({record.get('to')} -> {record.get('from')})? The current system layer is kept as a snapshot."
                                 + (" That update also upgraded system packages: their checkpointed versions return, but changes "
                                    "outside the system layer (home volume, workspace, migrated data) are not undone."
-                                   if record.get("system_packages") else ""),
-                                docker=True):
+                                   if record.get("system_packages") else "")):
         raise typer.Abort()
     result=v.rollback_environment(m)
     typer.echo(f"Rolled back OpenCode {result['rolled_back_from']} -> {result['version']}"
@@ -251,10 +253,11 @@ def opencode_configs_list():
 def opencode_config_status(name: str):
     """OpenCode Config Editor status and exact persistent-on-host temporary export path."""
     from . import opencode_configs as oc
-    result=oc.status(c.resolve(name))
+    m = c.resolve(name)
+    result=oc.status(m)
     typer.echo(result["state"])
     if result["path"]: typer.echo(result["path"])
-    typer.echo(oc.SCOPE + "\n" + oc.EXPORT_WARNING)
+    typer.echo(oc.scope(m) + "\n" + oc.EXPORT_WARNING)
 
 
 def _config_running_warning(m):
@@ -317,10 +320,10 @@ def opencode_config_reload(name: str, profile: str | None=typer.Option(None,"--p
         # Never turn a vanished original into an implicit Empty, especially with --yes.
         raise c.SandboxError(f"Original OpenCode config profile {source} is no longer available; choose --profile NAME or --empty")
     if source is not None: oc.profile_path(source)
-    typer.echo(oc.REPLACE_WARNING + "\n" + oc.SCOPE)
+    typer.echo(oc.REPLACE_WARNING + "\n" + oc.scope(m))
     typer.echo(f"Selected: {source or 'Empty — completely clear local configuration'}")
     _config_running_warning(m)
-    if not yes and not _confirm("Reload and replace the entire global config directory?",docker=True): raise typer.Abort()
+    if not yes and not _confirm_environment(m, "Reload and replace the entire global config directory?"): raise typer.Abort()
     typer.echo("Staging/validating the whole replacement tree…", err=True)
     result=oc.reload(m,source,confirmed=True)
     typer.echo(f"Reloaded: {result['source']}. No container or OpenCode restart.")
@@ -454,7 +457,9 @@ def cleanup_command(yes: bool = typer.Option(False, "--yes", help="Remove the li
 @app.command("list",rich_help_panel=ENVIRONMENTS)
 def list_envs():
     """List the environments."""
-    for m in c.all_envs(): msg(m)
+    for m in c.all_envs():
+        msg(m)
+        typer.echo(f"  Docker: {backends.describe(m)}")
     for path in c.invalid_metadata():
         typer.secho(f"WARNING: ignoring {path}: {c.metadata_error(path) or 'invalid metadata'}",fg=typer.colors.YELLOW,err=True)
 
@@ -470,6 +475,7 @@ def create(name:str,
            copy_entire_directory:bool=typer.Option(False,"--copy-entire-directory",rich_help_panel=WORKSPACE_PANEL,help="Copy all of --source without Git, including hidden and ignored files. Review for secrets first."),
            kind:str | None=typer.Option(None,"--kind",help="scratch (normally empty) | project (typically a folder copy or a direct mount) | quick (disposable, managed only). Default: project with --source or a direct workspace, otherwise scratch"),
            profile:str=typer.Option("default","--profile",help="Provider profile (see: providers list)"),
+           backend: str = typer.Option(backends.ROOTLESS, "--backend", help="Docker backend: rootless or rootful (requires opt-in)"),
            distro:str | None=typer.Option(None,"--distro",rich_help_panel=IMAGE_PANEL,help="Base definitions: "+_distro_help()),
            image:str | None=typer.Option(None,"--image",rich_help_panel=IMAGE_PANEL,help="Custom image instead of a distribution (no tool or OS claims in Agent Context)"),
            workspace_mode:str=typer.Option("managed","--workspace-mode",rich_help_panel=WORKSPACE_PANEL,help="managed (default: empty or a copy of --source) | direct (not recommended: the agent works in your host folder itself)"),
@@ -492,10 +498,14 @@ def create(name:str,
         fingerprint=plan.fingerprint
     if copy_entire_directory:
         typer.echo(workspaces.ENTIRE_WARNING, err=True)
+    with backends.use(backend):
+        if backend == backends.ROOTFUL:
+            typer.secho(backends.WARNING, fg=typer.colors.YELLOW, err=True)
     consent=False
     if workspace_mode==workspaces.DIRECT and workspace is not None:
         target=workspaces.check_direct(workspace)  # explain refusals before asking
-        c.verify_runtime()  # the preflight needs the daemon: check it before asking for consent
+        with backends.use(backend):
+            c.verify_runtime()  # verify the selected daemon before asking for consent
         typer.secho(f"{workspaces.LABEL}.",fg=typer.colors.YELLOW,bold=True)
         typer.echo(DIRECT_CONSENT.format(path=target))
         if yes: consent=True
@@ -507,8 +517,9 @@ def create(name:str,
     m=c.create(name,kind,source,profile,distro=distro,image=image,workspace_mode=workspace_mode,
                 workspace=workspace,consent=consent,opencode_config=opencode_config,agent_context_enabled=agent_context,
                 include_working_changes=include_working_changes,copy_entire_directory=copy_entire_directory,
-                import_fingerprint=fingerprint)
+                import_fingerprint=fingerprint, **({"backend": backend} if backend != backends.ROOTLESS else {}))
     msg(m)
+    typer.echo(f"Docker: {backends.describe(m)}")
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Distribution: {c.distribution_description(m)}\n"
                f"Provider profile: {m['profile']}\n"
@@ -527,6 +538,21 @@ DIRECT_CONSENT=("The agent in the container can read, change and delete every fi
 
 config_app=typer.Typer(help="Environment settings: limits, network, ports, provider profile and Agent Context (show, plan, apply, recover).",no_args_is_help=True)
 app.add_typer(config_app,name="config",rich_help_panel=DATA)
+
+@config_app.command("global")
+def settings(allow_rootful: bool | None = typer.Option(None, "--allow-rootful/--no-allow-rootful",
+                                                    help="Allow rootful Docker environments")):
+    """Show or change the rootful Docker opt-in."""
+    from . import preferences
+
+    current = preferences.read()
+    if allow_rootful is not None:
+        if allow_rootful:
+            typer.secho(backends.WARNING, fg=typer.colors.YELLOW, err=True)
+        preferences.write({**current, "allow_rootful": allow_rootful})
+    typer.echo("Allow rootful Docker environments: " + ("enabled" if preferences.read()["allow_rootful"] else "disabled"))
+
+
 
 def _config_changes(cpus, memory, pids, network, publish, no_ports, profile, agent_context=None):
     """Only the options given; config_plan merges them with the current values."""
@@ -550,9 +576,16 @@ def config_show(name: str):
     """Configured settings and, when a container exists, what Docker reports for it."""
     from .config_plan import current
     m=c.resolve(name)
-    typer.echo(json.dumps({"configured": current(m), "kind": m["kind"], "workspace": workspaces.info(m),
+    try:
+        observed = {"container": c.observed_runtime(m)}
+    except c.SandboxError as exc:
+        if backends.get(m) == backends.ROOTLESS:
+            raise
+        observed = {"container": None, "container_error": c.error_text(exc)}
+    typer.echo(json.dumps({"configured": current(m), "kind": m["kind"], "docker_backend": backends.get(m),
+                           "runtime_identity": m.get("identity"), "workspace": workspaces.info(m),
                            "workspace_origin": workspaces.origin(m), "workspace_import": m.get("workspace_import"),
-                           "container": c.observed_runtime(m)}, indent=2))
+                           **observed}, indent=2))
 
 @config_app.command("plan")
 def config_plan_command(name: str, cpus: float | None = CPUS, memory: str | None = MEMORY, pids: int | None = PIDS,
@@ -600,7 +633,7 @@ def run(name:str | None=typer.Argument(None)):
 
 @app.command(rich_help_panel=SESSIONS)
 def shell(name:str | None=typer.Argument(None)):
-    """Open a root shell in the environment (without NAME: the environment of the current folder)."""
+    """Open a shell as the environment user (without NAME: the environment of the current folder)."""
     raise typer.Exit(c.interactive(pick(name),shell=True))
 
 @app.command("exec",rich_help_panel=SESSIONS,context_settings={"allow_extra_args":True,"ignore_unknown_options":True})
@@ -628,14 +661,18 @@ def status(name:str):
     from . import agent_context as ac
     from . import opencode_availability as availability
     m=c.resolve(name); msg(m)
+    typer.echo(f"Docker: {backends.describe(m)}")
     typer.echo(f"OpenCode: {availability.check(m).value}")
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Provider profile: {m.get('profile')}\nContainer: {c.cname(m)}\n"
                f"Image: {c.env_image(m)}\n"
                f"Agent Context: {'enabled' if ac.enabled(m) else 'disabled'}; "
                f"initial OpenCode config: {m.get('opencode_config_source') or 'Local'}")
-    c.ensure_runtime(False)
-    typer.echo("Running: "+str(c.running(m)))
+    try:
+        typer.echo("Running: " + str(c.running(m)))
+    except c.SandboxError as exc:
+        typer.echo(f"Running: Unknown ({exc})")
+        return
     from . import readiness as r
     try:
         inputs=c.guidance_inputs(m)
@@ -816,14 +853,14 @@ def restore_rollback(name:str,yes:bool=typer.Option(False,"--yes",help="Do not a
     """Delete an incomplete restore (only that), after confirmation."""
     from .backup import rollback_restore
     m=c.resolve(name)
-    if not yes and not _confirm(f"Delete failed restore {m['name']} and its data?", docker=True):
+    if not yes and not _confirm_environment(m, f"Delete failed restore {m['name']} and its data?"):
         raise typer.Abort()
     rollback_restore(m)
     typer.echo('Failed restore removed')
 
 @container_app.command("snapshot")
 def snapshot(name:str,tag:str | None=typer.Option(None,"--tag",help="A new image tag outside the manager's repositories, or ocs-snapshot:<id>-NAME (default: ocs-snapshot:<id>-<time>-<random>); an existing tag is never replaced")):
-    """Commit the container's system layer to an image (NOT the workspace or the /root home volume)."""
+    """Commit the container's system layer to an image (excludes the workspace and persistent home volume)."""
     typer.echo(c.snapshot(c.resolve(name),tag))
 
 @container_app.command("recreate")
@@ -833,7 +870,7 @@ def recreate(name:str,yes:bool=typer.Option(False,"--yes",help="Recreate without
     if not yes:
         typer.echo("A running container is stopped first (its processes end), its system layer is committed to a "
                    "snapshot and the new container is created from it and started; workspace and home volume stay.",err=True)
-        if not _confirm(f"Recreate the container of {name}?", docker=True): raise typer.Abort()
+        if not _confirm_environment(m, f"Recreate the container of {name}?"): raise typer.Abort()
     c.recreate(m,confirm=True)
 
 @container_app.command("recreate-recover")
@@ -853,7 +890,8 @@ def delete(name:str,export_first:bool=typer.Option(False,"--export-first",help="
     typer.echo(c.printable(c.git_changes(m)))
     if workspaces.is_direct(m): typer.echo(f"The direct workspace {m['workspace']['path']} is not touched.")
     if export_first: typer.echo(f"Exported: {c.export(m)}")
-    c.verify_runtime()  # before asking: a confirmed deletion must not fail for a missing daemon
+    with backends.use(backends.get(m)):
+        c.verify_runtime()  # before asking: a confirmed deletion must not fail for a missing daemon
     if not yes:
         if not c._tty(): raise c.SandboxError(f"No terminal to confirm the deletion of {m['name']}; confirm with --yes")
         if typer.prompt(f"Type {m['name']} to delete")!=m["name"]: raise typer.Abort()
@@ -940,6 +978,11 @@ def _dashboard():
 
 ORDER=("create","list","status","check","start","stop","promote","delete","run","shell","exec","quick","tui",
        "config","changes","backup","container","agent-context","providers","repair","opencode","manager","disk","build","doctor")
+
+
+def _confirm_environment(m, question):
+    with backends.use(backends.get(m)):
+        return _confirm(question, docker=True)
 
 
 def _confirm(question, docker=False):

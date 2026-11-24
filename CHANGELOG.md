@@ -6,6 +6,9 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+- Add opt-in rootful Docker environments with an immutable backend and host-matched session
+  identity, a persistent home and container-local passwordless sudo.
+
 - Add the Kali Linux rolling base image to CLI and dashboard creation and the scheduled image
   verification matrix.
 - Check runtime OpenCode availability from the CLI and dashboard. A restored container can pass

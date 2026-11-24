@@ -12,7 +12,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from . import distros, workspaces
+from . import backends, distros, workspaces
 
 CONTAINER_DIR = "/run/ocs-agent"
 CONTAINER_PATH = CONTAINER_DIR + "/context.md"
@@ -84,6 +84,7 @@ if updated!=document or not os.path.exists(path):
 '''
 
 
+@backends.environment
 def reconcile(m, *, include=None):
     """Locked, running-container reconciliation. Failure prevents managed OpenCode launch."""
     import inspect
@@ -123,7 +124,11 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
         "", "## Container, user and privileges",
         "- Container image: " + image,
     ]
-    if distro:
+    rootful = backends.get(m) == backends.ROOTFUL
+    if rootful:
+        lines += [f"- Docker backend and runtime identity: {backends.describe(m)}.",
+                  "- You can use passwordless sudo inside the container. Root commands can change host ownership on writable bind mounts."]
+    elif distro:
         lines.append("- You run as root (UID 0) in the container. Rootless Docker maps it to the host user who owns this "
                      "sandbox: files you create in /workspace belong to that user on the host. Other container users "
                      "map to unprivileged subordinate IDs, so files they create there may not be editable on the host.")
@@ -131,14 +136,14 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
         lines.append("- The container user is defined by the custom image. Rootless Docker maps container UID 0 to the "
                      "host user who owns this sandbox and other UIDs to unprivileged subordinate IDs.")
     lines += [
-        "- The container runs with no-new-privileges: sudo and setuid programs cannot raise privileges. Container root is not root on the host.",
+        *([] if rootful else ["- The container runs with no-new-privileges: sudo and setuid programs cannot raise privileges. Container root is not root on the host."]),
         ("- There is no Docker socket and no host package manager in the container. "
          "Do not try to manage the host, the Docker daemon, hardware or system services."),
         "- Do not assume access to GPU, USB, cameras or audio.",
         "", "## Workspace and persistence",
         f"- Environment: {m['name']} ({m['kind']}). Working directory: /workspace. Work on project files here.",
         *workspace_lines(m),
-        ("- The workspace and the persistent /root Docker volume (OpenCode state, user data) survive stopping, "
+        (f"- The workspace and the persistent {backends.home(m)} Docker volume (OpenCode state, user data) survive stopping, "
          "recreating and reconfiguring the container."),
         ("- Packages and files elsewhere live in the container's system layer: kept across stop/start, recreation and "
          "runtime changes, but lost when the user restores a backup without it. Do not assume they are permanent."),
@@ -165,8 +170,10 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
     if distro:
         if definition is not None and definition.matches(distro):
             current = definition.version == distro.version and definition.revision == distro.revision
-            lines += ["", f"## Operating system ({distro.name} {definition.version})",
-                      *distro.context_lines(version=definition.version, include_tools=current)]
+            system = distro.context_lines(version=definition.version, include_tools=current)
+            if rootful:
+                system = [line.replace(", and sudo cannot raise privileges here", "") for line in system]
+            lines += ["", f"## Operating system ({distro.name} {definition.version})", *system]
         else:
             lines += ["", "## Operating system",
                       f"- Configured managed distribution: {distro.name}; base OS version and installed tools are unknown (image not inspected or labels unavailable)."]

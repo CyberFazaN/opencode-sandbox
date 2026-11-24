@@ -21,8 +21,8 @@ tells you what is still missing.
 | Python 3.11 or newer | For the application's venv (tested: 3.11 and 3.14). Release 6.0.0 required 3.14 or newer. pipx can run on a different Python; select the application's interpreter with `--python`. |
 | pipx and Git | Install them using your distribution's official documentation. pipx installs the application, not Docker. |
 | Network access during installation | pipx downloads the source from GitHub and the Python dependencies (Typer, Textual and theirs) from PyPI. |
-| Docker in rootless mode | Your own rootless daemon; see [Prepare Docker](#prepare-docker). |
-| Kernel and system support for rootless Docker | Subordinate UID and GID ranges for your user and `newuidmap`/`newgidmap`; unprivileged user namespaces (some distributions restrict them by policy); cgroup v2 with the `cpu`, `memory` and `pids` controllers delegated to your user's daemon, because the manager sets CPU, memory and process limits on every container. See [Prepare Docker](#prepare-docker) for upstream guidance and the limits of the application's checks. |
+| Docker | Your own rootless daemon by default. A configured local rootful daemon can be used with [explicit opt-in](settings.md#docker-backend). |
+| Kernel and system support for the default rootless backend | Subordinate UID and GID ranges for your user and `newuidmap`/`newgidmap`; unprivileged user namespaces (some distributions restrict them by policy); cgroup v2 with the `cpu`, `memory` and `pids` controllers delegated to your user's daemon, because the manager sets CPU, memory and process limits on every container. See [Prepare Docker](#prepare-docker) for upstream guidance and the limits of the application's checks. |
 | Disk space | Each base image is about 2.2 GB (Debian) or 2.4 GB (Arch); a build also leaves several GB of Docker build cache. |
 
 The base images supply the distribution inside the containers: Debian 13, Arch Linux rolling

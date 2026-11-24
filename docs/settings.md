@@ -25,6 +25,36 @@ Omitted options keep their current values. `config plan --json` prints the plan 
 `config show` also reports the environment kind, managed/direct workspace record, and how the
 workspace was initialized. The import method is unknown for older copies that did not record it.
 
+## Docker backend
+
+Rootless Docker is the default. To use a configured local rootful daemon, enable
+**Allow rootful Docker environments** in Manager Settings or run the first command below.
+Build the base on that daemon before starting the environment.
+
+```sh
+opencode-sandbox config global --allow-rootful
+opencode-sandbox --docker-backend rootful build --distro debian
+opencode-sandbox create example --distro debian --backend rootful
+opencode-sandbox start example
+```
+
+In the dashboard, select **Rootful** under **More options** when creating an environment.
+**Disk** and the **Base Images** tab of **Updates** use the selected environment's backend.
+The CLI's global `--docker-backend` option selects the daemon for maintenance such as
+`build`, `doctor`, and `disk cleanup`. Named environment operations use the saved backend.
+
+The backend is fixed at creation. Turning the setting off preserves metadata and visibility
+and blocks new rootful Docker operations. Stop rootful environments before disabling access
+if you also want their processes to stop. Existing sessions and containers otherwise continue
+to run. Backups keep their backend. Rootful restore requires the original username, UID and
+primary GID. Rootful environments use managed distribution images.
+
+Rootful sessions run with the host username, UID and primary GID. Files created by ordinary
+commands have the host user's ownership. Supplementary host groups are excluded, so paths
+that rely on supplementary group access may fail the direct workspace preflight. The home
+volume is mounted at `/home/ocs` and follows the environment across recreation. Review the
+security implications before enabling rootful. [Security model](security.md#rootful-docker)
+
 ## How a change is applied
 
 - Without a container, settings are only saved.
@@ -36,7 +66,7 @@ workspace was initialized. The import method is unknown for older copies that di
   a limit below the current usage would make the kernel kill the whole container.
 - **Network, ports and the provider profile** need a new container. `apply` stops it if it runs
   (sessions end), commits the system layer to an `ocs-runtime:*` image, replaces the container
-  (`/workspace`, the `/root` volume and installed packages are kept) and starts it again if it was
+  (`/workspace`, the persistent home volume and installed packages are kept) and starts it again if it was
   running; the superseded runtime image is untagged.
 - Changes that stop or recreate a container ask for confirmation; scripts pass `--yes`.
 - Interrupted changes are journalled; `start` and `repair` refuse until

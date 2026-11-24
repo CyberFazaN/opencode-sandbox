@@ -5,7 +5,7 @@ isolation boundary. Read this page before you give an agent work you would not r
 
 ## What the sandbox gives you
 
-- The agent runs in a container of **your own rootless Docker daemon**. It is root inside the
+- By default the agent runs in a container of **your own rootless Docker daemon**. It is root inside the
   container, and container root maps to **your user** on the host, not to the host's root. A
   container escape would have your user's privileges.
 - With a managed workspace (the default) the agent works on a copy; your project changes only
@@ -13,9 +13,23 @@ isolation boundary. Read this page before you give an agent work you would not r
 - Host files are visible only at `/workspace` (and read-only manager files under `/run`). The
   manager never mounts the Docker socket into a container and never uses `--privileged` or host
   networking.
-- Containers run with `no-new-privileges` and without the capabilities `NET_RAW` and `MKNOD`;
+- Rootless containers run with `no-new-privileges`. Both backends drop the capabilities `NET_RAW` and `MKNOD`;
   published ports bind to `127.0.0.1` only.
 - OpenCode's self-update is disabled; versions change only through the manager.
+
+## Rootful Docker
+
+Rootful support is off by default. When explicitly enabled and selected at creation, the
+manager authenticates the local root-owned daemon at `/run/docker.sock` and requires Docker
+without user namespace remapping. Access to that socket already grants host root authority.
+The manager uses the daemon for the environment's lifetime.
+
+The session starts as the host user and can become container root using passwordless
+`sudo`. Rootful containers omit `no-new-privileges` to make this possible. A container escape
+can have host root impact. Container-root commands can also write root-owned files and change
+ownership or permissions on writable bind mounts. The manager still drops `NET_RAW` and
+`MKNOD`, keeps Docker's normal separation, and leaves privileged mode, extra capabilities,
+host networking and Docker socket mounts disabled.
 
 ## What it does not give you
 

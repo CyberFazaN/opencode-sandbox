@@ -12,19 +12,25 @@ The current checkpoint below records fresh verification; older sections retain t
 | Manager | `6.4.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
-| Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
+| Schemas | Rootless metadata 2 and backup 3; rootful metadata 3 and backup 4 on develop. Unknown schemas are refused |
 | Images | Debian 13/default (`node:24-trixie`, revision 5); Arch rolling (`archlinux:base-devel`, revision 4) |
 
 6.4.0 adds opt-in full-directory copies, clarifies workspace setup and Agent Context activation,
 and corrects the Debian/Arch launcher installation and the Arch AUR helper build. Environment and
 backup schemas are unchanged. Manager upgrades do not rebuild existing images or environments.
 
+Unreleased rootful support has focused real Docker evidence on the disposable Arch VM
+with Debian and Kali images. It covers authenticated daemon separation, UID/GID and direct
+bind ownership, container-local sudo, config copy and export, OpenCode update and rollback,
+system-image backup and restore, recreation, and the disabled gate. The Arch container
+image and release campaign have separate qualification requirements.
+
 ## Supported environments
 
 - Intended host: Linux meeting [the prerequisites](../install.md#requirements); real Docker/OpenCode
   evidence is on Arch Linux only. Tested kernel 7.3.4, Git 2.56.1, own rootless Docker 29.10.0,
   RootlessKit 3.3.0/slirp4netns, overlayfs/containerd image store, cgroup v2 with CPU/memory/PIDs
-  delegated by systemd 262. Foreign/rootful/remote daemons and socket proxies are refused.
+  delegated by systemd 262. Foreign and remote daemons and socket proxies are refused. Opted-in environments can use the authenticated local rootful daemon.
 - Python >=3.11: local 3.11.18 and 3.14.10; 3.12/3.13 accepted, not tested separately. Hosted CI
   uses Ubuntu 26.04 and Python 3.11/3.14, plus an unprivileged rolling Arch userland job.
 - Python 3.15 is stable ([upstream status](https://devguide.python.org/versions/)) and accepted by

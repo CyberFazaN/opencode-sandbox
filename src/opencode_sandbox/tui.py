@@ -23,8 +23,8 @@ from textual.widgets import (
 )
 from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 
+from . import backends, workspaces
 from . import core as c
-from . import workspaces
 from .tui_runtime import publish, work
 
 
@@ -114,9 +114,17 @@ class CreateScreen(ModalScreen[dict | None]):
             yield Input(placeholder="Folder to copy", id="source", compact=True)
             yield Select(self.import_choices("project"), value=workspaces.COPY_COMMITTED,
                          allow_blank=False, id="import-mode", compact=True)
-            with Collapsible(title="More options: distribution, provider, OpenCode config", id="more"):
+            with Collapsible(title="More options: distribution, Docker, configuration", id="more"):
                 yield Select([(f"Base definition: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
                               for d in distros.REGISTRY.values()], value=distros.DEFAULT, allow_blank=False, id="distro", compact=True)
+                try:
+                    allow_rootful = backends.allowed()
+                except (OSError, ValueError, c.SandboxError):
+                    allow_rootful = False
+                yield Select([("Docker: Rootless", backends.ROOTLESS),
+                              *([("Docker: Rootful (host root authority)", backends.ROOTFUL)] if allow_rootful else [])],
+                             value=backends.ROOTLESS, allow_blank=False, id="backend", compact=True,
+                             disabled=not allow_rootful)
                 yield Select([(f"Provider profile: {name}", name) for name in profiles], value="default",
                              allow_blank=False, id="profile", compact=True)
                 yield Select([("OpenCode config: Local (no initial import)", "local"),
@@ -182,6 +190,7 @@ class CreateScreen(ModalScreen[dict | None]):
         if setup == "copy" and not folder:
             raise c.SandboxError("A workspace copy needs a source folder")
         distro = self.query_one("#distro", Select).value
+        backend = self.query_one("#backend", Select).value
         direct = setup == "direct"
         mode = workspaces.DIRECT if direct else workspaces.MANAGED
         path = Path(folder).expanduser() if folder else None
@@ -198,7 +207,7 @@ class CreateScreen(ModalScreen[dict | None]):
         if copying and (not isinstance(config, str) or not config):
             raise c.SandboxError("Copy requires a config profile; place user-maintained directories in OpenCode Configs, or use Local")
         return {"name": name, "kind": kind, "source": folder or None, "profile": self.query_one("#profile", Select).value,
-                "mode": mode, "distro": distro, "opencode_config": config if copying else None,
+                "mode": mode, "distro": distro, "backend": backend, "opencode_config": config if copying else None,
                  "include_working_changes": working, "copy_entire_directory": entire,
                 "agent_context_enabled": self.query_one("#include-agent-context", Checkbox).value}
 
@@ -428,7 +437,11 @@ class Dashboard(App):
                             severity="warning", timeout=12)
         except Exception as exc:
             self.notify(c.error_text(exc), severity="error")
-        self._prerequisites_worker()
+        selected = self.selected()
+        if selected and backends.get(selected) == backends.ROOTFUL:
+            self._prerequisites_worker(backends.ROOTFUL)
+        else:
+            self._prerequisites_worker()
         self.set_interval(60, self.refresh_discovery_preferences)
         self.refresh_discovery_preferences()
         self.refresh_clipboard_preferences()
@@ -494,20 +507,27 @@ class Dashboard(App):
         else: button.tooltip = "Local/cached Updates; Check explicitly refreshes the selected component's source"
 
     @work(thread=True, exclusive=True, group="prerequisites")
-    def _prerequisites_worker(self) -> None:
+    def _prerequisites_worker(self, backend=backends.ROOTLESS) -> None:
         """Shared daemon/base-image checks at startup/explicit Refresh, off the UI thread.
 
         Image warnings are advisory; they never block or change an existing environment.
         """
         from . import readiness
         try:
-            check = readiness.daemon_check()
+            with backends.use(backend):
+                check = readiness.daemon_check()
+                if check.status == readiness.PASSED:
+                    self._publish_daemon_advisories(readiness)
+                    return
+                detail = check.detail
         except Exception as exc:
-            publish(self, self._show_prerequisites, c.error_text(exc))
-            return
-        if check.status != readiness.PASSED:
-            publish(self, self._show_prerequisites, check.detail)
-            return
+            detail = c.error_text(exc)
+        if backend == backends.ROOTFUL:
+            publish(self, self._show_rootful_prerequisites, detail)
+        else:
+            publish(self, self._show_prerequisites, detail)
+
+    def _publish_daemon_advisories(self, readiness):
         publish(self, self._prerequisites_ready)
         try:
             support = readiness.resource_support_check()
@@ -521,6 +541,11 @@ class Dashboard(App):
             images = [readiness.Check("images", "Base images", readiness.NOT_CHECKED,
                                       f"check could not run: {c.error_text(exc)}")]
         publish(self, self._show_image_checks, images)
+
+    def _show_rootful_prerequisites(self, detail):
+        self._replace_advisory("daemon", "Rootful Docker is unavailable. See Settings or rootful doctor.",
+                               title="Rootful Docker is unavailable",
+                               detail=f"{detail}\nDetails: opencode-sandbox --docker-backend rootful doctor")
 
     def _replace_advisory(self, category, summary=None, *, title="", detail="") -> None:
         """UI-thread replacement of just this category, including success with no new toast."""
@@ -643,7 +668,11 @@ class Dashboard(App):
     def action_refresh_readiness(self) -> None:
         """Explicit Refresh retries prerequisites; metadata auto-refresh stays Docker-free."""
         self.action_refresh()
-        self._prerequisites_worker()
+        selected = self.selected()
+        if selected and backends.get(selected) == backends.ROOTFUL:
+            self._prerequisites_worker(backends.ROOTFUL)
+        else:
+            self._prerequisites_worker()
 
     def selected(self):
         table = self.query_one("#envs", DataTable)
@@ -686,7 +715,7 @@ class Dashboard(App):
                 f"State: {m.get('status', '?')}  Operation: {m.get('operation') or '—'}  Created: {created}\n"
                 f"Workspace: {escape(workspace)}\n"
                 f"Distribution: {escape(image)}  Provider profile: {escape(profile)}\n"
-                f"Settings: {escape(settings)}\n"
+                f"Docker: {escape(backends.describe(m))}  Settings: {escape(settings)}\n"
                 f"Readiness: {Dashboard._readiness_line(m)}\n"
                 + (f"Error: {escape(str(m['last_error']))}" if m.get("last_error")
                  else f"OpenCode: {Dashboard._availability_line(m)}"))
@@ -831,13 +860,15 @@ class Dashboard(App):
     def action_disk(self) -> None:
         """Disk usage and cleanup preview (same implementation as `disk` / `cleanup`)."""
         self.notify("Collecting disk usage…")
-        self._disk_worker()
+        m = self.selected()
+        self._disk_worker(backends.get(m) if m else backends.ROOTLESS)
 
     @work(thread=True, exclusive=True, group="disk-usage")
-    def _disk_worker(self):
+    def _disk_worker(self, backend=backends.ROOTLESS):
         from . import cleanup
         try:
-            inv = cleanup.inventory()
+            with backends.use(backend):
+                inv = cleanup.inventory()
             publish(self, self._show_disk, inv)
         except Exception as exc:
             publish(self, self.notify, f"Disk usage failed: {c.error_text(exc)}", severity="error")
@@ -853,13 +884,14 @@ class Dashboard(App):
         text = (f"Remove {len(items)} object(s), freeing {cleanup.human(cleanup.reclaimable(items))}?\n"
                 + "\n".join(cleanup.format_preview(items)[:12]) + ("\n  …" if len(items) > 12 else "")
                 + "\nEach object is checked again first; objects in use are skipped.")
-        self.push_screen(ConfirmScreen(text), lambda yes: self._cleanup_worker([i.key for i in items], superseded) if yes else None)
+        self.push_screen(ConfirmScreen(text), lambda yes: self._cleanup_worker([i.key for i in items], superseded, getattr(inv, "backend", backends.ROOTLESS)) if yes else None)
 
     @work(thread=True, exclusive=True, group="disk-cleanup")
-    def _cleanup_worker(self, keys, superseded):
+    def _cleanup_worker(self, keys, superseded, backend=backends.ROOTLESS):
         from . import cleanup
         try:
-            results = cleanup.apply(keys, superseded=superseded)
+            with backends.use(backend):
+                results = cleanup.apply(keys, superseded=superseded)
             def line(item, error):
                 label = item if isinstance(item, str) else f"{item.kind} {item.name}"
                 if error is None:
@@ -1067,16 +1099,16 @@ class Dashboard(App):
         self._finished(result, failed)
         callback(key, result, failed)
 
-    def run_base_update_action(self, key, action, plan, callback):
+    def run_base_update_action(self, key, action, plan, callback, *, backend=backends.ROOTLESS):
         """Base-only worker binding; no screen ownership or universal update executor."""
         if self._operation_pending: return
         self._operation_pending = self._updates_mutation_active = True
         self._base_operation = {'distro': key, 'phase': 'Preparing base operation', 'output': '', 'result': None}
         self._set_busy(f'{action.capitalize()} base {key}…')
-        self._base_update_worker(key, action, plan, callback)
+        self._base_update_worker(key, action, plan, callback, backend)
 
     @work(thread=True, group='base-operation')
-    def _base_update_worker(self, key, action, plan, callback):
+    def _base_update_worker(self, key, action, plan, callback, backend=backends.ROOTLESS):
         import json
 
         from . import build_output
@@ -1088,12 +1120,13 @@ class Dashboard(App):
                     if self.is_running: raise
         with c.runtime_feedback(progress=None, cancelled=None), build_output.listen(progress):
             try:
-                if action == 'build':
-                    outcome = v.update_base(plan.target, key, refresh=plan.refresh, plan=plan)
-                    result = ('Base verified unchanged; ' if outcome.get('unchanged') else 'Base build verified and published; ') + json.dumps(outcome)
-                else:
-                    outcome = v.rollback_base(key, plan=plan)
-                    result = ('Base rollback verified unchanged; ' if outcome.get('unchanged') else 'Base rollback verified and published; ') + json.dumps(outcome)
+                with backends.use(backend):
+                    if action == 'build':
+                        outcome = v.update_base(plan.target, key, refresh=plan.refresh, plan=plan)
+                        result = ('Base verified unchanged; ' if outcome.get('unchanged') else 'Base build verified and published; ') + json.dumps(outcome)
+                    else:
+                        outcome = v.rollback_base(key, plan=plan)
+                        result = ('Base rollback verified unchanged; ' if outcome.get('unchanged') else 'Base rollback verified and published; ') + json.dumps(outcome)
                 failed = False
             except Exception as exc:
                 result, failed = c.error_text(exc), True
@@ -1210,10 +1243,14 @@ class Dashboard(App):
     def action_create_environment(self) -> None:
         self.push_screen(CreateScreen(), self._create_from_form)
 
-    def _create_from_form(self, values) -> None:
+    def _create_from_form(self, values, *, rootful_confirmed=False) -> None:
         if values is not None:
             if self._operation_pending:
                 self.notify("Another operation is running", severity="warning"); return
+            if values.get("backend") == backends.ROOTFUL and not rootful_confirmed:
+                self.push_screen(ConfirmScreen(backends.WARNING),
+                                 lambda yes: self._create_from_form(values, rootful_confirmed=True) if yes else None)
+                return
             if values["mode"] == "direct":
                 self._confirm_direct(values)
                 return
@@ -1281,6 +1318,8 @@ class Dashboard(App):
                        "copy_entire_directory": values.get("copy_entire_directory", False),
                        "import_fingerprint": values.get("import_fingerprint"),
                        "agent_context_enabled": values.get("agent_context_enabled", True)}
+            if values.get("backend") == backends.ROOTFUL:
+                options["backend"] = backends.ROOTFUL
             source = Path(values["source"]).expanduser() if values.get("source") else None
             if values.get("mode") == "direct":
                 m = c.create(values["name"], values["kind"], None, profile=values["profile"], distro=values.get("distro"),
@@ -1319,7 +1358,8 @@ class Dashboard(App):
     @work(thread=True, exclusive=True, group="environment-operation")
     def _prepare_attach(self, m, shell) -> None:
         try:
-            c.verify_runtime()
+            with backends.use(backends.get(m)):
+                c.verify_runtime()
             self.call_from_thread(self._attach_ready, m, shell)
         except Exception as exc:
             self.call_from_thread(self._finished, c.error_text(exc), True)

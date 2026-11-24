@@ -23,8 +23,8 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import backends, distros
 from . import core as c
-from . import distros
 
 MANAGED, ID, VERSION = "org.opencode-sandbox.managed", "org.opencode-sandbox.id", "org.opencode-sandbox.manager-version"
 
@@ -73,6 +73,7 @@ class Inventory:
     host: list = field(default_factory=list)
     build_cache: dict | None = None
     errors: list = field(default_factory=list)
+    backend: str = backends.ROOTLESS
 
     def eligible(self, superseded=False):
         return [i for i in self.items if i.scope == DEFAULT or (superseded and i.scope == EXTRA)]
@@ -448,7 +449,7 @@ def _host(inv, ids, envs):
 def inventory():
     """Read-only. Raises only when the daemon is not verified; other failures are reported."""
     c.ensure_runtime(False)
-    inv = Inventory(str(c.BASE), c.data_id())
+    inv = Inventory(str(c.BASE), c.data_id(), backend=backends.selected())
     sizes = _docker_df(inv)
     try:
         fetched = _fetch()
@@ -618,7 +619,7 @@ BUILD_CACHE_NOTE = ("  daemon-wide: Docker does not record which builds created 
 
 def format_inventory(inv):
     lines = [f"Data directory: {inv.data_dir} (Docker label org.opencode-sandbox.data-dir={inv.data_id})",
-             SIZES_NOTE, "", "Environments (remove one with: delete NAME):"]
+             f"Docker backend: {inv.backend}", SIZES_NOTE, "", "Environments (remove one with: delete NAME):"]
     shown = set()
     for e in inv.environments:
         parts = [f"directory {human(e['size'])}" + ("" if e["complete"] else " or more (some files unreadable)")]

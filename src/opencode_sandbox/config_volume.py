@@ -179,7 +179,15 @@ def helper_main():
     try:
         os.umask(0o077)
         request = json.loads(sys.argv[1])
-        result = operation("/root", request, sys.stdin.buffer, sys.stdout.buffer)
+        home = request.get("home", "/root")
+        if identity := request.get("identity"):
+            uid, gid = identity["uid"], identity["gid"]
+            if request.get("fresh"):
+                os.chown(home, uid, gid)
+            os.setgroups([])
+            os.setgid(gid)
+            os.setuid(uid)
+        result = operation(home, request, sys.stdin.buffer, sys.stdout.buffer)
         print(json.dumps(result), file=sys.stderr)
     except (OSError, ValueError, TreeError, tarfile.TarError, RecursionError) as exc:
         # Fixed codec errors are safe; OS/JSON/archive messages may contain sensitive paths/data.

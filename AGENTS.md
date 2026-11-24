@@ -12,8 +12,8 @@ never lift the "Never" list.
 ## Product contract
 
 OpenCode Sandbox is a Python >= 3.11 Typer CLI and Textual TUI that runs OpenCode V2 coding agents
-in per-environment containers on the current user's **own rootless Docker daemon** (identity
-verified, never assumed). Hosts: Linux distributions that meet the prerequisites (D-046); Arch
+in per-environment containers. The default is the current user's **own rootless Docker daemon**.
+Opted-in environments can use the local rootful daemon. The manager verifies both identities. Hosts: Linux distributions that meet the prerequisites (D-046); Arch
 Linux is the development and real-test host. Base images come from a distribution
 registry (`src/opencode_sandbox/distros.py`): Debian 13 (`node:24-trixie`, default), Arch
 Linux (`archlinux:base-devel`, AUR via `ocs-aur`), and Kali Linux rolling

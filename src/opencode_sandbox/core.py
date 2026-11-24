@@ -23,7 +23,7 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import build_output, diagnostics, distros, runtime_identity
+from . import backends, build_output, diagnostics, distros, runtime_identity
 from .assets.images.common.ocs_opencode import validate_profile
 
 APP = "opencode-sandbox"
@@ -34,7 +34,10 @@ CONTEXT = os.getenv("OPENCODE_SANDBOX_DOCKER_CONTEXT", "rootless")
 # environment created from a custom image (`image` set at creation), see D-016; and
 # `workspace`: {mode: managed|direct, path}, see D-012 and workspaces.py.
 METADATA_SCHEMA = 2
+ROOTFUL_METADATA_SCHEMA = 3
 _IMAGE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/:@-]{0,254}")
+
+
 
 class SandboxError(RuntimeError): pass
 
@@ -146,6 +149,17 @@ def runtime_feedback(*, progress=_runtime_progress, cancelled=None, timeout=runt
 def verify_runtime(strict=True):
     """Verify the daemon identity (D-003); return the Identity, raising unless verified when strict."""
     global _ENDPOINT, _RUNTIME_GENERATION, _RUNTIME_LAST
+    if backends.selected() == backends.ROOTFUL:
+        budget = runtime_identity.Budget(**(_RUNTIME_FEEDBACK.get() or {"progress": _runtime_progress}))
+        try:
+            ident = runtime_identity.verify(rootful=True, budget=budget)
+        finally:
+            if budget.notified and budget.progress:
+                budget.progress(None)
+        backends.endpoint.set(ident.endpoint if ident.verified else None)
+        if not ident.verified and strict:
+            raise PrerequisiteError(ident.message(), runtime_identity.EXIT_CODES[ident.classification])
+        return ident
     budget = runtime_identity.Budget(**(_RUNTIME_FEEDBACK.get() or {"progress": _runtime_progress}))
     generation = _RUNTIME_GENERATION
     acquired = False
@@ -173,6 +187,8 @@ def verify_runtime(strict=True):
     return ident
 
 def docker_endpoint():
+    if backends.selected() == backends.ROOTFUL:
+        return backends.endpoint.get() or verify_runtime().endpoint
     if _ENDPOINT is None: verify_runtime()
     return _ENDPOINT
 
@@ -219,13 +235,19 @@ def docker_info():
 
 def docker_cli():
     """Shell-ready docker prefix for hints shown to the user."""
+    if backends.selected() == backends.ROOTFUL: return f"docker -H {runtime_identity.ROOTFUL_ENDPOINT}"
     return f"docker -H {shlex.quote(_ENDPOINT)}" if _ENDPOINT else f"docker --context {shlex.quote(CONTEXT)}"
 
 def ensure_runtime(distro=None):
     """Verify the daemon; with a registry Distro also require its base image."""
     verify_runtime()
-    if distro and docker("image", "inspect", distro.image, capture=True, check=False).returncode:
-        raise SandboxError(f"Image {distro.image} missing. Run: opencode-sandbox build --distro {distro.id}")
+    if distro:
+        if backends.selected() == backends.ROOTFUL:
+            present = inspect_base_image(distro, distro.image, missing=True) is not None
+        else:
+            present = docker("image", "inspect", distro.image, capture=True, check=False).returncode == 0
+        if not present:
+            raise SandboxError(f"Image {distro.image} missing. Run: opencode-sandbox {backends.cli_flag()}build --distro {distro.id}")
 
 def env_distro(m):
     """The environment's registry distribution, or None for a custom image."""
@@ -305,6 +327,9 @@ def env_dir(eid):
 def save(m):
     """Atomic, durable metadata replacement; caller holds environment lock for mutations."""
     d=env_dir(m["id"]); d.mkdir(parents=True,exist_ok=True)
+    previous = _load_metadata(d / "metadata.json")
+    if previous and (backends.get(previous), previous.get("identity")) != (backends.get(m), m.get("identity")):
+        raise SandboxError("Docker backend and runtime identity are immutable")
     fd, name=tempfile.mkstemp(prefix=".metadata-",dir=d)
     try:
         with os.fdopen(fd,"w") as f:
@@ -334,9 +359,10 @@ def _read_metadata(p):
             or not isinstance(m.get("name"),str) or not isinstance(m.get("kind"),str)
             or not isinstance(m.get("created",""),str)):
         return None, "malformed metadata"
-    if m.get("schema")!=METADATA_SCHEMA:
+    expected_schema = ROOTFUL_METADATA_SCHEMA if backends.get(m) == backends.ROOTFUL else METADATA_SCHEMA
+    if m.get("schema")!=expected_schema:
         # Other schemas are not migrated and never modified (D-002).
-        return None, (f"metadata schema {m.get('schema')!r} is not supported (expected {METADATA_SCHEMA}); "
+        return None, (f"metadata schema {m.get('schema')!r} is not supported (expected {expected_schema}); "
                       "this environment is not managed by this version and is left unchanged")
     if "distro" not in m:
         return None, "metadata has no distribution (written by a pre-release build)"
@@ -344,6 +370,10 @@ def _read_metadata(p):
         if not isinstance(m.get("image"),str): return None, "custom-image environment without an image"
     elif m["distro"] not in distros.REGISTRY:
         return None, f"unknown distribution {m['distro']!r}"
+    backend = backends.get(m)
+    if backend not in backends.NAMES or (backend == backends.ROOTFUL
+                                        and (not m["distro"] or not backends.valid_identity(m.get("identity")))):
+        return None, "invalid Docker backend or runtime identity"
     from . import workspaces
     try: workspaces.info(m)
     except SandboxError: return None, "missing or invalid workspace record"
@@ -459,6 +489,7 @@ def port_conflicts(m, settings):
             conflicts.append(f"{port}/{proto} reserved by {other['name']}")
     return conflicts
 
+@backends.environment
 def runtime_usage(m):
     """Docker's one-shot stats; returns raw daemon values, never guessed metrics."""
     state=inspect_container(m)
@@ -471,6 +502,7 @@ def runtime_usage(m):
             "memory_percent":data.get("MemPerc"),"network_io":data.get("NetIO"),
             "processes":data.get("PIDs")}
 
+@backends.environment
 def reconfigure_runtime(m, settings, profile=None, agent_context_enabled=None):
     """Replace a stopped container, retaining /root volume, workspace and committed layer.
     The recreate step of config_plan.apply(); `settings` is the complete target runtime and
@@ -515,6 +547,7 @@ def reconfigure_runtime(m, settings, profile=None, agent_context_enabled=None):
     # Do not auto-start: preserves the user's stopped state.
     return {"image":tag,"recreated":True}
 
+@backends.environment
 def recover_runtime_reconfigure(m, *, precondition=None):
     """Complete a durable runtime-recreate intent, never removing an unowned container.
 
@@ -540,6 +573,7 @@ def recover_runtime_reconfigure(m, *, precondition=None):
         _finish_reconfigure(m)
         return {"image":m["image"],"recovered":True}
 
+@backends.environment
 def _finish_reconfigure(m):
     """Close the journal; untag this environment's superseded ocs-runtime image (its layers
     live on in the new one). Other tags (user snapshots, base images) are never touched."""
@@ -607,7 +641,18 @@ def creation_options(name, kind=None, source=None, *, distro=None, image=None, w
 def create(name, kind=None, source=None, profile="default", *, distro=None, image=None,
            workspace_mode="managed", workspace=None, consent=False, agent_context_enabled=True,
            opencode_config=None, journal=None, include_working_changes=False, copy_entire_directory=False,
-           import_fingerprint=None):
+           import_fingerprint=None, backend=backends.ROOTLESS):
+    with backends.use(backend):
+        return _create_options(name, kind, source, profile, distro=distro, image=image,
+                               workspace_mode=workspace_mode, workspace=workspace, consent=consent,
+                               agent_context_enabled=agent_context_enabled, opencode_config=opencode_config,
+                               journal=journal, include_working_changes=include_working_changes,
+                               copy_entire_directory=copy_entire_directory, import_fingerprint=import_fingerprint)
+
+
+def _create_options(name, kind, source, profile, *, distro, image, workspace_mode, workspace, consent,
+                    agent_context_enabled, opencode_config, journal, include_working_changes,
+                    copy_entire_directory, import_fingerprint):
     from . import opencode_configs as oc
     options = {"distro":distro, "image":image, "workspace_mode":workspace_mode, "workspace":workspace,
                "consent":consent, "agent_context_enabled":agent_context_enabled,
@@ -641,6 +686,12 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
     profile_read(profile)
     kind,distro=creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
                                 include_working_changes=include_working_changes, copy_entire_directory=copy_entire_directory)
+    backend = backends.selected()
+    identity = backends.host_identity() if backend == backends.ROOTFUL else None
+    if identity and image is not None:
+        raise SandboxError("Rootful environments require a managed distribution image")
+    if journal and any(key in journal for key in ("backend", "identity")):
+        raise SandboxError("Docker backend and identity cannot be changed by a creation journal")
     import_method=None
     if source is not None:
         try: source=Path(source).expanduser().resolve(strict=True)
@@ -677,7 +728,10 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
         if image is not None and docker("image","inspect",image,capture=True,check=False).returncode:
             raise SandboxError(f"Image {image} not found locally; the preflight needs it")
         direct=workspaces.check_direct(workspace)
-        workspaces.preflight(direct, image or distros.get(distro).image)
+        if identity:
+            workspaces.preflight(direct, distros.get(distro).image, user=backends.user({"identity": identity}))
+        else:
+            workspaces.preflight(direct, image or distros.get(distro).image)
     with lock("registry"):
         # Names are the primary CLI/TUI handle; duplicates made every name lookup ambiguous.
         if any(other["name"]==name for other in all_envs()):
@@ -713,8 +767,10 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
                     origin=None
             else: workspace.mkdir()
             m={"id":eid,"name":name,"kind":kind,"source":str(source) if source else None,"base_commit":origin,"profile":profile,"created":now(),"status":"ready","schema":METADATA_SCHEMA,"runtime":validate_runtime_settings({}),
-               "distro":distro,"workspace":{"mode":workspace_mode,"path":str(direct) if direct else None},
+               "distro":distro,"backend":backend,"workspace":{"mode":workspace_mode,"path":str(direct) if direct else None},
                "agent_context_enabled":agent_context_enabled,"opencode_config_source":opencode_config}
+            if identity:
+                m.update(identity=identity, schema=ROOTFUL_METADATA_SCHEMA)
             if import_method is not None: m["workspace_import"]=import_method
             if image is not None: m["image"]=m["custom_image"]=image  # custom_image never changes
             if journal:
@@ -793,6 +849,7 @@ def profile_set(name, values):
 def profile_keys(name):
     return sorted(profile_read(name))
 
+@backends.environment
 def volume_state(m):
     """Return volume inspect dict or None. Never treat daemon errors as absence."""
     p=docker("volume","inspect",volume(m),capture=True,check=False)
@@ -807,24 +864,31 @@ def volume_state(m):
     except (ValueError,TypeError,IndexError) as exc:
         raise SandboxError("Invalid Docker volume inspect response") from exc
 
+@backends.environment
 def assert_volume_owned(m):
     v=volume_state(m)
     if v is not None and (v.get("Labels") or {}).get("org.opencode-sandbox.id") != m["id"]:
         raise SandboxError(f"Volume ownership mismatch: {volume(m)}; refusing operation")
+    if v is not None and backends.get(m) == backends.ROOTFUL and (v.get("Labels") or {}).get(DATA_LABEL) != data_id():
+        raise SandboxError(f"Volume belongs to another data directory: {volume(m)}")
     return v
 
+@backends.environment
 def ensure_volume(m):
     existing=assert_volume_owned(m)
     if existing is None:
         docker("volume","create",*labels(m["id"]),volume(m),capture=True)
         assert_volume_owned(m)
 
+@backends.environment
 def container_exists(m): return docker("container","inspect",cname(m),capture=True,check=False).returncode==0
 
+@backends.environment
 def running(m):
     state=inspect_container(m)
     return bool(state and state.get("Running"))
 
+@backends.environment
 def assert_owned(m):
     """Refuse operations on Docker objects not labelled as belonging to this environment."""
     p=docker("container", "inspect", "--format", '{{index .Config.Labels "org.opencode-sandbox.id"}}', cname(m), capture=True, check=False)
@@ -832,8 +896,18 @@ def assert_owned(m):
         raise SandboxError(f"Cannot verify ownership of {cname(m)}: {p.stderr.strip()}")
     if p.stdout.strip()!=m["id"]:
         raise SandboxError(f"Container name collision / ownership mismatch: {cname(m)}")
+    if backends.get(m) == backends.ROOTFUL:
+        p = docker("container", "inspect", "--format", "{{json .Config}}", cname(m), capture=True)
+        try:
+            config = json.loads(p.stdout)
+            if config["User"] == backends.user(m) and config["Labels"][DATA_LABEL] == data_id():
+                return
+        except (ValueError, TypeError, KeyError):
+            pass
+        raise SandboxError(f"Rootful container identity or data-directory ownership mismatch: {cname(m)}")
 
 
+@backends.environment
 def inspect_container(m):
     """Return Docker container state, or None when missing. Raise on daemon failures."""
     p=docker("container","inspect","--format","{{json .State}}",cname(m),capture=True,check=False)
@@ -854,6 +928,7 @@ def memory_bytes(text):
     text=str(text)
     return int(text[:-1])*_MEMORY_UNITS[text[-1]] if text[-1] in _MEMORY_UNITS else int(text)
 
+@backends.environment
 def observed_runtime(m):
     """Network and limits of the existing container as Docker reports them, in the format of
     runtime_settings(); None when there is no container."""
@@ -870,6 +945,7 @@ def observed_runtime(m):
     return {"network":host.get("NetworkMode"),"cpus":str(nano/1e9) if nano else "unlimited",
             "memory":shown if memory else "unlimited","pids":pids if pids>0 else "unlimited"}
 
+@backends.environment
 def image_definition(m, *, container=False):
     """Read base provenance from the owned container, else the selected creation image.
 
@@ -913,6 +989,7 @@ def pending_operation(m):
     return SandboxError(f"{m['name']} has a pending operation ({op}). If another manager command is "
                         f"still working on it, wait until it finishes; if it was interrupted, run: {hint}")
 
+@backends.environment
 def _remove_unstarted(m):
     """A failed `docker run` can leave the container it created (e.g. the host port was taken).
     It never ran, so its layer holds nothing: remove it, so the settings can be fixed with
@@ -968,11 +1045,11 @@ def missing_image(m, image, command):
     name=m["name"]
     return SandboxError(
         f"Image {image}, which {name} needs, was removed outside the manager (the manager's cleanup keeps it), so "
-        "the container cannot be created from it. The workspace and the /root volume are not affected. If you still "
+        "the container cannot be created from it. The workspace and the home volume are not affected. If you still "
         f"have the image (for example saved with docker image save), load it under that name and run: "
         f"{command.format(name=name)}. Otherwise save the workspace with 'opencode-sandbox changes export {name}' (or "
         f"'opencode-sandbox changes bundle {name}' for a Git project) and remove the environment with "
-        f"'opencode-sandbox delete {name} --yes', which also removes the /root volume.")
+        f"'opencode-sandbox delete {name} --yes', which also removes the home volume.")
 
 def recheck_mount(m):
     """Docker mounts a direct workspace again at every container start, following the path as it
@@ -981,6 +1058,7 @@ def recheck_mount(m):
     if workspaces.is_direct(m):
         workspaces.recheck(m)
 
+@backends.environment
 def start(m, *, _resume_recreate=False, precondition=None):
     ensure_runtime(None if m.get("image") else env_distro(m))
     with lock(m["id"]):
@@ -1007,7 +1085,7 @@ def start(m, *, _resume_recreate=False, precondition=None):
                     if image.split(":",1)[0] in MANAGER_IMAGE_KINDS or image.startswith("sha256:"):
                         raise missing_image(m, image, "opencode-sandbox container recreate-recover {name}" if _resume_recreate
                                             else "opencode-sandbox start {name}")
-                    raise SandboxError(f"Base image {image} is missing; build it: opencode-sandbox build --distro {m.get('distro')}")
+                    raise SandboxError(f"Base image {image} is missing; build it: opencode-sandbox {backends.cli_flag()}build --distro {m.get('distro')}")
                 mark(m,"creating",operation="recreate" if _resume_recreate else "start")
                 # A failed docker run may leave a created container and/or volume.
                 try:
@@ -1028,12 +1106,15 @@ def start(m, *, _resume_recreate=False, precondition=None):
                     guidance = ac.refresh(m, env_dir, **inputs)
                     # Never pull a manager image (its name is local); drop capabilities an agent
                     # does not need: raw sockets, device nodes.
-                    args=["run","-d","--name",cname(m),"--init","--security-opt","no-new-privileges:true",
+                    identity_flags = (["--user", backends.user(m), "--env", f"HOME={backends.home(m)}"]
+                                      if backends.get(m) == backends.ROOTFUL else
+                                      ["--security-opt", "no-new-privileges:true"])
+                    args=["run","-d","--name",cname(m),"--init", *identity_flags,
                           *([] if pull else ["--pull","never"]),"--cap-drop","NET_RAW","--cap-drop","MKNOD",
                           "--memory",runtime["memory"],"--cpus",runtime["cpus"],
                           "--pids-limit",str(runtime["pids"]),"--network",runtime["network"],
                           "--mount",f"type=bind,src={workspaces.path(m)},dst=/workspace",
-                          "--mount",f"type=volume,src={volume(m)},dst=/root",
+                          "--mount",f"type=volume,src={volume(m)},dst={backends.home(m)}",
                           # OpenCode's own self-update is off; the manager updates it (D-019).
                           "--env",opencode_versions.SELF_UPDATE_ENV,
                           *labels(m["id"])]
@@ -1066,20 +1147,38 @@ def start(m, *, _resume_recreate=False, precondition=None):
             except Exception as exc:
                 mark(m,"error",last_error=f"Start failed: {exc}")
                 raise
-        from . import agent_context as ac
         try:
-            ac.refresh(m, env_dir, **guidance_inputs(m))
-            try:
-                ac.reconcile(m)
-            except SandboxError:
-                from . import opencode_availability as availability
-                if availability.check(m) not in (availability.Status.MISSING, availability.Status.BROKEN):
-                    raise
+            _prepare_running_environment(m)
         except Exception as exc:
             mark(m,"error",last_error=f"Agent Context reconciliation failed: {exc}")
             raise
         mark(m,"running",last_error=None,operation=None)
 
+
+def _prepare_running_environment(m):
+    from . import agent_context as ac
+
+    if backends.get(m) == backends.ROOTFUL:
+        _initialize_rootful(m)
+    ac.refresh(m, env_dir, **guidance_inputs(m))
+    try:
+        ac.reconcile(m)
+    except SandboxError:
+        from . import opencode_availability as availability
+
+        if availability.check(m) not in (availability.Status.MISSING, availability.Status.BROKEN):
+            raise
+
+
+def _initialize_rootful(m):
+    # The persistent home root is the only mounted path whose ownership is set here.
+    from .rootful_home import BOOTSTRAP
+    identity = m["identity"]
+    docker("exec", "--user", "0:0", "--workdir", "/", cname(m), "python3", "-I", "-c", BOOTSTRAP,
+           identity["name"], str(identity["uid"]), str(identity["gid"]), backends.home(m), capture=True)
+
+
+@backends.environment
 def repair(m, *, cleanup=False):
     """Reconcile metadata against Docker without destroying user data.
 
@@ -1102,7 +1201,7 @@ def repair(m, *, cleanup=False):
             # writable layer holds the user's system changes, which removing it would lose.
             if state.get("Status") not in ("created","dead"):
                 raise SandboxError("Refusing --cleanup: this stopped container has run before and its writable layer holds "
-                                   "system changes (packages, files outside /workspace and /root). Use "
+                                   "system changes (packages, files outside /workspace and the home volume). Use "
                                    f"'opencode-sandbox container recreate {m['name']} --yes' (keeps them via snapshot) or 'delete'.")
             docker("rm",cname(m),capture=True)
             mark(m,"ready",last_error=None,operation=None)
@@ -1118,6 +1217,7 @@ def _tty():
 
 PROFILE_TARGET = "/run/secrets/ocs-provider.json"
 
+@backends.environment
 def mounted_profile(m):
     """Host path of the profile bind-mounted into the container, "" if none, None if unknown."""
     p=docker("container","inspect","--format","{{json .Mounts}}",cname(m),capture=True,check=False)
@@ -1129,6 +1229,7 @@ def mounted_profile(m):
             return mount.get("Source") or ""
     return ""
 
+@backends.environment
 def profile_mismatch(m):
     """Mounts are fixed at container creation: a restart keeps the old profile."""
     mounted=mounted_profile(m)
@@ -1148,6 +1249,7 @@ def profile_mismatch(m):
 # applied) and outlives the terminal.
 LAUNCHER = (distros.IMAGES / "common" / "ocs_opencode.py").read_text()
 
+@backends.environment
 def interactive(m, shell=False):
     if not _tty():
         raise SandboxError("run/shell need an interactive terminal; use 'exec NAME -- COMMAND' for scripts")
@@ -1254,6 +1356,7 @@ if words and words[0].isdigit():
 subprocess.run(sys.argv[1:],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
 """
 
+@backends.environment
 def session_watchdog(m, token):
     """Best effort: None when it cannot start (the session then runs without it)."""
     argv = [sys.executable, "-I", "-c", WATCHDOG, "docker", "-H", docker_endpoint(),
@@ -1280,10 +1383,12 @@ HANGUP = """for e in /proc/[0-9]*/environ; do
   p=${e#/proc/}; kill -HUP "${p%/environ}" 2>/dev/null
 done; exit 0"""
 
+@backends.environment
 def hangup_session(m, token):
     try: docker("exec", cname(m), "sh", "-c", HANGUP, "ocs-hangup", token, capture=True, check=False)
     except Exception: pass  # noqa: BLE001, S110 — best effort while the launcher exits; never replaces the exception that ended the session
 
+@backends.environment
 def exec_cmd(m,cmd):
     """Run a command; allocate a TTY only when attached to one (pipes/scripts work)."""
     start(m)
@@ -1294,6 +1399,7 @@ def exec_cmd(m,cmd):
 # Interrupted operations whose journal only their recovery command may close.
 JOURNALS = frozenset({"runtime-recreate","recreate","config-update","delete","restore","opencode-update","opencode-config"})
 
+@backends.environment
 def stop(m, *, precondition=None):
     """True if this call stopped a running container."""
     ensure_runtime(False)
@@ -1342,6 +1448,7 @@ def require_docker_space(what):
                            "('opencode-sandbox disk usage' and 'disk cleanup') or adjust OPENCODE_SANDBOX_DOCKER_RESERVE_BYTES.")
     return free
 
+@backends.environment
 def snapshot(m,tag=None):
     """docker commit captures container writable layer, not /root volume or /workspace."""
     ensure_runtime(False)
@@ -1352,6 +1459,7 @@ def snapshot(m,tag=None):
     docker("commit",cname(m),tag,capture=True)
     return tag
 
+@backends.environment
 def snapshot_tag(m):
     """A new default snapshot tag: the time has one-second resolution, so a random suffix; a tag
     that exists is never moved by `docker commit`/`docker tag`."""
@@ -1362,6 +1470,7 @@ def snapshot_tag(m):
 
 MANAGER_IMAGE_KINDS = ("ocs-snapshot", "ocs-runtime", "ocs-backup", "ocs-checkpoint")  # repositories, cleanup.ENV_IMAGE
 
+@backends.environment
 def check_snapshot_tag(m, tag):
     """`docker commit` moves an existing tag, so a chosen tag could have replaced a base image or
     another environment's image. Only new tags; in the manager's repositories only
@@ -1374,6 +1483,7 @@ def check_snapshot_tag(m, tag):
     if docker("image","inspect",tag,capture=True,check=False).returncode==0:
         raise SandboxError(f"Image {tag} already exists; snapshots never replace an existing tag")
 
+@backends.environment
 def recreate(m, confirm=False):
     """Preserve writable layer via commit, then recreate using that exact image.
 
@@ -1405,6 +1515,7 @@ def recreate(m, confirm=False):
     return recreate_recover(m)
 
 
+@backends.environment
 def recreate_recover(m):
     """Explicitly finish a journalled recreation; do not discard its snapshot."""
     ensure_runtime(False)
@@ -1424,9 +1535,7 @@ def recreate_recover(m):
                         f"The running container is the old container (image {image!r}), not the replacement from "
                         f"{env_image(m)!r}; changes made in it after the snapshot are not in that snapshot. Stop it with "
                         f"'opencode-sandbox stop {m['name']}', then rerun 'opencode-sandbox container recreate-recover {m['name']}'.")
-                from . import agent_context as ac
-                ac.refresh(m, env_dir, **guidance_inputs(m))
-                ac.reconcile(m)
+                _prepare_running_environment(m)
                 mark(m,"running",operation=None,last_error=None)
                 return "replacement already running"
             if not m.get("image") or image != m["image"]:
@@ -1441,9 +1550,7 @@ def recreate_recover(m):
             except Exception as exc:
                 mark(m,"error",operation="recreate",last_error=f"Recreation start failed: {exc}")
                 raise
-            from . import agent_context as ac
-            ac.refresh(m, env_dir, **guidance_inputs(m))
-            ac.reconcile(m)
+            _prepare_running_environment(m)
             mark(m,"running",operation=None,last_error=None)
             return "replacement started"
         # Preserve the journal through container creation. A crash at any point
@@ -1539,6 +1646,7 @@ def export(m,destination=None):
         target.unlink(missing_ok=True); raise
     return target
 
+@backends.environment
 def delete(m, *, force=False, precondition=None):
     """Retryable deletion: journal intent before destructive Docker operations.
 
@@ -1570,9 +1678,8 @@ def delete(m, *, force=False, precondition=None):
             raise
 
 def _remove_env_dir(m):
-    """Remove the environment directory, including workspace files owned by
-    subordinate UIDs (created by non-root users in the container), which only
-    the rootless user namespace can delete.
+    """Remove the environment directory, including workspace files created
+    by users that the host account cannot delete directly.
 
     Only the managed workspace below the environment directory is ever removed: a direct
     workspace lives elsewhere and is never computed here (D-012)."""
@@ -1595,7 +1702,8 @@ def _remove_env_dir(m):
         image=next((i for i in options if not docker("image","inspect",i,capture=True,check=False).returncode),None)
         if not image:
             raise SandboxError(f"Workspace has container-owned files and no local image is available to remove them: {w}")
-        docker("run","--rm","--network","none","--security-opt","no-new-privileges:true",
+        cleanup_user = ("--user", "0:0") if backends.get(m) == backends.ROOTFUL else ()
+        docker("run","--rm","--network","none","--security-opt","no-new-privileges:true", *cleanup_user,
                *helper_labels("cleanup"),"--label",f"org.opencode-sandbox.cleanup={m['id']}",
                "--mount",f"type=bind,src={w},dst=/w","--entrypoint","find",image,
                "/w","-mindepth","1","-delete",capture=True)

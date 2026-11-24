@@ -76,7 +76,8 @@ class SettingsScreen(Screen):
             yield Checkbox("Show quick environments", id="show-quick")
             yield Checkbox("Refresh after terminal session", id="refresh-return")
             yield Checkbox("Daily metadata discovery (dashboard only)", id="daily-discovery")
-            yield Checkbox("Copy selected text", id="copy-selected-text")
+            yield Checkbox("Copy selected text", id="copy-selected-text", compact=True)
+            yield Checkbox("Allow rootful Docker environments", id="allow-rootful", compact=True)
             with Horizontal():
                 yield Button("Save", id="save-settings", variant="primary")
                 yield Button("Cancel", id="cancel-settings")
@@ -86,7 +87,7 @@ class SettingsScreen(Screen):
             self.notify(c.error_text(exc), severity="error"); data = dict(preferences.DEFAULTS)
         for key, widget in (("confirm_stop", "confirm-stop"), ("show_quick", "show-quick"),
                             ("refresh_on_return", "refresh-return"), ("daily_discovery", "daily-discovery"),
-                            ("copy_selected_text", "copy-selected-text")):
+                            ("copy_selected_text", "copy-selected-text"), ("allow_rootful", "allow-rootful")):
             self.query_one("#" + widget, Checkbox).value = data[key]
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "cancel-settings": self.app.pop_screen(); return
@@ -96,7 +97,8 @@ class SettingsScreen(Screen):
                                    "show_quick": self.query_one("#show-quick", Checkbox).value,
                                    "refresh_on_return": self.query_one("#refresh-return", Checkbox).value,
                                    "daily_discovery": self.query_one("#daily-discovery", Checkbox).value,
-                                   "copy_selected_text": self.query_one("#copy-selected-text", Checkbox).value})
+                                   "copy_selected_text": self.query_one("#copy-selected-text", Checkbox).value,
+                                   "allow_rootful": self.query_one("#allow-rootful", Checkbox).value})
                 self.app.pop_screen()
                 self.app.action_refresh()
                 self.app.refresh_discovery_preferences()

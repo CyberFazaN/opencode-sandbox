@@ -17,8 +17,8 @@ import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from . import backends, probes
 from . import core as c
-from . import probes
 
 PASSED, WARNING, FAILED, NOT_CHECKED, NOT_APPLICABLE = "passed", "warning", "failed", "not checked", "not applicable"
 ORDER = (PASSED, WARNING, FAILED, NOT_CHECKED, NOT_APPLICABLE)
@@ -117,8 +117,10 @@ def host_checks():
 def daemon_check():
     ident = c.verify_runtime(strict=False)
     if ident.verified:
+        if backends.selected() == backends.ROOTFUL:
+            return Check("daemon", "Docker daemon", PASSED, f"verified local rootful daemon ({ident.endpoint})")
         return Check("daemon", "Docker daemon", PASSED, f"verified rootless daemon of this user ({ident.endpoint})")
-    return Check("daemon", "Docker daemon", FAILED, ident.message(), "See: opencode-sandbox doctor")
+    return Check("daemon", "Docker daemon", FAILED, ident.message(), f"See: opencode-sandbox {backends.cli_flag()}doctor")
 
 
 RESOURCE_HINT = ("Review Docker's rootless resource-limit requirements and your distribution's guidance: "
@@ -505,7 +507,8 @@ def reachability_check(m, state, data, *, flags=..., address=..., gateway=...):
     if not state.get("Running"):
         return Check("reachability", title, NOT_CHECKED, "container stopped; measured only in a running container",
                      f"opencode-sandbox start {m['name']}, then run the check again")
-    flags = rootlesskit_flags() if flags is ... else flags
+    if flags is ...:
+        flags = {"net": "rootful bridge"} if backends.get(m) == backends.ROOTFUL else rootlesskit_flags()
     address = host_address() if address is ... else address
     gateway = host_gateway() if gateway is ... else gateway
     actual = (data.get("HostConfig") or {}).get("NetworkMode")
@@ -537,7 +540,9 @@ def reachability_check(m, state, data, *, flags=..., address=..., gateway=...):
     else:
         lines.append(f"internet: not reachable ({INTERNET[0]}: {internet})")
     if not loopback_known:
-        lines.append(f"host 127.0.0.1 services: not checked (rootless network driver {flags.get('net')})")
+        driver = flags.get("net")
+        label = "rootful bridge" if backends.get(m) == backends.ROOTFUL else f"rootless network driver {driver}"
+        lines.append(f"host 127.0.0.1 services: not checked ({label})")
     elif reached_loopback:
         lines.append("host 127.0.0.1 services: REACHABLE (a test listener on the host's 127.0.0.1 received the connection)")
         problems.append("host loopback")
@@ -758,6 +763,7 @@ def environment_checks(m):
     return out
 
 
+@backends.environment
 def run(m):
     """Run every check for one environment and cache the report; read-only otherwise."""
     from . import __version__

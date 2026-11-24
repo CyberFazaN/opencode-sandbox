@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from . import backends
 from . import core as c
 from . import opencode_versions as v
 from . import runtime_identity as rid
@@ -90,6 +91,7 @@ class StartGuard:
             raise c.SandboxError(result['error'] + ('; original stopped state restored' if result['cleanup'] == 'stopped' else '; no temporary start performed'))
 
 
+@backends.environment
 def check(m, *, expected=None):
     """Restore original running state on all exits. Inventory and ordinary CLI reports stay passive."""
     c.ensure_runtime(False)
@@ -136,10 +138,11 @@ def check(m, *, expected=None):
 
 def review(keys):
     """A fixed batch snapshot, not authority inferred from cached table rows."""
-    c.ensure_runtime(False)
     targets, stopped = {}, []
     for key in keys:
         m = c.resolve(key)
+        if backends.get(m) == backends.ROOTFUL and not backends.allowed():
+            continue
         with c.lock(key):
             m = c.resolve(key)
             state = c.inspect_container(m)
