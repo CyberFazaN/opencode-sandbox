@@ -31,9 +31,10 @@ def fixture_environment(camp, name, distro):
 
 
 def confirm(t, ck, subject):
-    assert ck(t.wait_for('Review environment operation', 30), subject + ': exact consent appears')
-    ck('Cancel' in t.text() and 'Confirm' in t.text(), subject + ': consent buttons fit')
+    ready = t.wait_for('Review environment operation', 30)
     t.snap(subject + ' consent')
+    assert ck(ready, subject + ': exact consent appears')
+    ck('Cancel' in t.text() and 'Confirm' in t.text(), subject + ': consent buttons fit')
     t.send(TAB + ENTER, .4)  # initial focus is Cancel
 
 
@@ -66,7 +67,7 @@ def test_environment_actions_terminal(campaign, checks, distro, size):
         t.send('u', .3); enter_target(t)
         ck(t.wait_for('pinned to OpenCode 2.2.0', 20) and camp.metadata(name).get('opencode_update') is None, 'Environment pin: incompatible real update refused without installation')
         t.send('p', .3); t.send(ENTER, .2); t.send(UP, .2); t.send(ENTER, .2)
-        t.send(TAB * 3 + ENTER, .3)
+        t.send(TAB * 2 + ENTER, .3)  # Manual disables the pin field
         confirm(t, ck, 'Environment Manual policy')
         ck(t.wait_for('OpenCode policy saved', 20) and camp.metadata(name).get('opencode_policy') == 'manual'
            and camp.metadata(name).get('opencode_pin') is None, 'Environment Manual policy: explicit unpin does not install anything')
