@@ -39,7 +39,7 @@ body:
         Linux distribution and version:
         OpenCode Sandbox version (opencode-sandbox --version):
         Python version:
-        Docker version and rootless setup:
+        Docker version and selected backend (rootless or rootful):
         Container image (Debian, Arch, Kali or custom):
         Related versions, if relevant (OpenCode, pipx, Typer, Textual):
     validations:

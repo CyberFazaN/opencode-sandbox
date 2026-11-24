@@ -4,6 +4,7 @@ import subprocess
 import pytest
 from typer.testing import CliRunner
 
+from opencode_sandbox import agent_context as ac
 from opencode_sandbox import core as c
 from opencode_sandbox import opencode_availability as availability
 from opencode_sandbox.cli import app
@@ -17,6 +18,7 @@ from opencode_sandbox.cli import app
 def test_availability_uses_live_path_and_version(monkeypatch, tmp_path, exit_code, status):
     m = c.create("ocs-test-availability", image="example.org/custom:1")
     (tmp_path / "timeout").symlink_to(shutil.which("timeout"))
+    (tmp_path / "tail").symlink_to(shutil.which("tail"))
     (tmp_path / "sh").symlink_to("/bin/sh")
     if exit_code is not None:
         binary = tmp_path / "opencode"
@@ -30,7 +32,7 @@ def test_availability_uses_live_path_and_version(monkeypatch, tmp_path, exit_cod
 
     monkeypatch.setattr(c, "docker", docker)
     result = CliRunner().invoke(app, ["opencode", "availability", m["name"]])
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == (0 if status == availability.Status.AVAILABLE else 1), result.output
     assert result.output.strip() == status.value
 
 
@@ -63,3 +65,50 @@ def test_failed_docker_exec_does_not_mean_missing(monkeypatch):
         c, "docker", lambda *a, **k: subprocess.CompletedProcess(a, 125, "", "Cannot connect to the Docker daemon")
     )
     assert availability.check({"id": "1234"}) is availability.Status.UNKNOWN
+
+
+def test_hanging_version_is_unknown_not_broken(monkeypatch, tmp_path):
+    binary = tmp_path / "opencode"
+    binary.write_text("#!/bin/sh\nexec /bin/sleep 30\n")
+    binary.chmod(0o700)
+    monkeypatch.setenv("PATH", str(tmp_path) + ":/usr/bin:/bin")
+    monkeypatch.setattr(availability.probes, "EXEC_TIMEOUT", 0.1)
+    monkeypatch.setattr(c, "inspect_container", lambda m: {"Running": True})
+    monkeypatch.setattr(c, "docker", lambda *args, **kwargs: subprocess.run(
+        args[2:], capture_output=True, text=True, timeout=2, check=False))
+    m = c.create("ocs-test-hanging", image="example.org/custom:1")
+    result = CliRunner().invoke(app, ["opencode", "availability", m["name"]])
+    assert (result.exit_code, result.output.strip()) == (2, "Unknown")
+
+
+def test_unexpected_probe_response_is_unknown(monkeypatch):
+    monkeypatch.setattr(c, "inspect_container", lambda m: {"Running": True})
+    monkeypatch.setattr(c, "docker", lambda *a, **k: subprocess.CompletedProcess(a, 0, "Unexpected", ""))
+    assert availability.check({"id": "1234"}) is availability.Status.UNKNOWN
+
+
+def test_probe_limits_version_output():
+    result = subprocess.run(
+        ["sh", "-c", "opencode() { head -c 65536 /dev/zero; printf '\\n2.2.0\\n'; }; " + availability._PROBE],
+        capture_output=True, check=True,
+    )
+    assert len(result.stdout) < 4200 and result.stdout.endswith(b"2.2.0\n\nocs-exit:0\n")
+
+
+def test_start_reports_failed_agent_context_while_opencode_is_missing(monkeypatch):
+    m = c.create("ocs-test-context-repair")
+    monkeypatch.setattr(c, "inspect_container", lambda m: {"Running": True})
+    monkeypatch.setattr(c, "guidance_inputs", lambda m: {"image": "example", "runtime": c.runtime_settings(m)})
+    monkeypatch.setattr(availability, "check", lambda m: availability.Status.MISSING)
+
+    def failed(m):
+        raise c.SandboxError("Cannot reconcile system Agent Context activation")
+
+    monkeypatch.setattr(ac, "reconcile", failed)
+    result = CliRunner().invoke(app, ["start", m["name"]])
+    assert result.exit_code == 0 and "WARNING: Cannot reconcile" in result.output
+    saved = c.resolve(m["name"])
+    assert saved["status"] == "running" and "Cannot reconcile" in saved["last_error"]
+    monkeypatch.setattr(ac, "reconcile", lambda m: None)
+    c.start(m)
+    assert c.resolve(m["name"])["last_error"] is None

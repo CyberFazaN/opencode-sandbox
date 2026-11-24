@@ -941,8 +941,10 @@ def inspect_container(m):
         # "dial unix ...docker.sock: connect: no such file or directory".
         if re.search(r"no such (container|object)", message): return None
         raise SandboxError(f"Cannot inspect {cname(m)}: {p.stderr.strip()}")
-    try: state=json.loads(getattr(p, "stdout", None) or "")
+    try: state=json.loads(p.stdout)
     except ValueError as exc: raise SandboxError("Invalid Docker inspect response") from exc
+    if not isinstance(state, dict):
+        raise SandboxError("Invalid Docker container state")
     assert_owned(m)
     return state
 
@@ -1193,7 +1195,7 @@ def start(m, *, _resume_recreate=False, precondition=None):
         except Exception as exc:
             mark(m,"error",last_error=f"Agent Context reconciliation failed: {exc}")
             raise
-        mark(m,"running",last_error=None,operation=None)
+        mark(m,"running",last_error=m.get("agent_context_warning"),operation=None)
 
 
 def _prepare_running_environment(m):
@@ -1204,11 +1206,15 @@ def _prepare_running_environment(m):
     ac.refresh(m, env_dir, **guidance_inputs(m))
     try:
         ac.reconcile(m)
-    except SandboxError:
+    except SandboxError as exc:
         from . import opencode_availability as availability
 
         if availability.check(m) not in (availability.Status.MISSING, availability.Status.BROKEN):
             raise
+        # Leave a repair shell reachable, but persist the independent activation failure.
+        m["agent_context_warning"] = str(exc)
+    else:
+        m.pop("agent_context_warning", None)
 
 
 def _initialize_rootful(m):
@@ -1291,13 +1297,17 @@ def profile_mismatch(m):
 LAUNCHER = (distros.IMAGES / "common" / "ocs_opencode.py").read_text()
 
 @backends.environment
-def prepare_interactive(m, shell=False):
+def prepare_interactive(m, shell=False, *, warn=None):
     start(m)
     from . import agent_context as ac
     from . import opencode_availability as availability
     m = resolve(m["id"])
-    warning = profile_mismatch(m)
-    if warning: print(f"WARNING: {warning}", file=sys.stderr)
+    for warning in (profile_mismatch(m), m.get("agent_context_warning")):
+        if warning:
+            if warn is None:
+                print(f"WARNING: {warning}", file=sys.stderr)
+            else:
+                warn(warning)
     status = availability.check(m)
     # Regenerate before every launch; the directory mount makes it visible at once.
     with lock(m["id"]):
@@ -1585,7 +1595,7 @@ def recreate_recover(m):
                         f"{env_image(m)!r}; changes made in it after the snapshot are not in that snapshot. Stop it with "
                         f"'opencode-sandbox stop {m['name']}', then rerun 'opencode-sandbox container recreate-recover {m['name']}'.")
                 _prepare_running_environment(m)
-                mark(m,"running",operation=None,last_error=None)
+                mark(m,"running",operation=None,last_error=m.get("agent_context_warning"))
                 return "replacement already running"
             if not m.get("image") or image != m["image"]:
                 raise SandboxError(
@@ -1600,7 +1610,7 @@ def recreate_recover(m):
                 mark(m,"error",operation="recreate",last_error=f"Recreation start failed: {exc}")
                 raise
             _prepare_running_environment(m)
-            mark(m,"running",operation=None,last_error=None)
+            mark(m,"running",operation=None,last_error=m.get("agent_context_warning"))
             return "replacement started"
         # Preserve the journal through container creation. A crash at any point
         # remains explicitly recoverable instead of looking like a normal start.

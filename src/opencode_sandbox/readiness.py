@@ -648,24 +648,23 @@ def delivery_check(m, state):
                   if ac.enabled(m) else "automatic inclusion intentionally disabled; generated file remains mounted and matches the host file"))
 
 
-def opencode_availability_check(m):
+def opencode_availability_check(m, status):
     from . import opencode_availability as availability
 
-    status = availability.check(m)
     if status == availability.Status.AVAILABLE:
         return Check("opencode-availability", "OpenCode availability", PASSED, status.value)
     if status == availability.Status.UNKNOWN:
         return Check("opencode-availability", "OpenCode availability", NOT_CHECKED, status.value,
                      "Checking requires a running environment and a working container diagnostic command.")
-    return Check("opencode-availability", "OpenCode availability", WARNING, status.value,
+    return Check("opencode-availability", "OpenCode availability", FAILED, status.value,
                  f"Inspect or repair OpenCode with opencode-sandbox shell {m['name']}.")
 
-def opencode_check(m, state, data):
+def opencode_check(m, state, data, *, probe=None):
     from . import opencode_versions as v
     title = "OpenCode"
     if state is None or not state.get("Running"):
         return Check("opencode", title, NOT_CHECKED, "container not running")
-    item = {"state": "running", "policy": v.policy(m), **v.environment_version(m)}
+    item = {"state": "running", "policy": v.policy(m), **v.environment_version(m, probe=probe)}
     line = v.environment_line(item)
     env = (data.get("Config") or {}).get("Env") or []
     if item.get("recovery") or (item.get("verification") != "verified" and not item.get("error")) \
@@ -682,6 +681,28 @@ def opencode_check(m, state, data):
         return Check("opencode", title, WARNING, line,
                      f"opencode-sandbox stop {m['name']} && opencode-sandbox opencode update {m['name']} --version {item['policy']['version']}")
     return Check("opencode", title, PASSED, line + "; self-update off")
+
+
+def _opencode_checks(m, state, data):
+    from . import opencode_availability as availability
+    from . import opencode_versions as versions
+
+    status = availability.Status.UNKNOWN
+
+    def probe(m, *, container_id):
+        nonlocal status
+        status, version = availability.observe(m, container_id=container_id)
+        if status != availability.Status.AVAILABLE:
+            raise c.SandboxError(f"OpenCode availability: {status.value}")
+        try:
+            return versions.normalize(version)
+        except c.SandboxError:
+            raise c.SandboxError("OpenCode answered but did not report a recognizable version") from None
+
+    version_check = _guard(opencode_check, m, state, data, probe=probe, _id="opencode")
+    if state and state.get("Running") and status != availability.Status.AVAILABLE:
+        version_check = Check("opencode", "OpenCode", NOT_CHECKED, "No live version verified; see OpenCode availability.")
+    return opencode_availability_check(m, status), version_check
 
 
 TITLES = {"daemon": "Docker daemon", "resource-support": "Resource-limit support", "workspace": "Workspace", "operation": "Pending operation", "image": "Image",
@@ -741,8 +762,7 @@ def environment_checks(m):
             _guard(profile_check, m, state, data, _id="profile"),
             _guard(agent_context_check, m, _id="agent-context"),
             _guard(delivery_check, m, state, _id="agent-context-delivery"),
-            _guard(opencode_availability_check, m, _id="opencode-availability"),
-            _guard(opencode_check, m, state, data, _id="opencode"),
+            *_opencode_checks(m, state, data),
             _guard(storage_check, _id="storage")]
     return out
 
@@ -751,7 +771,9 @@ def environment_checks(m):
 def run(m):
     """Run every check for one environment and cache the report; read-only otherwise."""
     from . import __version__
+    m = c.resolve(m["id"])
     report = {"schema": SCHEMA, "environment": m["id"], "at": c.now(), "manager_version": __version__,
+              "environment_revision": m.get("updated") or m.get("created"),
               "checks": [asdict(x) for x in environment_checks(m)]}
     _save(m, report)
     return report
@@ -816,6 +838,8 @@ def cached_opencode_availability(m):
     if m.get("status") != "running":
         return Status.UNKNOWN.value
     report = cached(m)
+    if not report or report.get("environment_revision") != (m.get("updated") or m.get("created")):
+        return Status.UNKNOWN.value
     for item in (report or {}).get("checks", []):
         if not isinstance(item, dict) or item.get("id") != "opencode-availability":
             continue

@@ -10,7 +10,8 @@ ROOTLESS = "rootless"
 ROOTFUL = "rootful"
 NAMES = (ROOTLESS, ROOTFUL)
 WARNING = ("Rootful Docker runs with host root authority. Inside the container the session user "
-           "can become root with passwordless sudo and can change ownership or permissions in a writable workspace.")
+           "can become root with passwordless sudo and can change ownership or permissions in a writable workspace. "
+           "Files it creates there may grant elevated privileges if executed on the host. Use rootless for untrusted work.")
 _active = ContextVar("docker_backend", default=None)
 endpoint = ContextVar("rootful_endpoint", default=None)
 

@@ -250,3 +250,53 @@ def test_base_selector_ignores_delayed_other_backend(monkeypatch, inventory, siz
         run(test, size)
     finally:
         release.set()
+
+
+def test_updates_defaults_to_selected_backends_images_without_an_advisory(inventory):
+    images, _ = inventory
+    distro = distros.get(distros.DEFAULT)
+    images[backends.ROOTFUL, distro.image] = present(distro, "sha256:" + "c" * 64)
+    c.create("ocs-test-rootful-updates", backend=backends.ROOTFUL)
+
+    async def test(app, pilot):
+        await app.workers.wait_for_complete()
+        assert not app._image_advisory
+        await pilot.press("v", "2")
+        assert app.screen.query_one("#base-backend", Select).value == backends.ROOTFUL
+
+    run(test, (80, 24))
+
+
+def test_covered_create_form_is_reenabled_after_base_check(monkeypatch):
+    import asyncio
+    import threading
+
+    from opencode_sandbox.tui import ConfirmScreen
+
+    entered, release = threading.Event(), threading.Event()
+
+    def check(*args):
+        entered.set()
+        assert release.wait(5)
+
+    monkeypatch.setattr(c, "check_creation_base", check)
+
+    async def test(app, pilot):
+        await pilot.press("n")
+        form = app.screen
+        form.query_one("#name", Input).value = "ocs-test-covered"
+        button = form.query_one("#create", Button)
+        button.press()
+        assert await asyncio.to_thread(entered.wait, 2)
+        assert button.disabled
+        await app.push_screen(ConfirmScreen("Cover the create form"))
+        release.set()
+        await app.workers.wait_for_complete()
+        await pilot.press("escape")
+        assert app.screen is form and not button.disabled
+        assert not c.all_envs()
+
+    try:
+        run(test, (80, 24))
+    finally:
+        release.set()

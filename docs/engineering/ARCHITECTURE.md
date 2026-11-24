@@ -1,6 +1,6 @@
 # Architecture — OpenCode Sandbox
 
-Current design of the `develop` checkout. [DECISIONS](DECISIONS.md) owns essential rationale;
+Current design. [DECISIONS](DECISIONS.md) owns essential rationale;
 [BASELINE](BASELINE.md) owns verification scope and gaps. User operation/recovery instructions are
 in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTRIBUTING.md).
 
@@ -14,7 +14,7 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
   Rootful sessions use an explicit numerical UID:GID, a named home volume at `/home/ocs`,
   and a container-local account and sudo rule initialized from the saved identity.
   Builds remain independent of the host identity.
-- Container root maps to the host user. Containers have `--init`, dropped
+- In rootless, container root maps to the host user. Containers have `--init`, dropped
   `NET_RAW`/`MKNOD`, no host Docker socket, privileged mode or host networking. Published ports
   bind only to 127.0.0.1. Rootless also sets `no-new-privileges`. `bridge` can reach the LAN; it is not egress isolation.
 - Manager settings, disposable observation/discovery caches, durable operation state and user
@@ -30,6 +30,7 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
 |---|---|
 | `core.py` | Paths, metadata, labels, environment locks, Docker/lifecycle/session access, recreation journals, snapshots, image builds and shared errors |
 | `runtime_identity.py` | Stdlib bounded daemon acquisition and authenticated response-sender proof |
+| `backends.py`, `rootful_home.py` | Operation-local backend, opt-in and immutable identity; container-side account, home and sudo setup |
 | `base_locks.py` | Daemon/distribution build/publication guards and lock ordering |
 | `distros.py`, `assets/images/` | Declarative distribution definitions, build labels/assets, OpenCode install and AUR broker |
 | `config_plan.py` | Shared settings diff, consent/preconditions and executor |
@@ -66,7 +67,8 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
 - Global config exports: fixed `/tmp/ocs-occonfig-<uid>-<data_id>/<environment-id>/config/`, private
   validated namespace/workspace and external `.ocs-export.json` identity/baseline marker; no saved
   export path or missing-export monitoring. Container IDs/names never identify an export.
-- Containers `ocs-<id>`, home volumes `ocs-home-<id>` mounted at `/root`, staging volumes
+- Containers `ocs-<id>`, home volumes `ocs-home-<id>` mounted at `/root` (rootless) or `/home/ocs`
+  (rootful), staging volumes
   `ocs-stage-<id>-<hex>`; images `ocs-snapshot:`, `ocs-runtime:`, `ocs-checkpoint:`, `ocs-backup:`.
   Bases are `opencode-sandbox:<distro>`; rollback copies add `-previous-<hex12>`.
 - Labels under `org.opencode-sandbox.*` record managed status, manager version, environment ID,
@@ -100,8 +102,9 @@ are not coordinated. Incomplete authoritative update state adds a separate start
 
 Base builds/rollback hold build throughout verification/owned cleanup and publication only for
 inspection/revalidation/tag changes. Creation holds publication from pin validation through Docker
-creation. Cleanup takes build then publication nonblocking, rechecks ownership/references, and
-releases each item's guards before proceeding. No per-data-directory lock protects a shared base.
+creation. Rootless cleanup takes build then publication nonblocking, rechecks ownership/references,
+and releases each item's guards before proceeding. Rootful cleanup excludes shared base artifacts:
+the build guards are UID-scoped and another user or data directory may depend on them.
 
 Environment mutations hold `core.lock` for guarded steps. Multi-step operations persist an
 `operation` journal (`recreate`, `runtime-recreate`, `config-update`, `opencode-config`, `restore`, `opencode-update`,
@@ -113,14 +116,19 @@ Missing images retain journal/error and salvage guidance rather than discarding 
 
 ## Docker access, identity and diagnostics
 
-`runtime_identity.verify()` resolves the configured context (default `rootless`) once and accepts
-only a local Unix socket without TLS configuration. Foreign/rootful listeners refuse immediately.
+For rootless, `runtime_identity.verify()` resolves the configured context (default `rootless`)
+once and accepts only a local Unix socket without TLS. Foreign/rootful listeners refuse immediately.
 With SO_PASSCRED enabled, each byte of bounded HTTP/1.0 `/info` must have matching SCM_CREDENTIALS:
 one live own-UID `dockerd` with its own namespace mapping UID/GID 0 to the host user, and exact
 `name=rootless` in that response. Recheck process start time, executable and maps after reading.
 Reject proxies, changed/missing credentials, received rights, malformed/encoded responses and PID
 reuse. A legitimate inherited listener works because the **response sender**, not systemd's
 listening PID, proves identity (D-052). Socket names/ownership and forwarded rootless text do not.
+
+The rootful branch uses the fixed `/run/docker.sock`, requires root-controlled parent directories,
+and verifies a local UID 0 `dockerd` with unmapped UID/GID maps. The authenticated `/info` response
+must report neither rootless mode nor user namespace remapping. Rootful access is opt-in; rootless
+never falls back to it. Rootful commands reuse the verified endpoint within their operation scope.
 
 Subsequent calls use the pinned `docker -H unix://<socket>` with Docker endpoint/TLS environment
 overrides dropped. Explicit `ensure_runtime()` re-verifies, never re-resolves that endpoint.
@@ -199,8 +207,8 @@ custom-image provenance. Home/workspace data is not undone by a system-layer rol
 
 ## OpenCode, image builds and discovery
 
-`distros.REGISTRY` owns distribution-specific assets/tools/smoke checks. Debian 13, Arch Linux rolling and Kali Linux rolling
-are verified against `/etc/os-release`, tools and the actual OpenCode
+`distros.REGISTRY` owns distribution-specific assets/tools/smoke checks. Builds of Debian 13,
+Arch rolling and Kali rolling are verified against `/etc/os-release`, tools and the actual OpenCode
 binary. Existing/derived/restored layers retain inherited provenance; never describe them with
 today's registry OS/tool promises. Unknown/offline labels stay unknown, not an invented current OS.
 
@@ -232,6 +240,11 @@ restore/update history and pending journals invalidate/qualify observations. Fai
 old evidence into fresh success. Cache format 1 is not metadata/journal authority; bounded no-follow
 private storage failures are misses, not path repair or normal-operation failure.
 
+Availability is checked only in running containers. Readiness shares one bounded, output-limited
+probe for executable health and version evidence, and marks a timeout unknown, not broken. The
+dashboard's last availability result is tied to the checked metadata revision; it is not live
+evidence after out-of-band changes.
+
 Daily discovery is dashboard-only and defaults off. Each npm/GitHub source durably claims an
 attempt before HTTP under a private source/data-directory flock; overlapping callers share its
 result/failure. Success and attempt history stay separate. An automatic failure/interruption still
@@ -249,7 +262,7 @@ Manual/Pinned/Unknown/pending recovery do not generate unsolicited environment c
 ## Sessions and initial configuration
 
 Managed `run` uses `opencode --standalone` so one session cannot retain a previous client's provider
-environment. `shell` gets the same profile; arbitrary `exec` does not. Both images' executable
+environment. `shell` gets the same profile; arbitrary `exec` does not. Each managed image's executable
 `ocs-opencode` shares the manager's stdlib validator, reads mounted JSON without shell evaluation
 and preserves arguments with `--standalone`. Interactive direct Bash hints only when a mounted
 profile was not already loaded. A per-session token/watchdog
@@ -260,7 +273,9 @@ use threaded `preexec_fn`. Reap forced termination and restore the attached inpu
 Agent Context is always generated and mounted read-only at `/run/ocs-agent/`. Neutral base system
 JSON is reconciled at every managed start to persisted `agent_context_enabled` (default true): only
 the exact context instruction is deduplicated/removed; unrelated fields/list order are retained.
-Malformed config is preserved and blocks managed launch. Atomic host refreshes remain visible;
+Malformed config is preserved and blocks managed OpenCode launch. If OpenCode is missing or
+broken, an independent reconciliation error is reported while leaving a repair shell reachable.
+Atomic host refreshes remain visible;
 preview failure is qualified, not verification of saved guidance. Stopped setting changes reconcile
 at the next start; live changes never interrupt a session. Native user references are outside the toggle.
 

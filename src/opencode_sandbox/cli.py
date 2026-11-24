@@ -93,7 +93,10 @@ def opencode_availability(name: str):
     """Check the executable in a running environment without starting it."""
     from . import opencode_availability as availability
 
-    typer.echo(availability.check(c.resolve(name)).value)
+    status = availability.check(c.resolve(name))
+    typer.echo(status.value)
+    if status != availability.Status.AVAILABLE:
+        raise typer.Exit(2 if status == availability.Status.UNKNOWN else 1)
 
 
 @opencode_app.command("versions")
@@ -487,6 +490,8 @@ def create(name:str,
 
     Without options: the default distribution, Local OpenCode config and Agent Context enabled. Copying does not modify the original folder."""
     from .config_plan import check_profile
+    if backends.selected() != backends.ROOTLESS and backend != backends.selected():
+        raise c.SandboxError("Use 'create NAME --backend rootful' to select rootful Docker for an environment.")
     check_profile(profile)  # as config apply: a mistyped name would leave the container without credentials
     kind,distro_id=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
                              include_working_changes=include_working_changes,copy_entire_directory=copy_entire_directory)
@@ -650,7 +655,10 @@ def exec_command(ctx:typer.Context,name:str):
 @app.command(rich_help_panel=ENVIRONMENTS)
 def start(name:str):
     """Start or create the persistent container and reconcile Agent Context activation."""
-    c.start(c.resolve(name))
+    m = c.resolve(name)
+    c.start(m)
+    if warning := c.resolve(m["id"]).get("agent_context_warning"):
+        typer.secho(f"WARNING: {warning}", fg=typer.colors.YELLOW, err=True)
 
 @app.command(rich_help_panel=ENVIRONMENTS)
 def stop(name:str):
@@ -665,6 +673,8 @@ def status(name:str):
     m=c.resolve(name); msg(m)
     typer.echo(f"Docker: {backends.describe(m)}")
     typer.echo(f"OpenCode: {availability.check(m).value}")
+    if warning := m.get("agent_context_warning"):
+        typer.secho(f"WARNING: {warning}", fg=typer.colors.YELLOW, err=True)
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Provider profile: {m.get('profile')}\nContainer: {c.cname(m)}\n"
                f"Image: {c.env_image(m)}\n"
@@ -839,10 +849,16 @@ def backup_prune(keep:int=typer.Option(5,min=0,help="Keep the newest N verified 
 
 @backup_app.command("restore-check")
 def restore_check(name:str):
-    """Start a restored environment and smoke-test OpenCode and mounts."""
+    """Start a restored environment, smoke-test its mounts and report OpenCode separately."""
+    from . import opencode_availability as availability
     from .backup import check_restored
-    check_restored(c.resolve(name))
+    m = c.resolve(name)
+    check_restored(m)
     typer.echo('Restored environment smoke check: OK')
+    status = availability.check(m)
+    typer.echo(f"OpenCode: {status.value}")
+    if status != availability.Status.AVAILABLE:
+        typer.secho(f"Use 'opencode-sandbox shell {m['name']}' to inspect or repair OpenCode.", fg=typer.colors.YELLOW, err=True)
 
 @backup_app.command("restore-resume")
 def restore_resume(name:str):

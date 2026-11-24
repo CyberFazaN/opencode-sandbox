@@ -336,6 +336,9 @@ def _images(inv, sizes, tags, data, ids, envs, data_id):
             if len(names) > 1:
                 item.detail = f"same image as {', '.join(sorted(names - {tag}))}; "
             _classify_image(item, tag, labels, ids, envs, data_id, referenced, base, previous, candidate)
+            if inv.backend == backends.ROOTFUL and item.base_distro and item.scope is not None:
+                item.status, item.scope = KEPT, None
+                item.detail = "shared rootful base artifact; other data directories or builds may still need it"
             inv.items.append(item)
 
 
@@ -477,6 +480,8 @@ def _recheck(item):
             return "no longer an unfinished backup directory"
         return None
     if item.base_distro:
+        if backends.selected() == backends.ROOTFUL:
+            return "shared rootful base artifacts are not eligible for disk cleanup"
         try:
             info = c.inspect_base_image(distros.get(item.base_distro), item.ref)
         except c.SandboxError as exc:

@@ -20,7 +20,8 @@ the `main` pull-request ruleset. It is not standing permission to perform those 
 2. Set `__version__` in `src/opencode_sandbox/__init__.py` (the single source, D-001).
 3. In `CHANGELOG.md`, rename "Unreleased" to `X.Y.Z — YYYY-MM-DD` and check the entries.
 4. Replace the release tag in the install commands of `README.md` and `docs/install.md`
-   (`@vX.Y.Z`); `tests/test_user_docs.py` fails until they name the new version.
+   (`@vX.Y.Z`); `tests/test_user_docs.py` fails until they name the new version. Update the
+   supported version in `SECURITY.md`.
 5. Update the tested versions in `README.md` ("Tested environment") and `BASELINE.md`
    ("Supported environments") if the test platform changed. Review the user guides against the
    approved candidate so the source and documentation integrated into `main` match the release.
@@ -81,7 +82,11 @@ skips and is not a PASS. `test_36_socket_activation.py` records and cleans only 
 runtime directory, isolated Docker objects and manager data; read its scope before granting it.
 
 Also run the campaign against a pipx installation of a local test tag (`OCS_TEST_MANAGER`, see
-`BASELINE.md`). Record the results in `BASELINE.md` ("Verification") and the status column of
+`BASELINE.md`). Rootless campaign results do not qualify rootful. For changes that include
+rootful, record separate authorized real evidence for the affected boundary and lifecycle paths:
+opt-in and identity refusal, daemon separation, workspace/home ownership, backup and recovery,
+and cleanup across data directories. Record scope and gaps per image/backend.
+Record the results in `BASELINE.md` ("Verification") and the status column of
 `CAMPAIGN.md`. Release only when every P0 and P1 row is PASS with real evidence, or BLOCKED with
 an accepted risk and a reproducible next step (`AGENTS.md`, "Release rule"). New defects: fix
 them with a regression test and re-run the affected layers.

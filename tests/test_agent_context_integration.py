@@ -20,6 +20,7 @@ def test_interactive_refreshes_verified_guidance_before_launch(monkeypatch):
     m = c.create("ocs-qa-ac", "scratch")
     commands = []
     monkeypatch.setattr(c, "start", lambda m: None)
+    monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "observed_runtime", lambda m: None)
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "profile_mismatch", lambda m: None)

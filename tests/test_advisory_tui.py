@@ -5,6 +5,7 @@ import threading
 import pytest
 from test_tui import run
 
+from opencode_sandbox import backends
 from opencode_sandbox import core as c
 from opencode_sandbox import readiness as r
 
@@ -165,7 +166,7 @@ def test_worker_check_exception_is_unknown_in_its_own_category_and_other_checks_
             assert "[not checked]" in note.message and "probe unavailable [test]" in note.message
             assert "old warning" not in note.message and "could not" in status(app)
         else:
-            assert not notes(app, category) and status(app) == "Ready"
+            assert not notes(app, category) and "could not be completed" in status(app)
         assert not notes(app, "daemon")
         state[category] = r.Check("resource-support", "Resource-limit support", r.PASSED, "supported") if category == "resources" else []
         await app._request_readiness("rootless").wait()
@@ -201,8 +202,38 @@ def test_metadata_only_refresh_neither_rechecks_nor_clears_advisories(checks):
     run(test, (80, 24))
 
 
+def test_backend_selection_shows_unchecked_without_replaying_toasts(checks):
+    state, _ = checks
+    state["daemon"] = c.SandboxError("daemon unavailable")
+
+    async def test(app, pilot):
+        await app.workers.wait_for_complete()
+        assert notes(app, "daemon")
+        app._select_readiness_backend(backends.ROOTFUL)
+        assert "Rootful Docker not checked" in status(app)
+        app._select_readiness_backend(backends.ROOTLESS)
+        assert "Docker is not ready" in status(app) and not notes(app, "daemon")
+
+    run(test, (80, 24))
+
+
+def test_new_readiness_warning_can_replace_operation_result(checks):
+    state, _ = checks
+
+    async def test(app, pilot):
+        await app.workers.wait_for_complete()
+        app._finished("Operation complete")
+        assert "Operation complete" in status(app)
+        state["images"] = [r.Check("image-debian", "Base image Debian", r.WARNING, "old", image_status="outdated")]
+        await app._request_readiness(backends.ROOTLESS).wait()
+        assert "has base image updates" in status(app)
+
+    run(test, (80, 24))
+
+
 @pytest.mark.parametrize("size", [(80, 24), (100, 30)])
-def test_replaced_prerequisite_worker_cannot_publish_obsolete_image_warning(checks, monkeypatch, size):
+@pytest.mark.parametrize("after_change", [False, True])
+def test_repeated_refresh_coalesces_until_backend_check_finishes(checks, monkeypatch, size, after_change):
     started, release, finished = threading.Event(), threading.Event(), threading.Event()
     block = {"old": False}
     def images():
@@ -220,12 +251,17 @@ def test_replaced_prerequisite_worker_cannot_publish_obsolete_image_warning(chec
         old = app._request_readiness("rootless")
         assert await asyncio.to_thread(started.wait, 1)
         block["old"] = False
-        await app._request_readiness("rootless").wait()
+        assert app._request_readiness("rootless", after_change=after_change) is old
         assert not old.is_finished
         release.set()
         assert await asyncio.to_thread(finished.wait, 1)
         await old.wait()
         await pilot.pause()
+        if after_change:
+            await app.workers.wait_for_complete()
+        else:
+            assert "has base image updates" in status(app)
+            await app._request_readiness("rootless").wait()
         assert not notes(app, "images") and status(app) == "Ready"
     try:
         run(test, size)

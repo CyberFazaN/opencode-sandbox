@@ -111,9 +111,9 @@ class UpdatesScreen(Screen):
                 if self.allow_rootful:
                     options.append(("Rootful", backends.ROOTFUL))
                 elif self.base_backend == backends.ROOTFUL:
-                    options = [("Rootful (disabled)", backends.ROOTFUL)]
+                    options.append(("Rootful (disabled)", backends.ROOTFUL))
                 yield Select(options, value=self.base_backend, allow_blank=False, compact=True,
-                             id="base-backend", disabled=not self.allow_rootful)
+                             id="base-backend", disabled=len(options) == 1)
             yield Static("", id="updates-discovery", markup=False)
             with Horizontal(id='updates-list-tools', classes='bar'):
                 yield Static('', id='updates-hint', markup=False)
@@ -225,8 +225,24 @@ class UpdatesScreen(Screen):
 
     @work(thread=True, group="updates-inventory")
     def _inventory_worker(self, section, entries, backend=backends.ROOTLESS):
+        if section == "bases":
+            results = []
+            try:
+                with backends.use(backend):
+                    c.verify_runtime()
+                    for key, token in entries:
+                        try:
+                            item = updates.base_inventory(distros.get(key))
+                        except Exception as exc:
+                            item = {"error": c.error_text(exc)}
+                        results.append((key, token, item))
+            except Exception as exc:
+                results = [(key, token, {"error": c.error_text(exc)}) for key, token in entries]
+            for key, token, item in results:
+                publish(self.app, self._receive, section, key, token, item, False)
+            return
         for key, token in entries:
-            item = self._inspect(section, key, check=False, backend=backend)
+            item = self._inspect(section, key, check=False)
             publish(self.app, self._receive, section, key, token, item, False)
 
     def _inspect(self, section, key, *, check, expected=None, backend=backends.ROOTLESS):

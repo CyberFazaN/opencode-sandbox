@@ -225,8 +225,8 @@ def test_busy_flag_blocks_duplicate_and_attach(monkeypatch):
 
 
 @pytest.mark.parametrize("shell", [False, True])
-@pytest.mark.parametrize("fail_at", ["prepare", "attach", None])
-def test_session_setup_and_launch_errors_are_visible(monkeypatch, shell, fail_at):
+@pytest.mark.parametrize("result", ["prepare", 125, 130, 1, 0])
+def test_session_setup_and_launch_errors_are_visible(monkeypatch, shell, result):
     from contextlib import contextmanager
 
     from opencode_sandbox import backends, preferences
@@ -237,11 +237,12 @@ def test_session_setup_and_launch_errors_are_visible(monkeypatch, shell, fail_at
     events = []
     endpoint = "unix:///verified-test-rootful.sock"
 
-    def prepare(environment, *, shell):
+    def prepare(environment, *, shell, warn):
         assert environment["id"] == m["id"] and backends.selected() == backends.ROOTFUL
         events.append(("prepare", shell))
-        if fail_at == "prepare":
+        if result == "prepare":
             raise c.SandboxError("Cannot prepare session [test]")
+        warn("Provider profile mismatch [test]")
         backends.endpoint.set(endpoint)
         return environment
 
@@ -256,7 +257,7 @@ def test_session_setup_and_launch_errors_are_visible(monkeypatch, shell, fail_at
         assert prepared and environment["id"] == m["id"]
         assert backends.selected() == backends.ROOTFUL and backends.endpoint.get() == endpoint
         events.append(("attach", shell))
-        return 125 if fail_at == "attach" else 0
+        return result
 
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "prepare_interactive", prepare)
@@ -268,12 +269,18 @@ def test_session_setup_and_launch_errors_are_visible(monkeypatch, shell, fail_at
         await app.workers.wait_for_complete()
         await pilot.pause()
         assert not app._operation_pending and not app._session_active
-        expected = "Cannot prepare session" if fail_at == "prepare" else (
-            f"{'Shell' if shell else 'OpenCode'} session exited with status 125" if fail_at else "Session exited")
+        error = result in ("prepare", 125) or (not shell and result == 1)
+        if result == "prepare":
+            expected = "Cannot prepare session"
+        elif error:
+            expected = f"{'Shell' if shell else 'OpenCode'} session exited with status {result}"
+        else:
+            expected = "Shell exited with status 1" if result == 1 else "Session exited"
         assert expected in str(app.query_one("#status").render())
-        if fail_at:
-            assert any(expected in n.message and n.severity == "error" for n in app._notifications)
-        assert events == [("prepare", shell)] + ([] if fail_at == "prepare"
+        assert any(expected in n.message and n.severity == "error" for n in app._notifications) is error
+        if result != "prepare":
+            assert any("Provider profile mismatch" in n.message and n.severity == "warning" for n in app._notifications)
+        assert events == [("prepare", shell)] + ([] if result == "prepare"
                                                   else ["suspend", ("attach", shell), "resume"])
 
     run(test)

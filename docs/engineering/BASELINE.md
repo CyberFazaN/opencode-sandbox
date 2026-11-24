@@ -3,7 +3,7 @@
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
 [ARCHITECTURE](ARCHITECTURE.md). Release gates: [CAMPAIGN](CAMPAIGN.md) and [RELEASING](RELEASING.md).
-The current checkpoint below records fresh verification; older sections retain their stated scope.
+Recorded checks apply only to the code and configurations tested.
 
 ## Version
 
@@ -12,25 +12,20 @@ The current checkpoint below records fresh verification; older sections retain t
 | Manager | `6.4.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
-| Schemas | Rootless metadata 2 and backup 3; rootful metadata 3 and backup 4 on develop. Unknown schemas are refused |
-| Images | Debian 13/default (`node:24-trixie`, revision 5); Arch rolling (`archlinux:base-devel`, revision 4) |
+| Schemas | Rootless metadata 2 and backup 3; rootful metadata 3 and backup 4. Unknown schemas are refused |
+| Images | Debian 13/default (`node:24-trixie`, revision 5); Arch rolling (`archlinux:base-devel`, revision 4); Kali rolling (`kalilinux/kali-rolling`, revision 2) |
 
 6.4.0 adds opt-in full-directory copies, clarifies workspace setup and Agent Context activation,
 and corrects the Debian/Arch launcher installation and the Arch AUR helper build. Environment and
 backup schemas are unchanged. Manager upgrades do not rebuild existing images or environments.
-
-Unreleased rootful support has focused real Docker evidence on the disposable Arch VM
-with Debian and Kali images. It covers authenticated daemon separation, UID/GID and direct
-bind ownership, container-local sudo, config copy and export, OpenCode update and rollback,
-system-image backup and restore, recreation, and the disabled gate. The Arch container
-image and release campaign have separate qualification requirements.
 
 ## Supported environments
 
 - Intended host: Linux meeting [the prerequisites](../install.md#requirements); real Docker/OpenCode
   evidence is on Arch Linux only. Tested kernel 7.3.4, Git 2.56.1, own rootless Docker 29.10.0,
   RootlessKit 3.3.0/slirp4netns, overlayfs/containerd image store, cgroup v2 with CPU/memory/PIDs
-  delegated by systemd 262. Foreign and remote daemons and socket proxies are refused. Opted-in environments can use the authenticated local rootful daemon.
+  delegated by systemd 262. Foreign and remote daemons and socket proxies are refused.
+  Opted-in environments can use the authenticated local rootful daemon.
 - Python >=3.11: local 3.11.18 and 3.14.10; 3.12/3.13 accepted, not tested separately. Hosted CI
   uses Ubuntu 26.04 and Python 3.11/3.14, plus an unprivileged rolling Arch userland job.
 - Python 3.15 is stable ([upstream status](https://devguide.python.org/versions/)) and accepted by
@@ -38,10 +33,23 @@ image and release campaign have separate qualification requirements.
   current/lowest, installed-package/process verification and review of the required-check transition.
 - Current Typer/Textual 0.29.2/8.2.8; lowest direct versions 0.16.0/4.0.0. Test environment:
   pytest 9.2.0, pyte 0.8.2, Ruff 0.17.3, shellcheck 0.11.0; pipx 1.18.7.
-- OpenCode `@opencode/cli` 2.x only; 2.1.4 and 2.2.0 in the real campaign, and 2.3.2 in hosted
-  image builds for both distributions.
+- OpenCode `@opencode/cli` 2.x only; 2.1.4 and 2.2.0 in the 6.4.0 real campaign, and 2.3.2 in
+  the hosted Debian/Arch image builds for that release.
 
 ## Verification
+
+### Focused backend and image verification
+
+Focused rootful evidence on the disposable Arch host covered Debian and Kali: authentication and
+daemon separation, UID/GID and direct-bind ownership, container-local sudo, config copy/export,
+OpenCode update/rollback, system-image backup/restore, recreation and the disabled gate. It does
+not extend to the Arch base on rootful.
+
+Follow-up verification covered executable availability and bounded probes on real Debian/Arch
+rootless environments, a real dashboard shell attach, a rootful cleanup preview, and a local
+Kali revision 2 image build with `npm` and `npx` verification. The affected tests passed after
+the fixes, including selected minimum-dependency pilots. The full suite and real release campaign
+were not repeated on the final product tree. This is focused evidence, not candidate qualification.
 
 ### Published 6.4.0
 
@@ -432,13 +440,9 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 
 ## Unverified behaviour
 
-- **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
-  release risk for 6.3.0 on 2026-11-04**, without testing or a reboot. Same-boot hard-interruption
-  refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
-  On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
-  original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
-  verifier and confirm startup/data retention. Never delete state/locks or infer success from an
-  empty old group, cache or installer exit.
+- **Backend and image coverage:** full regression has not been repeated after the focused fixes.
+  Arch's managed image on rootful remains unqualified. Run the applicable release gates on the
+  candidate tree.
 - **Host reboot generally (D09):** risk accepted for 6.3.0 on 2026-11-04, not executed. Daemon restart,
   stop/start and daemon-unit SIGKILL passed. Next: authorized reboot, then `start NAME` and
   `check NAME` on a manifested test environment; do not equate this with B15's separate proof.

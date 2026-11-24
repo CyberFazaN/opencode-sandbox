@@ -21,9 +21,9 @@ so scripts can tell the cases apart.
 | 1 | A check failed (`check NAME`), you declined a confirmation, or you pressed Ctrl+C ("Aborted.") | Read the failed lines |
 | 2 | Usage or operation error, for example an unknown environment, an invalid option, or a confirmation without a terminal | Read the message; in scripts, confirm with `--yes` |
 | 3 | unverified-proxy: the Docker socket is served by a proxy | Point the context at the daemon's own socket |
-| 4 | mismatch: not your own rootless daemon | Use your own rootless daemon |
+| 4 | mismatch: daemon does not match the selected backend | Check the selected backend's identity requirements |
 | 5 | unavailable: the daemon is not reachable | Start it |
-| 6 | unsupported: a remote or TLS endpoint | Use a local `unix://` socket |
+| 6 | unsupported: transport or socket path not supported for this backend | Use the supported local Unix socket |
 | 7 | missing: a required program is not installed (the Docker CLI, or Git for the commands that use it) | Install it |
 | 8 | not-configured: the Docker context does not exist or has no endpoint | Create the context |
 
@@ -32,8 +32,9 @@ plus the signal number (143 for `SIGTERM`).
 
 ## Daemon identity results
 
-`doctor` prints `Daemon identity: <result>`, a `reason:` line and a `hint:` line. The check
-itself is described in [security.md](security.md#daemon-identity).
+`doctor` prints `Daemon identity: <result>` and, on failure, a reason and a hint. The default
+diagnoses rootless. To diagnose opted-in rootful, run
+`opencode-sandbox --docker-backend rootful doctor`. See the [identity checks](security.md#daemon-identity).
 
 A configured socket-activated daemon may initially be inactive: the first
 connection triggers it. The manager waits up to 10 seconds for verified readiness rather than
@@ -53,13 +54,19 @@ partially completed operation. Missing/stale sockets and permanent errors fail p
   [Docker's rootless troubleshooting guide](https://docs.docker.com/engine/security/rootless/troubleshoot/).
   `docker context inspect rootless` shows the endpoint the manager uses (replace `rootless` if
   you selected another context).
-- **mismatch**: the socket belongs to a rootful daemon or another user's daemon, or the engine
-  does not report rootless mode. The manager refuses it on purpose: such a daemon would own the
-  files and containers created for you. Point the context at your own rootless daemon.
+- **mismatch**: for rootless, the context points to another user's daemon, a rootful daemon, or
+  an engine not reporting rootless mode. Point it at your own rootless daemon. For rootful, the
+  engine must be the local root-owned daemon with user namespace remapping disabled.
 - **unverified-proxy**: the process behind the socket is not `dockerd` (for example `socat` or a
   socket proxy), so the daemon behind it is unknown. Point the context at the rootless daemon's
   own socket, usually `unix://$XDG_RUNTIME_DIR/docker.sock`.
-- **unsupported**: the context uses `tcp://`, `ssh://` or TLS. Only a local socket is supported.
+- **unsupported**: a context uses `tcp://`, `ssh://` or TLS, or a socket path fails the backend's
+  requirements. Rootful requires `/run/docker.sock` and does not use your Docker context.
+
+**An image is present but creation cannot find it.** The same tag can exist independently on
+each daemon. Use `doctor` on the backend selected for creation, then build there if needed.
+For rootful, `build` takes the global `--docker-backend rootful` option; `create` takes
+`--backend rootful`. See [backend settings](settings.md#docker-backend).
 
 ## Common problems
 
@@ -74,7 +81,7 @@ service to repair it. [What the checks establish](maintenance.md#resource-limit-
 (`~/.local/bin`) is not on your `PATH`. Run `pipx ensurepath` and open a new terminal.
 
 **pipx refuses the installation because of the Python version.** OpenCode Sandbox needs Python
-3.11 or newer (release 6.0.0 needed 3.14 or newer). Name one with
+3.11 or newer. Name one with
 `pipx install --python python3.11 …`
 ([install.md](install.md#install-the-application)).
 
@@ -124,7 +131,7 @@ otherwise) and that you restarted it after changing a key ([providers.md](provid
 **The dashboard shows `running` for a stopped container.** It shows the recorded state; press `R`
 (Repair) or run `opencode-sandbox repair NAME`.
 
-**An operation was interrupted.** The environment stays in an error state; `status NAME` names
+**An operation was interrupted.** The journal is retained; `check NAME` or `repair NAME` names
 the command that finishes it ([maintenance.md](maintenance.md#recovery)).
 
 **The rootless daemon does not start, or resource limits are not enforced.** A verified daemon
@@ -141,7 +148,7 @@ environments created from a rebuilt base image work again
 Use the [issue chooser](https://github.com/CyberFazaN/opencode-sandbox/issues/new/choose) for a bug
 report or feature/improvement request; a blank issue is available when neither form fits.
 For a bug, describe what happened and what you expected. Reproduction steps, environment details
-(application, Linux, Python, Docker and OpenCode versions, plus rootless setup), and relevant
+(application, Linux, Python, Docker and OpenCode versions, plus the selected Docker backend), and relevant
 excerpts from `opencode-sandbox doctor` are helpful when available, not prerequisites. Intermittent
 reports are welcome even without exact steps.
 

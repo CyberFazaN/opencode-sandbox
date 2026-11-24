@@ -9,8 +9,8 @@ and release blockers are in [BASELINE](docs/engineering/BASELINE.md) and
 
 ## Maintenance and usability
 
-- Verify manager recovery after an authorized reboot of a named hard-interrupted test operation
-  (CAMPAIGN B15); same-boot unknown-quiescence refusal is not post-boot recovery proof.
+- Verify general environment recovery after an authorized host reboot (CAMPAIGN D09).
+  The 6.4.0 B15 updater recovery already has separate post-reboot evidence.
 - Offer Recovery Center buttons for remaining journals with working CLI handlers: container
   recreation, restore resume/rollback and deletion. OpenCode/configuration recovery already exists;
   reuse those handlers rather than introducing a parallel mechanism.
@@ -38,7 +38,7 @@ Revisit only for a demonstrated need, not as stabilization requirements:
   direct paths, ports and profile names, with explicit consent before importing host access.
 - **Prebuilt images or an AUR package:** require a distribution/trust/licensing/maintenance plan;
   pipx release tags and local image builds remain the supported path.
-- **Further capability drops:** measure real package/AUR/OpenCode compatibility on both images.
+- **Further capability drops:** measure real package/AUR/OpenCode compatibility across the affected images and backends.
 - **Dependency locking:** current/lowest-dependency CI is the present guard; add constraints only
   for a demonstrated reproducibility problem.
 - **Hosted real-Docker CI:** needs an owner and practical benefit; retain the local release campaign.

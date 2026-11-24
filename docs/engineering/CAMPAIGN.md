@@ -19,8 +19,10 @@ There are 88 active rows. Retired installer-only IDs B02–B08 are not reused or
 Statuses are **recorded scoped evidence, not a current candidate's release result**: plain real
 PASS refers to retained earlier-release behaviour; rows naming the 6.1.0 candidate/release or a
 later run have that specific scope. I04/I06 and affected rows must be re-established on the release
-tree. B01 still tests manager refusal as root. Do not infer full-campaign/Python/host coverage from
-a focused run, a private source fixture or a historical PASS.
+tree. B01 still tests manager refusal as root. The rootless campaign alone does not qualify
+opt-in rootful; see the [separate evidence](BASELINE.md#focused-backend-and-image-verification) and re-establish the
+applicable gates for changed backends and images. Do not infer full-campaign/Python/host coverage
+from a focused run, a private source fixture or a historical PASS.
 
 ## 6.4.0 qualification
 

@@ -328,11 +328,11 @@ def environment_history(m):
     return result
 
 
-def environment_version(m, *, check=True):
+def environment_version(m, *, check=True, probe=None):
     """Actual or last-verified evidence; inaccessible Docker only permits qualified history."""
     m = c.resolve(m["id"])
     try:
-        return _environment_version(m, check=check)
+        return _environment_version(m, check=check, probe=probe)
     except c.SandboxError as exc:
         result = environment_history(m)
         old = result["observation"]
@@ -344,7 +344,7 @@ def environment_version(m, *, check=True):
 
 
 @backends.environment
-def _environment_version(m, *, check=True):
+def _environment_version(m, *, check=True, probe=None):
     # Re-read metadata: historical completed-update fields do not verify the current binary.
     m = c.resolve(m["id"])
     state = c.inspect_container(m)
@@ -371,7 +371,7 @@ def _environment_version(m, *, check=True):
     attempt = {"at": time.time(), "ok": False, "identity": identity}
     cache.write(_environment_key(m), {"success": old, "attempt": {**attempt, "error": "probe did not complete"}})
     try:
-        value = _exec_version(m, container_id=identity["container"])
+        value = (probe or _exec_version)(m, container_id=identity["container"])
         current = c.resolve(m["id"])
         if current.get("operation") or _environment_identity(current) != identity:
             old = None

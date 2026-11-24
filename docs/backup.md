@@ -19,8 +19,8 @@ stopped). The result is a `0700` directory `*.ocsbackup` (default: `backups/` in
 directory) with a SHA-256 manifest and:
 
 - the workspace; a direct workspace only with `--include-workspace`;
-- the home volume (`/root`), archived with GNU tar in a helper container from the environment's
-  local base image (never pulled), keeping numeric owners, permissions, symlinks, ACLs and
+- the home volume (`/root` for rootless, `/home/ocs` for rootful), archived with GNU tar in a
+  helper from a local registry base image on the same daemon, keeping numeric owners, permissions, symlinks, ACLs and
   extended attributes;
 - the system layer, unless `--no-system`: committed from the container or, when the
   environment has no container (after a network, port or profile change while stopped, an
@@ -29,7 +29,7 @@ directory) with a SHA-256 manifest and:
 
 Details:
 
-- Sockets and FIFOs (in the workspace and in `/root`) are left out, listed in `manifest.json`
+- Sockets and FIFOs (in the workspace and the home volume) are left out, listed in `manifest.json`
   and named in the output. Device files and file names containing a backslash refuse the
   backup, naming the file.
 - Symlinks in the workspace are stored and restored as links, verbatim, also absolute ones and
@@ -37,7 +37,7 @@ Details:
   manager never follows them, and a restore never writes through a link.
 - Every archive is checked with the restore rules before the backup is published.
 - Backups are **not encrypted**. Provider profiles are not included, but credentials created
-  inside the container (in `/root`) are.
+  inside the container's home volume are.
 - `--destination` (also of `changes export` and `changes bundle`) is refused inside any
   environment's workspace, where the agent could change the output. Existing destination
   directories are not re-permissioned.
@@ -60,9 +60,13 @@ traversal, symlink escapes, special files, entry and size limits).
 
 - Only restore backups you trust: the system image is executable content.
 - A restored system image becomes the new environment's own `ocs-backup:<id>-*` image.
+- A home archive requires a local managed base image as a helper on the backup's backend, even
+  when restoring the system image. A managed restore without a system image also needs the base
+  for its recorded distribution.
 - A custom-image environment records the image it was created from; a restore without the system
   layer uses that image (pulled at the first start if it is not present; the restore warns).
-- `restore-check` starts the restored environment and smoke-tests OpenCode and the mounts.
+- `restore-check` starts the restored environment and smoke-tests the mounts. It reports OpenCode
+  availability separately, so a missing or broken executable does not invalidate the mount check.
 - An interrupted restore stays in `error/restore`: `backup restore-resume NAME` retries it while
   its target is still empty, `backup restore-rollback NAME --yes` deletes the incomplete
   environment.
@@ -75,7 +79,7 @@ opencode-sandbox container recreate NAME --yes
 ```
 
 - `container snapshot` is `docker commit`: the **system layer only**, not the workspace or
-  `/root`. Without `--tag` the tag is `ocs-snapshot:<id>-<time>-<random>`. `--tag` must be a new
+  home volume. Without `--tag` the tag is `ocs-snapshot:<id>-<time>-<random>`. `--tag` must be a new
   tag outside the manager's repositories (`opencode-sandbox`, `ocs-snapshot`, `ocs-runtime`,
   `ocs-checkpoint`, `ocs-backup`), except `ocs-snapshot:<id>-NAME`; an existing tag is never
   moved. Images with other names are yours: `disk usage` lists them, cleanup never removes them.

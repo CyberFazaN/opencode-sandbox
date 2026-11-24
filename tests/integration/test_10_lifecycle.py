@@ -380,19 +380,22 @@ def test_opencode_availability_does_not_start_or_block_lifecycle(campaign, distr
     name = f"ocs-test-health-{distro}"
     eid = camp.create(name, "--distro", distro)
 
-    def status():
-        return camp.ocs("opencode", "availability", name).stdout.strip()
+    def status(expected):
+        result = camp.ocs("opencode", "availability", name, check=False)
+        assert (result.stdout.strip(), result.returncode) == (expected, {"Available": 0, "Unknown": 2}.get(expected, 1))
 
-    assert status() == "Unknown"
+    status("Unknown")
     camp.ocs("start", name)
-    assert status() == "Available"
+    status("Available")
     camp.sh(eid, 'binary="$(command -v opencode)"; mv -- "$binary" "$binary.ocs-test-hidden"')
-    assert status() == "Missing"
+    status("Missing")
     camp.ocs("stop", name)
-    assert status() == "Unknown" and not camp.inspect(eid)["State"]["Running"]
+    status("Unknown")
+    assert not camp.inspect(eid)["State"]["Running"]
     camp.ocs("start", name)
-    assert status() == "Missing"
+    status("Missing")
+    assert "OpenCode: Missing" in camp.ocs("backup", "restore-check", name).stdout
     camp.sh(eid, """printf '#!/bin/sh\\nexit 1\\n' > /usr/local/bin/opencode
 chmod 755 /usr/local/bin/opencode""")
-    assert status() == "Broken"
+    status("Broken")
     camp.delete(name)

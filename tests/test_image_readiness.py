@@ -190,6 +190,8 @@ def test_advisory_does_not_replace_an_operation_status_or_change_its_guard(image
         app._finished("Session launch failed", True)
         app._show_image_checks([outdated])
         assert not app._operation_pending and str(app.query_one("#status").render()) == "Session launch failed"
+        app._expire_error_result(app._error_result)
+        assert "has base image updates" in str(app.query_one("#status").render())
     run(test)
 
 

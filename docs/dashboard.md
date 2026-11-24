@@ -31,8 +31,9 @@ usable for everything that does not need Docker. `opencode-sandbox doctor` shows
 
 After Docker is verified, the status line can report that the relevant backend has no managed
 base images or has image updates. It shows the last result for the selected environment's
-backend (Rootless without a selection). Selecting a row does not contact Docker. Press **r** to
-check that backend, or open **Updates → Base Images** for individual image states.
+backend (Rootless without a selection). Selecting a row does not contact Docker or replay a
+notification. An unchecked backend is labeled as such. Press **r** to check it, or open
+**Updates → Base Images** for individual image states.
 
 The same worker also reports [resource-limit support](maintenance.md#resource-limit-support).
 Missing support or unavailable evidence gets an advisory notice, not an identity failure or
@@ -42,8 +43,10 @@ Refresh replaces each checked category's old notice rather than stacking repeate
 Success clears that category; an unavailable check replaces its old warning with an unverified
 result, not a claim that the problem is fixed. A category skipped because Docker is unavailable
 is not marked successful. Clearing one category leaves other notices intact and reveals any
-remaining advisory in the status line. New advisories do not overwrite active operation progress;
-clearing advisories or readiness waits does not erase an operation's completion/recovery result.
+remaining advisory in the status line. New advisories do not overwrite active operation progress.
+After an operation completes, new advisories can replace its status; the completion notice is
+separate. An operation error keeps the status line until its notice expires or you refresh or
+switch Docker backends.
 Metadata-only refresh does not recheck or clear these advisories.
 
 ## Keys
@@ -52,7 +55,7 @@ Metadata-only refresh does not recheck or clear these advisories.
 |---|---|---|---|
 | `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
 | `F5` / `F6` | Start / Stop | `x` | Delete (confirmation) |
-| `n` | New environment (`create`; choose kind and workspace first, distribution and config under "More options") | `c` | Create a project from the current folder using the default import (the confirmation shows what is copied) |
+| `n` | New environment (`create`; backend, distribution and config are under "More options") | `c` | Create a project from the current folder using the default import (the confirmation shows what is copied) |
 | `/` | Filter | `r` | Refresh |
 | `t` | Settings (`config apply`; shows the change plan first) | `u` | Usage (`container usage`) |
 | `i` | Check (`check NAME`; the details pane shows the last result) | `a` | Agent Context preview and activation |
@@ -149,8 +152,7 @@ In **Manager** (`1`), opening shows the running version, cached release evidence
 independent local installation inspection. **Check** queries published full releases from the
 official GitHub repository and repeats that inspection. No GitHub login/token is needed or sent;
 drafts, prereleases, invalid tags and unpublished checkouts are not release targets. Tags must be
-exactly `vX.Y.Z`; numeric comparison never offers an implicit downgrade. The unchanged development
-version is not treated as a new release. A missing/failed GitHub response means availability is
+exactly `vX.Y.Z`; only strictly newer versions are offered. A missing/failed GitHub response means availability is
 unknown (or dated cached evidence), not current; local inspection failures do not erase release
 information or the installed version. GitHub Retry-After and reported rate-limit reset times also
 apply to explicit Check. A full 100-entry page is refused rather than claiming a truncated latest
@@ -232,8 +234,9 @@ do not cover operation forms or Updates Details at 80x24.
 
 ### Base image actions
 
-Choose **Rootless** or **Rootful** in **Base Images** (`2`). Rootful appears when enabled in
-Settings. Inventory, Check, build, and rollback use the selected daemon.
+**Base Images** (`2`) opens on the selected environment's backend, or Rootless if no environment
+is selected. You can switch between **Rootless** and **Rootful** when rootful access is enabled in
+Preferences. Inventory, Check, build and rollback use the selected daemon.
 
 **Build/Rebuild** (`b` or `u`) opens the target/mode form; **Rollback**
 (`r`) reviews managed rollback copies. Check remains a read-only binary/registry check, never a
@@ -242,8 +245,8 @@ build, pull or package-freshness assessment. Opening the view still inspects onl
 Choose an exact compatible target or let latest resolve before consent. **Cached rebuild** reuses
 the local upstream image and layers before the package step; **Refresh & Rebuild** explicitly
 pulls/bypasses cache with extra network/time/disk, never pruning it. **Both modes always upgrade
-system packages** with fresh indexes (Debian `apt-get update` plus `apt-get upgrade`, Arch a full
-`pacman -Syu`); there is no option to skip it. Neither certifies package freshness/security or
+system packages** with fresh indexes (Debian and Kali run `apt-get update` plus `apt-get upgrade`;
+Arch runs a full `pacman -Syu`). There is no option to skip it. Neither certifies package freshness/security or
 reproducibility. Cancel-first
 consent names distribution/definition/target/current image/mode; unknown ownership or changed
 identities refuse. The verified immutable candidate is published only after live revalidation.

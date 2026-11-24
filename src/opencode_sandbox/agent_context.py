@@ -172,7 +172,8 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
             current = definition.version == distro.version and definition.revision == distro.revision
             system = distro.context_lines(version=definition.version, include_tools=current)
             if rootful:
-                system = [line.replace(", and sudo cannot raise privileges here", "") for line in system]
+                system = [line.replace(", and sudo cannot raise privileges here", "")
+                          .replace("`ocs-aur ", "`sudo ocs-aur ").replace(" (as root)", "") for line in system]
             lines += ["", f"## Operating system ({distro.name} {definition.version})", *system]
         else:
             lines += ["", "## Operating system",
@@ -184,7 +185,7 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
         lines += ["", "## Operating system",
                   "- Custom image: installed tools, OS and package manager are unknown; inspect only when needed."]
     lines += ["", "## Working behavior",
-              f"{AVAILABILITY_LINE}{opencode_status}.",
+              *([f"{AVAILABILITY_LINE}{opencode_status}."] if opencode_status != "Unknown" else []),
               "- Start with the user's task; avoid a full system inventory or repeated probing.",
               "- If a dependency is missing, explain the required change; use container-local installation only when appropriate and permitted.",
               "- Never attempt to bypass container boundaries or reconfigure the host.",

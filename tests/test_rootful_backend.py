@@ -30,6 +30,9 @@ def test_opt_in_and_metadata_visibility_when_disabled(host):
     assert "Rootful Docker is disabled" in str(rejected.exception)
     enabled = runner.invoke(app, ["config", "global", "--allow-rootful"])
     assert enabled.exit_code == 0
+    wrong_flag = runner.invoke(app, ["--docker-backend", "rootful", "create", "ocs-test-rootful"])
+    assert wrong_flag.exit_code != 0 and "create NAME --backend rootful" in str(wrong_flag.exception)
+    assert not c.all_envs()
     created = runner.invoke(app, ["create", "ocs-test-rootful", "--backend", "rootful"])
     assert created.exit_code == 0, created.output
     m = c.resolve("ocs-test-rootful")

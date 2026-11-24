@@ -1,5 +1,6 @@
 """Agent Context reports inspected provenance/runtime and omits secrets and host paths."""
 import json
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -47,6 +48,8 @@ def test_os_section_claims_only_registry_facts(distro):
     for other in distros.REGISTRY.values():
         if other.package_manager != d.package_manager:
             assert other.package_manager not in text
+        for tool in set(other.tools) - set(d.tools) - {"sudo"}:  # may be named in the privilege warning
+            assert not re.search(rf"(?<![\w-]){re.escape(tool)}(?![\w-])", text)
     assert "root (UID 0)" in text
 
 
@@ -59,6 +62,14 @@ def test_custom_image_makes_no_os_tool_or_user_claims():
         assert d.package_manager not in text
     # A manager-named image does not make an environment managed (was a name-prefix check).
     assert 'includes:' not in a.render({**M, 'distro': None}, image='opencode-sandbox:debian', runtime=R)
+
+
+def test_rootful_arch_guidance_uses_container_local_sudo():
+    d = distros.get("arch")
+    m = {**M, "distro": d.id, "backend": "rootful", "identity": {"name": "coder", "uid": 1000, "gid": 1000}}
+    text = a.render(m, image=d.image, runtime=R, definition=distros.ImageDefinition(d.id, d.version, d.revision))
+    assert "sudo ocs-aur -S PACKAGE" in text and "sudo ocs-aur -Gp PACKAGE" in text
+    assert "sudo cannot raise privileges" not in text
 
 
 def test_derived_image_keeps_the_inspected_definition():
@@ -115,6 +126,15 @@ def test_refresh_verify(tmp_path):
     assert not a.verify(M, env_dir, image='opencode-sandbox:debian', runtime=R, observed={**R, 'pids': 50})
     assert path == a.path(M, env_dir)
     assert path.parent.stat().st_mode & 0o777 == 0o700
+
+
+def test_transient_availability_is_not_configuration_drift(tmp_path):
+    def env_dir(eid):
+        return tmp_path / eid
+
+    path = a.refresh(M, env_dir, image="example", runtime=R, opencode_status="Available")
+    assert f"{a.AVAILABILITY_LINE}Available." in path.read_text()
+    assert a.verify(M, env_dir, image="example", runtime=R, opencode_status="Missing")
 
 
 def test_refresh_replaces_file_inside_the_same_directory(tmp_path):

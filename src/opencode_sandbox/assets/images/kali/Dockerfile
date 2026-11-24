@@ -14,7 +14,8 @@ RUN test -n "${SYSTEM_PACKAGE_REFRESH:?build with --build-arg SYSTEM_PACKAGE_REF
  && rm -rf /var/lib/apt/lists/*
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-runtime /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 # OpenCode V2 (D-007); the manager always passes a concrete version.
 ARG OPENCODE_VERSION
 COPY common/install-opencode.sh /tmp/install-opencode.sh

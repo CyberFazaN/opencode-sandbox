@@ -109,6 +109,7 @@ def test_compact_dashboard_and_expanded_form_keep_actions_visible(monkeypatch):
 
     monkeypatch.setattr(tui.Dashboard, "_prerequisites_worker", lambda self, *_: None)
     monkeypatch.setattr(opencode_configs, "profiles", lambda: [f"profile-{i:02d}" for i in range(16)])
+    c.create("ocs-test-compact-details")
 
     async def test(app, pilot):
         await pilot.resize_terminal(60, 18)
@@ -116,6 +117,11 @@ def test_compact_dashboard_and_expanded_form_keep_actions_visible(monkeypatch):
         dashboard = app.screen
         assert dashboard.query_one("#envs").region.height >= 3
         assert all(dashboard.region.contains_region(button.region) for button in dashboard.query(Button))
+        pane = dashboard.query_one("#details-pane")
+        await pilot.press("tab")
+        assert pane.has_focus and pane.max_scroll_y > 0
+        await pilot.press("end")
+        await until(pilot, lambda: pane.scroll_y == pane.max_scroll_y)
         await pilot.press("n")
         screen = app.screen
         screen.query_one("#kind", Select).value = "project"

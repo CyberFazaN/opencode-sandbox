@@ -1,5 +1,6 @@
 """Textual environment manager. Destructive actions always require confirmation."""
 import contextlib
+import sys
 from pathlib import Path
 
 from rich.markup import escape
@@ -305,7 +306,7 @@ class CreateScreen(ModalScreen[dict | None]):
             publish(self.app, self._base_checked, values, None, False)
 
     def _base_checked(self, values, error, missing):
-        if not self.is_mounted or self.app.screen is not self:
+        if not self.is_mounted:
             return
         self.query_one("#create", Button).disabled = False
         try:
@@ -319,8 +320,10 @@ class CreateScreen(ModalScreen[dict | None]):
             if missing:
                 self._missing_target = values["backend"], values["distro"]
                 self.query_one("#create-base-images").remove_class("hidden")
-        else:
+        elif self.app.screen is self:
             self.dismiss(values)
+        else:
+            self.query_one("#create-error", Static).update("Base image checked. Press Create to continue.")
 
 
 class GitImportPreviewScreen(ModalScreen[bool]):
@@ -374,10 +377,10 @@ class Dashboard(App):
     .bar Button.-error:focus {background: $error; color: $text;}
     #envs {height: 1fr; min-height: 3;}
     #details-pane {height: 9; scrollbar-size-vertical: 1;}
-    #details {height: 9; border: round $accent; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
+    #details {height: auto; min-height: 9; border: round $accent; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
     .compact-dashboard #details-pane {height: 3; border-left: solid $accent;}
     .compact-dashboard #details-pane:focus #details {background: $panel;}
-    .compact-dashboard #details {height: auto; border: none;}
+    .compact-dashboard #details {min-height: 0; border: none;}
     #status, #metrics {height: 1; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
     """
     # Labels match the CLI's terms: Settings = `config`, Changes = `changes`, Usage =
@@ -515,8 +518,10 @@ class Dashboard(App):
         self._readiness_backend = backends.ROOTLESS
         self._readiness_results = {}
         self._readiness_requests = {}
+        self._readiness_recheck = set()
         self._image_advisory = None
         self._status_owner = None
+        self._error_result = None
         self._discovery_worker_ref = None
         self._discovery_status = None
         self._manager_discovery_worker_ref = None
@@ -541,6 +546,7 @@ class Dashboard(App):
             self.notify(c.error_text(exc), severity="error")
         m = self.selected()
         self._readiness_backend = backends.get(m) if m else backends.ROOTLESS
+        self._render_readiness()
         self._request_readiness(self._readiness_backend)
         self.set_interval(60, self.refresh_discovery_preferences)
         self.refresh_discovery_preferences()
@@ -561,8 +567,8 @@ class Dashboard(App):
         toolbar.min_column_width = 14 if compact else 16
         dashboard.query_one("#actions", ItemGrid).min_column_width = 14 if compact else 15
         pane = dashboard.query_one("#details-pane", VerticalScroll)
-        pane.can_focus = compact
-        if not compact and pane.has_focus:
+        pane.can_focus = compact or bool((self.selected() or {}).get("last_error"))
+        if not pane.can_focus and pane.has_focus:
             dashboard.query_one("#envs", DataTable).focus()
 
     def refresh_discovery_preferences(self):
@@ -625,9 +631,17 @@ class Dashboard(App):
                                + 'GitHub/npm may be stale; dates/errors in Updates Details. No installation is automatic.')
         else: button.tooltip = "Local/cached Updates; Check explicitly refreshes the selected component's source"
 
-    def _request_readiness(self, backend):
-        token = self._readiness_requests[backend] = object()
-        return self._prerequisites_worker(backend, token)
+    def _request_readiness(self, backend, *, after_change=False):
+        current = self._readiness_requests.get(backend)
+        if current and not current[1].is_finished:
+            if after_change:
+                self._readiness_recheck.add(backend)
+            return current[1]
+        self._readiness_recheck.discard(backend)
+        token = object()
+        worker = self._prerequisites_worker(backend, token)
+        self._readiness_requests[backend] = (token, worker)
+        return worker
 
     @work(thread=True, group="prerequisites")
     def _prerequisites_worker(self, backend, token) -> None:
@@ -636,6 +650,7 @@ class Dashboard(App):
         try:
             with backends.use(backend):
                 check = readiness.daemon_check()
+                result = (check.detail, None, [])
                 if check.status == readiness.PASSED:
                     try:
                         support = readiness.resource_support_check()
@@ -644,60 +659,66 @@ class Dashboard(App):
                                                   f"check could not run: {c.error_text(exc)}")
                     try:
                         images = readiness.image_checks()
-                    except Exception:
-                        images = []
-                    self.call_later(self._readiness_received, backend, token, (None, support, images))
-                    return
-                detail = check.detail
+                    except Exception as exc:
+                        images = [readiness.Check("images", "Base images", readiness.NOT_CHECKED, c.error_text(exc))]
+                    result = (None, support, images)
         except Exception as exc:
-            detail = c.error_text(exc)
-        self.call_later(self._readiness_received, backend, token, (detail, None, []))
+            result = (c.error_text(exc), None, [])
+        publish(self, self._readiness_received, backend, token, result)
 
     def _readiness_received(self, backend, token, result):
-        if self._readiness_requests.get(backend) is not token:
+        current = self._readiness_requests.get(backend)
+        if current is None or current[0] is not token:
+            return
+        self._readiness_requests.pop(backend)
+        if backend in self._readiness_recheck:
+            self._request_readiness(backend)
             return
         self._readiness_results[backend] = result
         if backend == self._readiness_backend:
-            self._render_readiness()
+            self._render_readiness(toast=True)
 
-    def _render_readiness(self):
+    def _render_readiness(self, *, toast=False):
         backend = self._readiness_backend
         detail, support, images = self._readiness_results.get(backend, (None, None, []))
         if detail and backend == backends.ROOTFUL:
-            self._show_rootful_prerequisites(detail)
+            self._show_rootful_prerequisites(detail, toast=toast)
         elif detail:
-            self._show_prerequisites(detail)
+            self._show_prerequisites(detail, toast=toast)
         else:
             self._prerequisites_ready()
         if support is None:
             self._replace_advisory("resources")
         else:
-            self._show_resource_support(support)
+            self._show_resource_support(support, toast=toast)
         self._show_image_checks(images)
+        if self._can_show_advisory() and self._status_owner != "result":
+            self._advisory_status()
 
-    def _show_rootful_prerequisites(self, detail):
+    def _show_rootful_prerequisites(self, detail, *, toast=True):
         self._replace_advisory("daemon", "Rootful Docker is unavailable. See Settings or rootful doctor.",
                                title="Rootful Docker is unavailable",
-                               detail=f"{detail}\nDetails: opencode-sandbox --docker-backend rootful doctor")
+                               detail=f"{detail}\nDetails: opencode-sandbox --docker-backend rootful doctor", toast=toast)
 
-    def _replace_advisory(self, category, summary=None, *, title="", detail="") -> None:
+    def _replace_advisory(self, category, summary=None, *, title="", detail="", toast=True) -> None:
         """UI-thread replacement of just this category, including success with no new toast."""
         previous = self._advisories.pop(category, None)
-        if previous is not None:
+        if previous is not None and previous[1] is not None:
             self._unnotify(previous[1], refresh=False)
         if summary is not None:
-            note = Notification(detail, title=title, severity="warning", timeout=30, markup=False)
+            note = Notification(detail, title=title, severity="warning", timeout=30, markup=False) if toast else None
             self._advisories[category] = (summary, note)
             # Register synchronously, like Textual's notify handler: a queued warning must not
             # arrive after a same-turn success. Own the object, not every notice with this title.
-            self._notifications.add(note)
+            if note is not None:
+                self._notifications.add(note)
         self._refresh_notifications()
         if self._can_show_advisory() \
                 and (summary is not None or self._status_owner == "advisory"):
             self._advisory_status()
 
     def _can_show_advisory(self):
-        return not (self._operation_pending or self._runtime_waiters or self._status_owner == "operation")
+        return not (self._operation_pending or self._runtime_waiters or self._status_owner in ("operation", "error-result"))
 
     def _advisory_status(self) -> None:
         # A successful image check must not conceal an outstanding daemon/resource warning.
@@ -710,16 +731,21 @@ class Dashboard(App):
             self.query_one("#status", Static).update(self._image_advisory)
             self._status_owner = "advisory"
             return
+        if self._readiness_backend not in self._readiness_results:
+            self.query_one("#status", Static).update(f"{self._readiness_backend.capitalize()} Docker not checked. Press r to check.")
+            self._status_owner = "advisory"
+            return
         self.query_one("#status", Static).update("Ready")
         self._status_owner = None
 
-    def _show_resource_support(self, check) -> None:
+    def _show_resource_support(self, check, *, toast=True) -> None:
         from . import readiness
         if check.status not in (readiness.PASSED, readiness.NOT_APPLICABLE):
             state = "could not be verified" if check.status == readiness.NOT_CHECKED else "needs attention"
             text = "\n".join(readiness.format_report({"checks": [vars(check)]}))
-            self._replace_advisory("resources", f"Resource-limit support {state}. Details: opencode-sandbox doctor",
-                                   title="Resource-limit support", detail=text)
+            flag = "--docker-backend rootful " if self._readiness_backend == backends.ROOTFUL else ""
+            self._replace_advisory("resources", f"Resource-limit support {state}. Details: opencode-sandbox {flag}doctor",
+                                   title="Resource-limit support", detail=text, toast=toast)
         else:
             self._replace_advisory("resources")
 
@@ -729,15 +755,17 @@ class Dashboard(App):
             self._image_advisory = f"{backend} has no base images. See Updates → Base Images."
         elif any(item.image_status == "outdated" for item in checks):
             self._image_advisory = f"{backend} has base image updates. See Updates → Base Images."
+        elif any(item.status == "not checked" for item in checks):
+            self._image_advisory = f"{backend} base image checks could not be completed. See Updates → Base Images."
         else:
             self._image_advisory = None
         if self._can_show_advisory() \
                 and (self._image_advisory or self._status_owner == "advisory"):
             self._advisory_status()
 
-    def _show_prerequisites(self, detail: str) -> None:
+    def _show_prerequisites(self, detail: str, *, toast=True) -> None:
         self._replace_advisory("daemon", "Docker is not ready: environments cannot start. Details: opencode-sandbox doctor",
-                               title="Docker is not ready", detail=f"{detail}\nDetails: opencode-sandbox doctor")
+                               title="Docker is not ready", detail=f"{detail}\nDetails: opencode-sandbox doctor", toast=toast)
 
     def _prerequisites_ready(self) -> None:
         self._replace_advisory("daemon")
@@ -748,7 +776,7 @@ class Dashboard(App):
         if message:
             first = not self._runtime_waiters
             self._runtime_waiters[worker] = message
-            if not self._operation_pending and self._status_owner != "operation":
+            if not self._operation_pending and self._status_owner not in ("operation", "error-result"):
                 self.query_one("#status", Static).update(message)
                 self._status_owner = "runtime"
             if first:
@@ -812,15 +840,15 @@ class Dashboard(App):
 
     def refresh_docker_preferences(self) -> None:
         self._readiness_results.pop(backends.ROOTFUL, None)
-        self._readiness_requests.pop(backends.ROOTFUL, None)
         if self._readiness_backend == backends.ROOTFUL:
             self._render_readiness()
-        self.action_refresh_readiness()
+        self.action_refresh()
+        self._request_readiness(self._readiness_backend, after_change=True)
 
     def action_refresh_readiness(self) -> None:
         """Explicit Refresh retries prerequisites; metadata auto-refresh stays Docker-free."""
         self.action_refresh()
-        if self._status_owner == "operation" and not self._operation_pending:
+        if self._status_owner in ("operation", "result", "error-result") and not self._operation_pending:
             self._advisory_status()
         m = self.selected()
         self._select_readiness_backend(backends.get(m) if m else backends.ROOTLESS, refresh=True)
@@ -828,6 +856,8 @@ class Dashboard(App):
     def _select_readiness_backend(self, backend, *, refresh=False):
         if backend != self._readiness_backend:
             self._readiness_backend = backend
+            if self._status_owner in ("result", "error-result"):
+                self._status_owner = None
             self._render_readiness()
         # Selection only changes the view. In particular it cannot activate a Docker socket.
         if refresh:
@@ -858,12 +888,12 @@ class Dashboard(App):
                                              "this folder, / to change the filter." if empty else ""))
             return
         self.query_one("#details", Static).update(self._details(m))
+        self.query_one("#details-pane", VerticalScroll).can_focus = self.screen_stack[0].has_class("compact-dashboard") or bool(m.get("last_error"))
         self.query_one("#metrics", Static).update("Resource metrics: press Usage to fetch Docker stats")
 
     @staticmethod
     def _details(m) -> str:
-        """Seven lines, the pane's height at 80x24 (not wrapped: long values end in an ellipsis; the
-        full values: `status NAME`), in the CLI's wording (`status`, `config show`)."""
+        """Seven summary lines and an optional error; full values are in CLI status/config show."""
         from .config_plan import current
         try:
             cfg = current(m)
@@ -882,8 +912,8 @@ class Dashboard(App):
                 f"Distribution: {escape(image)}  Provider profile: {escape(profile)}\n"
                 f"Docker: {escape(backends.describe(m))}  Settings: {escape(settings)}\n"
                 f"Readiness: {Dashboard._readiness_line(m)}\n"
-                + (f"Error: {escape(str(m['last_error']))}" if m.get("last_error")
-                 else f"OpenCode: {Dashboard._availability_line(m)}"))
+                f"OpenCode: {Dashboard._availability_line(m)}"
+                + (f"\nError: {escape(str(m['last_error']))}" if m.get("last_error") else ""))
 
     @staticmethod
     def _readiness_line(m) -> str:
@@ -1084,7 +1114,7 @@ class Dashboard(App):
         from .updates_tui import UpdatesScreen
         m = self.selected()
         self.push_screen(UpdatesScreen(environment_id=m["id"] if m else None,
-                                       base_backend=self._readiness_backend if self._image_advisory else backends.ROOTLESS,
+                                       base_backend=backends.get(m) if m else self._readiness_backend,
                                        open_bases=bool(self._image_advisory)))
 
     def action_agent_context(self) -> None:
@@ -1129,8 +1159,21 @@ class Dashboard(App):
     def _finished(self, message: str, error: bool = False) -> None:
         self._operation_pending = False
         self._set_busy(message)
+        self._status_owner = "error-result" if error else "result"
+        if error:
+            token = self._error_result = object()
+            self.set_timer(10, lambda: self._expire_error_result(token))
         self.notify(message, severity="error" if error else "information", timeout=10)
         self.action_refresh()
+
+    def _expire_error_result(self, token):
+        if self._error_result is not token or self._status_owner != "error-result" or self._operation_pending:
+            return
+        if self._runtime_waiters:
+            self.query_one("#status", Static).update(next(reversed(self._runtime_waiters.values())))
+            self._status_owner = "runtime"
+        else:
+            self._advisory_status()
 
     def action_quit(self) -> None:
         if getattr(self, "_updates_mutation_active", False):
@@ -1316,7 +1359,7 @@ class Dashboard(App):
         self._base_operation.update(result=result, failed=failed, phase='Failed; inspect actual base/copies before retry' if failed else 'Complete')
         self._updates_mutation_active = False
         self._finished(result, failed)
-        self._request_readiness(backend)
+        self._request_readiness(backend, after_change=True)
         for screen in self.screen_stack:
             if isinstance(screen, UpdatesScreen):
                 screen.base_finished(backend, key, result, failed)
@@ -1540,17 +1583,22 @@ class Dashboard(App):
 
     @work(thread=True, exclusive=True, group="environment-operation")
     def _prepare_attach(self, m, shell) -> None:
+        warnings = []
         try:
             if not c._tty():
                 raise c.SandboxError("An interactive session requires a terminal")
             with backends.use(backends.get(m)):
-                prepared = c.prepare_interactive(m, shell=shell)
+                def warn(message):
+                    warnings.append(message)
+                    self.call_from_thread(self.notify, message, severity="warning", timeout=15, markup=False)
+
+                prepared = c.prepare_interactive(m, shell=shell, warn=warn)
                 endpoint = backends.endpoint.get()
-            self.call_from_thread(self._attach_ready, prepared, shell, endpoint)
+            self.call_from_thread(self._attach_ready, prepared, shell, endpoint, warnings)
         except Exception as exc:
             self.call_from_thread(self._finished, c.error_text(exc), True)
 
-    def _attach_ready(self, m, shell, endpoint=None) -> None:
+    def _attach_ready(self, m, shell, endpoint=None, warnings=()) -> None:
         self._operation_pending = False
         self._session_active = True
         try:
@@ -1558,14 +1606,18 @@ class Dashboard(App):
                 if endpoint is not None:
                     backends.endpoint.set(endpoint)
                 with self.suspend():
+                    for warning in warnings:
+                        print(f"WARNING: {c.printable(warning)}", file=sys.stderr, flush=True)
                     code = c.interactive(m, shell=shell, prepared=True)
-            if code:
+            if code in (125, 126, 127) or (not shell and code not in (0, 130, -2)):
                 raise c.SandboxError(f"{'Shell' if shell else 'OpenCode'} session exited with status {code}")
+            message = f"Shell exited with status {code}" if shell and code not in (0, 130, -2) else "Session exited"
             from .preferences import read
             if read()["refresh_on_return"]:
-                self._finished("Session exited")
+                self._finished(message)
             else:
-                self._set_busy("Session exited")
+                self._set_busy(message)
+                self._status_owner = "result"
         except Exception as exc:
             self._finished(c.error_text(exc), True)
         finally:

@@ -9,8 +9,9 @@ Engineering records provide design and evidence, not additional routine executio
 
 ## Scope
 
-OpenCode Sandbox runs OpenCode coding agents in containers on the user's own rootless Docker
-daemon, on Linux hosts; Arch Linux is the development and test host (D-046). It is deliberately not
+OpenCode Sandbox runs OpenCode coding agents in Linux containers using the user's own rootless
+daemon by default, or an explicitly opted-in local rootful daemon. Arch Linux is the development
+and test host (D-046). The project is deliberately not
 a general container manager, does not manage repositories or package repositories, and leaves an
 environment's OpenCode configuration to the user, with only explicitly requested global-config
 file transfers and no automatic provisioning/synchronization. Please open an issue to
@@ -205,13 +206,13 @@ High-risk selection checklist (apply the affected rows, not every row to every c
 
 | Boundary | Failure modes / evidence to cover |
 |---|---|
-| Rootless daemon identity/isolation | Own UID, authenticated `dockerd` peer/user namespace/rootless option; refuse proxies, rootful/foreign/remote daemons; ownership/data-dir labels/collisions; measured `bridge`/`none` reachability, not assumed isolation |
+| Docker daemon identity/isolation | Authenticate `dockerd` response sender; verify own UID/namespace for rootless, local UID 0/unmapped for rootful; never fall back or use rootful without consent; refuse foreign/remote/proxied endpoints; verify ownership and measured reachability |
 | Filesystem/direct workspaces and host Git transfer | Symlink/traversal/unsafe paths and permissions, hostile Git configuration, uncommitted files/conflicts, export/stage/apply boundaries and preservation of user data |
 | Secrets/profiles | JSON permissions, executable `.env` refusal, safe argv/key injection; no leakage in processes, logs, metadata or backups; dummy credentials/fake providers unless explicitly authorized |
 | Lifecycle/configuration, locking/concurrency | Creation/start/recreate/cleanup races and lock order, journals/crash consistency, home/workspace/system-layer boundaries, once-only integrations, read-only readiness and no cross-data-directory/base/cache cleanup |
 | Backup/restore/rollback/recovery | Archive/link validation, interrupted/staged restore, retained checkpoints/copies, failed recovery and data/configuration preservation; no unsupported-schema migration |
 | Manager self-update/destructive operations | pipx tag install/upgrade/downgrade/uninstall/data retention, foreign-launcher refusal, independent helper/terminal handoff, exact installed-result verification and interruption/recovery, not success-path-only checks |
-| OpenCode/images/session boundaries | Both affected distributions, supported-major/pin/update/rollback policy, disabled self-update, real first-prompt Agent Context and user-owned configuration; keyboard/focus/confirmation/async errors and terminal/session return or manager death when affected |
+| OpenCode/images/session boundaries | Every affected distribution and backend, supported-major/pin/update/rollback policy, disabled self-update, real first-prompt Agent Context and user-owned configuration; keyboard/focus/confirmation/async errors and terminal/session return or manager death when affected |
 
 At meaningful local integration checkpoints, default to the complete suite on Python 3.11 with
 lowest direct dependencies and Python 3.14 with current compatible dependencies. Add the other

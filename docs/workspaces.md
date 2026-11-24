@@ -165,8 +165,9 @@ the directory; `delete` removes only the container, the volume and the metadata.
 
 | `--distro` | Base image | Built from | Notes |
 |---|---|---|---|
-| `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | Current definition revision 4; 6.0.0 built Debian 12 (revision 1) |
+| `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | APT packages |
 | `arch` | `opencode-sandbox:arch` | `archlinux:base-devel` (rolling) | AUR packages through `ocs-aur` |
+| `kali` | `opencode-sandbox:kali` | `kalilinux/kali-rolling` | Node.js, npm and npx from `node:24-trixie` |
 
 Build the base image on the backend you will use before creating the environment
 (`opencode-sandbox build --distro ID` for Rootless or
@@ -175,19 +176,16 @@ at creation and cannot change later. `create NAME --image REF` uses a custom ima
 Agent Context then makes no claims about its operating system or tools, the image needs
 `python3` for `run` and `shell`, and it is pulled at the first start if it is not present.
 
-The distribution family is fixed, not the OS of a future rebuilt base tag. Installing a newer
-manager does not rebuild images. Rebuilding a base affects future containers created from
-that base, **not existing containers**. Stop/start, settings recreation, snapshots and backups
-with the system layer retain the old OS and packages. A Debian 12 environment is still 12
-after the manager's default definition becomes 13; Debian 12 has LTS-only support until
-2028-06-30.
+The distribution family is fixed at creation. Updating the manager does not rebuild images.
+Rebuilding a base affects future containers created from that base, **not existing containers**.
+Stop/start, settings recreation, snapshots and backups with the system layer retain the
+environment's OS and packages.
 
-For the new default, first explicitly run `opencode-sandbox build --distro debian`; `doctor`
-compares its revision with the installed definition. Then create a new environment and transfer
-your work, or explicitly restore with `backup restore BACKUP NEW --no-system`. The latter keeps
-workspace/home files but discards the old system layer and installed packages, using the local
-current base. A backup that includes its system image instead keeps its old OS. Do not delete
-the old environment until you have checked the new one.
+To move to a different base OS, build the desired base on the matching backend, then create a
+new environment and transfer your work. To move to the current base of the same distribution,
+you can also use `backup restore BACKUP NEW --no-system`: it restores archived workspace and home
+files without the system layer or its installed packages. Check the new environment before deleting
+the original.
 
 `status NAME` reports the base OS from the owned container's inherited build labels, or from
 the selected image when no container exists. Derived/restored images retain those labels.
@@ -199,13 +197,14 @@ inside a container; inspect `/etc/os-release` there when an exact current versio
 ### Arch Linux environments
 
 - Repository packages: `pacman -Syu --needed PACKAGE` (Arch has no partial upgrades).
-- AUR packages: `ocs-aur -S PACKAGE`, as the container's root (the default user). `ocs-aur` runs
+- AUR packages: `ocs-aur -S PACKAGE` as container root. In a rootful environment, prefix package
+  and `ocs-aur` commands with `sudo`; rootless managed sessions already run as root. `ocs-aur` runs
   the AUR helper `paru` as the unprivileged user `aurbuild` in `/var/lib/aurbuild` (never in
   `/workspace`) and performs paru's `pacman` calls as root through a broker that exists only
   while `ocs-aur` runs and only accepts `pacman` from paru itself, not from PKGBUILD code.
-  `makepkg` and `paru` refuse to run as root, and `sudo` cannot work under `no-new-privileges`.
+  `makepkg` and `paru` refuse to run as root; do not run either directly as root.
 - Review PKGBUILDs first (`ocs-aur -Gp PACKAGE`): installed packages run as root inside the
-  container. `aurbuild` maps to a subordinate UID on the host; container root maps to you.
+  container. Rootless maps `aurbuild` to a subordinate UID and container root to your host UID.
 - Packages live in the system layer ([concepts.md](concepts.md#where-things-live)).
 - If a `pacman -Syu` inside an environment installs a pacman with a new libalpm version,
   `ocs-aur` stops working in that environment until it is created again from a rebuilt base

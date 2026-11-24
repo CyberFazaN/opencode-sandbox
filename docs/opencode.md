@@ -6,17 +6,17 @@ Use `opencode-sandbox opencode availability NAME`, `status NAME`, or the dashboa
 **Check** action (`i`). **Available** means the executable answered `--version`.
 **Missing** means the executable is absent from the container's PATH. **Broken** means
 it was found but its version command failed. **Unknown** means the check could not run,
-for example because the container is stopped. The check leaves stopped containers stopped
-and does not query npm. If OpenCode is missing or broken, use **Shell** to inspect or
-repair the installation.
+for example because the container is stopped or the probe timed out. The check leaves stopped
+containers stopped and does not query npm. The `availability` command exits with `0` for Available,
+`1` for Missing or Broken, and `2` for Unknown. Use **Shell** to inspect or repair OpenCode.
 
 
 ## Sessions
 
-`run NAME` starts OpenCode V2 as root in `/workspace` with the provider profile's variables:
+`run NAME` starts OpenCode V2 as the environment user in `/workspace` with the provider profile's variables:
 `opencode --standalone`, a private OpenCode server per launch. (The V2 background service would
 keep the environment of whichever client started it first, so the provider keys of later
-launches would be ignored.) `shell NAME` opens a root bash with the same variables; OpenCode
+launches would be ignored.) `shell NAME` opens Bash as the same user and with the same variables; OpenCode
 started from there, or from `exec`, reads the system config's saved Agent Context setting.
 Generic `exec` does not load the provider profile: use `ocs-opencode` for a validated profile
 and private server from shells/scripts. Plain `opencode` does not load the mounted profile itself.
@@ -35,10 +35,10 @@ Provider profiles cannot override config paths/content.
 The manager writes guidance for each environment that tells OpenCode about the sandbox. It
 states only what the manager configures or verifies:
 
-- **Container, user and privileges:** the image; container root (UID 0) mapped by rootless
-  Docker to your host user (custom images: the image defines the user); `no-new-privileges`
-  (sudo and setuid cannot raise privileges); no Docker socket, host services or host package
-  managers; host files only at `/workspace` (plus read-only manager files under `/run`).
+- **Container, user and privileges:** the image and backend. Rootless managed images run as
+  container root mapped to your host user; custom images define their own user. Rootless sets
+  `no-new-privileges`. Rootful runs as your host UID/GID with container-local sudo. Neither mounts
+  the Docker socket; host files are limited to the workspace and read-only manager mounts.
 - **Workspace and persistence:** the environment's name and kind; whether `/workspace` is a copy
   of a host directory, started empty, or a host directory mounted directly (every change is
   immediate in your files, no undo, not in backups by default; the host path is never named);
@@ -113,11 +113,9 @@ every container runs with `OPENCODE_DISABLE_AUTOUPDATE=1`, so OpenCode's own upd
 self-update (also `update: auto` in your OpenCode configuration) are off. The upstream updater
 has left unsafe permissions/caches and broken the Arch binary; use the manager's update commands.
 
-`opencode rollback-base` verifies a copy against the installed manager's current OS definition.
-A Debian-13 manager therefore refuses a Debian-12 base rollback copy; this is not an in-place
-OS downgrade tool. Retained Debian 12 containers and backups with their system image still
-work independently of the new base definition. Per-environment OpenCode update/rollback keeps
-that environment's OS and system layer.
+`opencode rollback-base` verifies a copy against the registry's OS definition. It is not an OS
+downgrade tool and does not modify existing containers or system-image backups. Per-environment
+OpenCode update and rollback operate on the environment's own system layer, not the current base.
 
 | Command | Does |
 |---|---|
@@ -196,7 +194,7 @@ same target, container identity, policy, network and pending operation under the
 It never substitutes a newer release after consent. It commits a checkpoint
 `ocs-checkpoint:<id>-*` of the container's system layer, journals the update, and on any
 failure replaces the container with one created from the checkpoint (the system layer exactly
-as before; `/root` and `/workspace` are not touched). It also repairs a broken installation.
+as before; the home volume and `/workspace` are not touched). It also repairs a broken installation.
 
 `--update-system-packages` (off by default; **Update system packages** in the dashboard) first
 upgrades the environment's installed packages inside that same checkpointed update: Debian and Kali run
@@ -207,7 +205,7 @@ After the upgrade, OpenCode is verified again and reinstalled if the upgrade bro
 current OpenCode then keeps the checkpoint as the rollback point. Custom-image environments
 refuse the option: their package manager is unknown. Package upgrades are **not fully
 reversible**: rollback restores the checkpointed system layer, but not changes outside it (the
-`/root` home volume, `/workspace`) or data and configuration that upgraded programs migrated.
+home volume, `/workspace`) or data and configuration that upgraded programs migrated.
 On Arch, AUR/foreign packages such as `paru` are not rebuilt (see the libalpm limitation).
 Without the option, packages are left unchanged.
 `opencode rollback` undoes the last successful update the same way, keeping the current system
@@ -237,7 +235,8 @@ build and publication; a changed base requires a new review, never silent target
 The candidate's immutable ID passes OS/tool/binary verification before publication. Failed
 verification leaves the current base intact; cleanup removes only the known candidate. If its
 identity or cleanup cannot be confirmed, inspect the named leftover and actual base/copies before
-retrying `disk cleanup`. This is not a durable base-build journal or an automatic recovery engine.
+retrying `disk cleanup` on rootless. Rootful cleanup preserves shared base artifacts; review the
+named leftover separately. This is not a durable base-build journal or an automatic recovery engine.
 
 Choose the mode explicitly:
 
