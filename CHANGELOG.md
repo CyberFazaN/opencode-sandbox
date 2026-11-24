@@ -16,6 +16,7 @@ rootful Docker access.
 - Add the Kali Linux rolling base image to CLI and dashboard creation and the scheduled image
   verification matrix. Rebuild a development Kali revision 1 base for `npx` support; a rebuild
   does not change existing containers.
+- Fix OpenCode configuration profile transfers on Kali when the helper runs on rootless Docker.
 - Check runtime OpenCode availability from the CLI and dashboard. A probe timeout is unknown,
   not broken. Restore smoke checks report OpenCode separately from the mounts.
 - Keep confirmation actions visible while long reviews scroll. Improve keyboard focus and

@@ -369,15 +369,14 @@ def volume_operation(m, action, *, incoming=None, outgoing=None, bounds=None, **
         request.update(home=backends.home(m), identity=m["identity"])
     token = secrets.token_hex(12)
     name = "ocs-config-" + token
-    argv = ["docker", "-H", c.docker_endpoint(), "run", "--rm", *c.helper_labels("opencode-config"), "--pull", "never", "--name", name,
+    # Give timeout its own process group instead of running it as container PID 1.
+    argv = ["docker", "-H", c.docker_endpoint(), "run", "--rm", "--init", *c.helper_labels("opencode-config"), "--pull", "never", "--name", name,
             "--network", "none", "--security-opt", "no-new-privileges:true", "--cap-drop", "NET_RAW",
             "--cap-drop", "MKNOD", "--user", "0:0",
             "--label", f"org.opencode-sandbox.config-operation={token}",
             "--mount", f"type=volume,src={c.volume(m)},dst={backends.home(m)}" + ("" if options.get("fresh") else ",volume-nocopy"),
             "--entrypoint", "timeout", "-i", image, "--signal=KILL", "1800s", "python3", "-c",
             _helper_source(), json.dumps(request)]
-    if backends.get(m) == backends.ROOTFUL:
-        argv.insert(argv.index("--rm") + 1, "--init")
     # The spool is file-backed, not an unbounded capture_output. The helper codec enforces
     # byte/entry limits before writing; host available-space errors abort without publication.
     # No removal by a guessed name after interruption. --rm and the in-container
