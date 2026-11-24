@@ -8,6 +8,7 @@ from textual.widgets import Button, Input, Select, Static, TextArea
 from . import core as c
 from . import distros
 from . import opencode_versions as v
+from .tui_widgets import FormBody
 
 
 class BaseTargetScreen(ModalScreen[tuple | None]):
@@ -23,18 +24,19 @@ class BaseTargetScreen(ModalScreen[tuple | None]):
         self.distro = distro
 
     def compose(self) -> ComposeResult:
-        with Vertical(id='base-target-panel'):
-            yield Static(f'Build / Rebuild — {self.distro.name}', markup=False)
-            yield Static('OpenCode version (exact 2.x version or latest):', markup=False)
-            yield Input(value='latest', id='base-target', compact=True)
-            yield Static('Build mode:', markup=False)
-            yield Select([('Cached rebuild (reuse eligible layers)', False),
-                          ('Refresh & Rebuild (pull + no-cache)', True)],
-                         value=False, allow_blank=False, compact=True, id='base-refresh')
-            yield Static('Cached: no upstream pull. Refresh: pull and bypass the build cache.\n'
-                         f'Both modes always upgrade system packages:\n  {self.distro.build_upgrade}.\n'
-                         'Existing environments are unchanged.', markup=False)
-            with Horizontal():
+        with Vertical(id='base-target-panel', classes='dialog-fields'):
+            with FormBody():
+                yield Static(f'Build / Rebuild — {self.distro.name}', classes='form-title', markup=False)
+                yield Static('OpenCode version (exact 2.x version or latest):', markup=False)
+                yield Input(value='latest', id='base-target', compact=True)
+                yield Static('Build mode:', markup=False)
+                yield Select([('Cached rebuild (reuse eligible layers)', False),
+                              ('Refresh & Rebuild (pull + no-cache)', True)],
+                             value=False, allow_blank=False, compact=True, id='base-refresh')
+                yield Static('Cached: no upstream pull. Refresh: pull and bypass the build cache.\n'
+                             f'Both modes always upgrade system packages:\n  {self.distro.build_upgrade}.\n'
+                             'Existing environments are unchanged.', markup=False)
+            with Horizontal(classes="dialog-actions"):
                 yield Button('Cancel', id='base-target-cancel', compact=True)
                 yield Button('Review', id='base-target-review', compact=True)
 
@@ -59,15 +61,15 @@ class BaseRollbackScreen(ModalScreen[str | None]):
         self.inventory = inventory
 
     def compose(self) -> ComposeResult:
-        with Vertical(id='base-copies'):
-            yield Static(f'Choose rollback copy — {self.inventory.distro}', markup=False)
+        with Vertical(id='base-copies', classes='dialog-fields'):
+            yield Static(f'Choose rollback copy — {self.inventory.distro}', classes='form-title', markup=False)
             yield Static('Several distinct images: explicitly choose a copy; no newest-by-date default.\n'
                          'Aliases of one immutable image are one choice.', markup=False)
-            yield Select([(f'{copy.image_id} | OpenCode {copy.version or "Unknown"}', copy.image_id)
+            yield Select([(f'OpenCode {copy.version or "Unknown"} · {copy.image_id[:19]}', copy.image_id)
                           for copy in self.inventory.copies], prompt='Choose an immutable image', compact=True, id='base-copy')
             yield TextArea('\n'.join(v.format_base_rollback_copies(self.inventory)), read_only=True, id='base-copy-text')
             yield Static('', markup=False, id='base-copy-error')
-            with Horizontal():
+            with Horizontal(classes="dialog-actions"):
                 yield Button('Cancel', id='base-copy-cancel', compact=True)
                 yield Button('Review', id='base-copy-review', compact=True)
 
@@ -98,7 +100,7 @@ class BaseConsentScreen(ModalScreen[bool]):
         with Vertical(id='base-consent'):
             yield Static('Review Base Images operation — existing environments do not migrate', markup=False)
             yield TextArea(self.message, read_only=True, id='base-consent-text')
-            with Horizontal():
+            with Horizontal(classes="dialog-actions"):
                 yield Button('Cancel', id='base-cancel', compact=True)
                 yield Button('Confirm', id='base-confirm', variant='warning', compact=True)
 

@@ -13,6 +13,8 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   verification matrix.
 - Check runtime OpenCode availability from the CLI and dashboard. A restored container can pass
   its lifecycle smoke check even if OpenCode needs repair.
+- Keep confirmation actions visible while long reviews scroll. Improve keyboard focus and
+  field visibility in dialogs, compact dashboard layouts, and selected recovery details.
 
 ## 6.4.0 — 2026-11-20
 

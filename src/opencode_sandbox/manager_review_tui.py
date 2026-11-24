@@ -7,6 +7,7 @@ from textual.widgets import Button, Checkbox, Static, TextArea
 
 from . import core as c
 from . import manager_review as review
+from .tui_widgets import FormCheckbox
 
 
 class ManualUpdateScreen(ModalScreen):
@@ -23,11 +24,12 @@ class ManualUpdateScreen(ModalScreen):
 
     def compose(self):
         with Vertical(id='manual-update'):
-            yield Static('Manual update required', markup=False)
+            yield Static('Manual update required', classes='form-title', markup=False)
             yield TextArea(self.message, read_only=True, id='manual-update-text')
-            with Horizontal():
-                yield Button('Cancel', id='manual-update-cancel', compact=True)
-                yield Button('Confirm' if self.command else 'Close', id='manual-update-confirm', compact=True)
+            with Horizontal(classes="dialog-actions"):
+                yield Button('Close' if not self.command else 'Cancel', id='manual-update-cancel', compact=True)
+                if self.command:
+                    yield Button('Copy command', id='manual-update-confirm', variant='primary', compact=True)
 
     def action_cancel(self): self.dismiss()
 
@@ -55,11 +57,13 @@ class ManagerReviewScreen(ModalScreen[review.Approval | None]):
         self.message = c.printable(review.text(prepared, update=update))
 
     def compose(self) -> ComposeResult:
-        with Vertical(id='manager-review'):
+        with Vertical(id='manager-review', classes='dialog-fields'):
             yield Static('Review Sandbox Manager update' if self.update else 'Review Sandbox Manager — internal fixture, no installation', markup=False)
             yield TextArea(self.message, read_only=True, id='manager-review-text')
-            yield Checkbox('I accept this exact target and public-default network policy', id='manager-review-network')
-            with Horizontal():
+            yield Static('Required to continue · Space toggles the focused checkbox', classes='form-hint', markup=False)
+            yield FormCheckbox('Accept exact target and public network defaults',
+                               id='manager-review-network', compact=True)
+            with Horizontal(classes="dialog-actions"):
                 yield Button('Cancel', id='manager-review-cancel', compact=True)
                 yield Button('Update & close' if self.update else 'Confirm review', id='manager-review-confirm', variant='warning', compact=True, disabled=True)
 

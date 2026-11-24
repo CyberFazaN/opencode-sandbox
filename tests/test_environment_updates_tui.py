@@ -226,7 +226,10 @@ def test_policy_and_pin_require_separate_consent_without_installation(sources, r
         screen = app.screen_stack[-2]
         assert isinstance(app.screen, PolicyScreen)
         app.screen.query_one('#opencode-policy', Select).value = mode
-        app.screen.query_one('#opencode-pin', Input).value = pin or ''
+        await pilot.pause()
+        pin_field = app.screen.query_one('#opencode-pin', Input)
+        assert pin_field.disabled is (mode != 'pinned')
+        pin_field.value = pin or ''
         app.screen.query_one('#policy-review', Button).press()
         await until(pilot, lambda: isinstance(app.screen, EnvironmentConsentScreen))
         await pilot.pause()

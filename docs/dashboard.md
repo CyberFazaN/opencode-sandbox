@@ -11,6 +11,8 @@ The dashboard is usable at 80x24 and larger. Focus starts on the environment tab
 of buttons acts on the manager as a whole, the bottom rows on the selected environment. The
 details pane shows the selected environment's state, workspace, distribution, provider profile,
 settings, last readiness result and last error.
+In a shorter terminal the details pane shrinks to leave room for the table and action rows.
+Tab from the environment table to the compact details pane and use the arrow keys to scroll.
 
 The distribution family is shown without guessing an OS version from the current base
 definition. Use `status NAME` for inspected base-image provenance; new-environment choices
@@ -60,11 +62,14 @@ Metadata-only refresh does not recheck or clear these advisories.
 | `O` | OpenCode Configs (user-maintained directories, not an in-app source editor) | | |
 | `Esc` | Close a dialog or screen | `q` | Quit |
 
-Dialogs default to Cancel. Dashboard keys are inactive while a sub-screen is open. Promotion to a
+Confirmation dialogs start on Cancel. In a long confirmation, use Page Up and Page Down to
+read the full review while the action buttons stay visible. In forms, use Tab and Shift+Tab to
+move between controls, Space to toggle a checkbox, and Enter and the arrow keys to choose a
+dropdown option. Dashboard keys are inactive while a sub-screen is open. Promotion to a
 project, `backup restore-check`, `backup restore-rollback` and custom images are only available
 in the CLI.
 
-Press `?` again, Esc, or Close to dismiss Keys. Manager Settings (`g`, the Preferences button)
+Press `?` again, Esc, or Close to dismiss Keys. Preferences (`g`)
 includes **Copy selected text**, off by default. Completed selections in displayed text and
 read-only reports are copied once; editable/password fields keep normal editing behavior.
 Available local Linux clipboard tools are used without installing anything. Otherwise the
@@ -157,8 +162,8 @@ launchers are not taken over. Details shows source, time, bounded notes and the 
 
 When a newer version exists, Update remains available even if automatic updating is unsupported.
 The manual-update dialog explains the reason. Only freshly verified official-tag pipx ownership
-and settings produce an exact-tag command preserving Python and recognized locations. Confirm
-copies that command and closes the dialog; it does not install anything. Other installation
+and settings produce an exact-tag command preserving Python and recognized locations.
+**Copy command** puts the command on the clipboard and closes the dialog. Other installation
 methods receive guidance without an unsafe generic replacement command.
 
 For a supported install and newer target, **Update** (`u`) prepares fresh exact source/tool/impact
@@ -183,7 +188,7 @@ Cancel is focused first. Changed metadata, policy, container or checkpoint requi
 - **Start** is explicit, may create a container, and **leaves it running**. Use Check afterward
   for fresh binary verification. Normal pin, direct
   workspace, profile, ownership and pending-operation checks remain in force.
-- **Stop** honors Manager Settings' stop-confirmation preference and preserves home/workspace.
+- **Stop** honors the stop-confirmation preference and preserves home/workspace.
 - **Update** resolves an exact compatible target before consent and requires an owned,
   network-enabled container and matching pin. A running target gets **Caution** consent: it will
   be stopped and **will not restart afterward**, on success or rollback. After stopping, the
@@ -203,7 +208,7 @@ Cancel is focused first. Changed metadata, policy, container or checkpoint requi
   recovery handler. It never guesses whether npm finished. It may stop/remove the owned incomplete
   container, discarding unfinished update-layer changes; explicit Start is required afterward.
   Other journals route to **Recovery Center**, which handles OpenCode/configuration recovery
-  and names the CLI next steps for other journals. Full errors remain scrollable at 80x24.
+  and shows the selected entry's CLI next step and full error in a scrollable detail pane.
 
 Home/workspace/user configuration are preserved, **not rolled back**; binary rollback cannot undo
 application-data changes. Missing checkpoints/failures retain journals and guidance. A successor

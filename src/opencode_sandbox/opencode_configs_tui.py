@@ -180,11 +180,13 @@ class ConfigEditorScreen(Screen):
         elif action == "oc-recover": run_transfer(self, "recover")
         elif action == "oc-export":
             if self.exists:
-                self.app.push_screen(ConfirmScreen("Replace this export? Existing host-side edits will be lost. Cancel keeps it intact."),
+                self.app.push_screen(ConfirmScreen("Replace this export? Existing host-side edits will be lost. Cancel keeps it intact.",
+                                                   title="Replace config export", action_label="Replace export"),
                                      lambda yes: run_transfer(self, "export", replace=True) if yes else None)
             else: run_transfer(self, "export")
         elif action == "oc-delete":
-            self.app.push_screen(ConfirmScreen("Delete Export? Unapplied host edits will be lost. Container config is not touched."),
+            self.app.push_screen(ConfirmScreen("Delete Export? Unapplied host edits will be lost. Container config is not touched.",
+                                               title="Delete config export", action_label="Delete export"),
                                  lambda yes: run_transfer(self, "delete") if yes else None)
         elif action == "oc-apply": self.review_apply()
 
@@ -200,7 +202,8 @@ class ConfigEditorScreen(Screen):
         if not self.is_mounted or self.app.screen is not self: return
         if error: self.result_text(error)
         elif running:
-            self.app.push_screen(ConfirmScreen(oc.RUNNING_WARNING + "\nApply Export now?"),
+            self.app.push_screen(ConfirmScreen(oc.RUNNING_WARNING + "\nApply Export now?",
+                                               title="Apply configuration", action_label="Apply export"),
                                  lambda yes: run_transfer(self, "apply") if yes else None)
         else: run_transfer(self, "apply")
 
@@ -217,8 +220,9 @@ class ReloadConfigScreen(Screen):
         try: names, problem = oc.profiles(), ""
         except c.SandboxError as exc: names, problem = [], c.error_text(exc) + "\n\n"
         original = self.environment.get("opencode_config_source")
-        with Vertical(id="oc-reload"):
-            yield Static(f"Reload OpenCode Config — {self.environment['name']}", markup=False)
+        with Vertical(id="oc-reload", classes="dialog-fields"):
+            yield Static(f"Reload OpenCode Config — {self.environment['name']}", classes="form-title", markup=False)
+            yield Static("Reload source", markup=False)
             yield Select([("Empty — clear the whole global config directory", ""),
                           *((f"Profile: {name}" + (" (original)" if name == original else ""), name) for name in names)],
                          value=original if original in names else "", allow_blank=False, id="oc-reload-source", compact=True)
@@ -250,4 +254,8 @@ class ReloadConfigScreen(Screen):
         if error: self.result_text(error); return
         text = oc.REPLACE_WARNING + "\n" + ("Empty completely clears local config." if source is None else f"Copy profile {source} once.")
         if running: text += "\n" + oc.RUNNING_WARNING
-        self.app.push_screen(ConfirmScreen(text), lambda yes: run_transfer(self, "reload", source=source) if yes else None)
+        self.app.push_screen(
+            ConfirmScreen(text, title="Replace OpenCode configuration",
+                          action_label="Reload config" if source is not None else "Clear config"),
+            lambda yes: run_transfer(self, "reload", source=source) if yes else None,
+        )

@@ -4,9 +4,11 @@ from pathlib import Path
 
 from rich.markup import escape
 from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, ItemGrid, Vertical
+from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
+from textual.geometry import Size
 from textual.notifications import Notification
 from textual.screen import ModalScreen
 from textual.widgets import (
@@ -26,24 +28,60 @@ from textual.widgets.data_table import CellDoesNotExist, RowDoesNotExist
 from . import backends, workspaces
 from . import core as c
 from .tui_runtime import publish, work
+from .tui_widgets import DIALOG_CSS, FormBody, FormCheckbox
 
 
 class ConfirmScreen(ModalScreen[bool]):
-    CSS = "ConfirmScreen {align: center middle;} ConfirmScreen ToastRack {height: 0; max-height: 0; overflow: hidden;} #confirm-panel {width: 72; max-width: 100%; height: auto; max-height: 100%; border: round $error; background: $surface; padding: 1 2;} #confirm-panel Horizontal {height: auto;}"
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    CSS = """
+    ConfirmScreen {align: center middle;}
+    ConfirmScreen ToastRack {height: 0; max-height: 0; overflow: hidden;}
+    #confirm-panel {width: 72; max-width: 100%; height: auto; max-height: 100%;
+                    border: round $warning; background: $surface; padding: 0 2;}
+    #confirm-panel.destructive {border: round $error;}
+    #confirm-review {height: auto; max-height: 65vh; scrollbar-size-vertical: 1;}
+    """
+    BINDINGS = [Binding("escape", "cancel", "Cancel"), Binding("pageup", "review_page(-1)", show=False),
+                Binding("pagedown", "review_page(1)", show=False)]
     AUTO_FOCUS = "#cancel"
-    def __init__(self, message: str):
+
+    def __init__(self, message: str, *, title="Confirm action", action_label="Confirm", destructive=True):
         super().__init__()
         self.message = message
+        self.title_text = title
+        self.action_label = action_label
+        self.destructive = destructive
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="confirm-panel"):
-            yield Static(self.message, markup=False)
-            with Horizontal():
-                yield Button("Cancel", id="cancel")
-                yield Button("Confirm", id="confirm", variant="error")
+        panel = Vertical(id="confirm-panel")
+        panel.border_title = self.title_text
+        panel.set_class(self.destructive, "destructive")
+        with panel:
+            with FormBody(id="confirm-review"):
+                yield Static(self.message, markup=False)
+            with Horizontal(classes="dialog-actions"):
+                yield Button("Cancel", id="cancel", compact=True)
+                yield Button(self.action_label, id="confirm", variant="error" if self.destructive else "warning", compact=True)
+
+    def on_mount(self) -> None:
+        self.call_after_refresh(self._update_scroll_hint)
+
+    def on_resize(self) -> None:
+        self.call_after_refresh(self._update_scroll_hint)
+
+    def _update_scroll_hint(self) -> None:
+        body = self.query_one("#confirm-review", VerticalScroll)
+        panel = self.query_one("#confirm-panel", Vertical)
+        panel.border_subtitle = "Page Up / Page Down to scroll" if body.max_scroll_y > 0 else None
+
+    def action_review_page(self, direction: int) -> None:
+        body = self.query_one("#confirm-review", VerticalScroll)
+        if direction > 0:
+            body.scroll_page_down()
+        else:
+            body.scroll_page_up()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
         self.dismiss(event.button.id == "confirm")
 
     def action_cancel(self) -> None:
@@ -84,8 +122,8 @@ class CreateScreen(ModalScreen[dict | None]):
     #create-panel Horizontal {height: auto;}
     #create-panel Collapsible {padding: 0; border: none;}
     #create-panel Collapsible Contents {padding: 0 0 0 2;}
-    #create-error {color: $error; height: auto;}
-    .hint {color: $text-muted;}"""
+    #create-panel FormBody {max-height: 68vh;}
+    #create-error {color: $error; height: auto; max-height: 2;}"""
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     AUTO_FOCUS = "#name"
     WORKSPACE_OPTIONS = {
@@ -105,42 +143,47 @@ class CreateScreen(ModalScreen[dict | None]):
         from . import distros
         from . import opencode_configs as oc
         profiles = sorted({"default", *c.profile_list()})
-        with Vertical(id="create-panel"):
-            yield Static("[b]New environment[/b]  (Tab: next field, Esc: cancel)")
-            yield Input(placeholder="Name (letters, digits, . _ -)", id="name", compact=True)
-            yield Select([("Scratch: start from an empty workspace", "scratch"), ("Project: persistent project", "project"),
-                          ("Quick: disposable session", "quick")], value="scratch", allow_blank=False, id="kind", compact=True)
-            yield Select(self.workspace_choices("scratch"), value="empty", allow_blank=False, id="workspace-mode", compact=True)
-            yield Input(placeholder="Folder to copy", id="source", compact=True)
-            yield Select(self.import_choices("project"), value=workspaces.COPY_COMMITTED,
-                         allow_blank=False, id="import-mode", compact=True)
-            with Collapsible(title="More options: distribution, Docker, configuration", id="more"):
-                yield Select([(f"Base definition: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
-                              for d in distros.REGISTRY.values()], value=distros.DEFAULT, allow_blank=False, id="distro", compact=True)
-                try:
-                    allow_rootful = backends.allowed()
-                except (OSError, ValueError, c.SandboxError):
-                    allow_rootful = False
-                yield Select([("Docker: Rootless", backends.ROOTLESS),
-                              *([("Docker: Rootful (host root authority)", backends.ROOTFUL)] if allow_rootful else [])],
-                             value=backends.ROOTLESS, allow_blank=False, id="backend", compact=True,
-                             disabled=not allow_rootful)
-                yield Select([(f"Provider profile: {name}", name) for name in profiles], value="default",
-                             allow_blank=False, id="profile", compact=True)
-                yield Select([("OpenCode config: Local (no initial import)", "local"),
-                              ("OpenCode config: Copy a profile once", "copy")], value="local", allow_blank=False,
-                             id="oc-config-mode", compact=True)
-                try: names, problem = oc.profiles(), None
-                except c.SandboxError as exc: names, problem = [], c.error_text(exc)
-                yield Select([(name, name) for name in names], prompt="Select config profile",
-                             id="oc-config-profile", compact=True)
-                hint = [problem or "No profiles found; use Local or add one:"] if problem or not names else []
-                hint += [f"User-maintained directories: {oc.profiles_directory()}", "Copy is independent, not a live link."]
-                yield Static("\n".join(hint),
-                             markup=False, classes="hint", id="oc-config-hint")
-                yield Checkbox("Include specialized Agent Context", value=True, id="include-agent-context", compact=True)
+        panel = Vertical(id="create-panel", classes="dialog-fields")
+        panel.border_title = "New environment"
+        with panel:
+            yield Static("Tab: next field · Space: toggle · Esc: cancel", classes="form-hint")
+            with FormBody():
+                yield Static("Name")
+                yield Input(placeholder="Letters, digits, . _ -", id="name", compact=True)
+                yield Select([("Scratch: start from an empty workspace", "scratch"), ("Project: persistent project", "project"),
+                              ("Quick: disposable session", "quick")], value="scratch", allow_blank=False, id="kind", compact=True)
+                yield Select(self.workspace_choices("scratch"), value="empty", allow_blank=False, id="workspace-mode", compact=True)
+                yield Static("Source folder", id="source-label")
+                yield Input(placeholder="Folder to copy", id="source", compact=True)
+                yield Select(self.import_choices("project"), value=workspaces.COPY_COMMITTED,
+                             allow_blank=False, id="import-mode", compact=True)
+                with Collapsible(title="More options: distribution, Docker, configuration", id="more"):
+                    yield Select([(f"Base definition: {d.name} {d.version}" + (" (default)" if d.id == distros.DEFAULT else ""), d.id)
+                                  for d in distros.REGISTRY.values()], value=distros.DEFAULT, allow_blank=False, id="distro", compact=True)
+                    try:
+                        allow_rootful = backends.allowed()
+                    except (OSError, ValueError, c.SandboxError):
+                        allow_rootful = False
+                    yield Select([("Docker: Rootless", backends.ROOTLESS),
+                                  *([("Docker: Rootful (host root authority)", backends.ROOTFUL)] if allow_rootful else [])],
+                                 value=backends.ROOTLESS, allow_blank=False, id="backend", compact=True,
+                                 disabled=not allow_rootful)
+                    yield Select([(f"Provider profile: {name}", name) for name in profiles], value="default",
+                                 allow_blank=False, id="profile", compact=True)
+                    yield Select([("OpenCode config: Local (no initial import)", "local"),
+                                  ("OpenCode config: Copy a profile once", "copy")], value="local", allow_blank=False,
+                                 id="oc-config-mode", compact=True)
+                    try: names, problem = oc.profiles(), None
+                    except c.SandboxError as exc: names, problem = [], c.error_text(exc)
+                    yield Select([(name, name) for name in names], prompt="Select config profile",
+                                 id="oc-config-profile", compact=True)
+                    hint = [problem or "No profiles found; use Local or add one:"] if problem or not names else []
+                    hint += [f"User-maintained directories: {oc.profiles_directory()}", "Copy is independent, not a live link."]
+                    yield Static("\n".join(hint),
+                                 markup=False, classes="form-hint", id="oc-config-hint")
+                    yield FormCheckbox("Include specialized Agent Context", value=True, id="include-agent-context", compact=True)
             yield Static("", id="create-error")
-            with Horizontal():
+            with Horizontal(classes="dialog-actions"):
                 yield Button("Cancel", id="cancel", compact=True)
                 yield Button("Create", id="create", variant="primary", compact=True)
 
@@ -176,6 +219,7 @@ class CreateScreen(ModalScreen[dict | None]):
             field.value = ""
             self.query_one("#import-mode", Select).value = workspaces.COPY_COMMITTED
         field.display = setup in ("copy", "direct")
+        self.query_one("#source-label").display = field.display
         field.placeholder = "Host folder to mount directly (required)" if setup == "direct" else "Folder to copy (required)"
         self.query_one("#import-mode").display = setup == "copy"
 
@@ -268,7 +312,7 @@ class Dashboard(App):
     # Compact, wrapping button rows: at 80x24 the old layout left one table row and
     # hid 11 of 20 buttons off-screen. Bar buttons stay unfilled on one strip: filled one-line
     # buttons merge into tiles across wrapped rows, and borders are unavailable on compact buttons.
-    CSS = """
+    CSS = DIALOG_CSS + """
     Screen {layout: vertical;}
     #search {width: 1fr;}
     .bar {height: auto; grid-gutter: 0 1; background: $panel;}
@@ -281,7 +325,11 @@ class Dashboard(App):
     .bar Button.-error {background: transparent; color: $error; text-style: bold;}
     .bar Button.-error:focus {background: $error; color: $text;}
     #envs {height: 1fr; min-height: 3;}
+    #details-pane {height: 9; scrollbar-size-vertical: 1;}
     #details {height: 9; border: round $accent; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
+    .compact-dashboard #details-pane {height: 3; border-left: solid $accent;}
+    .compact-dashboard #details-pane:focus #details {background: $panel;}
+    .compact-dashboard #details {height: auto; border: none;}
     #status, #metrics {height: 1; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis;}
     """
     # Labels match the CLI's terms: Settings = `config`, Changes = `changes`, Usage =
@@ -326,7 +374,8 @@ class Dashboard(App):
                                ("Recovery", "recovery"), ("Disk", "disk"), ("OpenCode Configs", "opencode-configs")):
                 yield Button(label, id=bid, compact=True)
         yield DataTable(id="envs", cursor_type="row")
-        yield Static("Select an environment to see details", id="details")
+        with VerticalScroll(id="details-pane"):
+            yield Static("Select an environment to see details", id="details")
         with ItemGrid(id="actions", classes="bar", min_column_width=15):
             for label, bid in (("OpenCode", "open"), ("Shell", "shell"), ("Start", "start"), ("Stop", "stop"),
                                ("Check", "check"), ("Settings", "runtime"), ("Usage", "usage"),
@@ -427,6 +476,7 @@ class Dashboard(App):
         self.set_interval(self.AUTO_REFRESH_SECONDS, self._refresh_if_changed)
         # Focus the table, not the filter: otherwise every letter key typed into the filter.
         self.query_one("#envs", DataTable).focus()
+        self._layout_dashboard(self.size)
         try:
             pending = c.pending_repairs()
             if pending:
@@ -445,6 +495,25 @@ class Dashboard(App):
         self.set_interval(60, self.refresh_discovery_preferences)
         self.refresh_discovery_preferences()
         self.refresh_clipboard_preferences()
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._layout_dashboard(event.size)
+
+    def _layout_dashboard(self, size: Size) -> None:
+        if not self.screen_stack:
+            return
+        dashboard = self.screen_stack[0]
+        if not (toolbars := dashboard.query("#toolbar")):
+            return
+        toolbar = toolbars.first(ItemGrid)
+        compact = size.width < 76 or size.height < 24
+        dashboard.set_class(compact, "compact-dashboard")
+        toolbar.min_column_width = 14 if compact else 16
+        dashboard.query_one("#actions", ItemGrid).min_column_width = 14 if compact else 15
+        pane = dashboard.query_one("#details-pane", VerticalScroll)
+        pane.can_focus = compact
+        if not compact and pane.has_focus:
+            dashboard.query_one("#envs", DataTable).focus()
 
     def refresh_discovery_preferences(self):
         if self._manager_update_intent is not None: return
@@ -758,6 +827,7 @@ class Dashboard(App):
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if self.is_running and event.data_table.id == "envs" and event.data_table.is_mounted:
             self.update_details()
+            self.query_one("#details-pane", VerticalScroll).scroll_home(animate=False)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         # Enter (or a click on the highlighted row); the table consumes Enter itself.
@@ -812,8 +882,11 @@ class Dashboard(App):
                 self.notify("No configuration changes", severity="information"); return
             if plan.blockers:
                 raise c.SandboxError("; ".join(plan.blockers))
-            self.push_screen(ConfirmScreen(cp.describe(plan)),
-                lambda yes: self._apply_runtime(m,changes,plan) if yes else None)
+            self.push_screen(
+                ConfirmScreen(cp.describe(plan), title="Review settings changes",
+                              action_label="Apply settings", destructive=False),
+                lambda yes: self._apply_runtime(m, changes, plan) if yes else None,
+            )
         except Exception as exc:
             self.notify(f"Configuration plan failed: {c.error_text(exc)}", severity="error")
 
@@ -884,7 +957,12 @@ class Dashboard(App):
         text = (f"Remove {len(items)} object(s), freeing {cleanup.human(cleanup.reclaimable(items))}?\n"
                 + "\n".join(cleanup.format_preview(items)[:12]) + ("\n  …" if len(items) > 12 else "")
                 + "\nEach object is checked again first; objects in use are skipped.")
-        self.push_screen(ConfirmScreen(text), lambda yes: self._cleanup_worker([i.key for i in items], superseded, getattr(inv, "backend", backends.ROOTLESS)) if yes else None)
+        self.push_screen(
+            ConfirmScreen(text, title="Review disk cleanup", action_label="Clean up"),
+            lambda yes: self._cleanup_worker(
+                [i.key for i in items], superseded, getattr(inv, "backend", backends.ROOTLESS),
+            ) if yes else None,
+        )
 
     @work(thread=True, exclusive=True, group="disk-cleanup")
     def _cleanup_worker(self, keys, superseded, backend=backends.ROOTLESS):
@@ -1199,7 +1277,8 @@ class Dashboard(App):
         m = self.selected()
         if not m: return
         if confirm:
-            self.push_screen(ConfirmScreen(f"Stop environment {m['name']}?\nWorkspace and home volume are retained."),
+            self.push_screen(ConfirmScreen(f"Stop environment {m['name']}?\nWorkspace and home volume are retained.",
+                                           title="Stop environment", action_label="Stop", destructive=False),
                              lambda yes: self._perform("stop", m) if yes else None)
         else:
             self._perform("stop", m)
@@ -1217,7 +1296,8 @@ class Dashboard(App):
         new_name = f"scratch-{m['id'][:6]}"
         self.push_screen(ConfirmScreen(f"Promote quick session '{m['name']}' to scratch environment '{new_name}'?\n"
                                        "Workspace, home volume and container stay unchanged; it is no longer "
-                                       "treated as disposable."),
+                                       "treated as disposable.", title="Promote quick session",
+                                       action_label="Promote", destructive=False),
                          lambda yes: self._keep_quick(m, new_name) if yes else None)
 
     def _keep_quick(self, m, new_name) -> None:
@@ -1237,7 +1317,8 @@ class Dashboard(App):
         removed = (f"Container and home volume will be removed. The direct workspace {m['workspace']['path']} is not touched.\n"
                    if direct else "Container, home volume, and workspace will be removed.\n")
         self.push_screen(ConfirmScreen(f"Permanently DELETE '{m['name']}' ({m['id']})?\n" + removed +
-                                       "Export or back up any important data first."),
+                                       "Export or back up any important data first.",
+                                       title="Delete environment", action_label="Delete"),
                          lambda confirmed: self._perform("delete", m) if confirmed else None)
 
     def action_create_environment(self) -> None:
@@ -1248,7 +1329,8 @@ class Dashboard(App):
             if self._operation_pending:
                 self.notify("Another operation is running", severity="warning"); return
             if values.get("backend") == backends.ROOTFUL and not rootful_confirmed:
-                self.push_screen(ConfirmScreen(backends.WARNING),
+                self.push_screen(ConfirmScreen(backends.WARNING, title="Rootful Docker",
+                                               action_label="Continue", destructive=False),
                                  lambda yes: self._create_from_form(values, rootful_confirmed=True) if yes else None)
                 return
             if values["mode"] == "direct":
@@ -1260,7 +1342,9 @@ class Dashboard(App):
                 self._preview_git_import(values)
                 return
             if values.get("copy_entire_directory"):
-                self.push_screen(ConfirmScreen("Copy entire directory?\n\n" + workspaces.ENTIRE_WARNING),
+                self.push_screen(ConfirmScreen("Copy entire directory?\n\n" + workspaces.ENTIRE_WARNING,
+                                               title="Review workspace copy", action_label="Copy and create",
+                                               destructive=False),
                                  lambda yes: self._create_managed(values) if yes else None)
                 return
             self._create_managed(values)
@@ -1300,7 +1384,9 @@ class Dashboard(App):
             target = workspaces.check_direct(Path(values["source"]).expanduser())
         except c.SandboxError as exc:
             self.notify(str(exc), severity="error"); return
-        self.push_screen(ConfirmScreen(f"{workspaces.LABEL}.\n\n" + DIRECT_CONSENT.format(path=target)),
+        self.push_screen(ConfirmScreen(f"{workspaces.LABEL}.\n\n" + DIRECT_CONSENT.format(path=target),
+                                       title="Review direct workspace", action_label="Create environment",
+                                       destructive=False),
                          lambda yes: self._create_direct({**values, "source": str(target)}) if yes else None)
 
     def _create_direct(self, values) -> None:
@@ -1420,7 +1506,8 @@ class Dashboard(App):
         else:
             what = ("Not a Git repository: ALL files are COPIED except hidden files, symlinks and "
                     "node_modules/target/dist/build/__pycache__. The agent can read everything copied.")
-        self.push_screen(ConfirmScreen(f"Create project environment '{p.name}' from the current folder?\n{p}\n\n{what}"),
+        self.push_screen(ConfirmScreen(f"Create project environment '{p.name}' from the current folder?\n{p}\n\n{what}",
+                                       title="Import current folder", action_label="Create project", destructive=False),
                          lambda yes: self._create_current(p) if yes else None)
 
     def _create_current(self, p: Path) -> None:
@@ -1435,7 +1522,7 @@ class RuntimeScreen(ModalScreen[dict | None]):
     # Labelled one-line fields: the placeholders were the only labels and vanished once filled.
     CSS = ("RuntimeScreen {align: center middle;} #runtime-panel {width: 78; max-width: 100%; height: auto; max-height: 100%; "
            "border: round $accent; background: $surface; padding: 0 1;} #runtime-panel Horizontal {height: auto;} "
-           "#runtime-panel .field {height: 1; margin-bottom: 1;} #runtime-panel .field > Static {width: 19;} "
+           "#runtime-panel .field {height: 1;} #runtime-panel .field > Static {width: 19;} "
            "#runtime-panel .field Input, #runtime-panel .field Select {width: 1fr;}")
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
@@ -1451,27 +1538,30 @@ class RuntimeScreen(ModalScreen[dict | None]):
         cfg = current(self.environment)
         ports = ",".join(f"{p['host']}:{p['container']}/{p['protocol']}" for p in cfg["ports"])
         profiles = sorted({"default", cfg["profile"], *c.profile_list()})
-        with Vertical(id="runtime-panel"):
-            yield Static(f"[b]Settings of {escape(self.environment['name'])}[/b] (same as: config apply)\n"
-                         "The next step shows the change plan. Ports bind to 127.0.0.1.\n")
-            fields = (("CPUs (--cpus)", Input(value=cfg["cpus"], placeholder="e.g. 4", id="rt-cpus", compact=True)),
-                      ("Memory (--memory)", Input(value=cfg["memory"], placeholder="e.g. 8g", id="rt-memory", compact=True)),
-                      ("Processes (--pids)", Input(value=str(cfg["pids"]), placeholder="e.g. 2048", id="rt-pids", compact=True)),
-                      ("Network", Select([("bridge: internet + LAN", "bridge"), ("none: offline", "none")], value=cfg["network"],
-                                         allow_blank=False, id="rt-network", compact=True)),
-                      ("Ports (--publish)", Input(value=ports, placeholder="none, e.g. 8080:8000/tcp,5353:5353/udp", id="rt-ports", compact=True)),
-                      ("Provider profile", Select([(name, name) for name in profiles], value=cfg["profile"], allow_blank=False,
-                                                  id="rt-profile", compact=True)))
-            for label, widget in fields:
-                with Horizontal(classes="field"):
-                    yield Static(label)
-                    yield widget
-            yield Checkbox("Include specialized Agent Context", value=cfg["agent_context_enabled"], id="rt-agent-context", compact=True)
-            yield Static("Context file remains available when disabled. Global config transfers:", markup=False)
-            with Horizontal():
-                yield Button("OpenCode Config Editor", id="rt-config-editor", compact=True)
-                yield Button("Reload Config", id="rt-config-reload", compact=True)
-            with Horizontal():
+        panel = Vertical(id="runtime-panel", classes="dialog-fields")
+        panel.border_title = f"Settings of {self.environment['name']}"
+        with panel:
+            with FormBody():
+                yield Static("Preview reviews changes before applying. Ports bind to 127.0.0.1.",
+                             classes="form-hint", markup=False)
+                fields = (("CPUs (--cpus)", Input(value=cfg["cpus"], placeholder="e.g. 4", id="rt-cpus", compact=True)),
+                          ("Memory (--memory)", Input(value=cfg["memory"], placeholder="e.g. 8g", id="rt-memory", compact=True)),
+                          ("Processes (--pids)", Input(value=str(cfg["pids"]), placeholder="e.g. 2048", id="rt-pids", compact=True)),
+                          ("Network", Select([("bridge: internet + LAN", "bridge"), ("none: offline", "none")], value=cfg["network"],
+                                             allow_blank=False, id="rt-network", compact=True)),
+                          ("Ports (--publish)", Input(value=ports, placeholder="none, e.g. 8080:8000/tcp,5353:5353/udp", id="rt-ports", compact=True)),
+                          ("Provider profile", Select([(name, name) for name in profiles], value=cfg["profile"], allow_blank=False,
+                                                      id="rt-profile", compact=True)))
+                for label, widget in fields:
+                    with Horizontal(classes="field"):
+                        yield Static(label)
+                        yield widget
+                yield FormCheckbox("Include specialized Agent Context", value=cfg["agent_context_enabled"], id="rt-agent-context", compact=True)
+                yield Static("Context file remains available when disabled. Global config transfers:", markup=False)
+                with Horizontal():
+                    yield Button("OpenCode Config Editor", id="rt-config-editor", compact=True)
+                    yield Button("Reload Config", id="rt-config-reload", compact=True)
+            with Horizontal(classes="dialog-actions"):
                 yield Button("Cancel", id="rt-cancel", compact=True)
                 yield Button("Preview", id="rt-save", variant="primary", compact=True)
 
@@ -1505,7 +1595,7 @@ class RuntimeScreen(ModalScreen[dict | None]):
 
 class DiskScreen(ModalScreen[bool | None]):
     """Disk usage report; dismisses with False (cleanup), True (cleanup incl. superseded) or None."""
-    CSS = "DiskScreen {align: center middle;} #disk-panel {width: 95%; height: 90%; border: round $accent; padding: 0 1; background: $surface;} #disk-report {height: 1fr;} #disk-panel Horizontal {height: auto;}"
+    CSS = "DiskScreen {align: center middle;} #disk-panel {width: 95%; height: 90%; border: round $accent; padding: 0 1; background: $surface;} #disk-report {height: 1fr;}"
     BINDINGS = [Binding("escape", "close", "Close")]
 
     def __init__(self, inv):
@@ -1522,10 +1612,12 @@ class DiskScreen(ModalScreen[bool | None]):
         with Vertical(id="disk-panel"):
             yield Static("Disk usage (read-only; sizes approximate; same as: disk usage, disk cleanup)")
             yield TextArea(self.report, read_only=True, id="disk-report")
-            with Horizontal():
-                yield Button("Close", id="disk-close")
-                yield Button(f"Clean up ({default})", id="disk-cleanup", variant="warning", disabled=not default)
-                yield Button(f"Clean up incl. superseded ({extra})", id="disk-cleanup-all", variant="error", disabled=not extra)
+            with ItemGrid(classes="dialog-grid dialog-actions", min_column_width=26):
+                yield Button("Close", id="disk-close", compact=True)
+                yield Button(f"Clean up ({default})", id="disk-cleanup", variant="warning", disabled=not default,
+                             compact=True)
+                yield Button(f"Clean superseded too ({extra})", id="disk-cleanup-all", variant="error",
+                             disabled=not extra, compact=True)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss({"disk-cleanup": False, "disk-cleanup-all": True}.get(event.button.id))
@@ -1546,10 +1638,10 @@ class AgentContextScreen(ModalScreen[dict | None]):
 
     def compose(self):
         from . import agent_context as ac
-        with Vertical(id="context-panel"):
-            yield Static(f"Agent Context — {self.environment['name']}", markup=False, id="report-title")
+        with Vertical(id="context-panel", classes="dialog-fields"):
+            yield Static(f"Agent Context — {self.environment['name']}", markup=False, id="report-title", classes="form-title")
             yield Static(ac.activation_status(self.environment) + " (saved setting)", markup=False, id="context-status")
-            yield Checkbox("Include specialized Agent Context", value=ac.enabled(self.environment),
+            yield FormCheckbox("Include specialized Agent Context", value=ac.enabled(self.environment),
                            id="context-inclusion", compact=True)
             yield TextArea(self.preview, read_only=True, id="report-text")
             with Horizontal():

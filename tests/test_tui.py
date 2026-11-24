@@ -684,9 +684,7 @@ def test_recovery_center_names_the_finishing_command():
     async def t(app, pilot):
         app.push_screen(RecoveryScreen())
         await settle(pilot)
-        table = app.screen.query_one("#recovery-table")
-        row = [str(cell) for cell in table.get_row_at(0)]  # Text cells
-        assert "opencode-sandbox container recreate-recover ocs-qa-rec" in row
+        assert "opencode-sandbox container recreate-recover ocs-qa-rec" in app.screen.query_one("#recovery-detail").text
     run(t, (120, 40))
 
 
