@@ -1,6 +1,5 @@
 """CLI robustness: crashes, metadata robustness, profile checks."""
 import os
-from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -52,11 +51,13 @@ def test_config_apply_preserves_omitted_settings(monkeypatch):
 
 def _start_until_run(monkeypatch, m):
     """Run start() with fake Docker; return the docker run argv or raise."""
+    from docker_fixtures import start_transport
+
     calls = []
     monkeypatch.setattr(c, "ensure_runtime", lambda image=True: None)
     monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
-    monkeypatch.setattr(c, "docker", lambda *a, **k: calls.append(a) or SimpleNamespace(returncode=0, stdout="", stderr=""))
+    monkeypatch.setattr(c, "docker", start_transport(calls))
     c.start(m)
     return next(a for a in calls if a[0] == "run")
 

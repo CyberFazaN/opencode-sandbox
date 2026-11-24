@@ -168,7 +168,9 @@ the directory; `delete` removes only the container, the volume and the metadata.
 | `debian` (default) | `opencode-sandbox:debian` | `node:24-trixie` (Debian 13) | Current definition revision 4; 6.0.0 built Debian 12 (revision 1) |
 | `arch` | `opencode-sandbox:arch` | `archlinux:base-devel` (rolling) | AUR packages through `ocs-aur` |
 
-Build the base image first (`opencode-sandbox build --distro ID`). The distribution is recorded
+Build the base image on the backend you will use before creating the environment
+(`opencode-sandbox build --distro ID` for Rootless or
+`opencode-sandbox --docker-backend rootful build --distro ID` for Rootful). The distribution is recorded
 at creation and cannot change later. `create NAME --image REF` uses a custom image instead: the
 Agent Context then makes no claims about its operating system or tools, the image needs
 `python3` for `run` and `shell`, and it is pulled at the first start if it is not present.

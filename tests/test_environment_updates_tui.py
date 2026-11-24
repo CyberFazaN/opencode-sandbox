@@ -61,11 +61,9 @@ def test_subscreen_and_unmounted_table_events_do_not_reach_dashboard_selection(s
         table = app.screen.query_one('#updates-table')
         monkeypatch.setattr(app, 'update_details', lambda: calls.append('dashboard details'))
         app.on_data_table_row_highlighted(SimpleNamespace(data_table=table))
-        app.on_data_table_row_selected(SimpleNamespace(data_table=table))
         assert calls == []
         unmounted = SimpleNamespace(id='envs', is_mounted=False)
         app.on_data_table_row_highlighted(SimpleNamespace(data_table=unmounted))
-        app.on_data_table_row_selected(SimpleNamespace(data_table=unmounted))
         assert calls == []
     run(test, (80, 24))
 

@@ -12,6 +12,7 @@ from textual.widgets import (
     DataTable,
     Footer,
     LoadingIndicator,
+    Select,
     Static,
     Tab,
     Tabs,
@@ -38,6 +39,9 @@ class UpdatesScreen(Screen):
     CSS = """UpdatesScreen {align: center middle;}
     UpdatesScreen ToastRack {height: 0; max-height: 0; margin: 0; overflow: hidden;}
     #updates-panel {width: 100%; max-width: 120; height: 1fr; border: round $accent; padding: 0 1;}
+    #base-backend {height: 1; width: 23;}
+    #base-backend-label {width: auto; margin-right: 1;}
+    #base-backend-controls {height: 1;}
     #updates-title {height: 1; text-style: bold;}
     #updates-tabs Tab.-active {color: $accent; text-style: bold;}
     #updates-discovery {height: 2; text-wrap: nowrap; text-overflow: ellipsis;}
@@ -64,17 +68,16 @@ class UpdatesScreen(Screen):
                 Binding("e", "environment('recover')", "Recover", show=False), Binding("b", "base('build')", "Build/Rebuild", show=False)]
     AUTO_FOCUS = "#updates-table"
 
-    def __init__(self, *, environment_id=None):
+    def __init__(self, *, environment_id=None, base_backend=backends.ROOTLESS, open_bases=False, base_distro=None):
         super().__init__()
-        self.view = "manager"
-        self.base_backend = backends.ROOTLESS
-        if environment_id:
-            try:
-                self.base_backend = backends.get(c.resolve(environment_id))
-            except c.SandboxError:
-                pass
+        self.view = "bases" if open_bases else "manager"
+        try:
+            self.allow_rootful = backends.allowed()
+        except (c.SandboxError, OSError, ValueError):
+            self.allow_rootful = False
+        self.base_backend = base_backend
         self.items = {key: {} for key in VIEWS}
-        self.selection = {"environments": environment_id}
+        self.selection = {"environments": environment_id, "bases": base_distro}
         self.remote = v.discovery()
         self._cached_remote = dict(self.remote)
         self.manager_remote = mr.discovery()
@@ -101,7 +104,16 @@ class UpdatesScreen(Screen):
         with Vertical(id="updates-panel"):
             yield Static("Updates", id="updates-title", markup=False)
             yield Tabs(Tab("1 Manager", id="manager"), Tab("2 Base Images", id="bases"),
-                       Tab("3 Environments", id="environments"), id="updates-tabs")
+                       Tab("3 Environments", id="environments"), active=self.view, id="updates-tabs")
+            with Horizontal(id="base-backend-controls"):
+                yield Static("Docker backend", id="base-backend-label")
+                options = [("Rootless", backends.ROOTLESS)]
+                if self.allow_rootful:
+                    options.append(("Rootful", backends.ROOTFUL))
+                elif self.base_backend == backends.ROOTFUL:
+                    options = [("Rootful (disabled)", backends.ROOTFUL)]
+                yield Select(options, value=self.base_backend, allow_blank=False, compact=True,
+                             id="base-backend", disabled=not self.allow_rootful)
             yield Static("", id="updates-discovery", markup=False)
             with Horizontal(id='updates-list-tools', classes='bar'):
                 yield Static('', id='updates-hint', markup=False)
@@ -147,7 +159,7 @@ class UpdatesScreen(Screen):
         self.query_one('#updates-check').focus()
         for section in ("manager", "bases", "environments"):
             entries = [(key, self._next(section, key)) for key in self.items[section]]
-            self._track(self._inventory_worker(section, entries))
+            self._track(self._inventory_worker(section, entries, self.base_backend))
         self.set_interval(1, self._refresh_discovery)
 
     def _refresh_discovery(self):
@@ -187,19 +199,44 @@ class UpdatesScreen(Screen):
         self._generation[section, key] = token
         return token
 
+    def on_select_changed(self, event: Select.Changed):
+        if event.select.id != "base-backend" or event.value == self.base_backend:
+            return
+        if event.value not in backends.NAMES:
+            return
+        if self._batch_remaining or self._preparing or self.app._operation_pending:
+            event.select.value = self.base_backend
+            return
+        if event.value == backends.ROOTFUL:
+            try:
+                if not backends.allowed():
+                    raise c.SandboxError("Enable rootful Docker in Settings")
+            except (c.SandboxError, OSError, ValueError) as exc:
+                event.select.value = self.base_backend
+                self.notify(c.error_text(exc), severity="warning", markup=False)
+                return
+        self.base_backend = event.value
+        self.operation_result = self._check_result = None
+        self.items["bases"] = {d.id: {"name": d.name, "state": "inspecting local image…", "version": None}
+                               for d in distros.REGISTRY.values()}
+        entries = [(key, self._next("bases", key)) for key in self.items["bases"]]
+        self._track(self._inventory_worker("bases", entries, self.base_backend))
+        self._render_view()
+
     @work(thread=True, group="updates-inventory")
-    def _inventory_worker(self, section, entries):
+    def _inventory_worker(self, section, entries, backend=backends.ROOTLESS):
         for key, token in entries:
-            item = self._inspect(section, key, check=False)
+            item = self._inspect(section, key, check=False, backend=backend)
             publish(self.app, self._receive, section, key, token, item, False)
 
-    def _inspect(self, section, key, *, check, expected=None):
+    def _inspect(self, section, key, *, check, expected=None, backend=backends.ROOTLESS):
         try:
             if section == 'manager':
                 installation = mi.classify()
                 return {'installation': installation, 'state': installation['classification']}
             if section == "bases":
-                with backends.use(self.base_backend):
+                with backends.use(backend):
+                    c.verify_runtime()
                     return updates.base_inventory(distros.get(key), check=check)
             from . import environment_checks
             m = c.resolve(key)
@@ -255,7 +292,8 @@ class UpdatesScreen(Screen):
         return None
 
     def on_tabs_tab_activated(self, event: Tabs.TabActivated):
-        if self._alive and self.app.screen is self: self.action_view(event.tab.id)
+        if self._alive and self.app.screen is self and event.tabs.active == event.tab.id:
+            self.action_view(event.tab.id)
 
     def on_resize(self):
         if self._alive: self._render_view()
@@ -275,6 +313,7 @@ class UpdatesScreen(Screen):
     def _render_view(self):
         table = self.query_one("#updates-table", DataTable)
         table.display = self.view != 'manager'
+        self.query_one('#base-backend-controls').display = self.view == 'bases'
         self.query_one('#updates-manager').display = self.view == 'manager'
         self.query_one('#updates-selected').display = self.view != 'manager'
         self.query_one('#updates-list-tools').display = self.view != 'manager'
@@ -379,11 +418,11 @@ class UpdatesScreen(Screen):
         if self._preparing: reason = "Preparing review…"
         elif self._batch_remaining: reason = f'Inspecting installed versions… {len(self._batch_remaining)} remaining'
         base_operation = getattr(self.app, '_base_operation', None)
-        if self.view == 'bases' and base_operation and base_operation['distro'] == key:
+        if self.view == 'bases' and base_operation and (base_operation['backend'], base_operation['distro']) == (self.base_backend, key):
             reason = (base_operation.get('result') or base_operation['phase']) + '\nBuild output / full result: Details.'
             failed = base_operation.get('failed', False)
         if self.app._operation_pending:
-            active_base = self.view == 'bases' and base_operation and base_operation['distro'] == key and not base_operation.get('result')
+            active_base = self.view == 'bases' and base_operation and (base_operation['backend'], base_operation['distro']) == (self.base_backend, key) and not base_operation.get('result')
             reason = (base_operation['phase'] if active_base else 'An operation is running.') + '\nClose returns to the dashboard; approved work continues.'
         busy = bool(self._active or self._preparing or self.app._operation_pending)
         status = self.query_one('#updates-reason', Static)
@@ -393,6 +432,9 @@ class UpdatesScreen(Screen):
         status.set_class(not busy and not failed and bool(self.operation_result or self._check_result)
                          and not (self._batch_unavailable and not self.operation_result), 'succeeded')
         self.query_one('#updates-spinner').display = busy
+        self.query_one("#base-backend", Select).disabled = (
+            not self.allow_rootful or bool(self._preparing or self.app._operation_pending or self._batch_remaining)
+        )
         button = self.query_one("#updates-check", Button)
         button.disabled = bool(self._preparing or self.app._operation_pending or (self.view, key) in self._active or self._batch_remaining)
         button.tooltip = ('Read published GitHub releases and independently inspect local installation; no pipx execution'
@@ -485,7 +527,7 @@ class UpdatesScreen(Screen):
             token = self._next(section, key)
             item['checking'] = True
             self._batch_remaining.add((section, key))
-            self._active[section, key] = self._check_worker(section, key, token, (expected or {}).get(key))
+            self._active[section, key] = self._check_worker(section, key, token, (expected or {}).get(key), self.base_backend)
             self._track(self._active[section, key])
         if not self._batch_remaining: self._check_result = self._check_summary()
         self._render_view()
@@ -527,8 +569,8 @@ class UpdatesScreen(Screen):
         self._render_selected()
 
     @work(thread=True, group="updates-check")
-    def _check_worker(self, section, key, token, expected=None):
-        item = self._inspect(section, key, check=True, expected=expected)
+    def _check_worker(self, section, key, token, expected=None, backend=backends.ROOTLESS):
+        item = self._inspect(section, key, check=True, expected=expected, backend=backend)
         if section == 'environments' and self.app.is_running:
             from . import environment_checks
             notice = environment_checks.cleanup_notice({'id': key, 'name': self.items[section][key]['name']})
@@ -679,29 +721,30 @@ class UpdatesScreen(Screen):
         if self.view != 'bases' or self.app.screen is not self or self.app._operation_pending or self._preparing or self._batch_remaining: return
         key = self.selected_key()
         if key is None: return
+        backend = self.base_backend
         if action == 'build':
             self.app.push_screen(BaseTargetScreen(distros.get(key)),
-                                 lambda value: self._prepare_base(key, action, value) if value is not None else None)
-        else: self._prepare_base(key, action)
+                                 lambda value: self._prepare_base(key, action, value, backend=backend) if value is not None else None)
+        else: self._prepare_base(key, action, backend=backend)
 
-    def _prepare_base(self, key, action, value=None):
+    def _prepare_base(self, key, action, value=None, *, backend):
         if not self._alive or self.app._operation_pending or self._preparing: return
         self._prepare_token = token = object()
-        self._preparing = self._prepare_base_worker(key, action, value, token)
+        self._preparing = self._prepare_base_worker(key, action, value, token, backend)
         self._track(self._preparing)
         self._render_selected()
 
     @work(thread=True, group='updates-prepare')
-    def _prepare_base_worker(self, key, action, value, token):
+    def _prepare_base_worker(self, key, action, value, token, backend):
         try:
-            with backends.use(self.base_backend):
+            with backends.use(backend):
                 if action == 'build': plan = v.prepare_base_build(value[0], key, refresh=value[1])
                 else: plan = v.base_rollback_inventory(key)
-            publish(self.app, self._base_prepared, token, key, action, plan, None)
+            publish(self.app, self._base_prepared, token, key, action, backend, plan, None)
         except Exception as exc:
-            publish(self.app, self._base_prepared, token, key, action, None, c.error_text(exc))
+            publish(self.app, self._base_prepared, token, key, action, backend, None, c.error_text(exc))
 
-    def _base_prepared(self, token, key, action, plan, error):
+    def _base_prepared(self, token, key, action, backend, plan, error):
         from .base_updates_tui import BaseRollbackScreen
         if not self._alive or self._prepare_token is not token: return
         self._preparing = self._prepare_token = None
@@ -713,35 +756,35 @@ class UpdatesScreen(Screen):
         if action == 'rollback':
             if len(plan.copies) > 1:
                 self.app.push_screen(BaseRollbackScreen(plan),
-                                     lambda choice: self._confirm_base(key, action, v.select_base_rollback(plan, choice)) if choice is not None else None)
+                                     lambda choice: self._confirm_base(key, action, backend, v.select_base_rollback(plan, choice)) if choice is not None else None)
                 return
             try: plan = v.select_base_rollback(plan)
             except c.SandboxError as exc:
                 self.operation_result = str(exc)
                 self.operation_failed = True
                 self._render_selected(); return
-        self._confirm_base(key, action, plan)
+        self._confirm_base(key, action, backend, plan)
 
-    def _confirm_base(self, key, action, plan):
+    def _confirm_base(self, key, action, backend, plan):
         from .base_updates_tui import BaseConsentScreen, rollback_consent
         if not self._alive or self.app._operation_pending: return
         text = v.describe_base_build(plan) if action == 'build' else rollback_consent(plan)
-        self.app.push_screen(BaseConsentScreen(f"Docker backend: {self.base_backend}\n" + text), lambda yes: self._approved_base(key, action, plan) if yes else None)
+        self.app.push_screen(BaseConsentScreen(f"Docker backend: {backend}\n" + text), lambda yes: self._approved_base(key, action, backend, plan) if yes else None)
 
-    def _approved_base(self, key, action, plan):
+    def _approved_base(self, key, action, backend, plan):
         if not self._alive or self.app._operation_pending: return
         self._cancel_readonly()
         self._next('bases', key)
         self.operation_result = None
-        options = {"backend": self.base_backend} if self.base_backend == backends.ROOTFUL else {}
-        self.app.run_base_update_action(key, action, plan, self._base_finished, **options)
+        self.app.run_base_update_action(key, action, plan, backend=backend)
         self._render_selected()
 
-    def _base_finished(self, key, result, failed):
+    def base_finished(self, backend, key, result, failed):
         if not self._alive: return
-        self.operation_result = result
-        self.operation_failed = failed
-        self._track(self._inventory_worker('bases', [(key, self._next('bases', key))]))
+        if self.base_backend == backend:
+            self.operation_result = result
+            self.operation_failed = failed
+            self._track(self._inventory_worker('bases', [(key, self._next('bases', key))], backend))
         self._render_selected()
 
     def _prepare_action(self, key, action, value=None):
@@ -827,7 +870,7 @@ class UpdatesScreen(Screen):
         lines = [VIEWS[self.view]]
         if self.operation_result: lines += ["Last operation result:", self.operation_result, ""]
         base_operation = getattr(self.app, '_base_operation', None)
-        if self.view == 'bases' and base_operation and base_operation['distro'] == key:
+        if self.view == 'bases' and base_operation and (base_operation['backend'], base_operation['distro']) == (self.base_backend, key):
             lines += ['Base operation (app-owned; closing this screen does not cancel it):',
                       base_operation['phase'], base_operation.get('result') or '',
                       'Bounded build output tail:', base_operation.get('output') or '(no build output)', '']

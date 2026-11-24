@@ -81,13 +81,28 @@ def test_initial_focus_lets_letter_keys_work():
     run(t)
 
 
-def test_enter_on_row_opens_opencode(monkeypatch):
-    c.create("ocs-qa-open", "scratch")
-    opened = []
+def test_selecting_a_row_does_not_launch_a_session(monkeypatch):
+    from opencode_sandbox import backends, preferences
+
+    preferences.write({**preferences.read(), "allow_rootful": True})
+    monkeypatch.setattr(backends, "host_identity", lambda: {"name": "coder", "uid": 1100, "gid": 1100})
+    rootless = c.create("ocs-qa-open", "scratch")
+    rootful = c.create("ocs-qa-other", "scratch", backend=backends.ROOTFUL)
+    opened, probed = [], []
     monkeypatch.setattr(tui.Dashboard, "_attach", lambda self, shell: opened.append((self.selected()["name"], shell)))
+    monkeypatch.setattr(tui.Dashboard, "_request_readiness", lambda self, backend: probed.append(backend))
     async def t(app, pilot):
-        await pilot.press("enter")
-        await pilot.press("s")
+        table = app.query_one("#envs")
+        await pilot.pause()
+        startup = probed.copy()
+        assert len(startup) == 1
+        for environment in (rootful, rootless):
+            table.move_cursor(row=table.get_row_index(environment["id"]))
+            await pilot.press("enter")
+        await pilot.click("#envs", offset=(2, 1))
+        assert opened == [] and probed == startup
+        table.move_cursor(row=table.get_row_index(rootless["id"]))
+        await pilot.press("o", "s")
         assert opened == [("ocs-qa-open", False), ("ocs-qa-open", True)]
     run(t)
 
@@ -209,6 +224,61 @@ def test_busy_flag_blocks_duplicate_and_attach(monkeypatch):
     run(t)
 
 
+@pytest.mark.parametrize("shell", [False, True])
+@pytest.mark.parametrize("fail_at", ["prepare", "attach", None])
+def test_session_setup_and_launch_errors_are_visible(monkeypatch, shell, fail_at):
+    from contextlib import contextmanager
+
+    from opencode_sandbox import backends, preferences
+
+    preferences.write({**preferences.read(), "allow_rootful": True})
+    monkeypatch.setattr(backends, "host_identity", lambda: {"name": "coder", "uid": 1100, "gid": 1100})
+    m = c.create("ocs-test-attach", backend=backends.ROOTFUL)
+    events = []
+    endpoint = "unix:///verified-test-rootful.sock"
+
+    def prepare(environment, *, shell):
+        assert environment["id"] == m["id"] and backends.selected() == backends.ROOTFUL
+        events.append(("prepare", shell))
+        if fail_at == "prepare":
+            raise c.SandboxError("Cannot prepare session [test]")
+        backends.endpoint.set(endpoint)
+        return environment
+
+    @contextmanager
+    def suspend(self):
+        assert self._session_active
+        events.append("suspend")
+        yield
+        events.append("resume")
+
+    def attach(environment, *, shell, prepared):
+        assert prepared and environment["id"] == m["id"]
+        assert backends.selected() == backends.ROOTFUL and backends.endpoint.get() == endpoint
+        events.append(("attach", shell))
+        return 125 if fail_at == "attach" else 0
+
+    monkeypatch.setattr(c, "_tty", lambda: True)
+    monkeypatch.setattr(c, "prepare_interactive", prepare)
+    monkeypatch.setattr(c, "interactive", attach)
+    monkeypatch.setattr(tui.Dashboard, "suspend", suspend)
+
+    async def test(app, pilot):
+        await pilot.press("s" if shell else "o")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert not app._operation_pending and not app._session_active
+        expected = "Cannot prepare session" if fail_at == "prepare" else (
+            f"{'Shell' if shell else 'OpenCode'} session exited with status 125" if fail_at else "Session exited")
+        assert expected in str(app.query_one("#status").render())
+        if fail_at:
+            assert any(expected in n.message and n.severity == "error" for n in app._notifications)
+        assert events == [("prepare", shell)] + ([] if fail_at == "prepare"
+                                                  else ["suspend", ("attach", shell), "resume"])
+
+    run(test)
+
+
 def test_confirm_dialog_buttons_are_normal_size():
     """The panel and the Confirm button shared id 'confirm': the panel CSS made the button 72 wide."""
     c.create("ocs-qa-dlg", "scratch")
@@ -276,6 +346,7 @@ def test_subscreens_fit_80x24(key):
         await pilot.pause()
         assert len(app.screen_stack) == 2
         for b in app.screen.query(Button):
+            if not b.display: continue
             r = b.region
             assert r.width > 0 and r.height > 0 and r.right <= 80 and r.bottom <= 24, (key, b.id, r)
             for parent in b.ancestors:
@@ -704,3 +775,26 @@ def test_settings_fields_are_labelled_at_80x24():
         label = network.query("SelectCurrent > Static").first()
         assert network.region.height == 1 and label.region.width >= len("bridge: internet + LAN")  # not cut by the label style
     run(t, (80, 24))
+
+
+def test_environment_actions_warn_if_filter_hides_every_row(fake_runtime):
+    c.create("ocs-test-filtered", "scratch")
+
+    async def test(app, pilot):
+        await app.workers.wait_for_complete()
+        app.query_one("#search").value = "no matching environment"
+        await pilot.pause()
+        assert app.selected() is None
+        for action in (app.action_open_selected, app.action_shell_selected, app.action_start_selected,
+                       app.action_stop_selected, app.action_delete_selected, app.action_runtime,
+                       app.action_usage, app.action_check_selected, app.action_repair_selected,
+                       app.action_backup_selected, app.action_export_selected, app.action_keep_quick,
+                       app.action_git_review, app.action_agent_context):
+            before = len([note for note in app._notifications if note.message == "Select an environment"])
+            action()
+            await pilot.pause()
+            assert len([note for note in app._notifications if note.message == "Select an environment"]) == before + 1
+            assert stack(app) == ["Screen"] and not app._operation_pending
+        assert not any(args[0] in {"start", "stop", "run", "exec", "rm"} for args in fake_runtime)
+
+    run(test)

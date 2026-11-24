@@ -8,7 +8,9 @@ from test_tui import run
 from opencode_sandbox import core as c
 from opencode_sandbox import readiness as r
 
-TITLES = {"daemon": "Docker is not ready", "resources": "Resource-limit support", "images": "Base images need attention"}
+TITLES = {"daemon": "Docker is not ready", "resources": "Resource-limit support",
+          "images": "Base images need attention"}
+TOAST_CATEGORIES = ("daemon", "resources")
 
 
 @pytest.fixture(autouse=True)
@@ -40,12 +42,13 @@ def show(app, category, result=r.WARNING, detail="old warning"):
     if category == "daemon":
         app._prerequisites_ready() if result == r.PASSED else app._show_prerequisites(detail)
     else:
-        check = r.Check(category, TITLES[category], result, detail)
+        check = r.Check(category, TITLES[category], result, detail,
+                        image_status="outdated" if category == "images" and result == r.WARNING else None)
         app._show_resource_support(check) if category == "resources" else app._show_image_checks([check])
 
 
 @pytest.mark.parametrize("size", [(80, 24), (100, 30)])
-@pytest.mark.parametrize("category", TITLES)
+@pytest.mark.parametrize("category", TOAST_CATEGORIES)
 def test_repeated_warning_unknown_and_success_replace_only_owned_notice(size, category):
     async def test(app, pilot):
         await app.workers.wait_for_complete()
@@ -83,19 +86,12 @@ def test_overlapping_categories_reveal_the_remaining_advisory(size):
     async def test(app, pilot):
         await app.workers.wait_for_complete()
         for category in TITLES: show(app, category)
-        original = {category: notes(app, category)[0] for category in TITLES}
         assert status(app).startswith("Docker is not ready")
-        show(app, "images", r.PASSED)
-        assert not notes(app, "images") and status(app).startswith("Docker is not ready")
-        assert all(notes(app, category) == [original[category]] for category in ("daemon", "resources"))
-        show(app, "images", detail="new image warning")
+        assert not notes(app, "images")
         show(app, "daemon", r.PASSED)
-        assert status(app).startswith("Resource-limit support") and notes(app, "resources") == [original["resources"]]
+        assert status(app).startswith("Resource-limit support")
         show(app, "resources", r.PASSED)
-        assert status(app).startswith("Base image checks") and "new image warning" in notes(app, "images")[0].message
-        # An expired/dismissed toast still leaves its category's status until fresh evidence.
-        app._unnotify(notes(app, "images")[0])
-        assert status(app).startswith("Base image checks")
+        assert status(app).startswith("Rootless has base image updates")
         show(app, "images", r.PASSED)
         assert status(app) == "Ready"
     run(test, size)
@@ -162,14 +158,17 @@ def test_worker_check_exception_is_unknown_in_its_own_category_and_other_checks_
         show(app, category, detail="old warning")
         state[category] = c.SandboxError("probe unavailable [test]")
         calls.clear()
-        await app._prerequisites_worker().wait()
+        await app._request_readiness("rootless").wait()
         assert calls == ["daemon", "resources", "images"]
-        note, = notes(app, category)
-        assert "[not checked]" in note.message and "probe unavailable [test]" in note.message
-        assert "old warning" not in note.message and "could not" in status(app)
+        if category == "resources":
+            note, = notes(app, category)
+            assert "[not checked]" in note.message and "probe unavailable [test]" in note.message
+            assert "old warning" not in note.message and "could not" in status(app)
+        else:
+            assert not notes(app, category) and status(app) == "Ready"
         assert not notes(app, "daemon")
         state[category] = r.Check("resource-support", "Resource-limit support", r.PASSED, "supported") if category == "resources" else []
-        await app._prerequisites_worker().wait()
+        await app._request_readiness("rootless").wait()
         assert not notes(app, category) and status(app) == "Ready"
     run(test, size)
 
@@ -180,12 +179,11 @@ def test_failed_daemon_refresh_does_not_claim_skipped_categories_passed(checks):
         await app.workers.wait_for_complete()
         show(app, "images")
         show(app, "resources")
-        previous = [notes(app, category)[0] for category in ("images", "resources")]
         state["daemon"] = c.SandboxError("daemon unavailable")
         calls.clear()
-        await app._prerequisites_worker().wait()
+        await app._request_readiness("rootless").wait()
         assert calls == ["daemon"] and status(app).startswith("Docker is not ready")
-        assert [notes(app, category)[0] for category in ("images", "resources")] == previous
+        assert not notes(app, "images") and not notes(app, "resources")
     run(test, (80, 24))
 
 
@@ -194,11 +192,11 @@ def test_metadata_only_refresh_neither_rechecks_nor_clears_advisories(checks):
     async def test(app, pilot):
         await app.workers.wait_for_complete()
         show(app, "images")
-        note, = notes(app, "images")
         calls.clear()
         m = c.create("ocs-test-up06-metadata", "scratch")
         app._refresh_if_changed()
-        assert not calls and notes(app, "images") == [note] and app.query_one("#envs").row_count == 1
+        assert not calls and not notes(app, "images") and app.query_one("#envs").row_count == 1
+        assert status(app).startswith("Rootless has base image updates")
         assert c.resolve(m["id"]).get("operation") is None
     run(test, (80, 24))
 
@@ -212,20 +210,21 @@ def test_replaced_prerequisite_worker_cannot_publish_obsolete_image_warning(chec
             started.set()
             try:
                 assert release.wait(3)
-                return [r.Check("image-debian", "Base image Debian", r.WARNING, "obsolete image warning")]
+                return [r.Check("image-debian", "Base image Debian", r.WARNING, "obsolete image warning", image_status="outdated")]
             finally: finished.set()
         return []
     monkeypatch.setattr(r, "image_checks", images)
     async def test(app, pilot):
         await app.workers.wait_for_complete()
         block["old"] = True
-        old = app._prerequisites_worker()
+        old = app._request_readiness("rootless")
         assert await asyncio.to_thread(started.wait, 1)
         block["old"] = False
-        await app._prerequisites_worker().wait()
-        assert old.is_cancelled
+        await app._request_readiness("rootless").wait()
+        assert not old.is_finished
         release.set()
         assert await asyncio.to_thread(finished.wait, 1)
+        await old.wait()
         await pilot.pause()
         assert not notes(app, "images") and status(app) == "Ready"
     try:

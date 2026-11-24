@@ -238,16 +238,22 @@ def docker_cli():
     if backends.selected() == backends.ROOTFUL: return f"docker -H {runtime_identity.ROOTFUL_ENDPOINT}"
     return f"docker -H {shlex.quote(_ENDPOINT)}" if _ENDPOINT else f"docker --context {shlex.quote(CONTEXT)}"
 
+class MissingBaseImage(SandboxError):
+    """The selected daemon has no image at the managed base tag."""
+
+
 def ensure_runtime(distro=None):
     """Verify the daemon; with a registry Distro also require its base image."""
     verify_runtime()
     if distro:
-        if backends.selected() == backends.ROOTFUL:
-            present = inspect_base_image(distro, distro.image, missing=True) is not None
-        else:
-            present = docker("image", "inspect", distro.image, capture=True, check=False).returncode == 0
-        if not present:
-            raise SandboxError(f"Image {distro.image} missing. Run: opencode-sandbox {backends.cli_flag()}build --distro {distro.id}")
+        require_base_image(distro)
+
+
+def require_base_image(distro):
+    if inspect_base_image(distro, distro.image, missing=True) is None:
+        raise MissingBaseImage(f"{backends.selected().capitalize()} Docker is missing {distro.image}. "
+                               f"Run: opencode-sandbox {backends.cli_flag()}build --distro {distro.id}")
+
 
 def env_distro(m):
     """The environment's registry distribution, or None for a custom image."""
@@ -641,28 +647,45 @@ def creation_options(name, kind=None, source=None, *, distro=None, image=None, w
 def create(name, kind=None, source=None, profile="default", *, distro=None, image=None,
            workspace_mode="managed", workspace=None, consent=False, agent_context_enabled=True,
            opencode_config=None, journal=None, include_working_changes=False, copy_entire_directory=False,
-           import_fingerprint=None, backend=backends.ROOTLESS):
+           import_fingerprint=None, backend=backends.ROOTLESS, _restore_system_image=False):
     with backends.use(backend):
         return _create_options(name, kind, source, profile, distro=distro, image=image,
                                workspace_mode=workspace_mode, workspace=workspace, consent=consent,
                                agent_context_enabled=agent_context_enabled, opencode_config=opencode_config,
                                journal=journal, include_working_changes=include_working_changes,
-                               copy_entire_directory=copy_entire_directory, import_fingerprint=import_fingerprint)
+                               copy_entire_directory=copy_entire_directory, import_fingerprint=import_fingerprint,
+                               _restore_system_image=_restore_system_image)
+
+
+def check_creation_base(distro, backend):
+    """Check a managed creation target without writing workspace or environment data."""
+    with backends.use(backend):
+        ensure_runtime(distros.get(distro))
 
 
 def _create_options(name, kind, source, profile, *, distro, image, workspace_mode, workspace, consent,
                     agent_context_enabled, opencode_config, journal, include_working_changes,
-                    copy_entire_directory, import_fingerprint):
+                    copy_entire_directory, import_fingerprint, _restore_system_image):
     from . import opencode_configs as oc
     options = {"distro":distro, "image":image, "workspace_mode":workspace_mode, "workspace":workspace,
                "consent":consent, "agent_context_enabled":agent_context_enabled,
                "opencode_config":opencode_config, "journal":journal,
                "include_working_changes":include_working_changes, "copy_entire_directory":copy_entire_directory,
                "import_fingerprint":import_fingerprint}
+    _, distro_id = creation_options(
+        name, kind, source, distro=distro, image=image, workspace_mode=workspace_mode,
+        workspace=workspace, include_working_changes=include_working_changes,
+        copy_entire_directory=copy_entire_directory,
+    )
+    if _restore_system_image and (not journal or journal.get("operation") != "restore" or not journal.get("restore_system")):
+        raise SandboxError("Only a system-image restore can create a managed environment without its base")
+    if distro_id is not None and not _restore_system_image:
+        check_creation_base(distro_id, backends.selected())
     if opencode_config is not None:
+        if image is not None:
+            ensure_runtime()
         bounds = oc.limits()
         with oc.prepared_profile(opencode_config, bounds) as archive:
-            ensure_runtime(distros.get(distro or distros.DEFAULT) if image is None else None)
             return _create(name, kind, source, profile, _config_archive=(archive, bounds), **options)
     return _create(name, kind, source, profile, **options)
 
@@ -724,7 +747,8 @@ def _create(name, kind=None, source=None, profile="default", *, distro=None, ima
         if any(other["name"]==name for other in all_envs()):
             raise SandboxError(f"Environment name already exists: {name}")
         if not consent: raise SandboxError(f"A direct workspace needs explicit consent ({workspaces.LABEL})")
-        ensure_runtime(distros.get(distro) if image is None else None)
+        if image is not None:
+            ensure_runtime()
         if image is not None and docker("image","inspect",image,capture=True,check=False).returncode:
             raise SandboxError(f"Image {image} not found locally; the preflight needs it")
         direct=workspaces.check_direct(workspace)
@@ -1016,27 +1040,43 @@ def base_lock(distro, phase, *, timeout=30.0):
     from . import base_locks
     return base_locks.lock(distro, phase, timeout=timeout)
 
-def inspect_base_image(distro, ref, *, missing=False):
-    """Identity/ownership evidence, re-read under base guards before mutation.
-
-    Only a known missing-image response permits a first build; failed/invalid inspection must
-    not authorize replacement. Old definition revisions are allowed, foreign named images not.
-    """
+def base_image_info(ref):
+    """Read a local image on the selected daemon. Only explicit absence returns None."""
     p = docker("image", "inspect", ref, capture=True, check=False)
     if p.returncode:
-        if missing and "no such image:" in (p.stderr or "").lower(): return None
-        raise SandboxError(f"Cannot inspect base image {ref}; no image was authorized for replacement/removal")
+        if re.search(r"(?:^|\n)(?:Error(?: response from daemon)?: )?No such image(?::|$)",
+                     (p.stderr or "").strip(), re.IGNORECASE):
+            return None
+        raise SandboxError(f"Cannot inspect base image {ref} on {backends.selected()} Docker: "
+                           f"{(p.stderr or '').strip()[:200] or f'exit {p.returncode}'}")
     try:
         (info,) = json.loads(p.stdout)
-        labels = info["Config"]["Labels"]
-        image_id = info["Id"]
-        if not isinstance(image_id, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
+        labels = info["Config"].get("Labels")
+        if not isinstance(info["Id"], str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", info["Id"]):
             raise ValueError("invalid image identity")
-        if distros.image_definition(distro.id, labels) is None or labels.get(DATA_LABEL) \
-                or labels.get("org.opencode-sandbox.id"):
-            raise SandboxError(f"Refusing unmanaged/foreign base image {ref}; its name is not ownership proof")
-    except (ValueError, KeyError, TypeError) as exc:
+        if labels is not None and not isinstance(labels, dict):
+            raise ValueError("invalid image labels")
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
         raise SandboxError(f"Invalid base image inspection for {ref}") from exc
+    return info
+
+
+def base_definition(distro, info):
+    labels = info["Config"].get("Labels") or {}
+    if labels.get(DATA_LABEL) or labels.get(distros.LABEL + "id"):
+        return None
+    return distros.image_definition(distro.id, labels)
+
+
+def inspect_base_image(distro, ref, *, missing=False):
+    """Require managed provenance for a base tag used by lifecycle or publication."""
+    info = base_image_info(ref)
+    if info is None:
+        if missing:
+            return None
+        raise SandboxError(f"Cannot inspect base image {ref}; no image was authorized for replacement/removal")
+    if base_definition(distro, info) is None:
+        raise SandboxError(f"Refusing unmanaged/foreign base image {ref}; its name is not ownership proof")
     return info
 
 def missing_image(m, image, command):
@@ -1060,7 +1100,7 @@ def recheck_mount(m):
 
 @backends.environment
 def start(m, *, _resume_recreate=False, precondition=None):
-    ensure_runtime(None if m.get("image") else env_distro(m))
+    ensure_runtime()
     with lock(m["id"]):
         m=resolve(m["id"])
         if precondition is not None: precondition(m)
@@ -1077,15 +1117,16 @@ def start(m, *, _resume_recreate=False, precondition=None):
                 if cpus > host_cpus():
                     raise SandboxError(f"CPU limit {cpus:g} exceeds the {host_cpus()} CPUs on this host. "
                                        f"Run: opencode-sandbox config apply {m['name']} --cpus {host_cpus()}")
+                distro = env_distro(m)
+                if not m.get("image") and distro is not None:
+                    require_base_image(distro)
                 from . import opencode_versions
                 opencode_versions.check_pin(m)
                 image=env_image(m)
                 pull=image==m.get("custom_image")  # a custom image is pulled like docker run would (D-026)
-                if not pull and docker("image","inspect",image,capture=True,check=False).returncode:
-                    if image.split(":",1)[0] in MANAGER_IMAGE_KINDS or image.startswith("sha256:"):
-                        raise missing_image(m, image, "opencode-sandbox container recreate-recover {name}" if _resume_recreate
-                                            else "opencode-sandbox start {name}")
-                    raise SandboxError(f"Base image {image} is missing; build it: opencode-sandbox {backends.cli_flag()}build --distro {m.get('distro')}")
+                if m.get("image") and not pull and docker("image","inspect",image,capture=True,check=False).returncode:
+                    raise missing_image(m, image, "opencode-sandbox container recreate-recover {name}" if _resume_recreate
+                                        else "opencode-sandbox start {name}")
                 mark(m,"creating",operation="recreate" if _resume_recreate else "start")
                 # A failed docker run may leave a created container and/or volume.
                 try:
@@ -1250,9 +1291,7 @@ def profile_mismatch(m):
 LAUNCHER = (distros.IMAGES / "common" / "ocs_opencode.py").read_text()
 
 @backends.environment
-def interactive(m, shell=False):
-    if not _tty():
-        raise SandboxError("run/shell need an interactive terminal; use 'exec NAME -- COMMAND' for scripts")
+def prepare_interactive(m, shell=False):
     start(m)
     from . import agent_context as ac
     from . import opencode_availability as availability
@@ -1267,6 +1306,16 @@ def interactive(m, shell=False):
     if not shell and status in (availability.Status.MISSING, availability.Status.BROKEN):
         raise SandboxError(f"OpenCode is {status.value.lower()} in {m['name']}. "
                            f"Use 'opencode-sandbox shell {m['name']}' to inspect or repair it.")
+    return m
+
+
+@backends.environment
+def interactive(m, shell=False, *, prepared=False):
+    if not _tty():
+        raise SandboxError("run/shell need an interactive terminal; use 'exec NAME -- COMMAND' for scripts")
+    from . import agent_context as ac
+    if not prepared:
+        m = prepare_interactive(m, shell=shell)
     token = secrets.token_hex(8)
     watchdog = session_watchdog(m, token)
     try:

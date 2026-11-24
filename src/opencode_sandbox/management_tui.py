@@ -110,7 +110,7 @@ class SettingsScreen(Screen):
                                    "copy_selected_text": self.query_one("#copy-selected-text", Checkbox).value,
                                    "allow_rootful": self.query_one("#allow-rootful", Checkbox).value})
                 self.app.pop_screen()
-                self.app.action_refresh()
+                self.app.refresh_docker_preferences()
                 self.app.refresh_discovery_preferences()
                 self.app.refresh_clipboard_preferences()
             except Exception as exc: self.notify(c.error_text(exc), severity="error")

@@ -120,7 +120,7 @@ import signal
 from opencode_sandbox.cli import _exit_on_signal
 signal.signal(signal.SIGTERM, _exit_on_signal)
 signal.signal(signal.SIGHUP, _exit_on_signal)
-m = c.create("ocs-qa-wd", "scratch")
+m = c.create("ocs-qa-wd", "scratch", image="example.invalid/ocs-test-watchdog:1")
 sys.exit(c.interactive(m))
 """
 

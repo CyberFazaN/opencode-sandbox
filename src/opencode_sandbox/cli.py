@@ -488,8 +488,10 @@ def create(name:str,
     Without options: the default distribution, Local OpenCode config and Agent Context enabled. Copying does not modify the original folder."""
     from .config_plan import check_profile
     check_profile(profile)  # as config apply: a mistyped name would leave the container without credentials
-    kind,_=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
+    kind,distro_id=c.creation_options(name,kind,source,distro=distro,image=image,workspace_mode=workspace_mode,workspace=workspace,
                              include_working_changes=include_working_changes,copy_entire_directory=copy_entire_directory)
+    if distro_id is not None:
+        c.check_creation_base(distro_id, backend)
     fingerprint=None
     if include_working_changes:
         from . import git_import

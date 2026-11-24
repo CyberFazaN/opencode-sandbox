@@ -2,7 +2,6 @@ import json
 import os
 import stat
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -145,6 +144,8 @@ def test_copy_reads_the_checked_file_not_a_replacement_symlink(tmp_path, monkeyp
 
 @pytest.mark.parametrize('kind', ['scratch', 'project', 'quick'])
 def test_managed_start_uses_the_generated_workspace_not_the_source(monkeypatch, tmp_path, kind):
+    from docker_fixtures import start_transport
+
     source = tmp_path / 'source'
     source.mkdir()
     copies = kind != 'scratch'
@@ -153,7 +154,7 @@ def test_managed_start_uses_the_generated_workspace_not_the_source(monkeypatch, 
     monkeypatch.setattr(c, 'inspect_container', lambda m: None)
     monkeypatch.setattr(c, 'ensure_volume', lambda m: None)
     monkeypatch.setattr(c, 'ensure_runtime', lambda *a: None)
-    monkeypatch.setattr(c, 'docker', lambda *a, **kw: calls.append(a) or SimpleNamespace(returncode=0, stdout='', stderr=''))
+    monkeypatch.setattr(c, 'docker', start_transport(calls))
     c.start(m)
     run = next(cmd for cmd in calls if cmd[0] == 'run')
     assert f'type=bind,src={ws.managed_path(m)},dst=/workspace' in run

@@ -43,11 +43,15 @@ def test_labels_mark_manager_objects():
 
 
 def test_container_and_volume_are_labelled(monkeypatch):
+    from docker_fixtures import managed_image_json
+
     m = c.create("ocs-test-labels", "scratch")
     calls = []
 
     def docker(*args, capture=False, check=True):
         calls.append(args)
+        if args == ("image", "inspect", c.env_image(m)):
+            return SimpleNamespace(returncode=0, stdout=managed_image_json(), stderr="")
         if args[:2] == ("container", "inspect"):
             return SimpleNamespace(returncode=1, stdout="", stderr="Error: No such container: x")
         if args[:2] == ("volume", "inspect"):

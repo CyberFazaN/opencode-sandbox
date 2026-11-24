@@ -9,7 +9,14 @@ from test_tui import run
 from test_updates_tui import until
 from textual.widgets import Button, Checkbox, Select, Static
 
-from opencode_sandbox import build_output, distros, readiness, updates
+from opencode_sandbox import (
+    backends,
+    build_output,
+    distros,
+    preferences,
+    readiness,
+    updates,
+)
 from opencode_sandbox import core as c
 from opencode_sandbox import opencode_versions as v
 from opencode_sandbox.base_updates_tui import (
@@ -45,16 +52,30 @@ async def review(app, pilot, refresh=False):
 @pytest.mark.parametrize('size', [(80, 24), (120, 40)])
 @pytest.mark.parametrize('refresh', [False, True])
 def test_build_exact_mode_consent_cancel_then_preserving_executor(sources, monkeypatch, size, refresh):
+    backend = backends.ROOTFUL if size == (80, 24) else backends.ROOTLESS
+    preferences.write({**preferences.read(), "allow_rootful": True})
+    mutations = []
+    docker = c.docker
+
+    def route(*a, **kw):
+        if a[0] in ('build', 'tag'): mutations.append(backends.selected())
+        return docker(*a, **kw)
+
+    monkeypatch.setattr(c, 'docker', route)
+
     async def test(app, pilot):
         app._disable_notifications = False
         app._replace_advisory('images', 'test notice', title='test warning', detail='Keep notification [literal]')
         await pilot.press('v', '2')
         screen = app.screen
+        screen.query_one('#base-backend', Select).value = backend
+        await until(pilot, lambda: screen.base_backend == backend)
         for button in screen.query(Button):
             if button.display: assert button.region.bottom <= size[1]
         assert screen.query_one('#updates-table').region.height >= 3
         await review(app, pilot, refresh)
         message = app.screen.message
+        assert f'Docker backend: {backend}' in message
         assert OLD in message and 'Exact OpenCode target: 2.1.4' in message
         assert ('Refresh & Rebuild' if refresh else 'Cached rebuild') in message
         assert 'System packages: always refreshed and upgraded in both modes (apt-get update, then apt-get upgrade)' in message
@@ -69,6 +90,7 @@ def test_build_exact_mode_consent_cancel_then_preserving_executor(sources, monke
         app.screen.query_one('#base-confirm', Button).press()
         await until(pilot, lambda: screen.operation_result and not app._operation_pending)
         assert 'verified and published' in screen.operation_result
+        assert mutations and set(mutations) == {backend}
         build = next(a for a in sources if a[0] == 'build')
         assert ('--pull' in build) == refresh and ('--no-cache' in build) == refresh
         assert any(a[0] == 'tag' and a[1] == OLD and 'previous' in a[-1] for a in sources)
@@ -208,7 +230,8 @@ def test_previous_base_result_cannot_hide_a_different_active_operation(sources):
     async def test(app, pilot):
         await pilot.press('v', '2')
         screen = app.screen
-        app._base_operation = {'distro': 'debian', 'phase': 'Complete', 'output': '', 'result': 'Previous base build complete'}
+        app._base_operation = {'backend': 'rootless', 'distro': 'debian', 'phase': 'Complete',
+                               'output': '', 'result': 'Previous base build complete'}
         app._operation_pending = True
         screen._render_selected()
         assert 'An operation is running' in str(screen.query_one('#updates-reason').render())

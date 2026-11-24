@@ -87,6 +87,8 @@ def test_rootful_peer_requires_root_unmapped_dockerd(tmp_path):
 
 
 def test_launch_uses_non_root_user_and_rootful_home(host, monkeypatch):
+    from docker_fixtures import managed_image_json
+
     allow()
     m = c.create("ocs-test-runtime", backend="rootful")
     calls = []
@@ -95,7 +97,11 @@ def test_launch_uses_non_root_user_and_rootful_home(host, monkeypatch):
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
     monkeypatch.setattr(c, "guidance_inputs", lambda m, **k: {"image": c.env_image(m), "runtime": c.runtime_settings(m)})
     monkeypatch.setattr(c, "image_definition", lambda *a, **k: None)
-    monkeypatch.setattr(c, "docker", lambda *a, **k: calls.append(a) or SimpleNamespace(returncode=0, stdout=""))
+    def docker(*a, **k):
+        calls.append(a)
+        return SimpleNamespace(returncode=0, stdout=(
+            managed_image_json() if a == ("image", "inspect", c.env_image(m)) else ""))
+    monkeypatch.setattr(c, "docker", docker)
     c.start(m)
     run = next(argv for argv in calls if argv[0] == "run")
     assert run[run.index("--user") + 1] == "1000:1000"

@@ -39,6 +39,7 @@ def test_custom_images_are_explicit_not_selected_by_environment(tmp_path):
     # A fresh process also covers environment settings read at import/startup time.
     code = '''import json
 from opencode_sandbox import core as c
+c.ensure_runtime = lambda *a: None  # this subprocess checks import-time image selection, not Docker
 default = c.create("ocs-test-default", "scratch")
 explicit = c.create("ocs-test-explicit", "scratch", image="example.org/explicit:1")
 print(json.dumps([(m["distro"], c.env_image(m)) for m in (default, explicit)]))
@@ -102,12 +103,14 @@ def test_start_checks_the_distribution_image_and_uses_it(monkeypatch):
     calls = []
     def docker(*a, **k):
         calls.append(a)
-        return SimpleNamespace(returncode=1 if a[:2] == ("image", "inspect") else 0, stdout="", stderr="")
+        if a[:2] == ("image", "inspect"):
+            return SimpleNamespace(returncode=1, stdout="", stderr=f"No such image: {a[-1]}")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "docker", docker)
-    with pytest.raises(c.SandboxError, match="opencode-sandbox:debian missing. Run: opencode-sandbox build --distro debian"):
+    monkeypatch.setattr(c, "inspect_container", lambda m: None)
+    with pytest.raises(c.MissingBaseImage, match="missing opencode-sandbox:debian. Run: opencode-sandbox build --distro debian"):
         c.start(m)
     custom = c.create("ocs-qa-start2", "scratch", image="custom:1")
-    monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
     monkeypatch.setattr(c, "port_conflicts", lambda m, r: [])
     calls.clear()

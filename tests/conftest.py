@@ -94,6 +94,14 @@ def _no_real_session_processes(request, monkeypatch):
     monkeypatch.setattr(c, "docker_attached", attached)
 
 
+@pytest.fixture(autouse=True)
+def _managed_creation_target(request, monkeypatch):
+    """Metadata and lifecycle tests use a prepared creation target unless testing image preflight."""
+    if not any(request.node.get_closest_marker(mark) for mark in ("docker", "creation_base")):
+        monkeypatch.setattr(c, "check_creation_base", lambda distro, backend: None)
+
+
 def pytest_configure(config):
+    config.addinivalue_line("markers", "creation_base: exercise managed image preflight with explicit Docker evidence")
     config.addinivalue_line("markers", "real_identity: use the real runtime_identity.verify")
     config.addinivalue_line("markers", "real_session: real docker client and session watchdog processes (fake docker binary)")

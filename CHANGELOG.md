@@ -15,6 +15,10 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
   its lifecycle smoke check even if OpenCode needs repair.
 - Keep confirmation actions visible while long reviews scroll. Improve keyboard focus and
   field visibility in dialogs, compact dashboard layouts, and selected recovery details.
+- Check the selected Docker backend for a managed base image before creating an environment.
+  The dashboard summarizes image issues without per-image notifications and lets you choose the
+  backend in Base Images. Selecting a row no longer launches a session, and OpenCode and Shell
+  launch failures stay visible after returning to the dashboard.
 
 ## 6.4.0 — 2026-11-20
 

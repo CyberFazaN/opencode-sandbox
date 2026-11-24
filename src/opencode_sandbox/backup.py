@@ -598,7 +598,8 @@ def _restore(root, manifest, name, *, restore_system):
              'restore_stage':'initial'}
     # The home volume carries the independent global config; never re-import its source.
     m=c.create(name,kind='scratch',profile=settings['profile'],distro=settings['distro'],image=settings['custom_image'],
-               journal=journal, **({"backend": backends.ROOTFUL} if backends.get(env) == backends.ROOTFUL else {}))
+               journal=journal, backend=backends.get(env),
+               _restore_system_image=restore_system and "system-image.tar" in manifest["files"])
     # A failure is recorded by _restore_into under the lock, only for this restore's journal; a
     # refusal before it leaves the journal as it is.
     return _restore_into(m,root,manifest,restore_system=restore_system)

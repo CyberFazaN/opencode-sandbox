@@ -67,6 +67,7 @@ class Check:
     status: str
     detail: str
     hint: str | None = None
+    image_status: str | None = None
 
 
 def _recreate_hint(m):
@@ -183,48 +184,31 @@ def image_checks():
 
 
 def _base_image_check(distro):
-    from . import distros
+    from . import opencode_versions as versions
+    from . import updates
     check_id, title = f"image-{distro.id}", f"Base image {distro.image}"
-    build = f"opencode-sandbox build --distro {distro.id}"
-    inspect_hint = "Check Docker's status and permissions, then rerun: opencode-sandbox doctor"
+    prefix = f"opencode-sandbox {backends.cli_flag()}"
+    build = f"{prefix}build --distro {distro.id}"
     try:
-        p = c.docker("image", "inspect", "--format", "{{json .Config.Labels}}", distro.image, capture=True, check=False)
+        item = updates.base_inventory(distro)
     except c.SandboxError as exc:
-        return Check(check_id, title, NOT_CHECKED, f"image inspect failed: {c.error_text(exc)[:200]}", inspect_hint)
-    if p.returncode:
-        error = (p.stderr or "").strip()
-        # An inspect failure is not evidence of absence (e.g. a daemon stopped after verification).
-        if re.search(r"(?:^|\n)(?:Error(?: response from daemon)?: )?No such image(?::|$)", error, re.IGNORECASE):
-            return Check(check_id, title, WARNING, f"missing ({distro.name} environments cannot be created)", build)
-        return Check(check_id, title, NOT_CHECKED, f"image inspect failed: {error[:200] or f'exit {p.returncode}'}", inspect_hint)
-    try:
-        labels = json.loads(p.stdout or "")
-    except ValueError:
-        labels = ...
-    if labels is not None and not isinstance(labels, dict):
-        return Check(check_id, title, NOT_CHECKED, "invalid image inspect response (expected labels)", inspect_hint)
-    labels = labels or {}
-    review = f"Review the image at {distro.image} before rebuilding: {build}"
-    if labels.get(distros.LABEL + "managed") != "true" or labels.get(distros.LABEL + "distro") != distro.id:
-        return Check(check_id, title, WARNING,
-                     "present, but managed/distribution labels are missing or do not match; image revision cannot be verified", review)
-    raw = labels.get(distros.LABEL + "image-revision")
-    try:
-        revision = int(raw) if isinstance(raw, str) and re.fullmatch(r"[1-9][0-9]*", raw) else None
-    except ValueError:  # e.g. a label exceeding Python's integer-string conversion limit
-        revision = None
-    if revision is None:
-        return Check(check_id, title, WARNING,
-                     "present, but image revision cannot be verified (missing or invalid image-revision label)", review)
-    detail = f"{distro.name}; image revision {revision}"
-    if revision < distro.revision:
-        return Check(check_id, title, WARNING, f"{detail} is older than the manager definition ({distro.revision})", build)
-    if revision > distro.revision:
+        return Check(check_id, title, NOT_CHECKED, c.error_text(exc),
+                     f"Check Docker status and permissions, then run {prefix}doctor")
+    state = item["state"]
+    detail = f'{distro.name}; image revision {item["definition"]["revision"]}' if item.get("definition") else distro.name
+    if state == "not built":
+        return Check(check_id, title, WARNING, f"missing ({distro.name} environments cannot be created)", build, "missing")
+    if state == "old definition":
+        return Check(check_id, title, WARNING, f"{detail} is older than the manager definition ({distro.revision})", build, "outdated")
+    if state == "newer definition":
         return Check(check_id, title, WARNING, f"{detail} is newer than the manager definition ({distro.revision})",
-                     "Do not rebuild just to remove this warning; check opencode-sandbox --version and the image's release notes")
-    if labels.get(distros.LABEL + "distro-version") != distro.version:
-        return Check(check_id, title, WARNING,
-                     "present, but the distribution version label does not match the manager definition; image revision cannot be verified", review)
+                     "Do not rebuild just to remove this warning; check opencode-sandbox --version and the image release notes")
+    if state != "current definition":
+        return Check(check_id, title, WARNING, f"present, but {state}", f"Review {distro.image} before rebuilding: {build}")
+    latest = (versions.discovery().get("success") or {}).get("value")
+    installed = item.get("version")
+    if installed and latest and versions.describe(installed, latest).startswith("update available:"):
+        return Check(check_id, title, WARNING, f"{detail}; OpenCode {installed} can be updated to {latest}", build, "outdated")
     return Check(check_id, title, PASSED, f"{detail} (current definition)")
 
 

@@ -39,7 +39,7 @@ opencode-sandbox start example
 ```
 
 In the dashboard, select **Rootful** under **More options** when creating an environment.
-**Disk** and the **Base Images** tab of **Updates** use the selected environment's backend.
+**Disk** uses the selected environment's backend. **Updates → Base Images** has its own Docker backend selector.
 The CLI's global `--docker-backend` option selects the daemon for maintenance such as
 `build`, `doctor`, and `disk cleanup`. Named environment operations use the saved backend.
 

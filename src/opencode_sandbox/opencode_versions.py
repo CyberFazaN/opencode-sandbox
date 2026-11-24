@@ -281,6 +281,11 @@ def image_observation(image, *, check=False):
         if not isinstance(labels, dict): raise TypeError("invalid labels")
     except (ValueError, TypeError) as exc:
         raise c.SandboxError("Invalid image version inspection") from exc
+    return inspect_image_version_evidence(image_id, labels, check=check)
+
+
+def inspect_image_version_evidence(image_id, labels, *, check=False):
+    """Use a locally inspected immutable ID; cached version evidence is daemon-specific."""
     identity = {"image": image_id, "endpoint": c.docker_endpoint()}
     key = "image:" + identity["endpoint"] + ":" + image_id
     data = cache.read(key)

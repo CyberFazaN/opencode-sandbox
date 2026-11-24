@@ -171,6 +171,8 @@ def test_a_new_data_directory_is_private(tmp_path, monkeypatch):
 
 @pytest.fixture
 def first_start(monkeypatch):
+    from docker_fixtures import managed_image_json
+
     held = {}
 
     def run_answer(args):
@@ -186,7 +188,8 @@ def first_start(monkeypatch):
                 except BlockingIOError:
                     held["base-tag"] = True
         return 0, ""
-    fake = Docker(monkeypatch, {("run",): run_answer})
+    fake = Docker(monkeypatch, {("run",): run_answer,
+                               ("image", "inspect", c.distros.get(c.distros.DEFAULT).image): (0, managed_image_json())})
     state = {"value": None}
     monkeypatch.setattr(c, "inspect_container", lambda m: state["value"])
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)

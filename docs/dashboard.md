@@ -13,6 +13,9 @@ details pane shows the selected environment's state, workspace, distribution, pr
 settings, last readiness result and last error.
 In a shorter terminal the details pane shrinks to leave room for the table and action rows.
 Tab from the environment table to the compact details pane and use the arrow keys to scroll.
+Click a row or use the arrow keys to select it. Press **o** for OpenCode or **s** for Shell,
+or use the corresponding button. Session startup checks run in the dashboard before handing over
+the terminal; if startup fails, the dashboard shows the error.
 
 The distribution family is shown without guessing an OS version from the current base
 definition. Use `status NAME` for inspected base-image provenance; new-environment choices
@@ -26,11 +29,10 @@ the dashboard, and Agent Context observation runs in a worker. When Docker is no
 status line says "Docker is not ready" and a notification gives the reason; the dashboard stays
 usable for everything that does not need Docker. `opencode-sandbox doctor` shows the details.
 
-After the daemon is verified, the same worker checks managed base-image revisions. A
-"Base images need attention" notice uses the same results and commands as `doctor`. It is
-advisory, not a request to replace an existing environment, and never rebuilds an image.
-Press `r` for fresh dashboard results after changing images, or rerun `doctor`;
-[maintenance.md](maintenance.md#base-image-definitions) explains the cases.
+After Docker is verified, the status line can report that the relevant backend has no managed
+base images or has image updates. It shows the last result for the selected environment's
+backend (Rootless without a selection). Selecting a row does not contact Docker. Press **r** to
+check that backend, or open **Updates → Base Images** for individual image states.
 
 The same worker also reports [resource-limit support](maintenance.md#resource-limit-support).
 Missing support or unavailable evidence gets an advisory notice, not an identity failure or
@@ -48,7 +50,7 @@ Metadata-only refresh does not recheck or clear these advisories.
 
 | Key | Action | Key | Action |
 |---|---|---|---|
-| `Enter` / `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
+| `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
 | `F5` / `F6` | Start / Stop | `x` | Delete (confirmation) |
 | `n` | New environment (`create`; choose kind and workspace first, distribution and config under "More options") | `c` | Create a project from the current folder using the default import (the confirmation shows what is copied) |
 | `/` | Filter | `r` | Refresh |
@@ -230,7 +232,10 @@ do not cover operation forms or Updates Details at 80x24.
 
 ### Base image actions
 
-In **Base Images** (`2`), **Build/Rebuild** (`b` or `u`) opens the target/mode form; **Rollback**
+Choose **Rootless** or **Rootful** in **Base Images** (`2`). Rootful appears when enabled in
+Settings. Inventory, Check, build, and rollback use the selected daemon.
+
+**Build/Rebuild** (`b` or `u`) opens the target/mode form; **Rollback**
 (`r`) reviews managed rollback copies. Check remains a read-only binary/registry check, never a
 build, pull or package-freshness assessment. Opening the view still inspects only local metadata.
 

@@ -28,7 +28,7 @@ tools = external_tools
 @pytest.mark.parametrize('size', [(80, 24), (120, 40)])
 @pytest.mark.parametrize('approve', [False, True])
 def test_public_exact_review_cancel_first_and_approved_staging_exit_never_arms_inside_textual(prepared, size, approve, monkeypatch):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     monkeypatch.setattr(readiness, 'image_checks', list)
     monkeypatch.setattr(updates, 'base_inventory', lambda *args, **kwargs: {'state': 'not built', 'eligible': False})
     monkeypatch.setattr(review, 'prepare', lambda tag: prepared)
@@ -85,7 +85,7 @@ def test_cli_update_refuses_nonterminal_before_any_review_network_or_staging(mon
 
 
 def test_changed_approved_staging_fails_without_sealing_or_handoff(prepared, monkeypatch):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     def unavailable(*args): raise RuntimeError('changed origin review')
     monkeypatch.setattr(handoff, 'prepare_update', unavailable)
     async def test():

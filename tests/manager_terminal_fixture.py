@@ -49,7 +49,7 @@ def wait_release():
 
 
 if options.get('host'):
-    tui.Dashboard._prerequisites_worker = lambda self: None
+    tui.Dashboard._prerequisites_worker = lambda self, *_: None
 
 
 class FixtureDashboard(tui.Dashboard):

@@ -5,6 +5,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from docker_fixtures import managed_image_json
 from typer.testing import CliRunner
 
 from opencode_sandbox import core as c
@@ -60,6 +61,8 @@ class FakeDocker:
         elif op == "image" and args[1] == "inspect":
             if "--format" in args and "opencode-version" in args[3]:
                 return self.ok(self.base_label + "\n")
+            if args == ("image", "inspect", "opencode-sandbox:debian") and args[-1] in self.images:
+                return self.ok(managed_image_json(image_id=self.iid))
             return self.ok() if args[-1] in self.images else SimpleNamespace(returncode=1, stdout="", stderr="No such image")
         elif op == "exec" and args[2:4] == ("opencode", "--version"):
             return self.ok(f"opencode v{self.version}\n")

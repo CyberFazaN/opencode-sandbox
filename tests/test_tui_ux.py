@@ -79,7 +79,7 @@ def test_advisories_do_not_obscure_confirmation_controls():
 
 @pytest.mark.parametrize("size", [(60, 18), (80, 24), (120, 40)])
 def test_long_confirmation_can_scroll_with_actions_visible(monkeypatch, size):
-    monkeypatch.setattr(tui.Dashboard, "_prerequisites_worker", lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, "_prerequisites_worker", lambda self, *_: None)
     message = "\n".join(f"Settings plan line {index}" for index in range(60))
 
     async def test(app, pilot):
@@ -107,7 +107,7 @@ def test_long_confirmation_can_scroll_with_actions_visible(monkeypatch, size):
 def test_compact_dashboard_and_expanded_form_keep_actions_visible(monkeypatch):
     from opencode_sandbox import opencode_configs
 
-    monkeypatch.setattr(tui.Dashboard, "_prerequisites_worker", lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, "_prerequisites_worker", lambda self, *_: None)
     monkeypatch.setattr(opencode_configs, "profiles", lambda: [f"profile-{i:02d}" for i in range(16)])
 
     async def test(app, pilot):
