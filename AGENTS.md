@@ -34,6 +34,10 @@ Versions are separate and each has one source of truth: manager
 schemas. Data of other schema versions is not migrated, and the manager never modifies or deletes
 it.
 
+Product documentation describes the current codebase as the definitive product, not as a
+comparison with previous releases or development branches. Keep version history in the changelog
+and release notes, not in the README or user guides.
+
 ## Orientation and execution
 
 - Read this entry point, applicable local/nested instructions and the relevant parts of
