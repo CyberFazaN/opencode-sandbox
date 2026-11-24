@@ -30,6 +30,7 @@ in [the guides](../README.md); task/test policy is in [CONTRIBUTING](../../CONTR
 | `workspaces.py`, `workspace_io.py`, `git_import.py`, `gitflow.py` | Managed/direct checks, hardened host access, working-state import and Git review/transfer |
 | `backup.py`, `cleanup.py` | Validated cold backup/staged restore; data-directory-owned usage/removal |
 | `readiness.py`, `diagnostics.py`, `http_probe.py`, `probes.py` | Read-only readiness, finite host/HTTP/container probes and owned-client cleanup |
+| `opencode_availability.py` | Installer-independent executable health check in running environments |
 | `agent_context.py` | Render/verify/refresh sandbox guidance and reconcile the saved system instruction toggle |
 | `opencode_configs.py`, `config_tree.py`, `config_volume.py`, `opencode_configs_tui.py` | Read-only source profiles, canonical no-follow tree codec, recoverable volume replacement, private temporary export and shared file-transfer UI |
 | `opencode_versions.py` | Actual binary evidence, supported versions/policies, environment/base update and rollback |
@@ -192,8 +193,8 @@ custom-image provenance. Home/workspace data is not undone by a system-layer rol
 
 ## OpenCode, image builds and discovery
 
-`distros.REGISTRY` owns distribution-specific assets/tools/smoke checks. Debian 13/revision 4 and
-Arch rolling/revision 3 are verified against `/etc/os-release`, tools and the actual OpenCode
+`distros.REGISTRY` owns distribution-specific assets/tools/smoke checks. Debian 13, Arch Linux rolling and Kali Linux rolling
+are verified against `/etc/os-release`, tools and the actual OpenCode
 binary. Existing/derived/restored layers retain inherited provenance; never describe them with
 today's registry OS/tool promises. Unknown/offline labels stay unknown, not an invented current OS.
 

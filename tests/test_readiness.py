@@ -96,6 +96,8 @@ class FakeDocker:
             if argv[:2] == ("cat", ac.CONTAINER_PATH):  # the mounted Agent Context
                 host = ac.path(self.m, c.env_dir)
                 return ok(host.read_text()) if host.exists() else fail("No such file", 1)
+            if argv[:2] == ("sh", "-c") and "command -v opencode" in argv[2]:
+                return ok("Found\nAvailable\n" if self.version else "Missing\n")
             if argv[:2] == ("opencode", "--version"):
                 return ok(self.version + "\n") if self.version else fail("not found", 127)
             if argv[0] == "sh":
@@ -139,7 +141,7 @@ def test_healthy_running_environment_passes_and_the_check_is_read_only(monkeypat
         "daemon": "passed", "resource-support": "passed", "workspace": "passed", "operation": "passed", "image": "passed", "container": "passed",
         "volume": "passed", "runtime": "passed", "network": "passed", "ports": "not applicable",
         "reachability": "passed", "profile": "passed", "agent-context": "passed",
-        "agent-context-delivery": "passed", "opencode": "passed", "storage": "not checked"}
+        "agent-context-delivery": "passed", "opencode-availability": "passed", "opencode": "passed", "storage": "not checked"}
     assert not fake.ops() & MUTATING
     detail = result["reachability"]["detail"]
     assert "not isolated from the LAN" in detail and "internet: reachable (verified TLS handshake with registry.npmjs.org)" in detail
@@ -227,7 +229,7 @@ def test_container_and_volume_checks(monkeypatch):
     result = checks(m)
     assert result["container"]["status"] == "failed" and "ownership mismatch" in result["container"]["detail"]
     # The other checks still report; container-dependent ones say why they did not run.
-    assert len(result) == 16 and result["volume"]["status"] == "passed" and result["profile"]["status"] == "passed"
+    assert len(result) == len(r.TITLES) and result["volume"]["status"] == "passed" and result["profile"]["status"] == "passed"
     assert result["network"]["status"] == result["opencode"]["status"] == "not checked"
     assert result["network"]["detail"] == "container not inspected"
 
@@ -501,7 +503,7 @@ def test_tui_check_key_shows_the_report_and_the_details_line(monkeypatch):
     import asyncio
 
     from opencode_sandbox import tui
-    m = env()
+    m = env(status="running")
     FakeDocker(monkeypatch, m)
 
     async def main():
@@ -518,5 +520,7 @@ def test_tui_check_key_shows_the_report_and_the_details_line(monkeypatch):
             assert str(app.screen.query_one("#report-title").render()) == "Readiness check (read-only; nothing was started or changed)"
             assert f"Readiness of {m['name']}" in app.screen.report and "[passed]" in app.screen.report
             await pilot.press("escape"); await pilot.pause()
-            assert "Readiness: last check 20" in str(app.query_one("#details").render())
+            details = str(app.query_one("#details").render())
+            assert "Readiness: last check 20" in details
+            assert "OpenCode: Available (last check)" in details
     asyncio.run(main())

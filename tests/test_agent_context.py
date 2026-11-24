@@ -42,11 +42,11 @@ def test_os_section_claims_only_registry_facts(distro):
     text = a.render({**M, 'distro': distro}, image=d.image, runtime=R,
                     definition=distros.ImageDefinition(d.id, d.version, d.revision))
     assert f"{d.name} {d.version}" in text and all(tool in text for tool in d.tools)
+    tool_line = next(line for line in text.splitlines() if line.startswith("- The managed base image includes: "))
+    assert tool_line.removeprefix("- The managed base image includes: ").removesuffix(".").split(", ") == list(d.tools)
     for other in distros.REGISTRY.values():
         if other.package_manager != d.package_manager:
             assert other.package_manager not in text
-        for tool in set(other.tools) - set(d.tools):
-            assert tool not in text
     assert "root (UID 0)" in text
 
 

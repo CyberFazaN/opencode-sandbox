@@ -26,7 +26,7 @@ def test_registry_records_are_complete_and_assets_exist():
         assert "FROM " in d.dockerfile.read_text()
     with pytest.raises(dataclass_error()):
         distros.REGISTRY[distros.DEFAULT].id = "x"
-    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch"):
+    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch, kali"):
         distros.get("nope")
 
 
@@ -65,11 +65,14 @@ def test_create_records_the_distribution():
     assert c.env_distro(m) is distros.REGISTRY[distros.DEFAULT]
     assert c.env_image(m) == "opencode-sandbox:debian"
     assert c.resolve("ocs-qa-d1")["distro"] == distros.DEFAULT
-    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch"):
+    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch, kali"):
         c.create("ocs-qa-d2", "scratch", distro="nope")
     arch = c.create("ocs-qa-d3", "scratch", distro="arch")
     assert arch["distro"] == "arch" and c.env_image(arch) == "opencode-sandbox:arch"
-    assert sorted(e["name"] for e in c.all_envs()) == ["ocs-qa-d1", "ocs-qa-d3"]
+    kali = c.create("ocs-qa-d4", "scratch", distro="kali")
+    assert c.env_distro(c.resolve(kali["id"])) is distros.get("kali")
+    assert c.env_image(kali) == "opencode-sandbox:kali"
+    assert sorted(e["name"] for e in c.all_envs()) == ["ocs-qa-d1", "ocs-qa-d3", "ocs-qa-d4"]
 
 
 def test_custom_image_is_explicit():
@@ -117,7 +120,7 @@ def test_backup_manifest_carries_the_distribution_and_restore_requires_it(tmp_pa
     for name, value in (("ensure_runtime", lambda image=True: None), ("inspect_container", lambda m: None),
                         ("assert_volume_owned", lambda m: None), ("volume_state", lambda m: None)):
         monkeypatch.setattr(c, name, value)
-    for name, options in (("registry", {}), ("custom", {"image": "custom:1"})):
+    for name, options in (("registry", {}), ("kali", {"distro": "kali"}), ("custom", {"image": "custom:1"})):
         m = c.create(f"ocs-test-{name}", "scratch", **options)
         manifest = b.verify(b.backup(m, tmp_path / "backups"))
         restored = b._restored_settings(manifest["environment"])

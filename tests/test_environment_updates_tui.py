@@ -12,8 +12,8 @@ from test_updates_tui import until
 from textual.widgets import Button, Checkbox, Input, Select, Static, TextArea
 
 from opencode_sandbox import core as c
+from opencode_sandbox import distros, readiness, updates
 from opencode_sandbox import opencode_versions as v
-from opencode_sandbox import readiness, updates
 from opencode_sandbox.environment_updates_tui import (
     EnvironmentConsentScreen,
     PolicyScreen,
@@ -125,7 +125,7 @@ def test_system_package_checkbox_is_off_by_default_and_binds_consent_and_executi
         await until(pilot, lambda: not app._operation_pending and screen.operation_result)
         assert screen.operation_result.startswith('System package upgrade and OpenCode update complete; stopped.')
         ops = kinds(runtime)
-        assert seen == ['debian'] and ops.index('upgrade') < ops.index('install') and not runtime.running
+        assert seen == [distros.get('debian').system_upgrade] and ops.index('upgrade') < ops.index('install') and not runtime.running
     run(test, size)
 
 

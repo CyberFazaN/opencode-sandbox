@@ -55,7 +55,7 @@ host/application setup script or replacement wizard in the repository.
   pushes do not trigger release automation; that workflow accepts version tags only. The weekly
   Images workflow checks the published definitions on the default branch (`main`) and publishes
   no images. Use **Run workflow** on `develop` or a topic branch to check unreleased definitions
-  with the same Debian and Arch matrix. A fix on `develop` reaches the schedule only after it is
+  with the same Debian, Arch and Kali matrix. A fix on `develop` reaches the schedule only after it is
   integrated into `main` through an approved release or stable hotfix PR.
 - Agents need explicit human authorization for remote pushes, remote changes, tags and releases
   (`AGENTS.md`). The owner may delegate release tagging for an exact version and verified `main`
@@ -138,7 +138,7 @@ describe earlier assignments, not standing orders.
 | Unit, host, Textual pilot | Mocked Docker (`tests/conftest.py`); real files and Git; the dashboard headless | `pytest -q` (no daemon is contacted) |
 | Quality | `ruff check src tests .github/scripts` and `shellcheck` on the shell scripts (`tests/test_quality.py`); skipped when the tool is missing | part of `pytest -q` |
 | Real identity and sessions | Tests marked `real_identity` and `real_session` run the daemon-identity verifier and session watchdogs as real local processes (against fake sockets and a fake `docker`) | part of `pytest -q` |
-| Real campaign | Real rootless Docker, both base images, real OpenCode, real terminals, fault injection (`tests/integration/`) | see below |
+| Real campaign | Real rootless Docker, the managed base images, real OpenCode, real terminals, fault injection (`tests/integration/`) | see below |
 
 `pytest -q` is the complete default suite, not the required command for every local task. It mixes
 mocked Docker with real host files/Git, sockets, processes and terminal fixtures; it is not live
@@ -151,7 +151,7 @@ inside the checkout trigger direct-workspace/import guards; deep paths exceed Un
 Keep logs and manifests under ignored `.work/`; never remove other runs' resources.
 
 The real campaign creates and deletes containers, volumes and images on your rootless daemon,
-kills and interrupts operations on purpose, and needs both base images, network access and
+kills and interrupts operations on purpose, and needs the selected base images, network access and
 `pyte`. **Run it only on a disposable machine, such as a VM set aside for testing**, never on a
 machine whose Docker data you care about:
 
@@ -165,7 +165,7 @@ manifest of what it created to `.work/logs/` and removes it again. Variables:
 | Variable | Effect |
 |---|---|
 | `OCS_TEST_DOCKER=1` | Enable the real campaign (otherwise its tests are skipped) |
-| `OCS_TEST_DISTROS` | Distributions to test (default `debian arch`) |
+| `OCS_TEST_DISTROS` | Distributions to test (default `debian arch kali`) |
 | `OCS_TEST_RUN` | Run id, used in names and log files |
 | `OCS_TEST_PRIVILEGED=1` | Add the rows that use `sudo` and restart or kill your daemon; read the docstring of `tests/integration/test_70_privileged.py` first |
 | `OCS_TEST_SOCKET_ACTIVATION=1` | Explicit permission for C10's separate rootless daemon and temporary `ocs-test-act-*` user units; read `test_36_socket_activation.py`; never restarts the existing daemon |
@@ -218,7 +218,7 @@ lowest direct dependencies and Python 3.14 with current compatible dependencies.
 combinations immediately when dependency/interpreter interactions or high-risk uncertainty warrant
 them; do not require four full runs after every shared-code edit. Use targeted endpoint checks for
 narrower risks. Public CI and final release qualification still require the complete four-way matrix.
-Affected real-Docker/OpenCode paths need both distributions where applicable, and installed pipx/
+Affected real-Docker/OpenCode paths need all affected distributions, and installed pipx/
 terminal/fault paths for installation changes. Obtain the permissions in AGENTS first; if unavailable,
 report the gap and residual risk, not a PASS. A full default-suite PASS is not real integration proof.
 

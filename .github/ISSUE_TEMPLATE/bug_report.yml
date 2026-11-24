@@ -40,7 +40,7 @@ body:
         OpenCode Sandbox version (opencode-sandbox --version):
         Python version:
         Docker version and rootless setup:
-        Container image (Debian, Arch or custom):
+        Container image (Debian, Arch, Kali or custom):
         Related versions, if relevant (OpenCode, pipx, Typer, Textual):
     validations:
       required: false

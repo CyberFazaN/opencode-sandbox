@@ -85,6 +85,14 @@ def _root(version: bool = typer.Option(False, "--version", callback=_print_versi
                                        help="Show the manager version and exit.")):
     """Manage isolated OpenCode workspaces on rootless Docker."""
 
+@opencode_app.command("availability")
+def opencode_availability(name: str):
+    """Check the executable in a running environment without starting it."""
+    from . import opencode_availability as availability
+
+    typer.echo(availability.check(c.resolve(name)).value)
+
+
 @opencode_app.command("versions")
 def opencode_versions(check: bool=typer.Option(False,"--check",help="Query npm for the latest supported stable release; compare every policy without changing pins")):
     """OpenCode version/policy: probe running containers; retain dated stopped evidence, never start them.
@@ -371,7 +379,8 @@ def _guidance_inputs(m):
     """Observe the container when Docker answers; otherwise describe the configuration."""
     try:
         with c.runtime_feedback(timeout=0.25, progress=None):
-            return c.guidance_inputs(m)
+            from . import opencode_availability as availability
+            return {**c.guidance_inputs(m), "opencode_status": availability.check(m).value}
     except c.SandboxError as exc:
         typer.echo(f"Note: container not inspected ({exc}); using the configured runtime settings.", err=True)
         return c.guidance_inputs(m, observe=False)
@@ -617,7 +626,9 @@ def stop(name:str):
 def status(name:str):
     """Metadata, container state, network and the last readiness result."""
     from . import agent_context as ac
+    from . import opencode_availability as availability
     m=c.resolve(name); msg(m)
+    typer.echo(f"OpenCode: {availability.check(m).value}")
     typer.echo(f"Workspace: {workspaces.describe(m)}\n"
                f"Provider profile: {m.get('profile')}\nContainer: {c.cname(m)}\n"
                f"Image: {c.env_image(m)}\n"

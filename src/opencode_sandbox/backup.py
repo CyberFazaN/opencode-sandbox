@@ -647,6 +647,6 @@ def check_restored(m):
     if m.get('status') not in ('ready','stopped','running'):
         raise c.SandboxError('Environment is not ready for validation')
     c.start(m)
-    p=c.docker('exec',c.cname(m),'sh','-c','set -eu; test -d /workspace; test -d /root; test -w /workspace; test -w /root; command -v opencode >/dev/null; opencode --version >/dev/null',capture=True,check=False)
+    p=c.docker('exec',c.cname(m),'sh','-c','set -eu; test -d /workspace; test -d /root; test -w /workspace; test -w /root',capture=True,check=False)
     if p.returncode: raise c.SandboxError('Restored container smoke check failed')
     return True

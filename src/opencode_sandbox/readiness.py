@@ -659,6 +659,18 @@ def delivery_check(m, state):
                   if ac.enabled(m) else "automatic inclusion intentionally disabled; generated file remains mounted and matches the host file"))
 
 
+def opencode_availability_check(m):
+    from . import opencode_availability as availability
+
+    status = availability.check(m)
+    if status == availability.Status.AVAILABLE:
+        return Check("opencode-availability", "OpenCode availability", PASSED, status.value)
+    if status == availability.Status.UNKNOWN:
+        return Check("opencode-availability", "OpenCode availability", NOT_CHECKED, status.value,
+                     "Checking requires a running environment and a working container diagnostic command.")
+    return Check("opencode-availability", "OpenCode availability", WARNING, status.value,
+                 f"Inspect or repair OpenCode with opencode-sandbox shell {m['name']}.")
+
 def opencode_check(m, state, data):
     from . import opencode_versions as v
     title = "OpenCode"
@@ -687,7 +699,7 @@ TITLES = {"daemon": "Docker daemon", "resource-support": "Resource-limit support
           "container": "Container", "volume": "Home volume", "runtime": "Resource limits", "network": "Network mode",
           "ports": "Published ports", "reachability": "Network reachability (measured)", "profile": "Provider profile",
           "agent-context": "Agent Context file", "agent-context-delivery": "Agent Context delivery", "opencode": "OpenCode",
-          "storage": "Docker storage"}
+          "opencode-availability": "OpenCode availability", "storage": "Docker storage"}
 
 
 def _skipped(ids, why):
@@ -712,7 +724,7 @@ def environment_checks(m):
         out += _skipped(("resource-support", "image", "container", "volume", "runtime", "network", "ports", "reachability", "profile"),
                         "Docker daemon not verified")
         out.append(_guard(agent_context_check, m, observe=False, _id="agent-context"))
-        out += _skipped(("agent-context-delivery", "opencode", "storage"), "Docker daemon not verified")
+        out += _skipped(("agent-context-delivery", "opencode-availability", "opencode", "storage"), "Docker daemon not verified")
         return out
     out.append(_guard(resource_support_check, _id="resource-support"))
     try:
@@ -726,7 +738,7 @@ def environment_checks(m):
                 *_skipped(("runtime", "network", "ports", "reachability"), "container not inspected"),
                 _guard(profile_check, m, None, None, _id="profile"),
                 _guard(agent_context_check, m, observe=False, _id="agent-context"),
-                *_skipped(("agent-context-delivery", "opencode"), "container not inspected"),
+                *_skipped(("agent-context-delivery", "opencode-availability", "opencode"), "container not inspected"),
                 _guard(storage_check, _id="storage")]
         return out
     out += [_guard(operation_check, m, state, _id="operation"),
@@ -740,6 +752,7 @@ def environment_checks(m):
             _guard(profile_check, m, state, data, _id="profile"),
             _guard(agent_context_check, m, _id="agent-context"),
             _guard(delivery_check, m, state, _id="agent-context-delivery"),
+            _guard(opencode_availability_check, m, _id="opencode-availability"),
             _guard(opencode_check, m, state, data, _id="opencode"),
             _guard(storage_check, _id="storage")]
     return out
@@ -805,6 +818,21 @@ def format_report(report, width=14):
         if check.get("hint") and check["status"] in (WARNING, FAILED, NOT_CHECKED):
             lines.append(" " * (width + 2) + f"-> {check['hint']}")
     return lines
+
+
+def cached_opencode_availability(m):
+    from .opencode_availability import Status
+
+    if m.get("status") != "running":
+        return Status.UNKNOWN.value
+    report = cached(m)
+    for item in (report or {}).get("checks", []):
+        if not isinstance(item, dict) or item.get("id") != "opencode-availability":
+            continue
+        value = item.get("detail")
+        if value in (Status.AVAILABLE.value, Status.MISSING.value, Status.BROKEN.value):
+            return f"{value} (last check)"
+    return Status.UNKNOWN.value
 
 
 def cached_line(m):

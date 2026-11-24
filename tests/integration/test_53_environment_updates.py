@@ -210,11 +210,14 @@ def test_environment_recovery_terminal(campaign, checks, fault, distro):
 
 
 PACKAGES = {'debian': "dpkg-query -W -f='${Package}=${Version}\\n' | sha256sum", 'arch': 'pacman -Q | sha256sum'}
+PACKAGES['kali'] = PACKAGES['debian']
 # Deterministic local package-manager failures inside this run's system layer; no network fault.
 BROKEN = {'debian': "echo 'deb ocs-test-malformed' > /etc/apt/sources.list.d/ocs-test-broken.list",
           'arch': "printf '\\n[ocs-test-broken]\\nServer = file:///ocs-test-missing\\n' >> /etc/pacman.conf"}
+BROKEN['kali'] = BROKEN['debian']
 REPAIR = {'debian': 'rm /etc/apt/sources.list.d/ocs-test-broken.list',
           'arch': "sed -i '/^\\[ocs-test-broken\\]$/,$d' /etc/pacman.conf && tail -n 1 /etc/pacman.conf"}
+REPAIR['kali'] = REPAIR['debian']
 
 
 def version(camp, eid):

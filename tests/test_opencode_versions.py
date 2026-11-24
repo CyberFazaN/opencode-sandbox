@@ -109,6 +109,7 @@ def test_versions_survive_one_invalid_policy(monkeypatch):
 
 
 def fake_docker(calls, installed="2.1.4", same=False, os_release='ID=debian\nVERSION_ID="13"', problems="", previous_tags=()):
+    distro = distros.get(os_release.splitlines()[0].removeprefix("ID=").strip('"'))
     built = set()
     def docker(*a, **k):
         calls.append(a)
@@ -124,9 +125,8 @@ def fake_docker(calls, installed="2.1.4", same=False, os_release='ID=debian\nVER
             if "--format" in a:
                 out = ((NEW if new else OLD) + "|{}") if a[3] == "{{.Id}}|{{json .Config.Labels}}" else ("layers:new" if new else "layers:old")
             else:
-                d = c.distros.get("arch" if "arch" in a[-1] else c.distros.DEFAULT)
                 out = json.dumps([{"Id": NEW if new else OLD, "Config": {"Labels": {
-                    **d.image_labels(), "org.opencode-sandbox.managed": "true"}}}])
+                    **distro.image_labels(), "org.opencode-sandbox.managed": "true"}}}])
             return SimpleNamespace(returncode=0, stdout=out + "\n", stderr="")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
     return docker

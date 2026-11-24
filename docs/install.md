@@ -25,8 +25,11 @@ tells you what is still missing.
 | Kernel and system support for rootless Docker | Subordinate UID and GID ranges for your user and `newuidmap`/`newgidmap`; unprivileged user namespaces (some distributions restrict them by policy); cgroup v2 with the `cpu`, `memory` and `pids` controllers delegated to your user's daemon, because the manager sets CPU, memory and process limits on every container. See [Prepare Docker](#prepare-docker) for upstream guidance and the limits of the application's checks. |
 | Disk space | Each base image is about 2.2 GB (Debian) or 2.4 GB (Arch); a build also leaves several GB of Docker build cache. |
 
-The base images (Debian 13 or Arch Linux) are the distribution inside the containers. Choose
-either one on any host; they are independent of the distribution your host runs.
+The base images supply the distribution inside the containers: Debian 13, Arch Linux rolling
+or Kali Linux rolling. The Kali definition starts with Kali's official minimal container and
+adds OpenCode and the tools needed for normal sandbox operation. It includes no Kali tool
+metapackages. Build it with `opencode-sandbox build --distro kali`. You can choose any
+supported image independently of the distribution your host runs.
 
 ## Install the application
 

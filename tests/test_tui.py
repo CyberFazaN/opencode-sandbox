@@ -587,7 +587,11 @@ def test_create_form_discloses_options_progressively(size):
     run(t, size)
 
 
-def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
+@pytest.mark.parametrize(("distro", "distro_label", "size"), [
+    ("arch", "Arch Linux", (120, 40)),
+    ("kali", "Kali Linux", (80, 24)),
+])
+def test_create_form_uses_the_shared_rules_and_choices(tmp_path, distro, distro_label, size):
     folder = tmp_path / "proj"
     folder.mkdir()
     (folder / "a.txt").write_text("x")
@@ -616,7 +620,14 @@ def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
         assert stack(app)[-1] == "CreateScreen" and "name" in str(form.query_one("#create-error").render()).lower()
         form.query_one("#name").value = "ocs-qa-form"
         form.query_one("#more").collapsed = False
-        form.query_one("#distro").value = "arch"
+        distro_select = form.query_one("#distro")
+        if distro == "kali":
+            await settle(pilot)
+            distro_select.focus()
+            await pilot.press("enter", "down", "down", "enter")
+            assert distro_select.value == "kali"
+        else:
+            distro_select.value = distro
         form.query_one("#profile").value = "work"
         form.query_one("#include-agent-context").value = False
         await settle(pilot)
@@ -624,13 +635,13 @@ def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
         await settle(pilot, 1.0)
         m = c.resolve("ocs-qa-form")
         assert app.selected()["id"] == m["id"]  # The new environment is selected
-        assert (m["kind"], m["distro"], m["profile"], m["agent_context_enabled"]) == ("project", "arch", "work", False)
+        assert (m["kind"], m["distro"], m["profile"], m["agent_context_enabled"]) == ("project", distro, "work", False)
         assert m["source"] == str(folder.resolve())
         details = str(app.query_one("#details").render())
-        for text in ("Distribution: Arch Linux (OS version not inspected)", "Provider profile: work", f"managed copy of {folder.resolve()}",
+        for text in (f"Distribution: {distro_label} (OS version not inspected)", "Provider profile: work", f"managed copy of {folder.resolve()}",
                      "Settings: ", "network bridge", "Readiness: "):
             assert text in details, text
-    run(t, (120, 40))
+    run(t, size)
 
 
 def test_bars_separate_global_and_environment_actions_with_cli_terms():

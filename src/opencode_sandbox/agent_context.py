@@ -17,6 +17,7 @@ from . import distros, workspaces
 CONTAINER_DIR = "/run/ocs-agent"
 CONTAINER_PATH = CONTAINER_DIR + "/context.md"
 SYSTEM_CONFIG = "/etc/opencode/opencode.json"
+AVAILABILITY_LINE = "- OpenCode availability when this guidance was generated: "
 
 
 def enabled(m):
@@ -101,7 +102,7 @@ OBSERVED = (("network", "network"), ("cpus", "CPU limit"), ("memory", "memory li
 
 
 def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
-           definition: distros.ImageDefinition | None = None) -> str:
+           definition: distros.ImageDefinition | None = None, opencode_status: str = "Unknown") -> str:
     """Describe only what the manager configures or verifies for this environment.
 
     `runtime` is the configured runtime; `observed` the same keys as Docker reports them for
@@ -176,11 +177,12 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
         lines += ["", "## Operating system",
                   "- Custom image: installed tools, OS and package manager are unknown; inspect only when needed."]
     lines += ["", "## Working behavior",
+              f"{AVAILABILITY_LINE}{opencode_status}.",
               "- Start with the user's task; avoid a full system inventory or repeated probing.",
               "- If a dependency is missing, explain the required change; use container-local installation only when appropriate and permitted.",
               "- Never attempt to bypass container boundaries or reconfigure the host.",
               ("- OpenCode's own update check is off in this container (OPENCODE_DISABLE_AUTOUPDATE=1): the sandbox "
-               "manager on the host installs and updates OpenCode. Do not run `opencode upgrade`."),
+               "manager on the host installs and updates OpenCode in managed images. Do not run `opencode upgrade`."),
               "- Follow project AGENTS.md instructions in addition to this environment guidance.", ""]
     return "\n".join(lines)
 
@@ -217,10 +219,10 @@ def path(m: dict, env_dir) -> Path:
 
 
 def refresh(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None,
-            definition: distros.ImageDefinition | None = None) -> Path:
+            definition: distros.ImageDefinition | None = None, opencode_status: str = "Unknown") -> Path:
     target = path(m, env_dir)
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    contents = render(m, image=image, runtime=runtime, observed=observed, definition=definition)
+    contents = render(m, image=image, runtime=runtime, observed=observed, definition=definition, opencode_status=opencode_status)
     fd, tmp = tempfile.mkstemp(prefix=".agent-context-", dir=target.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -236,7 +238,13 @@ def refresh(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | Non
 
 
 def verify(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None,
-           definition: distros.ImageDefinition | None = None) -> bool:
+           definition: distros.ImageDefinition | None = None, opencode_status: str = "Unknown") -> bool:
     target = path(m, env_dir)
-    expected = render(m, image=image, runtime=runtime, observed=observed, definition=definition)
-    return target.is_file() and not target.is_symlink() and target.read_text(encoding="utf-8") == expected
+    expected = render(m, image=image, runtime=runtime, observed=observed, definition=definition, opencode_status=opencode_status)
+    if not target.is_file() or target.is_symlink():
+        return False
+    # Availability is a point-in-time observation, separate from configuration drift.
+    def settings(text):
+        return [line for line in text.splitlines() if not line.startswith(AVAILABILITY_LINE)]
+
+    return settings(target.read_text(encoding="utf-8")) == settings(expected)

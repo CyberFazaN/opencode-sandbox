@@ -105,8 +105,13 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
     work = camp.tmp('base-actions-' + distro)
     assets = work / 'images'
     shutil.copytree(ROOT / 'src/opencode_sandbox/assets/images', assets)
-    upstream = {'arch': 'archlinux:base-devel', 'debian': 'node:24-trixie'}[distro]
-    alias = 'registry-1.docker.io/library/' + upstream
+    upstream, repository = {
+        'arch': ('archlinux:base-devel', 'library/archlinux:base-devel'),
+        'debian': ('node:24-trixie', 'library/node:24-trixie'),
+        'kali': ('docker.io/kalilinux/kali-rolling', 'kalilinux/kali-rolling:latest'),
+    }[distro]
+    alias = 'registry-1.docker.io/' + repository
+    selection = DOWN * ('debian', 'arch', 'kali').index(distro)
     dockerfile = assets / distro / 'Dockerfile'
     original = dockerfile.read_text()
     dockerfile.write_text(original.replace('FROM ' + upstream, 'FROM ' + alias))
@@ -125,7 +130,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
         return camp.docker('image', 'inspect', '--format', '{{.Id}}', repo + ':' + distro).stdout.strip()
     names = []
     try:
-        package = 'apt-get update' if distro == 'debian' else 'pacman-retry -Syu'
+        package = 'apt-get update' if distro != 'arch' else 'pacman-retry -Syu'
         first = run('opencode', 'update-base', '--distro', distro, '--version', '2.1.4', '--yes')
         first_image = current()
         ck('Mode: Cached rebuild' in first.stdout and 'always refreshed and upgraded in both modes' in first.stdout,
@@ -180,7 +185,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
             try:
                 ck(term.wait_for(name, 30), 'Base terminal: dashboard ready')
                 term.send('v', .3); term.send('2', .3)
-                term.send(DOWN if distro == 'arch' else '', .2)
+                term.send(selection, .2)
                 term.send('b', .3)
                 ck(term.wait_for('Build / Rebuild', 15), 'Base terminal: target/mode form visible')
                 ck('always upgrade system packages' in term.text() and 'Update system packages' not in term.text(),
@@ -211,7 +216,7 @@ def test_cached_refresh_safety_and_base_actions_terminals(campaign, checks, dist
                           'Base terminal: normal Quit refuses active approved build')
                 Path(str(hold) + '.release').write_text('release actual verification/publication')
                 term.send('v', .3); term.send('2', .3)
-                term.send(DOWN if distro == 'arch' else '', .1)
+                term.send(selection, .1)
                 ck(term.wait_for(r'Base (?:build verified and published|verified unchanged)', 60), 'Base terminal: closed screen did not cancel mutation; result adopted')
                 # A content-equivalent cached build may leave the original image current. It
                 # then is not a rollback copy: explicitly swap back to the known refreshed ID.

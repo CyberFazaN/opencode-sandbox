@@ -70,7 +70,7 @@ def test_version_probe_runs_without_new_privileges(monkeypatch):
                         if a[:2] == ("image", "inspect") else real(*a, **k))
     assert v.image_version("opencode-sandbox:debian") == "2.2.0"
     run = next(a for a in fake.calls if a[0] == "run")
-    assert "no-new-privileges:true" in run
+    assert "no-new-privileges:true" in run and "--init" in run
 
 
 # --- Agent Context delivery check -----------------------------------------------------------------

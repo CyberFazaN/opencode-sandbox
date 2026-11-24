@@ -372,3 +372,27 @@ def test_custom_image_without_python_refuses_managed_start(campaign, checks):
        and camp.sh(eid, "test ! -e /etc/opencode/opencode.json").returncode == 0,
        "E11 failed reconciliation preserves workspace and does not replace system config with defaults")
     camp.delete(name)
+
+
+@pytest.mark.parametrize("distro", DISTROS)
+def test_opencode_availability_does_not_start_or_block_lifecycle(campaign, distro):
+    camp = campaign
+    name = f"ocs-test-health-{distro}"
+    eid = camp.create(name, "--distro", distro)
+
+    def status():
+        return camp.ocs("opencode", "availability", name).stdout.strip()
+
+    assert status() == "Unknown"
+    camp.ocs("start", name)
+    assert status() == "Available"
+    camp.sh(eid, 'binary="$(command -v opencode)"; mv -- "$binary" "$binary.ocs-test-hidden"')
+    assert status() == "Missing"
+    camp.ocs("stop", name)
+    assert status() == "Unknown" and not camp.inspect(eid)["State"]["Running"]
+    camp.ocs("start", name)
+    assert status() == "Missing"
+    camp.sh(eid, """printf '#!/bin/sh\\nexit 1\\n' > /usr/local/bin/opencode
+chmod 755 /usr/local/bin/opencode""")
+    assert status() == "Broken"
+    camp.delete(name)

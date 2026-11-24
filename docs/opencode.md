@@ -1,5 +1,16 @@
 # OpenCode in the sandbox
 
+## Check whether OpenCode runs
+
+Use `opencode-sandbox opencode availability NAME`, `status NAME`, or the dashboard's
+**Check** action (`i`). **Available** means the executable answered `--version`.
+**Missing** means the executable is absent from the container's PATH. **Broken** means
+it was found but its version command failed. **Unknown** means the check could not run,
+for example because the container is stopped. The check leaves stopped containers stopped
+and does not query npm. If OpenCode is missing or broken, use **Shell** to inspect or
+repair the installation.
+
+
 ## Sessions
 
 `run NAME` starts OpenCode V2 as root in `/workspace` with the provider profile's variables:
@@ -188,7 +199,7 @@ failure replaces the container with one created from the checkpoint (the system 
 as before; `/root` and `/workspace` are not touched). It also repairs a broken installation.
 
 `--update-system-packages` (off by default; **Update system packages** in the dashboard) first
-upgrades the environment's installed packages inside that same checkpointed update: Debian runs
+upgrades the environment's installed packages inside that same checkpointed update: Debian and Kali run
 `apt-get update` and `apt-get upgrade` (no removals or new packages, so such upgrades are held
 back; changed configuration files are kept), Arch runs `pacman -Sy archlinux-keyring` and a full
 `pacman -Su`. A failed upgrade stops **before** OpenCode is touched and restores the checkpoint.
@@ -240,7 +251,7 @@ Choose the mode explicitly:
 
 **Every build upgrades system packages**, in both modes and for the `build` command too: a
 per-build value forces the package layer to run with fresh indexes, so it and the later layers
-are never reused from the cache. Debian runs `apt-get update` and `apt-get upgrade`; Arch runs a
+are never reused from the cache. Debian and Kali run `apt-get update` and `apt-get upgrade`; Arch runs a
 full `pacman -Syu` (never a partial upgrade) and therefore also rebuilds `paru`. A repeated build
 publishes a new image even with the same OpenCode version. There is no option to skip this.
 

@@ -12,12 +12,12 @@ from opencode_sandbox.cli import app
 def upgrades(fake, monkeypatch, outcome="ok"):
     """Record package-upgrade execs; `fail` exits non-zero, `break` leaves OpenCode unrunnable."""
     real, seen = c.docker, []
-    scripts = {d.system_upgrade: d.id for d in distros.REGISTRY.values()}
+    scripts = {d.system_upgrade for d in distros.REGISTRY.values()}
 
     def docker(*args, capture=False, check=True):
         if args[0] == "exec" and args[2:4] == ("sh", "-c") and args[4] in scripts:
             fake.calls.append(args)
-            seen.append(scripts[args[4]])
+            seen.append(args[4])
             if outcome == "fail": raise c.SandboxError("Command failed (100): E: Unable to fetch some archives")
             if outcome == "break": fake.version = "broken"
             return fake.ok()
@@ -42,7 +42,7 @@ def test_requested_upgrade_runs_first_inside_the_checkpoint_with_the_distributio
     plan = v.prepare_environment_update(m, "2.2.0", system_packages=True)
     assert plan.system_packages
     result = v.update_environment(m, "2.2.0", plan=plan)
-    assert seen == [distro] and result["system_packages"] and result["previous_version"] == "2.1.4"
+    assert seen == [distros.get(distro).system_upgrade] and result["system_packages"] and result["previous_version"] == "2.1.4"
     ops = kinds(fake)
     assert ops.index("commit") < ops.index("start") < ops.index("upgrade") < ops.index("install") < len(ops) - 1
     assert ops[-1] == "stop" and not fake.running
@@ -136,7 +136,7 @@ def test_cli_flag_reaches_the_confirmed_plan_and_reports_the_upgrade(monkeypatch
     result = runner.invoke(app, ["opencode", "update", m["name"], "--version", "2.2.0", "--update-system-packages"])
     assert result.exit_code == 0, result.output
     assert "not fully reversible" in result.output and "upgrade its system packages" in asked[0]
-    assert "System packages upgraded; Updated OpenCode 2.1.4 -> 2.2.0" in result.output and seen == ["debian"]
+    assert "System packages upgraded; Updated OpenCode 2.1.4 -> 2.2.0" in result.output and seen == [distros.get("debian").system_upgrade]
     result = runner.invoke(app, ["opencode", "rollback", m["name"]])
     assert result.exit_code == 0, result.output
     assert "changes outside the system layer" in asked[1]

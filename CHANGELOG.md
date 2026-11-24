@@ -6,6 +6,11 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+- Add the Kali Linux rolling base image to CLI and dashboard creation and the scheduled image
+  verification matrix.
+- Check runtime OpenCode availability from the CLI and dashboard. A restored container can pass
+  its lifecycle smoke check even if OpenCode needs repair.
+
 ## 6.4.0 — 2026-11-20
 
 Workspace import and Agent Context release (Beta). Python 3.11 or newer; environment and backup

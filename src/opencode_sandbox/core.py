@@ -843,7 +843,7 @@ def inspect_container(m):
         # "dial unix ...docker.sock: connect: no such file or directory".
         if re.search(r"no such (container|object)", message): return None
         raise SandboxError(f"Cannot inspect {cname(m)}: {p.stderr.strip()}")
-    try: state=json.loads(p.stdout)
+    try: state=json.loads(getattr(p, "stdout", None) or "")
     except ValueError as exc: raise SandboxError("Invalid Docker inspect response") from exc
     assert_owned(m)
     return state
@@ -1069,7 +1069,12 @@ def start(m, *, _resume_recreate=False, precondition=None):
         from . import agent_context as ac
         try:
             ac.refresh(m, env_dir, **guidance_inputs(m))
-            ac.reconcile(m)
+            try:
+                ac.reconcile(m)
+            except SandboxError:
+                from . import opencode_availability as availability
+                if availability.check(m) not in (availability.Status.MISSING, availability.Status.BROKEN):
+                    raise
         except Exception as exc:
             mark(m,"error",last_error=f"Agent Context reconciliation failed: {exc}")
             raise
@@ -1148,13 +1153,18 @@ def interactive(m, shell=False):
         raise SandboxError("run/shell need an interactive terminal; use 'exec NAME -- COMMAND' for scripts")
     start(m)
     from . import agent_context as ac
+    from . import opencode_availability as availability
     m = resolve(m["id"])
     warning = profile_mismatch(m)
     if warning: print(f"WARNING: {warning}", file=sys.stderr)
+    status = availability.check(m)
     # Regenerate before every launch; the directory mount makes it visible at once.
     with lock(m["id"]):
         m = resolve(m["id"])
-        ac.refresh(m, env_dir, **guidance_inputs(m))
+        ac.refresh(m, env_dir, **guidance_inputs(m), opencode_status=status.value)
+    if not shell and status in (availability.Status.MISSING, availability.Status.BROKEN):
+        raise SandboxError(f"OpenCode is {status.value.lower()} in {m['name']}. "
+                           f"Use 'opencode-sandbox shell {m['name']}' to inspect or repair it.")
     token = secrets.token_hex(8)
     watchdog = session_watchdog(m, token)
     try:

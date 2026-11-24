@@ -58,9 +58,9 @@ campaign against disposable installed test venvs whose site-packages carry a tes
 that sets `distros.REPOSITORY` to an `ocs-test-*` name from `OCS_TEST_IMAGE_REPOSITORY`; the
 product has no such override and the hook must never ship. Put the hook into the installed
 manager's venv and into the runner venv (its helper snippets read the same namespace); the
-runner also needs `pyte` and `pipx`. Build both base images into that namespace before the run
+runner also needs `pyte` and `pipx`. Build the selected base images into that namespace before the run
 (the campaign compares the tagged images before and after) and remove them afterwards. Run the
-both-image gates on the selected release tree.
+image gates on the selected release tree.
 
 ```sh
 OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 OCS_TEST_PIPX_BUILD=1 \

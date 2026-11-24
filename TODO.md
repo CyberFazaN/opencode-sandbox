@@ -29,6 +29,9 @@ and release blockers are in [BASELINE](docs/engineering/BASELINE.md) and
 
 Revisit only for a demonstrated need, not as stabilization requirements:
 
+- **Custom Image Definitions:** support user-maintained Dockerfiles and custom images as reusable
+  definitions with explicit build inputs and provenance.
+
 - **Environment presets:** reuse validated settings/registries and preserve the separation from
   user-owned OpenCode configuration; no new template framework without a concrete use case.
 - **Configuration export/import:** manager settings only, not projects/secrets; validate schema,

@@ -688,12 +688,18 @@ class Dashboard(App):
                 f"Distribution: {escape(image)}  Provider profile: {escape(profile)}\n"
                 f"Settings: {escape(settings)}\n"
                 f"Readiness: {Dashboard._readiness_line(m)}\n"
-                f"Error: {escape(str(m.get('last_error') or '—'))}")
+                + (f"Error: {escape(str(m['last_error']))}" if m.get("last_error")
+                 else f"OpenCode: {Dashboard._availability_line(m)}"))
 
     @staticmethod
     def _readiness_line(m) -> str:
         from . import readiness
         return escape(readiness.cached_line(m)) + "  (i: check)"
+
+    @staticmethod
+    def _availability_line(m) -> str:
+        from . import readiness
+        return readiness.cached_opencode_availability(m) + "  (i: check)"
 
     def action_check_selected(self) -> None:
         """Comprehensive read-only check (same implementation as `check NAME`), off the UI thread."""
@@ -887,11 +893,12 @@ class Dashboard(App):
     @work(thread=True, exclusive=True, group="agent-context")
     def _agent_context_worker(self, m) -> None:
         from . import agent_context as ac
+        from . import opencode_availability as availability
         try:
             m = c.resolve(m['id'])
             note = ""
             try:
-                inputs = c.guidance_inputs(m)
+                inputs = {**c.guidance_inputs(m), "opencode_status": availability.check(m).value}
             except c.SandboxError as exc:
                 inputs = c.guidance_inputs(m, observe=False)
                 note = f"Container inspection unavailable ({c.error_text(exc)}); preview uses configured settings.\n"

@@ -15,8 +15,9 @@ OpenCode Sandbox is a Python >= 3.11 Typer CLI and Textual TUI that runs OpenCod
 in per-environment containers on the current user's **own rootless Docker daemon** (identity
 verified, never assumed). Hosts: Linux distributions that meet the prerequisites (D-046); Arch
 Linux is the development and real-test host. Base images come from a distribution
-registry (`src/opencode_sandbox/distros.py`): Debian 13 (`node:24-trixie`, default) and Arch
-Linux (`archlinux:base-devel`, AUR via `ocs-aur`); OpenCode is the npm package `@opencode/cli`
+registry (`src/opencode_sandbox/distros.py`): Debian 13 (`node:24-trixie`, default), Arch
+Linux (`archlinux:base-devel`, AUR via `ocs-aur`), and Kali Linux rolling
+(`kalilinux/kali-rolling`); OpenCode is the npm package `@opencode/cli`
 (2.x only). Preserve user files, persistent environments and configuration; never silently expand
 host access. Feature/module details are in [ARCHITECTURE.md](docs/engineering/ARCHITECTURE.md),
 not an instruction to inspect or retest every subsystem for every task.

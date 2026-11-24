@@ -94,6 +94,17 @@ REGISTRY: dict[str, Distro] = {d.id: d for d in (
                    "`paru` and `makepkg` refuse to run as root, and sudo cannot raise privileges here. "
                    "Review first with `ocs-aur -Gp PACKAGE` (prints the PKGBUILD); installed packages run as root."),),
            aur_helper="paru"),
+    Distro(id="kali", name="Kali Linux", version="rolling", revision=1, package_manager="apt",
+           os_release=(("ID", "kali"), ("VERSION_CODENAME", "kali-rolling")),
+           install_hint="`apt-get update && apt-get install -y PACKAGE` as root (needs network).",
+           build_upgrade="apt-get update, then apt-get upgrade",
+           system_upgrade=("export DEBIAN_FRONTEND=noninteractive && apt-get update"
+                           " && apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade"
+                           " && apt-get clean && rm -rf /var/lib/apt/lists/*"),
+           system_upgrade_summary=("apt-get update, then apt-get upgrade. Packages requiring dependency changes are "
+                                   "held back; locally changed configuration files are kept."),
+           tools=("bash", "curl", "git", "git-lfs", "ssh", "node", "npm", "python3", "sudo", "tar",
+                  "opencode", "ocs-opencode")),
 )}
 DEFAULT = "debian"
 

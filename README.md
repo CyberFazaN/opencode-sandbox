@@ -40,7 +40,7 @@ Consider something else if:
 
 - **Environments**: scratch (empty), project (a Git clone, optionally including local working
   changes, or a filtered copy of a folder) and
-  disposable quick sessions; Debian 13 or Arch Linux images (AUR through `ocs-aur`), or a
+  disposable quick sessions; Debian 13, Arch Linux (AUR through `ocs-aur`) or Kali Linux rolling images, or a
   custom image.
 - **Managed workspaces** by default, never your original folder; direct host workspaces only with
   explicit consent and checks (not recommended).
@@ -170,7 +170,7 @@ The manager sends no telemetry. These services are contacted:
 | GitHub, PyPI | Installation and upgrades with pipx (the source, then Typer, Textual and their dependencies) |
 | Docker Hub | Base image builds (`node:24-trixie`, `archlinux:base-devel`) |
 | The registry of a custom image | The first start of an environment created with `create --image` |
-| Debian or Arch package mirrors | Base image builds, and packages you install in an environment |
+| Debian, Arch or Kali package mirrors | Base image builds, and packages you install in an environment |
 | AUR, GitHub, crates.io | The Arch image build (the AUR helper `paru` and its sources); AUR packages you install |
 | npm registry | OpenCode installs and updates; version checks (`opencode check`, `opencode versions --check`) from the host; the internet probe of `check NAME` from inside the container |
 | Your model provider | Whatever your provider profile and OpenCode configuration use |

@@ -6,7 +6,7 @@ to `.work/logs/<run-id>-manifest.txt`; the session ends with `delete` of this ru
 and the product's `disk cleanup --yes` behind a guard, then a leak check.
 
 Environment: OCS_TEST_RUN (run id, default run-<UTC time>), OCS_TEST_DISTROS (default
-"debian arch")."""
+"debian arch kali")."""
 import json
 import os
 from datetime import UTC, datetime
