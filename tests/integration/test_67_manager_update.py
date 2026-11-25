@@ -53,7 +53,12 @@ def public_start(camp, ck, prefix, launcher, environment, endpoint, case, tag, *
         if dashboard:
             assert ck(term.wait_for('OpenCode Sandbox', 30), 'Manager public update: actual dashboard visible')
             term.send('v', .3)
-            assert ck(term.wait_for('verified official-tag pipx', 15), 'Manager public update: actual local classification visible without discovery')
+            assert ck(term.wait_for(r'1 Manager\s+2 Base Images', 15), 'Manager public update: Updates tabs visible')
+            term.send('1', .3)
+            classified = term.wait_for('verified official-tag pipx', 15)
+            if not classified:
+                term.snap('Manager local classification did not appear')
+            assert ck(classified, 'Manager public update: actual local classification visible without discovery')
             term.send('c', .3)
             assert ck(term.wait_for('Update available', 15), 'Manager public update: explicit published release check supplies availability only')
             term.send('u', .3)

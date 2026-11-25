@@ -60,6 +60,7 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
     camp.note(f"loopback HTTP fixture 127.0.0.1:{server.server_port}; no inbound LAN listener")
     camp.note(f"host files {script}, {calls_path}; source harness only registry URL and Docker argv recording")
     terminal = None
+    toggle_daily = TAB * 3 + " " + TAB * 3 + ENTER  # Daily discovery, then past Copy text and Allow rootful to Save
     try:
         terminal = Term([sys.executable, str(script)], *size, env=camp.env, log=camp.log)
         ck(terminal.wait_for(name, 30), "Daily terminal: default-off dashboard ready")
@@ -67,10 +68,12 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
         terminal.send("g", .5)
         ck(terminal.wait_for("Daily metadata discovery", 10) and "Save" in terminal.text(), "Daily terminal: opt-in and Save visible")
         terminal.snap("Daily discovery preference before opt-in")
-        terminal.send(TAB * 3 + " " + TAB * 2 + ENTER, 1)  # skip Copy selected text to Save
+        terminal.send(toggle_daily, 1)
         assert ck(terminal.wait_for(r"Updates \(1\)", 20), "Daily terminal: keyboard opt-in yields one quiet dated-history indicator")
         preferences_path = camp.config / "ui.json"
-        ck(preferences_path.exists() and json.loads(preferences_path.read_text())["daily_discovery"], "Daily terminal: preference persisted")
+        settings = json.loads(preferences_path.read_text())
+        ck(settings["daily_discovery"] and not settings["allow_rootful"],
+           "Daily terminal: only the discovery opt-in was enabled")
         ck(state["requests"] == 1, "Daily terminal: opt-in attempted npm once, not per environment")
         terminal.send("q", .5)
         ck(terminal.exit_code(15) == 0 and terminal.restored(), "Daily terminal: quit restores terminal")
@@ -100,7 +103,7 @@ def test_daily_discovery_terminal(campaign, checks, distro, size):
         terminal = Term([sys.executable, str(script)], *size, env=camp.env, log=camp.log)
         ck(terminal.wait_for(r"Updates \(1\)", 20) and state["requests"] == 2, "Daily terminal: failure/restart cannot trigger another automatic request")
         terminal.send("g", .3)
-        terminal.send(TAB * 3 + " " + TAB * 2 + ENTER, .5)
+        terminal.send(toggle_daily, .5)
         ck(terminal.wait_for(name, 10) and "Updates (1)" not in terminal.text(), "Daily terminal: disabling hides unsolicited indicator")
         terminal.send("q", .5)
         ck(terminal.exit_code(15) == 0 and terminal.restored(), "Daily terminal: disabled quit restores terminal")

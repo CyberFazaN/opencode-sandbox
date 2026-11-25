@@ -32,7 +32,7 @@ image, not Kali tool metapackages. The container's distribution is independent o
 ## Install the application
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.5.0
 opencode-sandbox --version
 ```
 
@@ -46,7 +46,7 @@ needed:
 
 ```sh
 pipx install --python python3.11 \
-  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
+  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.5.0
 ```
 
 `opencode-sandbox --help`, `--version` and `doctor` work without Docker.
