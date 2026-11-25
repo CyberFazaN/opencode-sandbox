@@ -38,6 +38,20 @@ backups use schemas 3 and 4. Manager upgrades do not rebuild existing images or 
 
 ## Verification
 
+### Published 6.5.0
+
+[OpenCode Sandbox 6.5.0](https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.5.0) was published
+on 2026-11-25. The annotated tag points to the [release PR #9](https://github.com/CyberFazaN/opencode-sandbox/pull/9)
+merge commit `13ac59db0965aa92382a16ed0dccf0adc41da004`, which matches the qualified release tree.
+All ten [PR checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/45516038621), ten
+[main checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/45517783071) and fourteen
+[release jobs](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/45589079553) passed. The workflow draft matched the
+changelog and was published as the latest stable release.
+
+Public GitHub-tag pipx installations passed on Python 3.11 and 3.14. Both reported
+`opencode-sandbox 6.5.0`, verified the local rootless Docker identity, and matched all
+78 installed product files to the tag. Docker inventory matched before and after the smoke checks.
+
 ### 6.5.0 candidate qualification
 
 The installed product was packaged from `3521605`. Subsequent changes cover tests and release

@@ -4,6 +4,8 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
 ## 6.5.0 — 2026-11-25
 
 Python 3.11 or newer. Existing rootless environments and backups keep their schema versions.
