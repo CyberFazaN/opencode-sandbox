@@ -25,7 +25,7 @@ def test_recovery_center_shows_an_error_with_brackets_as_text():
         app.push_screen(RecoveryScreen())
         await settle(pilot)
         assert stack(app)[-1] == "RecoveryScreen"
-        assert any(BRACKETS[:40] in cell for cell in _cells(app.screen.query_one("#recovery-table")))
+        assert BRACKETS in app.screen.query_one("#recovery-detail").text
     run(t, (120, 40))
 
 

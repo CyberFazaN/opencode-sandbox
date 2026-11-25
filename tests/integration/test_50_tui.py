@@ -165,6 +165,31 @@ def test_dashboard_against_real_docker(campaign, checks):
     camp.note(f"removed host dir {folder}")
 
 
+def test_selection_and_explicit_shell_in_real_dashboard(campaign):
+    camp = campaign
+    name = "ocs-test-tui-explicit-shell"
+    eid = camp.create(name)
+    camp.ocs("config", "apply", name, "--network", "none", "--yes")
+    term = Term([*MANAGER, "tui"], 80, 24, env=camp.env, log=camp.log)
+    try:
+        assert term.wait_for(name, 30)
+        term.send(ENTER, 1)
+        absent = camp.docker("container", "inspect", f"ocs-{eid}", check=False)
+        assert absent.returncode != 0 and re.search(r"no such (container|object)", absent.stderr, re.IGNORECASE)
+        term.send("s", 1)
+        # pyte may retain cells from the dashboard's alternate screen around the shell output.
+        assert term.wait_for(r"root@[^\n]+#", 45), term.text()
+        term.send("printf '%s%s\\n' OCS_ SHELL_ATTACHED" + ENTER, 1)
+        assert term.wait_for("OCS_SHELL_ATTACHED", 15), term.text()
+        term.send("exit" + ENTER, 1)
+        assert term.wait_for("Session exited", 30)
+        term.send("q", 1)
+        assert term.exit_code() == 0 and term.restored()
+    finally:
+        term.close()
+    camp.delete(name)
+
+
 @pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGHUP])
 def test_cli_signal_ends_attached_shell(campaign, checks, sig):
     """H05: a graceful manager signal ends/reaps its real client and token-scoped shell."""

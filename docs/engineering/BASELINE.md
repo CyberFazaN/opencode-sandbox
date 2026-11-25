@@ -3,28 +3,29 @@
 Current checkout state and applicable recorded evidence, not a development diary. Commands and
 test-selection policy: [CONTRIBUTING](../../CONTRIBUTING.md#verification-policy). Design:
 [ARCHITECTURE](ARCHITECTURE.md). Release gates: [CAMPAIGN](CAMPAIGN.md) and [RELEASING](RELEASING.md).
-The current checkpoint below records fresh verification; older sections retain their stated scope.
+Recorded checks apply only to the code and configurations tested.
 
 ## Version
 
 | Item | Current state |
 |---|---|
-| Manager | `6.4.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.5.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
-| Schemas | Environment metadata 2, backup 3; other schema versions are refused, never migrated/deleted |
-| Images | Debian 13/default (`node:24-trixie`, revision 5); Arch rolling (`archlinux:base-devel`, revision 4) |
+| Schemas | Rootless metadata 2 and backup 3; rootful metadata 3 and backup 4. Unknown schemas are refused |
+| Images | Debian 13/default (`node:24-trixie`, revision 5); Arch rolling (`archlinux:base-devel`, revision 4); Kali rolling (`kalilinux/kali-rolling`, revision 2) |
 
-6.4.0 adds opt-in full-directory copies, clarifies workspace setup and Agent Context activation,
-and corrects the Debian/Arch launcher installation and the Arch AUR helper build. Environment and
-backup schemas are unchanged. Manager upgrades do not rebuild existing images or environments.
+6.5.0 adds Kali rolling, opt-in rootful Docker, runtime OpenCode availability checks and dashboard
+improvements. Rootless environment and backup schemas stay at 2 and 3. Rootful environments and
+backups use schemas 3 and 4. Manager upgrades do not rebuild existing images or environments.
 
 ## Supported environments
 
 - Intended host: Linux meeting [the prerequisites](../install.md#requirements); real Docker/OpenCode
   evidence is on Arch Linux only. Tested kernel 7.3.4, Git 2.56.1, own rootless Docker 29.10.0,
   RootlessKit 3.3.0/slirp4netns, overlayfs/containerd image store, cgroup v2 with CPU/memory/PIDs
-  delegated by systemd 262. Foreign/rootful/remote daemons and socket proxies are refused.
+  delegated by systemd 262. Foreign and remote daemons and socket proxies are refused.
+  Opted-in environments can use the authenticated local rootful daemon.
 - Python >=3.11: local 3.11.18 and 3.14.10; 3.12/3.13 accepted, not tested separately. Hosted CI
   uses Ubuntu 26.04 and Python 3.11/3.14, plus an unprivileged rolling Arch userland job.
 - Python 3.15 is stable ([upstream status](https://devguide.python.org/versions/)) and accepted by
@@ -32,10 +33,66 @@ backup schemas are unchanged. Manager upgrades do not rebuild existing images or
   current/lowest, installed-package/process verification and review of the required-check transition.
 - Current Typer/Textual 0.29.2/8.2.8; lowest direct versions 0.16.0/4.0.0. Test environment:
   pytest 9.2.0, pyte 0.8.2, Ruff 0.17.3, shellcheck 0.11.0; pipx 1.18.7.
-- OpenCode `@opencode/cli` 2.x only; 2.1.4 and 2.2.0 in the real campaign, and 2.3.2 in hosted
-  image builds for both distributions.
+- OpenCode `@opencode/cli` 2.x only. Versions 2.1.4 and 2.2.0 were exercised in the 6.5.0
+  campaign, and 2.3.2 in the earlier 6.4.0 hosted Debian and Arch image builds.
 
 ## Verification
+
+### 6.5.0 candidate qualification
+
+The installed product was packaged from `3521605`. Subsequent changes cover tests and release
+documentation. Local verification used an Arch Linux host and all three managed image definitions.
+
+| Layer | Result and scope |
+|---|---|
+| Local Python and dependency matrix | Each combination passed 2,440 tests with 140 real-campaign opt-in skips. Python 3.11 and 3.14 used current Typer/Textual 0.29.2/8.2.8 and minimum direct versions 0.16.0/4.0.0. The minimum pairs emitted two dependency deprecation warnings each. |
+| Packaging and private-tag pipx | Both Python endpoints passed sdist and wheel builds, strict Twine and content checks, private-tag installation and verified rootless `doctor`. All 78 installed product files matched the release source before adding the disposable test hook. |
+| Installed rootless campaign | All 140 collected cases passed across measured batches on the same product. Coverage includes all three packaged base definitions, retained Debian 12, real OpenCode with a fake provider, fault injection, real terminal sessions, installed-manager replacement, isolated socket activation and the privileged rows. |
+| Python 3.11 installed-manager floor | All eight cases passed, covering pipx lifecycle, both installation layouts, replacement and independent recovery, and session exclusion on all three images. |
+| Scoped rootful campaign | Debian, Arch and Kali passed opt-in, host identity, daemon separation, direct workspace and home ownership, in-container sudo, real OpenCode, system backup and restore across data directories, cleanup boundary checks, and interrupted recreation recovery. Each run restored the original rootful daemon inventory. |
+| Static and privacy checks | actionlint and offline zizmor passed. Gitleaks found no leaks in history or the tracked tree. The detect-secrets fingerprints matched the 13 previously reviewed dummy fixtures. Path, host, address, and email scans matched only known test data. |
+
+The two public `develop` commits preceding qualification failed the same hanging-version test on
+Ubuntu 26.04. Its `uutils timeout` exited while the probe pipeline still held its output pipes. The
+old test transport raised `TimeoutExpired` outside the product's diagnostic budget. The revised
+transport exercised that budget and reported `Unknown`. This was reproduced with Ubuntu's packaged
+utilities. A separate Kali integration failure returned 125 when the config helper's timeout ran as
+container PID 1. Docker init resolved it, and real Kali profile transfer and interruption recovery passed.
+
+Test updates covered the custom-image repair and refusal paths, daemon admission before metadata
+creation, keyboard focus in the discovery and policy dialogs, explicit Manager-tab selection,
+and pipx warning line wrapping. The first Arch base-image
+terminal build at 120×40 hit the real disk reserve. It passed on retry with more free space and
+the same reserve. Coverage was checked against the collection and counted only passed cases.
+B15 repeated same-boot refusal and independent recovery. The earlier 6.4.0 two-boot result remains
+the evidence for the unchanged post-boot path.
+
+### Focused backend and image verification
+
+Before qualification, focused rootful evidence on the disposable Arch host covered Debian and
+Kali daemon identity and separation, UID/GID and direct-bind ownership, container-local sudo,
+config copy/export, OpenCode update/rollback, system-image backup/restore, recreation and opt-in.
+
+Follow-up verification covered executable availability and bounded probes on real Debian/Arch
+rootless environments, a real dashboard shell attach, a rootful cleanup preview, and a local
+Kali revision 2 image build with `npm` and `npx` verification. The affected tests passed after
+the fixes, including selected minimum-dependency pilots. The qualification above records the
+subsequent release checks.
+
+### Published 6.4.0
+
+[6.4.0](https://github.com/CyberFazaN/opencode-sandbox/releases/tag/v6.4.0) was published on
+2026-11-20 as the stable GitHub release. The annotated `v6.4.0` tag targets the
+[PR #7](https://github.com/CyberFazaN/opencode-sandbox/pull/7) merge commit
+`bab5a3ef4a25ab22e7c870a1f6684f447a94afae`, whose tree matches the qualified `e34de12`.
+The ten [PR checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/44636192152),
+ten [main checks](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/44637846472) and
+14 [release jobs](https://github.com/CyberFazaN/opencode-sandbox/actions/runs/44642215091) all
+passed. The reviewed draft matched the tagged changelog; no binary assets were uploaded.
+
+Fresh public-tag pipx installations on Python 3.11 and 3.14 passed version/help, installation
+contracts, dependency health and rootless `doctor`. The source/tag/commit metadata and all 73
+product files matched the tag. No test hooks were present, and the Docker inventory was unchanged.
 
 ### 6.4.0 candidate qualification
 
@@ -59,8 +116,8 @@ passed the reserve-sensitive case but stopped at stale terminal test keystrokes.
 correction, the affected terminal file and remaining cases ran separately; neither failure was
 discarded or counted as a pass. General recovery of a running environment across a host reboot
 (D09, P2) remains untested; B15 tested the manager updater, not that environment scenario. No paid
-provider call was made. Protected release PR/main CI, tag workflow and public-tag verification are
-separate from candidate qualification. Detailed logs and manifests remain in ignored `.work/`.
+provider call was made. Candidate qualification is distinct from the completed publication gates
+recorded above. Detailed logs and manifests remain in ignored `.work/`.
 
 ### Published 6.3.0
 
@@ -411,13 +468,6 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 
 ## Unverified behaviour
 
-- **B15 post-reboot manager recovery:** actual execution is unverified; the owner **accepted the
-  release risk for 6.3.0 on 2026-11-04**, without testing or a reboot. Same-boot hard-interruption
-  refusal passed at both Python endpoints; original frozen inputs are retained, not reset/deleted.
-  On an explicitly authorized disposable VM, retain a named hard-interrupted operation and its
-  original frozen recovery inputs, reboot, manually repair only if needed, run that frozen
-  verifier and confirm startup/data retention. Never delete state/locks or infer success from an
-  empty old group, cache or installer exit.
 - **Host reboot generally (D09):** risk accepted for 6.3.0 on 2026-11-04, not executed. Daemon restart,
   stop/start and daemon-unit SIGKILL passed. Next: authorized reboot, then `start NAME` and
   `check NAME` on a manifested test environment; do not equate this with B15's separate proof.

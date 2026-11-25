@@ -1,4 +1,4 @@
-# Weekly (and on demand): build both base images from the Dockerfiles with the manager's own
+# Weekly (and on demand): build the managed base images from the Dockerfiles with the manager's own
 # build and image verification, to notice upstream breakage (base images, packages, OpenCode on
 # npm, the AUR helper) before users do. The images are not published (D-039, D-042).
 name: Images
@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distro: [debian, arch]
+        distro: [debian, arch, kali]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

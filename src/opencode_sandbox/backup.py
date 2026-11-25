@@ -13,9 +13,11 @@ import uuid
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
+from . import backends
 from . import core as c
 
 SCHEMA = 3
+ROOTFUL_SCHEMA = 4
 COMPONENTS = {'workspace.tar.gz', 'home.tar.gz', 'system-image.tar'}
 HOME_SKIPPED = '.home-skipped'  # helper's list of left-out sockets/FIFOs; removed before publication
 
@@ -172,6 +174,7 @@ def _volume_tar(m, dest, *, restore=False):
     """
     image=helper_image(m)
     staging=dest.parent.resolve()
+    rootful = backends.get(m) == backends.ROOTFUL
     if restore:
         _validate_archive(dest)
         command=['sh','-ec',
@@ -192,7 +195,9 @@ def _volume_tar(m, dest, *, restore=False):
              'find . ! -type p ! -type s -print0 > /tmp/ocs-home-files; '
              'tar --create --gzip --file=/staging/home.tar.gz '
              '--numeric-owner --acls --xattrs --xattrs-include="*" '
-             '--null --verbatim-files-from --no-recursion --files-from=/tmp/ocs-home-files')]
+             '--null --verbatim-files-from --no-recursion --files-from=/tmp/ocs-home-files'
+             + (f'; chmod 0600 /staging/home.tar.gz /staging/{HOME_SKIPPED}; '
+                f'chown {backends.user(m)} /staging/home.tar.gz /staging/{HOME_SKIPPED}' if rootful else ''))]
         c.docker('run','--rm','--network','none','--security-opt','no-new-privileges:true',*c.helper_labels('backup'),
                  '--user','0:0','--entrypoint',command[0],
                  '--mount',f'type=volume,src={c.volume(m)},dst=/data,readonly',
@@ -283,6 +288,7 @@ def backup_notes(target):
                          f"{'workspace' if part=='workspace' else 'home volume'} (recreated by the programs that use them): {listed}")
     return notes
 
+@backends.environment
 def backup(m,destination=None,*,include_system=True,stop_running=False,include_workspace=None):
     """`include_workspace` defaults to True for managed and False for direct workspaces (D-012):
     a direct workspace is the user's own directory, normally covered by the user's own backups."""
@@ -350,9 +356,11 @@ def backup(m,destination=None,*,include_system=True,stop_running=False,include_w
                     files.append('system-image.tar')
                 finally: c.docker('image','rm',tag,capture=True,check=False)
             from . import __version__, agent_context
-            manifest={'format':'opencode-sandbox-backup','schema':SCHEMA,'manager_version':__version__,'created':c.now(),
+            manifest={'format':'opencode-sandbox-backup','schema':ROOTFUL_SCHEMA if backends.get(m) == backends.ROOTFUL else SCHEMA,'manager_version':__version__,'created':c.now(),
                       'environment':{**{k:m.get(k) for k in ('id','name','kind','source','base_commit','profile','opencode_policy','opencode_pin','distro','agent_context_enabled','opencode_config_source')},
                                       'custom_image':c.custom_image(m),
+                                      **({'backend': backends.ROOTFUL, 'identity': m['identity']}
+                                         if backends.get(m) == backends.ROOTFUL else {}),
                                       'agent_context_enabled':agent_context.enabled(m),
                                      'runtime':c.runtime_settings(m)},
                       'workspace':{'mode':mode,'included':include_workspace},
@@ -379,9 +387,14 @@ def verify(path):
     if not isinstance(manifest,dict): raise c.SandboxError('Invalid backup manifest: not a JSON object')
     if manifest.get('format')!='opencode-sandbox-backup':
         raise c.SandboxError('Unsupported backup format')
-    if manifest.get('schema')!=SCHEMA:
+    environment = manifest.get('environment')
+    backend = backends.get(environment) if isinstance(environment, dict) else backends.ROOTLESS
+    if backend not in backends.NAMES or (backend == backends.ROOTFUL and not backends.valid_identity(environment.get('identity'))):
+        raise c.SandboxError('Invalid backup Docker backend or runtime identity')
+    expected_schema = ROOTFUL_SCHEMA if backend == backends.ROOTFUL else SCHEMA
+    if manifest.get('schema') != expected_schema:
         # Other schemas are not migrated (D-002).
-        raise c.SandboxError(f"Unsupported backup schema {manifest.get('schema')!r} (expected {SCHEMA}); "
+        raise c.SandboxError(f"Unsupported backup schema {manifest.get('schema')!r} (expected {expected_schema}); "
                              'this version cannot restore it')
     files=manifest.get('files',{})
     workspace=manifest.get('workspace')
@@ -465,6 +478,7 @@ def prune(directory=None,*,keep=5,dry_run=True,on_delete=None):
             if on_delete: on_delete(p)
     return selected, skipped
 
+@backends.environment
 def _restore_into(m, root, manifest, *, restore_system=True):
     """Staged restore: publish only after workspace, volume and image succeed.
 
@@ -532,7 +546,8 @@ def _adopt_image(m, loaded, *, untag):
     ocs-backup:<id>-<hex> and removed; the loaded tag is removed when this restore created it.
     The container has the environment's name, so an interrupted restore's rollback removes it."""
     tag=f'ocs-backup:{m["id"]}-{c.secrets.token_hex(5)}'
-    c.docker('create','--pull','never','--network','none','--name',c.cname(m),*c.labels(m['id']),loaded,capture=True)
+    identity = ('--user', backends.user(m)) if backends.get(m) == backends.ROOTFUL else ()
+    c.docker('create','--pull','never','--network','none','--name',c.cname(m),*identity,*c.labels(m['id']),loaded,capture=True)
     try:
         c.docker('commit',c.cname(m),tag,capture=True)
         m['image']=tag
@@ -546,6 +561,14 @@ def restore(path,name,*,restore_system=True):
     root=Path(path).expanduser().resolve(strict=True)
     manifest=verify(root)
     c.safe_name(name)
+    env = manifest.get('environment', {})
+    with backends.use(backends.get(env)):
+        if backends.get(env) == backends.ROOTFUL and env.get('identity') != backends.host_identity():
+            raise c.SandboxError('Restore needs the original rootful username, UID and primary GID')
+        return _restore(root, manifest, name, restore_system=restore_system)
+
+
+def _restore(root, manifest, name, *, restore_system):
     c.ensure_runtime(False)
     env=manifest.get('environment',{})
     kind=env.get('kind','scratch')
@@ -575,7 +598,8 @@ def restore(path,name,*,restore_system=True):
              'restore_stage':'initial'}
     # The home volume carries the independent global config; never re-import its source.
     m=c.create(name,kind='scratch',profile=settings['profile'],distro=settings['distro'],image=settings['custom_image'],
-               journal=journal)
+               journal=journal, backend=backends.get(env),
+               _restore_system_image=restore_system and "system-image.tar" in manifest["files"])
     # A failure is recorded by _restore_into under the lock, only for this restore's journal; a
     # refusal before it leaves the journal as it is.
     return _restore_into(m,root,manifest,restore_system=restore_system)
@@ -628,6 +652,9 @@ def resume_restore(m):
         raise c.SandboxError('Not an interrupted restore')
     root=Path(m.get('restored_from',''))
     manifest=verify(root)
+    archived = manifest.get('environment', {})
+    if backends.get(archived) != backends.get(m) or archived.get('identity') != m.get('identity'):
+        raise c.SandboxError('Backup backend or identity changed since the restore was started')
     return _restore_into(m,root,manifest,restore_system=m.get('restore_system',True))
 
 def rollback_restore(m):
@@ -647,6 +674,7 @@ def check_restored(m):
     if m.get('status') not in ('ready','stopped','running'):
         raise c.SandboxError('Environment is not ready for validation')
     c.start(m)
-    p=c.docker('exec',c.cname(m),'sh','-c','set -eu; test -d /workspace; test -d /root; test -w /workspace; test -w /root; command -v opencode >/dev/null; opencode --version >/dev/null',capture=True,check=False)
+    with backends.use(backends.get(m)):
+        p=c.docker('exec',c.cname(m),'sh','-c','set -eu; test -d /workspace; test -d "$HOME"; test -w /workspace; test -w "$HOME"',capture=True,check=False)
     if p.returncode: raise c.SandboxError('Restored container smoke check failed')
     return True

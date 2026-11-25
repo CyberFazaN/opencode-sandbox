@@ -12,11 +12,12 @@ import os
 import tempfile
 from pathlib import Path
 
-from . import distros, workspaces
+from . import backends, distros, workspaces
 
 CONTAINER_DIR = "/run/ocs-agent"
 CONTAINER_PATH = CONTAINER_DIR + "/context.md"
 SYSTEM_CONFIG = "/etc/opencode/opencode.json"
+AVAILABILITY_LINE = "- OpenCode availability when this guidance was generated: "
 
 
 def enabled(m):
@@ -83,6 +84,7 @@ if updated!=document or not os.path.exists(path):
 '''
 
 
+@backends.environment
 def reconcile(m, *, include=None):
     """Locked, running-container reconciliation. Failure prevents managed OpenCode launch."""
     import inspect
@@ -101,7 +103,7 @@ OBSERVED = (("network", "network"), ("cpus", "CPU limit"), ("memory", "memory li
 
 
 def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
-           definition: distros.ImageDefinition | None = None) -> str:
+           definition: distros.ImageDefinition | None = None, opencode_status: str = "Unknown") -> str:
     """Describe only what the manager configures or verifies for this environment.
 
     `runtime` is the configured runtime; `observed` the same keys as Docker reports them for
@@ -122,7 +124,11 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
         "", "## Container, user and privileges",
         "- Container image: " + image,
     ]
-    if distro:
+    rootful = backends.get(m) == backends.ROOTFUL
+    if rootful:
+        lines += [f"- Docker backend and runtime identity: {backends.describe(m)}.",
+                  "- You can use passwordless sudo inside the container. Root commands can change host ownership on writable bind mounts."]
+    elif distro:
         lines.append("- You run as root (UID 0) in the container. Rootless Docker maps it to the host user who owns this "
                      "sandbox: files you create in /workspace belong to that user on the host. Other container users "
                      "map to unprivileged subordinate IDs, so files they create there may not be editable on the host.")
@@ -130,14 +136,14 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
         lines.append("- The container user is defined by the custom image. Rootless Docker maps container UID 0 to the "
                      "host user who owns this sandbox and other UIDs to unprivileged subordinate IDs.")
     lines += [
-        "- The container runs with no-new-privileges: sudo and setuid programs cannot raise privileges. Container root is not root on the host.",
+        *([] if rootful else ["- The container runs with no-new-privileges: sudo and setuid programs cannot raise privileges. Container root is not root on the host."]),
         ("- There is no Docker socket and no host package manager in the container. "
          "Do not try to manage the host, the Docker daemon, hardware or system services."),
         "- Do not assume access to GPU, USB, cameras or audio.",
         "", "## Workspace and persistence",
         f"- Environment: {m['name']} ({m['kind']}). Working directory: /workspace. Work on project files here.",
         *workspace_lines(m),
-        ("- The workspace and the persistent /root Docker volume (OpenCode state, user data) survive stopping, "
+        (f"- The workspace and the persistent {backends.home(m)} Docker volume (OpenCode state, user data) survive stopping, "
          "recreating and reconfiguring the container."),
         ("- Packages and files elsewhere live in the container's system layer: kept across stop/start, recreation and "
          "runtime changes, but lost when the user restores a backup without it. Do not assume they are permanent."),
@@ -164,8 +170,11 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
     if distro:
         if definition is not None and definition.matches(distro):
             current = definition.version == distro.version and definition.revision == distro.revision
-            lines += ["", f"## Operating system ({distro.name} {definition.version})",
-                      *distro.context_lines(version=definition.version, include_tools=current)]
+            system = distro.context_lines(version=definition.version, include_tools=current)
+            if rootful:
+                system = [line.replace(", and sudo cannot raise privileges here", "")
+                          .replace("`ocs-aur ", "`sudo ocs-aur ").replace(" (as root)", "") for line in system]
+            lines += ["", f"## Operating system ({distro.name} {definition.version})", *system]
         else:
             lines += ["", "## Operating system",
                       f"- Configured managed distribution: {distro.name}; base OS version and installed tools are unknown (image not inspected or labels unavailable)."]
@@ -176,11 +185,12 @@ def render(m: dict, *, image: str, runtime: dict, observed: dict | None = None,
         lines += ["", "## Operating system",
                   "- Custom image: installed tools, OS and package manager are unknown; inspect only when needed."]
     lines += ["", "## Working behavior",
+              *([f"{AVAILABILITY_LINE}{opencode_status}."] if opencode_status != "Unknown" else []),
               "- Start with the user's task; avoid a full system inventory or repeated probing.",
               "- If a dependency is missing, explain the required change; use container-local installation only when appropriate and permitted.",
               "- Never attempt to bypass container boundaries or reconfigure the host.",
               ("- OpenCode's own update check is off in this container (OPENCODE_DISABLE_AUTOUPDATE=1): the sandbox "
-               "manager on the host installs and updates OpenCode. Do not run `opencode upgrade`."),
+               "manager on the host installs and updates OpenCode in managed images. Do not run `opencode upgrade`."),
               "- Follow project AGENTS.md instructions in addition to this environment guidance.", ""]
     return "\n".join(lines)
 
@@ -217,10 +227,10 @@ def path(m: dict, env_dir) -> Path:
 
 
 def refresh(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None,
-            definition: distros.ImageDefinition | None = None) -> Path:
+            definition: distros.ImageDefinition | None = None, opencode_status: str = "Unknown") -> Path:
     target = path(m, env_dir)
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    contents = render(m, image=image, runtime=runtime, observed=observed, definition=definition)
+    contents = render(m, image=image, runtime=runtime, observed=observed, definition=definition, opencode_status=opencode_status)
     fd, tmp = tempfile.mkstemp(prefix=".agent-context-", dir=target.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -236,7 +246,13 @@ def refresh(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | Non
 
 
 def verify(m: dict, env_dir, *, image: str, runtime: dict, observed: dict | None = None,
-           definition: distros.ImageDefinition | None = None) -> bool:
+           definition: distros.ImageDefinition | None = None, opencode_status: str = "Unknown") -> bool:
     target = path(m, env_dir)
-    expected = render(m, image=image, runtime=runtime, observed=observed, definition=definition)
-    return target.is_file() and not target.is_symlink() and target.read_text(encoding="utf-8") == expected
+    expected = render(m, image=image, runtime=runtime, observed=observed, definition=definition, opencode_status=opencode_status)
+    if not target.is_file() or target.is_symlink():
+        return False
+    # Availability is a point-in-time observation, separate from configuration drift.
+    def settings(text):
+        return [line for line in text.splitlines() if not line.startswith(AVAILABILITY_LINE)]
+
+    return settings(target.read_text(encoding="utf-8")) == settings(expected)

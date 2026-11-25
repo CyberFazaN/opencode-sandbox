@@ -3,6 +3,8 @@ system config; managed launches regenerate it and use a private (`--standalone`)
 import json
 from types import SimpleNamespace
 
+from docker_fixtures import start_transport
+
 from opencode_sandbox import agent_context as ac
 from opencode_sandbox import core as c
 
@@ -18,6 +20,7 @@ def test_interactive_refreshes_verified_guidance_before_launch(monkeypatch):
     m = c.create("ocs-qa-ac", "scratch")
     commands = []
     monkeypatch.setattr(c, "start", lambda m: None)
+    monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "observed_runtime", lambda m: None)
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "profile_mismatch", lambda m: None)
@@ -50,7 +53,7 @@ def test_start_mounts_the_guidance_directory_read_only(monkeypatch):
     monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
     monkeypatch.setattr(c, "port_conflicts", lambda m, r: [])
-    monkeypatch.setattr(c, "docker", lambda *a, **k: calls.append(a) or SimpleNamespace(returncode=0, stdout="", stderr=""))
+    monkeypatch.setattr(c, "docker", start_transport(calls))
     c.start(m)
     run = next(a for a in calls if a[0] == "run")
     mount = f"type=bind,src={ac.directory(m, c.env_dir)},dst={ac.CONTAINER_DIR},readonly"

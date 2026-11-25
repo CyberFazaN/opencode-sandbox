@@ -47,7 +47,7 @@ Present a concise proposal containing:
 - Incomplete work, compatibility concerns, blockers, residual risks and required risk acceptance.
 - The validation and release plan under RELEASING, including branch/PR integration and automation
   handoffs. Identify required permissions for tests, pushes, remote PR/merge or ruleset changes,
-  maintainer-created tags and GitHub Release publication; distinguish requested from granted steps.
+  tag creation/push and GitHub Release publication; distinguish requested from granted steps.
 
 **STOP and explicitly ask: "Do you approve version X.Y.Z and this release plan?" Wait for the
 owner's answer before making any release-related changes.** Before that approval, do not create
@@ -56,9 +56,9 @@ merge, push, tag, change remote settings or publish anything.
 
 Version/plan approval authorizes only the stated scope and explicitly approved operations; it
 does not replace the separate permissions required by AGENTS and RELEASING. Ask before any
-operation not yet authorized and hand maintainer-only steps to the maintainer. If the proposed
-version or release scope changes materially, **STOP and request renewed approval** of the revised
-version and plan. Do not silently include newer `develop` commits or unapproved fixes.
+operation not yet authorized. If the proposed version or release scope changes materially,
+**STOP and request renewed approval** of the revised version and plan. Do not silently include
+newer `develop` commits or unapproved fixes.
 
 ## 3. Execute only the approved plan
 
@@ -69,7 +69,8 @@ version and plan. Do not silently include newer `develop` commits or unapproved 
 - Use the documented protected release PR and merge-commit integration into `main`, with required
   reviews, resolved discussions and CI gates. Verify the current required-check configuration;
   request authorized maintainer action for stale checks, never bypass or weaken safeguards. Wait
-  for the required `main` checks and hand release-tag creation to the maintainer as documented.
+  for the required `main` checks. Hand tagging to the maintainer unless the owner explicitly
+  authorizes the agent to create and push the annotated tag for the exact version and commit.
 - Respect the tag-triggered release automation: wait for its checks and generated draft, review
   that draft and publish only with explicit publication authorization. Inspect existing runs/drafts
   before resuming so no publication step is duplicated. Do not create a competing release or add

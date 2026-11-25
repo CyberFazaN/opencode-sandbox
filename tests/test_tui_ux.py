@@ -8,7 +8,7 @@ import test_environment_updates_tui
 import test_updates_tui
 from test_tui import run, settle
 from test_updates_tui import until
-from textual.widgets import Button, Checkbox, Input, TextArea
+from textual.widgets import Button, Checkbox, Input, Select, TextArea
 
 from opencode_sandbox import clipboard, preferences, tui
 from opencode_sandbox import core as c
@@ -51,7 +51,10 @@ def test_preference_is_opt_in_backward_compatible_and_saved():
         await pilot.press('g')
         box = app.screen.query_one('#copy-selected-text', Checkbox)
         assert not box.value
-        box.value = True
+        assert box.render().plain.startswith('[ ]')
+        box.focus()
+        await pilot.press('space')
+        assert box.value and box.render().plain.startswith('[x]')
         app.screen.query_one('#save-settings', Button).press()
         await pilot.pause()
         assert preferences.read()['copy_selected_text'] and app._copy_selected
@@ -71,6 +74,76 @@ def test_advisories_do_not_obscure_confirmation_controls():
         for button in app.screen.query(Button): assert button.region.bottom <= 24
         await pilot.press('escape')
         assert len(app.screen_stack) == 1
+    run(test, (80, 24))
+
+
+@pytest.mark.parametrize("size", [(60, 18), (80, 24), (120, 40)])
+def test_long_confirmation_can_scroll_with_actions_visible(monkeypatch, size):
+    monkeypatch.setattr(tui.Dashboard, "_prerequisites_worker", lambda self, *_: None)
+    message = "\n".join(f"Settings plan line {index}" for index in range(60))
+
+    async def test(app, pilot):
+        results = []
+        await app.push_screen(tui.ConfirmScreen(message, action_label="Apply settings"), results.append)
+        await pilot.pause()
+        screen = app.screen
+        body = screen.query_one("#confirm-review")
+        buttons = list(screen.query(Button))
+        assert app.focused.id == "cancel"
+        assert all(screen.region.contains_region(button.region) for button in buttons)
+        assert "Page Down" in str(screen.query_one("#confirm-panel").border_subtitle)
+        await pilot.press("pagedown")
+        await until(pilot, lambda: body.scroll_y > 0)
+        assert app.focused.id == "cancel"
+        await pilot.press("tab")
+        assert app.focused.id == "confirm"
+        assert all(screen.region.contains_region(button.region) for button in buttons)
+        await pilot.press("escape")
+        assert results == [False]
+
+    run(test, size)
+
+
+def test_compact_dashboard_and_expanded_form_keep_actions_visible(monkeypatch):
+    from opencode_sandbox import opencode_configs
+
+    monkeypatch.setattr(tui.Dashboard, "_prerequisites_worker", lambda self, *_: None)
+    monkeypatch.setattr(opencode_configs, "profiles", lambda: [f"profile-{i:02d}" for i in range(16)])
+    c.create("ocs-test-compact-details")
+
+    async def test(app, pilot):
+        await pilot.resize_terminal(60, 18)
+        await pilot.pause()
+        dashboard = app.screen
+        assert dashboard.query_one("#envs").region.height >= 3
+        assert all(dashboard.region.contains_region(button.region) for button in dashboard.query(Button))
+        pane = dashboard.query_one("#details-pane")
+        await pilot.press("tab")
+        assert pane.has_focus and pane.max_scroll_y > 0
+        await pilot.press("end")
+        await until(pilot, lambda: pane.scroll_y == pane.max_scroll_y)
+        await pilot.press("n")
+        screen = app.screen
+        screen.query_one("#kind", Select).value = "project"
+        screen.query_one("#more").collapsed = False
+        screen.query_one("#oc-config-mode", Select).value = "copy"
+        await pilot.pause()
+        for button in screen.query(Button):
+            assert screen.region.contains_region(button.region)
+        profile = screen.query_one("#oc-config-profile", Select)
+        profile.focus()
+        await pilot.pause()
+        await pilot.press("enter")
+        popup = screen.query_one("#oc-config-profile SelectOverlay")
+        assert 0 < popup.region.height <= 7 and screen.region.contains_region(popup.region)
+        await pilot.press("end", "enter")
+        assert profile.value == "profile-15"
+        await pilot.press("escape")
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+        assert app.screen is dashboard
+        assert not dashboard.query_one("#details-pane").can_focus
+
     run(test, (80, 24))
 
 
@@ -159,7 +232,9 @@ def test_manual_command_is_exact_and_only_for_fresh_verified_ownership(monkeypat
         await app.push_screen(ManualUpdateScreen(message, command))
         await pilot.pause()
         assert app.focused.id == 'manual-update-cancel'
-        app.screen.query_one('#manual-update-confirm', Button).press()
+        button = app.screen.query_one('#manual-update-confirm', Button)
+        assert str(button.label) == 'Copy command'
+        button.press()
         await pilot.pause()
         assert copied == [command] and len(app.screen_stack) == 1 and not app._operation_pending
     run(test, (80, 24))

@@ -10,6 +10,7 @@ import json
 import re
 import secrets
 
+from . import backends
 from . import core as c
 
 EXEC_TIMEOUT = 5.0
@@ -34,6 +35,7 @@ def _result(p, timeout):
     return p
 
 
+@backends.environment
 def exec(m, *argv, timeout=None, container_id=None):
     timeout = EXEC_TIMEOUT if timeout is None else timeout
     with c.diagnostic_timeout(timeout + CLIENT_GRACE):
@@ -73,7 +75,9 @@ def image(image, *argv, timeout=None):
     command = _command(argv, timeout)
     try:
         with c.diagnostic_timeout(timeout + CLIENT_GRACE):
-            p = c.docker("run", "--rm", "--pull", "never", "--name", name, "--network", "none",
+            # GNU timeout needs its own process group. Docker's init keeps it from
+            # becoming PID 1 (where some versions of timeout exit 125).
+            p = c.docker("run", "--rm", "--init", "--pull", "never", "--name", name, "--network", "none",
                          "--security-opt", "no-new-privileges:true", *c.helper_labels("diagnostic"),
                          "--label", f"{LABEL}={token}", "--entrypoint", command[0], image,
                          *command[1:], capture=True, check=False)

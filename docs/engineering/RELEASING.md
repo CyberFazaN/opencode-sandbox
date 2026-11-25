@@ -3,7 +3,8 @@
 A release is a version tag `vX.Y.Z` on `main` and a GitHub Release whose notes are the version's
 `CHANGELOG.md` section. Users install it with
 `pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@vX.Y.Z` (D-042); nothing is
-uploaded to a package index, and no wheels are attached. Only the maintainer creates tags.
+uploaded to a package index, and no wheels are attached. The maintainer creates the tag unless
+the owner explicitly delegates tagging to an agent under the procedure below.
 
 `main` is the published stable line; `develop` holds unreleased work (D-058). Ordinary development
 and its documentation never land directly on `main`. Verify the current branch and clean/preserved
@@ -19,7 +20,8 @@ the `main` pull-request ruleset. It is not standing permission to perform those 
 2. Set `__version__` in `src/opencode_sandbox/__init__.py` (the single source, D-001).
 3. In `CHANGELOG.md`, rename "Unreleased" to `X.Y.Z — YYYY-MM-DD` and check the entries.
 4. Replace the release tag in the install commands of `README.md` and `docs/install.md`
-   (`@vX.Y.Z`); `tests/test_user_docs.py` fails until they name the new version.
+   (`@vX.Y.Z`); `tests/test_user_docs.py` fails until they name the new version. Update the
+   supported version in `SECURITY.md`.
 5. Update the tested versions in `README.md` ("Tested environment") and `BASELINE.md`
    ("Supported environments") if the test platform changed. Review the user guides against the
    approved candidate so the source and documentation integrated into `main` match the release.
@@ -57,9 +59,9 @@ campaign against disposable installed test venvs whose site-packages carry a tes
 that sets `distros.REPOSITORY` to an `ocs-test-*` name from `OCS_TEST_IMAGE_REPOSITORY`; the
 product has no such override and the hook must never ship. Put the hook into the installed
 manager's venv and into the runner venv (its helper snippets read the same namespace); the
-runner also needs `pyte` and `pipx`. Build both base images into that namespace before the run
+runner also needs `pyte` and `pipx`. Build the selected base images into that namespace before the run
 (the campaign compares the tagged images before and after) and remove them afterwards. Run the
-both-image gates on the selected release tree.
+image gates on the selected release tree.
 
 ```sh
 OCS_TEST_DOCKER=1 OCS_TEST_PRIVILEGED=1 OCS_TEST_PIPX_BUILD=1 \
@@ -71,8 +73,9 @@ C10's extra opt-in authorizes temporary `ocs-test-act-*` user units and a separa
 rootless daemon, not a restart of the existing daemon. It needs `dockerd-rootless.sh` and
 `rootlesskit` on PATH, a working user systemd manager/runtime unit directory, and the campaign's
 run-owned Ubuntu/Python custom-image fixture (built from the existing `ubuntu:24.04`, never
-replacing that tag). Managed starts require Python and GNU timeout even for custom images;
-the unprepared-image row separately verifies refusal. The runtime unit directory `$XDG_RUNTIME_DIR/systemd/user`
+replacing that tag). Custom images need Python and GNU timeout for Agent Context reconciliation.
+The unprepared-image row verifies the repair warning when OpenCode is absent and refusal when
+OpenCode is present. The runtime unit directory `$XDG_RUNTIME_DIR/systemd/user`
 is volatile and absent after a reboot until something creates it; create it empty for the run
 and remove it afterwards. The row re-establishes cold state before each manager call;
 the campaign's initial doctor cannot count as cold-start evidence. Without this opt-in C10
@@ -80,7 +83,11 @@ skips and is not a PASS. `test_36_socket_activation.py` records and cleans only 
 runtime directory, isolated Docker objects and manager data; read its scope before granting it.
 
 Also run the campaign against a pipx installation of a local test tag (`OCS_TEST_MANAGER`, see
-`BASELINE.md`). Record the results in `BASELINE.md` ("Verification") and the status column of
+`BASELINE.md`). Rootless campaign results do not qualify rootful. For changes that include
+rootful, record separate authorized real evidence for the affected boundary and lifecycle paths:
+opt-in and identity refusal, daemon separation, workspace/home ownership, backup and recovery,
+and cleanup across data directories. Record scope and gaps per image/backend.
+Record the results in `BASELINE.md` ("Verification") and the status column of
 `CAMPAIGN.md`. Release only when every P0 and P1 row is PASS with real evidence, or BLOCKED with
 an accepted risk and a reproducible next step (`AGENTS.md`, "Release rule"). New defects: fix
 them with a regression test and re-run the affected layers.
@@ -101,10 +108,14 @@ rootlesskit's `10.0.2.2` and `example.invalid`/`example.org` addresses are expec
    publish that integration through the protected workflow and wait for CI on `main`. Do not
    bypass safeguards or include unreviewed development. No ordinary `develop` push creates a
    release: `.github/workflows/release.yml` accepts pushed version tags only.
-2. Create and push an annotated tag on that merge commit:
+2. After the required `main` checks pass, confirm the approved merge commit and that the tag
+   does not already exist locally or remotely. The maintainer creates and pushes the annotated
+   tag, or the owner explicitly authorizes an agent to create and push it for the exact version
+   and commit. Approval to prepare or merge the release does not authorize tagging, and tagging
+   does not authorize publication. Use the verified merge commit explicitly:
 
    ```sh
-   git tag -a vX.Y.Z -m "OpenCode Sandbox X.Y.Z"
+   git tag -a vX.Y.Z VERIFIED_MAIN_MERGE_COMMIT -m "OpenCode Sandbox X.Y.Z"
    git push origin vX.Y.Z
    ```
 

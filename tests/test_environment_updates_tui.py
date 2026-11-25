@@ -12,8 +12,8 @@ from test_updates_tui import until
 from textual.widgets import Button, Checkbox, Input, Select, Static, TextArea
 
 from opencode_sandbox import core as c
+from opencode_sandbox import distros, readiness, updates
 from opencode_sandbox import opencode_versions as v
-from opencode_sandbox import readiness, updates
 from opencode_sandbox.environment_updates_tui import (
     EnvironmentConsentScreen,
     PolicyScreen,
@@ -61,11 +61,9 @@ def test_subscreen_and_unmounted_table_events_do_not_reach_dashboard_selection(s
         table = app.screen.query_one('#updates-table')
         monkeypatch.setattr(app, 'update_details', lambda: calls.append('dashboard details'))
         app.on_data_table_row_highlighted(SimpleNamespace(data_table=table))
-        app.on_data_table_row_selected(SimpleNamespace(data_table=table))
         assert calls == []
         unmounted = SimpleNamespace(id='envs', is_mounted=False)
         app.on_data_table_row_highlighted(SimpleNamespace(data_table=unmounted))
-        app.on_data_table_row_selected(SimpleNamespace(data_table=unmounted))
         assert calls == []
     run(test, (80, 24))
 
@@ -125,7 +123,7 @@ def test_system_package_checkbox_is_off_by_default_and_binds_consent_and_executi
         await until(pilot, lambda: not app._operation_pending and screen.operation_result)
         assert screen.operation_result.startswith('System package upgrade and OpenCode update complete; stopped.')
         ops = kinds(runtime)
-        assert seen == ['debian'] and ops.index('upgrade') < ops.index('install') and not runtime.running
+        assert seen == [distros.get('debian').system_upgrade] and ops.index('upgrade') < ops.index('install') and not runtime.running
     run(test, size)
 
 
@@ -226,7 +224,10 @@ def test_policy_and_pin_require_separate_consent_without_installation(sources, r
         screen = app.screen_stack[-2]
         assert isinstance(app.screen, PolicyScreen)
         app.screen.query_one('#opencode-policy', Select).value = mode
-        app.screen.query_one('#opencode-pin', Input).value = pin or ''
+        await pilot.pause()
+        pin_field = app.screen.query_one('#opencode-pin', Input)
+        assert pin_field.disabled is (mode != 'pinned')
+        pin_field.value = pin or ''
         app.screen.query_one('#policy-review', Button).press()
         await until(pilot, lambda: isinstance(app.screen, EnvironmentConsentScreen))
         await pilot.pause()

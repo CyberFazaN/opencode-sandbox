@@ -56,15 +56,15 @@ def test_unknown_container_is_not_a_claim(env, monkeypatch):
 
 def launcher(monkeypatch, tmp_path, m, show="os.environ.get('QA_KEY')"):
     """Capture the real launcher script from interactive() and run it on the host with redirected paths."""
-    seen = {}
+    seen = []
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "start", lambda m: None)
     monkeypatch.setattr(c, "observed_runtime", lambda m: None)
     monkeypatch.setattr(c, "image_definition", lambda m, **k: None)  # isolate the launcher, not Docker observation
     monkeypatch.setattr(c, "profile_mismatch", lambda m: None)
-    monkeypatch.setattr(c, "docker", lambda *a, **k: seen.setdefault("argv", a) and SimpleNamespace(returncode=0))
+    monkeypatch.setattr(c, "docker", lambda *a, **k: seen.append(a) or SimpleNamespace(returncode=0, stdout=""))
     c.interactive(m)
-    argv = seen["argv"]
+    argv = next(a for a in seen if a[:2] == ("exec", "-it"))
     i = argv.index("-c")
     script, context = argv[i + 1], argv[i + 3]
     profile = tmp_path / "ocs-provider.json"

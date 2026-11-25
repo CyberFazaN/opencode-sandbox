@@ -2,14 +2,14 @@
 
 | Guide | Contents |
 |---|---|
-| [install.md](install.md) | Requirements; installing, upgrading and uninstalling with pipx; preparing rootless Docker and the base images; installing from a source checkout |
+| [install.md](install.md) | Requirements; installing, upgrading and uninstalling with pipx; preparing Docker and building base images |
 | [getting-started.md](getting-started.md) | From `doctor` to a first OpenCode session and back to your repository |
 | [concepts.md](concepts.md) | Terms, where data lives, names, labels, environment variables |
 | [workspaces.md](workspaces.md) | Environment kinds, managed and direct workspaces, distributions, initial config |
 | [opencode-configs.md](opencode-configs.md) | User-maintained profiles, global-config host exports, Apply/Reload/Empty and recovery |
 | [providers.md](providers.md) | Provider profiles and model credentials |
-| [settings.md](settings.md) | Resource limits, network modes, published ports, the change plan |
-| [opencode.md](opencode.md) | Sessions, the Agent Context, OpenCode versions and updates |
+| [settings.md](settings.md) | Docker backend, resource limits, network modes, published ports, the change plan |
+| [opencode.md](opencode.md) | Sessions, executable availability, Agent Context, versions and updates |
 | [backup.md](backup.md) | Backups, restores, snapshots, recreation |
 | [changes.md](changes.md) | Reviewing and transferring the agent's changes with Git |
 | [maintenance.md](maintenance.md) | Readiness checks, recovery, disk usage and cleanup |

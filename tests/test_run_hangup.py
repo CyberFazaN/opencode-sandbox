@@ -44,7 +44,7 @@ def test_signal_while_running_hangs_up_exactly_this_session(env, monkeypatch):
     monkeypatch.setattr(c, "docker", recorder(calls, interrupted))
     with pytest.raises(SystemExit):
         c.interactive(env)
-    token = calls[0][-2]
+    token = next(a for a in calls if a[:2] == ("exec", "-it"))[-2]
     assert len(token) == 16 and hangups(calls) == [("exec", c.cname(env), "sh", "-c", c.HANGUP, "ocs-hangup", token)]
 
 
@@ -120,7 +120,7 @@ import signal
 from opencode_sandbox.cli import _exit_on_signal
 signal.signal(signal.SIGTERM, _exit_on_signal)
 signal.signal(signal.SIGHUP, _exit_on_signal)
-m = c.create("ocs-qa-wd", "scratch")
+m = c.create("ocs-qa-wd", "scratch", image="example.invalid/ocs-test-watchdog:1")
 sys.exit(c.interactive(m))
 """
 

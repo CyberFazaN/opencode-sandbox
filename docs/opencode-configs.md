@@ -29,7 +29,8 @@ explicit Reload if replacement is wanted. Later transfer helpers never re-seed t
 
 ## What is copied
 
-Every operation covers the **entire global/local `/root/.config/opencode/` tree**, including files
+Every operation covers the **entire global/local config tree**: `/root/.config/opencode/` on
+rootless, `/home/ocs/.config/opencode/` on rootful. This includes files
 beyond `opencode.json(c)`, `cli.json`, plugins/dependencies and runtime-generated files. Reload
 and Empty can therefore lose credentials or local state stored **in this tree**.
 
@@ -138,11 +139,11 @@ for manual inspection, not guessed away. Recovery does not invent a new export b
 or review subsequent drift. Container helpers serialize on a volume lock even if their host client
 dies. If Docker is unavailable, wait for the named helper to end and retry recovery; do not manually
 remove volume transaction files or locks while it may still run.
-The private transaction boundary is `/root/.config/.ocs-occonfig-transaction/`, outside the editable
-global tree. Its identity/commit marker is retained until old-tree cleanup finishes, so interrupted
+The private transaction boundary is `.config/.ocs-occonfig-transaction/` in the home volume,
+outside the editable global tree. Its identity/commit marker is retained until old-tree cleanup finishes, so interrupted
 cleanup can resume too; an unmarked, empty reserved stage contains no user data and is safely removed.
 
 Manager locks coordinate manager actions, **not OpenCode or arbitrary in-container writers**.
 Stable sampling and final digest checks detect concurrent changes but cannot freeze a malicious
-same-UID process. Prefer applying/reloading while stopped. Existing `/root` backups include the
+same-UID process. Prefer applying/reloading while stopped. Home-volume backups include the
 independent global tree; source profiles and temporary exports are not included.

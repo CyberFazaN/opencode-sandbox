@@ -11,6 +11,11 @@ The dashboard is usable at 80x24 and larger. Focus starts on the environment tab
 of buttons acts on the manager as a whole, the bottom rows on the selected environment. The
 details pane shows the selected environment's state, workspace, distribution, provider profile,
 settings, last readiness result and last error.
+In a shorter terminal the details pane shrinks to leave room for the table and action rows.
+Tab from the environment table to the compact details pane and use the arrow keys to scroll.
+Click a row or use the arrow keys to select it. Press **o** for OpenCode or **s** for Shell,
+or use the corresponding button. Session startup checks run in the dashboard before handing over
+the terminal; if startup fails, the dashboard shows the error.
 
 The distribution family is shown without guessing an OS version from the current base
 definition. Use `status NAME` for inspected base-image provenance; new-environment choices
@@ -24,11 +29,11 @@ the dashboard, and Agent Context observation runs in a worker. When Docker is no
 status line says "Docker is not ready" and a notification gives the reason; the dashboard stays
 usable for everything that does not need Docker. `opencode-sandbox doctor` shows the details.
 
-After the daemon is verified, the same worker checks managed base-image revisions. A
-"Base images need attention" notice uses the same results and commands as `doctor`. It is
-advisory, not a request to replace an existing environment, and never rebuilds an image.
-Press `r` for fresh dashboard results after changing images, or rerun `doctor`;
-[maintenance.md](maintenance.md#base-image-definitions) explains the cases.
+After Docker is verified, the status line can report that the relevant backend has no managed
+base images or has image updates. It shows the last result for the selected environment's
+backend (Rootless without a selection). Selecting a row does not contact Docker or replay a
+notification. An unchecked backend is labeled as such. Press **r** to check it, or open
+**Updates → Base Images** for individual image states.
 
 The same worker also reports [resource-limit support](maintenance.md#resource-limit-support).
 Missing support or unavailable evidence gets an advisory notice, not an identity failure or
@@ -38,17 +43,19 @@ Refresh replaces each checked category's old notice rather than stacking repeate
 Success clears that category; an unavailable check replaces its old warning with an unverified
 result, not a claim that the problem is fixed. A category skipped because Docker is unavailable
 is not marked successful. Clearing one category leaves other notices intact and reveals any
-remaining advisory in the status line. New advisories do not overwrite active operation progress;
-clearing advisories or readiness waits does not erase an operation's completion/recovery result.
+remaining advisory in the status line. New advisories do not overwrite active operation progress.
+After an operation completes, new advisories can replace its status; the completion notice is
+separate. An operation error keeps the status line until its notice expires or you refresh or
+switch Docker backends.
 Metadata-only refresh does not recheck or clear these advisories.
 
 ## Keys
 
 | Key | Action | Key | Action |
 |---|---|---|---|
-| `Enter` / `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
+| `o` | OpenCode (`run`) | `s` | Shell (`shell`) |
 | `F5` / `F6` | Start / Stop | `x` | Delete (confirmation) |
-| `n` | New environment (`create`; choose kind and workspace first, distribution and config under "More options") | `c` | Create a project from the current folder using the default import (the confirmation shows what is copied) |
+| `n` | New environment (`create`; backend, distribution and config are under "More options") | `c` | Create a project from the current folder using the default import (the confirmation shows what is copied) |
 | `/` | Filter | `r` | Refresh |
 | `t` | Settings (`config apply`; shows the change plan first) | `u` | Usage (`container usage`) |
 | `i` | Check (`check NAME`; the details pane shows the last result) | `a` | Agent Context preview and activation |
@@ -60,11 +67,14 @@ Metadata-only refresh does not recheck or clear these advisories.
 | `O` | OpenCode Configs (user-maintained directories, not an in-app source editor) | | |
 | `Esc` | Close a dialog or screen | `q` | Quit |
 
-Dialogs default to Cancel. Dashboard keys are inactive while a sub-screen is open. Promotion to a
+Confirmation dialogs start on Cancel. In a long confirmation, use Page Up and Page Down to
+read the full review while the action buttons stay visible. In forms, use Tab and Shift+Tab to
+move between controls, Space to toggle a checkbox, and Enter and the arrow keys to choose a
+dropdown option. Dashboard keys are inactive while a sub-screen is open. Promotion to a
 project, `backup restore-check`, `backup restore-rollback` and custom images are only available
 in the CLI.
 
-Press `?` again, Esc, or Close to dismiss Keys. Manager Settings (`g`, the Preferences button)
+Press `?` again, Esc, or Close to dismiss Keys. Preferences (`g`)
 includes **Copy selected text**, off by default. Completed selections in displayed text and
 read-only reports are copied once; editable/password fields keep normal editing behavior.
 Available local Linux clipboard tools are used without installing anything. Otherwise the
@@ -142,8 +152,7 @@ In **Manager** (`1`), opening shows the running version, cached release evidence
 independent local installation inspection. **Check** queries published full releases from the
 official GitHub repository and repeats that inspection. No GitHub login/token is needed or sent;
 drafts, prereleases, invalid tags and unpublished checkouts are not release targets. Tags must be
-exactly `vX.Y.Z`; numeric comparison never offers an implicit downgrade. The unchanged development
-version is not treated as a new release. A missing/failed GitHub response means availability is
+exactly `vX.Y.Z`; only strictly newer versions are offered. A missing/failed GitHub response means availability is
 unknown (or dated cached evidence), not current; local inspection failures do not erase release
 information or the installed version. GitHub Retry-After and reported rate-limit reset times also
 apply to explicit Check. A full 100-entry page is refused rather than claiming a truncated latest
@@ -157,8 +166,8 @@ launchers are not taken over. Details shows source, time, bounded notes and the 
 
 When a newer version exists, Update remains available even if automatic updating is unsupported.
 The manual-update dialog explains the reason. Only freshly verified official-tag pipx ownership
-and settings produce an exact-tag command preserving Python and recognized locations. Confirm
-copies that command and closes the dialog; it does not install anything. Other installation
+and settings produce an exact-tag command preserving Python and recognized locations.
+**Copy command** puts the command on the clipboard and closes the dialog. Other installation
 methods receive guidance without an unsafe generic replacement command.
 
 For a supported install and newer target, **Update** (`u`) prepares fresh exact source/tool/impact
@@ -183,7 +192,7 @@ Cancel is focused first. Changed metadata, policy, container or checkpoint requi
 - **Start** is explicit, may create a container, and **leaves it running**. Use Check afterward
   for fresh binary verification. Normal pin, direct
   workspace, profile, ownership and pending-operation checks remain in force.
-- **Stop** honors Manager Settings' stop-confirmation preference and preserves home/workspace.
+- **Stop** honors the stop-confirmation preference and preserves home/workspace.
 - **Update** resolves an exact compatible target before consent and requires an owned,
   network-enabled container and matching pin. A running target gets **Caution** consent: it will
   be stopped and **will not restart afterward**, on success or rollback. After stopping, the
@@ -203,7 +212,7 @@ Cancel is focused first. Changed metadata, policy, container or checkpoint requi
   recovery handler. It never guesses whether npm finished. It may stop/remove the owned incomplete
   container, discarding unfinished update-layer changes; explicit Start is required afterward.
   Other journals route to **Recovery Center**, which handles OpenCode/configuration recovery
-  and names the CLI next steps for other journals. Full errors remain scrollable at 80x24.
+  and shows the selected entry's CLI next step and full error in a scrollable detail pane.
 
 Home/workspace/user configuration are preserved, **not rolled back**; binary rollback cannot undo
 application-data changes. Missing checkpoints/failures retain journals and guidance. A successor
@@ -225,15 +234,19 @@ do not cover operation forms or Updates Details at 80x24.
 
 ### Base image actions
 
-In **Base Images** (`2`), **Build/Rebuild** (`b` or `u`) opens the target/mode form; **Rollback**
+**Base Images** (`2`) opens on the selected environment's backend, or Rootless if no environment
+is selected. You can switch between **Rootless** and **Rootful** when rootful access is enabled in
+Preferences. Inventory, Check, build and rollback use the selected daemon.
+
+**Build/Rebuild** (`b` or `u`) opens the target/mode form; **Rollback**
 (`r`) reviews managed rollback copies. Check remains a read-only binary/registry check, never a
 build, pull or package-freshness assessment. Opening the view still inspects only local metadata.
 
 Choose an exact compatible target or let latest resolve before consent. **Cached rebuild** reuses
 the local upstream image and layers before the package step; **Refresh & Rebuild** explicitly
 pulls/bypasses cache with extra network/time/disk, never pruning it. **Both modes always upgrade
-system packages** with fresh indexes (Debian `apt-get update` plus `apt-get upgrade`, Arch a full
-`pacman -Syu`); there is no option to skip it. Neither certifies package freshness/security or
+system packages** with fresh indexes (Debian and Kali run `apt-get update` plus `apt-get upgrade`;
+Arch runs a full `pacman -Syu`). There is no option to skip it. Neither certifies package freshness/security or
 reproducibility. Cancel-first
 consent names distribution/definition/target/current image/mode; unknown ownership or changed
 identities refuse. The verified immutable candidate is published only after live revalidation.

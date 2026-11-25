@@ -1,4 +1,4 @@
-"""Verify that the Docker endpoint is the current user's own rootless daemon (D-003).
+"""Authenticate a local Docker daemon (rootless by default).
 
 The manager's Docker context (default ``rootless``) is resolved once to a ``unix://`` socket.
 The response sender's kernel credentials (``SCM_CREDENTIALS``) and ``/proc`` must show ``dockerd`` running as
@@ -38,6 +38,7 @@ MISSING = "missing"
 NOT_CONFIGURED = "not-configured"
 EXIT_CODES = {VERIFIED: 0, UNVERIFIED_PROXY: 3, MISMATCH: 4, UNAVAILABLE: 5, UNSUPPORTED: 6, MISSING: 7, NOT_CONFIGURED: 8}
 DEFAULT_CONTEXT = "rootless"
+ROOTFUL_ENDPOINT = "unix:///run/docker.sock"
 # Variables that would otherwise redirect or alter the Docker CLI; -H overrides the endpoint,
 # these are dropped so they cannot add TLS or a second endpoint behind the verified one.
 IGNORED_ENV = ("DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "DOCKER_TLS")
@@ -115,13 +116,20 @@ class Identity:
     def verified(self) -> bool:
         return self.classification == VERIFIED
 
+    def hint(self):
+        if self.verified:
+            return None
+        if self.context == "rootful" and self.endpoint == ROOTFUL_ENDPOINT:
+            return "Check access to the local root-owned dockerd socket and confirm user namespace remapping is disabled."
+        return HINTS.get(self.classification)
+
     def message(self) -> str:
         """One paragraph for errors: classification, reasons and what to do."""
         text = f"Docker daemon identity: {self.classification} (context '{self.context}'"
         text += f", {self.endpoint})" if self.endpoint else ")"
         if self.reasons:
             text += ": " + "; ".join(self.reasons)
-        hint = HINTS.get(self.classification)
+        hint = self.hint()
         return text + (f". {hint}" if hint else "")
 
     def report(self) -> str:
@@ -133,8 +141,8 @@ class Identity:
         lines.append(f"Daemon identity: {self.classification}")
         lines += [f"  reason: {r}" for r in self.reasons]
         lines += [f"  note: {n}" for n in self.notes]
-        if not self.verified and self.classification in HINTS:
-            lines.append(f"  hint: {HINTS[self.classification]}")
+        if hint := self.hint():
+            lines.append(f"  hint: {hint}")
         return "\n".join(lines)
 
 
@@ -273,6 +281,22 @@ def inspect_peer(pid, uid, gid, *, proc=Path("/proc"), my_uid=None, my_gid=None)
     return None, [], exe, notes
 
 
+def inspect_rootful_peer(pid, uid, gid, *, proc):
+    """Kernel credentials authenticate root; procfs confirms the local daemon process."""
+    if uid != 0 or pid <= 0:
+        return MISMATCH, ["rootful Docker requires a visible local UID 0 daemon"], None, []
+    try:
+        base = proc / str(pid)
+        name = (base / "comm").read_text().strip()
+        full_map = "0 0 4294967295"
+        if name == "dockerd" and all(" ".join((base / file).read_text().split()) == full_map
+                                     for file in ("uid_map", "gid_map")):
+            return None, [], "dockerd", []
+    except OSError:
+        pass
+    return UNVERIFIED_PROXY, ["cannot establish a local, unmapped root dockerd sender"], None, []
+
+
 class SenderError(ValueError):
     pass
 
@@ -290,12 +314,13 @@ def _process_token(pid, proc):
         raise SenderError("cannot read the response sender's process start time") from exc
 
 
-def _response(conn, budget, proc):
+def _response(conn, budget, proc, *, peer=None, rootful=False):
     """Bounded HTTP/1.0 /info; authenticate every received byte, including headers.
 
     Requesting HTTP/1.0 avoids chunking. EOF terminates the response; length, when supplied,
     must agree. No redirects, compression, upgrades, request bodies or Docker mutations.
     """
+    peer = inspect_peer if peer is None else peer
     request = memoryview(b"GET /info HTTP/1.0\r\nHost: localhost\r\n\r\n")
     while request:
         conn.settimeout(min(POLL, budget.remaining()))
@@ -330,7 +355,7 @@ def _response(conn, budget, proc):
             raise SenderError("response sender changed during the readiness probe")
         if sender is None:
             sender = creds[0]
-            evidence = inspect_peer(*sender, proc=proc)
+            evidence = peer(*sender, proc=proc)
             if evidence[0]:
                 return sender, evidence, None
             token = _process_token(sender[0], proc)
@@ -344,7 +369,7 @@ def _response(conn, budget, proc):
     if _process_token(sender[0], proc) != token:
         raise SenderError("response sender process changed while reading readiness")
     # Recheck the live process after receiving the complete response, not a claimed HTTP PID.
-    evidence = inspect_peer(*sender, proc=proc)
+    evidence = peer(*sender, proc=proc)
     if evidence[0]:
         return sender, evidence, None
     header, sep, body = bytes(data).partition(b"\r\n\r\n")
@@ -368,14 +393,22 @@ def _response(conn, budget, proc):
     except (ValueError, UnicodeError, RecursionError) as exc:
         raise ResponseError("readiness response is not valid JSON") from exc
     options = info.get("SecurityOptions") if isinstance(info, dict) else None
-    rootless = isinstance(options, list) and "name=rootless" in options
-    return sender, evidence, rootless
+    if rootful:
+        expected = isinstance(options, list) and all(
+            isinstance(option, str) and option.split(",", 1)[0] not in ("name=rootless", "name=userns")
+            for option in options)
+    else:
+        expected = isinstance(options, list) and "name=rootless" in options
+    return sender, evidence, expected
 
 
 def verify(context=None, *, endpoint=None, docker="docker", proc=Path("/proc"),
-           timeout=READINESS_TIMEOUT, progress=None, cancelled=None, budget=None) -> Identity:
+           timeout=READINESS_TIMEOUT, progress=None, cancelled=None, budget=None, rootful=False) -> Identity:
     """Classify the daemon behind ``context`` (or a fixed ``endpoint``, skipping context resolution)."""
     context = context or os.getenv("OPENCODE_SANDBOX_DOCKER_CONTEXT") or DEFAULT_CONTEXT
+    if rootful:
+        context, endpoint = "rootful", ROOTFUL_ENDPOINT
+    peer = inspect_rootful_peer if rootful else inspect_peer
     notes = [f"{name} is set but ignored; the manager uses context '{context}'"
              for name in ("DOCKER_HOST", "DOCKER_CONTEXT") if os.environ.get(name)]
     budget = budget or Budget(timeout, progress, cancelled)
@@ -408,6 +441,14 @@ def verify(context=None, *, endpoint=None, docker="docker", proc=Path("/proc"),
         return result(UNAVAILABLE, [f"cannot stat socket {path}: {exc.strerror}"])
     if not stat.S_ISSOCK(st.st_mode):
         return result(UNSUPPORTED, [f"{path} is not a socket"])
+    if rootful:
+        try:
+            for parent in Path(path).parents:
+                attrs = parent.stat()
+                if attrs.st_uid != 0 or attrs.st_mode & 0o022:
+                    return result(UNSUPPORTED, ["rootful Docker requires a socket under root-controlled directories"])
+        except OSError as exc:
+            return result(UNAVAILABLE, [f"cannot check rootful socket directories: {exc.strerror}"])
     notes.append(f"socket owner {st.st_uid}:{st.st_gid} (recorded, not trusted)")
     last = "readiness probe did not complete"
     delay = 0.1
@@ -416,18 +457,23 @@ def verify(context=None, *, endpoint=None, docker="docker", proc=Path("/proc"),
             budget.remaining()
             pid, uid, gid, conn = peer_credentials(path, budget=budget)
             with conn:
-                cls, reasons, exe, _ = inspect_peer(pid, uid, gid, proc=proc)
+                cls, reasons, exe, _ = peer(pid, uid, gid, proc=proc)
                 # A foreign/rootful listener is never a rootless activation candidate.
                 if cls == MISMATCH:
                     return result(cls, reasons, pid, exe)
                 last = f"waiting for an authenticated Docker /info response on {path}"
-                sender, evidence, rootless = _response(conn, budget, proc)
+                sender, evidence, expected = _response(conn, budget, proc, peer=peer, rootful=rootful)
             pid, uid, gid = sender
             cls, reasons, exe, peer_notes = evidence
             notes += peer_notes
             if cls:
                 return result(cls, reasons, pid, exe)
-            if not rootless:
+            if rootful:
+                if not expected:
+                    return result(MISMATCH, ["rootful environments require Docker without user namespace remapping"], pid, exe)
+                budget.remaining()
+                return result(VERIFIED, [f"authenticated local root dockerd response (PID {pid})"], pid, exe)
+            if not expected:
                 return result(MISMATCH, ["the engine does not report the 'rootless' security option"], pid, exe)
             budget.remaining()
             return result(VERIFIED, [(f"kernel-authenticated response from dockerd pid {pid} as UID {uid} "
@@ -454,6 +500,7 @@ def verify(context=None, *, endpoint=None, docker="docker", proc=Path("/proc"),
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Verify the Docker daemon identity used by OpenCode Sandbox.")
     ap.add_argument("--context", default=None, help="Docker context (default: $OPENCODE_SANDBOX_DOCKER_CONTEXT or rootless)")
+    ap.add_argument("--rootful", action="store_true", help="Verify the local rootful Docker socket")
     ap.add_argument("--json", action="store_true", help="print the result as JSON")
     args = ap.parse_args(argv)
     def interrupted(signum, frame):
@@ -461,7 +508,7 @@ def main(argv=None) -> int:
 
     handlers = {sig: signal.signal(sig, interrupted) for sig in (signal.SIGTERM, signal.SIGHUP)}
     try:
-        ident = verify(args.context, progress=lambda message: print(message, file=sys.stderr, flush=True))
+        ident = verify(args.context, rootful=args.rootful, progress=lambda message: print(message, file=sys.stderr, flush=True))
     finally:
         for sig, handler in handlers.items(): signal.signal(sig, handler)
     print(json.dumps(asdict(ident), indent=2) if args.json else ident.report())

@@ -4,7 +4,7 @@ from pathlib import Path
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import ItemGrid, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, Input, Static
 
@@ -19,20 +19,21 @@ class BackupScreen(Screen):
     BackupScreen { align: center middle; }
     #backup-panel { width: 95%; height: 85%; border: round $accent; padding: 1 2; }
     #backup-table { height: 1fr; }
-    #backup-status { height: 3; }
-    #restore-name { width: 2fr; }
+    #backup-status { height: auto; }
+    #restore-name { width: 1fr; }
     """
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="backup-panel"):
-            yield Static("Backup & Restore — select a backup")
+        with Vertical(id="backup-panel", classes="dialog-fields"):
+            yield Static("Backup & Restore", classes="form-title")
             yield DataTable(id="backup-table", cursor_type="row")
-            yield Input(placeholder="New environment name for restore", id="restore-name")
-            with Horizontal():
-                yield Button("Verify", id="verify")
-                yield Button("Restore as new", id="restore")
-                yield Button("Refresh", id="refresh-backups")
-                yield Button("Close", id="close-backups")
+            yield Static("New environment name for restore")
+            yield Input(id="restore-name", compact=True)
+            with ItemGrid(classes="dialog-grid dialog-actions", min_column_width=16):
+                yield Button("Verify", id="verify", compact=True)
+                yield Button("Restore as new", id="restore", compact=True)
+                yield Button("Refresh", id="refresh-backups", compact=True)
+                yield Button("Close", id="close-backups", compact=True)
             yield Static("Verification and restore run asynchronously.", id="backup-status")
 
     def on_mount(self) -> None:

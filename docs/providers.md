@@ -31,14 +31,14 @@ container is created**, and `run` and `shell` load it into the OpenCode process.
 
 - Another profile for an existing environment: `config apply NAME --profile OTHER --yes`. It
   recreates the container so that it mounts the new profile (the system layer, `/workspace` and
-  `/root` are kept); a restart alone keeps the previously mounted profile. `status`, `run` and
+  the home volume are kept); a restart alone keeps the previously mounted profile. `status`, `run` and
   `shell` warn while the container still uses a different profile.
 - After changing a key of the same profile, a **restart** is enough (`stop`, then `run`): the
   running container keeps the old file until it restarts. `check NAME` reports a profile changed
   after the container started.
 - A deleted profile file blocks `start` with an explanation; restore the file, or run
   `container recreate NAME --yes` to continue without it.
-- Generic `exec` and direct `docker exec` shells do not load the profile. Both base images
+- Generic `exec` and direct `docker exec` shells do not load the profile. All managed base images
   provide the executable `ocs-opencode`: it reads/validates the mounted JSON safely and launches
   `opencode --standalone`, preserving arguments. For example:
 

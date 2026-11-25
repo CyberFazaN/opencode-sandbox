@@ -3,7 +3,7 @@
 ## Readiness checks
 
 - `doctor` checks the host: Python, Git, the Docker CLI, the daemon identity, resource-limit
-  support, the base-image definitions,
+  support, the base-image definitions on the selected backend,
   free space in Docker's data root and the build cache. It is read-only, works without Docker,
   and its exit status names the problem ([troubleshooting.md](troubleshooting.md#exit-status)).
 - `check NAME` is a comprehensive **read-only** check of one environment; nothing is started,
@@ -14,7 +14,7 @@
   differ; a server listening on `127.0.0.1` only is flagged), the **measured network
   reachability** ([settings.md](settings.md#network-modes)), the provider profile (permissions,
   the mounted profile, a key changed after the container started), the Agent Context file and its
-  delivery, the OpenCode version and the self-update switch, and Docker storage.
+  delivery, OpenCode availability and version, the self-update switch, and Docker storage.
 
 Each result of `check` is `passed`, `warning`, `failed`, `not checked` (with the reason, for
 example a stopped container) or `not applicable`; the exit status is 1 if any check failed. The
@@ -25,7 +25,8 @@ and output limits; a timeout is reported, never interpreted as object absence. E
 identity/resource-support budgets remain separate. Container readiness probes have a ten-second
 container-side limit (OpenCode version: five seconds) and three seconds of client transport grace.
 They require compatible timeout tooling; unavailable tooling is `not checked`/unavailable, not
-permission to retry unbounded. No stopped environment is started for a check.
+permission to retry unbounded. `check NAME` never starts a stopped environment. An explicit
+[Updates version check](dashboard.md#updates) is a separate action that can temporarily start one.
 
 Dashboard read-only workers cooperatively cancel their owned diagnostic clients and ignore late
 results after cancellation or shutdown. Killing a Docker client alone does not stop a container's
@@ -61,9 +62,10 @@ explicitly does not claim measured enforcement.
 
 ### Base-image definitions
 
-`doctor` compares each managed base tag's `image-revision` label with the image definition in
-the installed manager. The dashboard runs the same checks at startup and explicit Refresh, after verifying the
-daemon, and shows non-blocking notices with the same details and hints.
+`doctor` compares each managed base tag's provenance with the installed manager's definition.
+It uses the default rootless backend unless you pass the global `--docker-backend rootful` option.
+The dashboard checks the selected backend at startup or explicit Refresh and summarizes known
+updates, complete absence or inspection failures. **Updates → Base Images** shows individual tags.
 
 - **Older revision**: rebuild explicitly with the suggested command, for example
   `opencode-sandbox build --distro debian`. Nothing rebuilds automatically.
@@ -94,10 +96,11 @@ command says how to finish it:
 | settings change | `config recover NAME` |
 | container recreation | `container recreate-recover NAME` |
 | OpenCode update | `opencode update-recover NAME` (rolls back) |
+| OpenCode global-config transfer | `opencode-configs recover NAME` |
 | restore | `backup restore-resume NAME` or `backup restore-rollback NAME --yes` |
 | deletion | `delete NAME --yes` |
 
-`check NAME`, `status NAME` and the dashboard's Recovery Center (`F8`) name the right command.
+`check NAME`, `repair NAME` and the dashboard's Recovery Center (`F8`) name the recovery command.
 
 - `repair NAME` and `repair --all` reconcile the recorded state with Docker without deleting
   data, for example after a container was stopped outside the manager.
@@ -129,10 +132,15 @@ manager's but are **not managed by this data directory**. Those are listed and n
 
 `disk cleanup --yes` removes: containers, volumes and images of environments that no longer
 exist in this data directory (including untagged earlier layers that a removal exposes),
-stopped helper containers, a restored system image no environment uses, a base image build
-candidate left by an interrupted build, and unfinished `.backup-*` directories.
-`--superseded` adds update checkpoints and runtime images that existing environments no longer
-use, base image rollback copies and replaced untagged base images.
+stopped helper containers, a restored system image no environment uses and unfinished `.backup-*`
+directories. `--superseded` adds unused update checkpoints and runtime images.
+
+Docker inventory and cleanup target the selected daemon. In the CLI use the global
+`--docker-backend rootful` option for an opted-in rootful daemon; in the dashboard Disk uses the
+selected environment's backend. Rootful cleanup keeps shared base artifacts, including build
+candidates, rollback copies and replaced untagged bases; another user or build may still need them.
+On rootless, cleanup can remove abandoned base build candidates, and `--superseded` can also
+remove unused rollback copies and replaced untagged bases.
 
 - Every object is checked again just before removal under its relevant guards. Base candidates,
   rollback copies and identifiable untagged replaced bases take the shared build and publication
@@ -142,8 +150,8 @@ use, base image rollback copies and replaced untagged base images.
   A removal is never forced; an interrupted cleanup can simply run again.
 - Never removed: environments (use `delete`), snapshots of existing environments, base images,
   direct workspaces, exports, backups, anything of another data directory.
-- Exception: base images, their rollback copies and replaced untagged base images are shared by
-  every data directory on the daemon, so `--superseded` in one data directory can remove a
+- Rootless exception: base artifacts are shared by every data directory on that daemon, so
+  `--superseded` in one data directory can remove a
   rollback copy that another one would use in a future `opencode rollback-base`. Shared guards
   protect participating active builds, rollback and creation, not another directory's future
   intentions or uncoordinated older managers/manual Docker. Docker also refuses an image removal
@@ -151,7 +159,7 @@ use, base image rollback copies and replaced untagged base images.
 
 ## The Docker build cache
 
-Building both base images leaves about 13 GB of build cache. The cache belongs to the whole
+Base image builds can leave several GB of build cache. The cache belongs to the whole
 daemon, and Docker does not record which builds created it, so `disk usage` reports it but
 `disk cleanup` never removes it. `docker builder prune` removes the unused build cache of **all**
 builds on this daemon; the next image build then downloads and rebuilds everything.

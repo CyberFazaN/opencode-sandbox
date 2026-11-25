@@ -31,9 +31,10 @@ def fixture_environment(camp, name, distro):
 
 
 def confirm(t, ck, subject):
-    assert ck(t.wait_for('Review environment operation', 30), subject + ': exact consent appears')
-    ck('Cancel' in t.text() and 'Confirm' in t.text(), subject + ': consent buttons fit')
+    ready = t.wait_for('Review environment operation', 30)
     t.snap(subject + ' consent')
+    assert ck(ready, subject + ': exact consent appears')
+    ck('Cancel' in t.text() and 'Confirm' in t.text(), subject + ': consent buttons fit')
     t.send(TAB + ENTER, .4)  # initial focus is Cancel
 
 
@@ -66,7 +67,7 @@ def test_environment_actions_terminal(campaign, checks, distro, size):
         t.send('u', .3); enter_target(t)
         ck(t.wait_for('pinned to OpenCode 2.2.0', 20) and camp.metadata(name).get('opencode_update') is None, 'Environment pin: incompatible real update refused without installation')
         t.send('p', .3); t.send(ENTER, .2); t.send(UP, .2); t.send(ENTER, .2)
-        t.send(TAB * 3 + ENTER, .3)
+        t.send(TAB * 2 + ENTER, .3)  # Manual disables the pin field
         confirm(t, ck, 'Environment Manual policy')
         ck(t.wait_for('OpenCode policy saved', 20) and camp.metadata(name).get('opencode_policy') == 'manual'
            and camp.metadata(name).get('opencode_pin') is None, 'Environment Manual policy: explicit unpin does not install anything')
@@ -210,11 +211,14 @@ def test_environment_recovery_terminal(campaign, checks, fault, distro):
 
 
 PACKAGES = {'debian': "dpkg-query -W -f='${Package}=${Version}\\n' | sha256sum", 'arch': 'pacman -Q | sha256sum'}
+PACKAGES['kali'] = PACKAGES['debian']
 # Deterministic local package-manager failures inside this run's system layer; no network fault.
 BROKEN = {'debian': "echo 'deb ocs-test-malformed' > /etc/apt/sources.list.d/ocs-test-broken.list",
           'arch': "printf '\\n[ocs-test-broken]\\nServer = file:///ocs-test-missing\\n' >> /etc/pacman.conf"}
+BROKEN['kali'] = BROKEN['debian']
 REPAIR = {'debian': 'rm /etc/apt/sources.list.d/ocs-test-broken.list',
           'arch': "sed -i '/^\\[ocs-test-broken\\]$/,$d' /etc/pacman.conf && tail -n 1 /etc/pacman.conf"}
+REPAIR['kali'] = REPAIR['debian']
 
 
 def version(camp, eid):

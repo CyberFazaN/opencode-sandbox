@@ -17,8 +17,8 @@ import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from . import backends, probes
 from . import core as c
-from . import probes
 
 PASSED, WARNING, FAILED, NOT_CHECKED, NOT_APPLICABLE = "passed", "warning", "failed", "not checked", "not applicable"
 ORDER = (PASSED, WARNING, FAILED, NOT_CHECKED, NOT_APPLICABLE)
@@ -67,6 +67,7 @@ class Check:
     status: str
     detail: str
     hint: str | None = None
+    image_status: str | None = None
 
 
 def _recreate_hint(m):
@@ -117,8 +118,10 @@ def host_checks():
 def daemon_check():
     ident = c.verify_runtime(strict=False)
     if ident.verified:
+        if backends.selected() == backends.ROOTFUL:
+            return Check("daemon", "Docker daemon", PASSED, f"verified local rootful daemon ({ident.endpoint})")
         return Check("daemon", "Docker daemon", PASSED, f"verified rootless daemon of this user ({ident.endpoint})")
-    return Check("daemon", "Docker daemon", FAILED, ident.message(), "See: opencode-sandbox doctor")
+    return Check("daemon", "Docker daemon", FAILED, ident.message(), f"See: opencode-sandbox {backends.cli_flag()}doctor")
 
 
 RESOURCE_HINT = ("Review Docker's rootless resource-limit requirements and your distribution's guidance: "
@@ -181,48 +184,31 @@ def image_checks():
 
 
 def _base_image_check(distro):
-    from . import distros
+    from . import opencode_versions as versions
+    from . import updates
     check_id, title = f"image-{distro.id}", f"Base image {distro.image}"
-    build = f"opencode-sandbox build --distro {distro.id}"
-    inspect_hint = "Check Docker's status and permissions, then rerun: opencode-sandbox doctor"
+    prefix = f"opencode-sandbox {backends.cli_flag()}"
+    build = f"{prefix}build --distro {distro.id}"
     try:
-        p = c.docker("image", "inspect", "--format", "{{json .Config.Labels}}", distro.image, capture=True, check=False)
+        item = updates.base_inventory(distro)
     except c.SandboxError as exc:
-        return Check(check_id, title, NOT_CHECKED, f"image inspect failed: {c.error_text(exc)[:200]}", inspect_hint)
-    if p.returncode:
-        error = (p.stderr or "").strip()
-        # An inspect failure is not evidence of absence (e.g. a daemon stopped after verification).
-        if re.search(r"(?:^|\n)(?:Error(?: response from daemon)?: )?No such image(?::|$)", error, re.IGNORECASE):
-            return Check(check_id, title, WARNING, f"missing ({distro.name} environments cannot be created)", build)
-        return Check(check_id, title, NOT_CHECKED, f"image inspect failed: {error[:200] or f'exit {p.returncode}'}", inspect_hint)
-    try:
-        labels = json.loads(p.stdout or "")
-    except ValueError:
-        labels = ...
-    if labels is not None and not isinstance(labels, dict):
-        return Check(check_id, title, NOT_CHECKED, "invalid image inspect response (expected labels)", inspect_hint)
-    labels = labels or {}
-    review = f"Review the image at {distro.image} before rebuilding: {build}"
-    if labels.get(distros.LABEL + "managed") != "true" or labels.get(distros.LABEL + "distro") != distro.id:
-        return Check(check_id, title, WARNING,
-                     "present, but managed/distribution labels are missing or do not match; image revision cannot be verified", review)
-    raw = labels.get(distros.LABEL + "image-revision")
-    try:
-        revision = int(raw) if isinstance(raw, str) and re.fullmatch(r"[1-9][0-9]*", raw) else None
-    except ValueError:  # e.g. a label exceeding Python's integer-string conversion limit
-        revision = None
-    if revision is None:
-        return Check(check_id, title, WARNING,
-                     "present, but image revision cannot be verified (missing or invalid image-revision label)", review)
-    detail = f"{distro.name}; image revision {revision}"
-    if revision < distro.revision:
-        return Check(check_id, title, WARNING, f"{detail} is older than the manager definition ({distro.revision})", build)
-    if revision > distro.revision:
+        return Check(check_id, title, NOT_CHECKED, c.error_text(exc),
+                     f"Check Docker status and permissions, then run {prefix}doctor")
+    state = item["state"]
+    detail = f'{distro.name}; image revision {item["definition"]["revision"]}' if item.get("definition") else distro.name
+    if state == "not built":
+        return Check(check_id, title, WARNING, f"missing ({distro.name} environments cannot be created)", build, "missing")
+    if state == "old definition":
+        return Check(check_id, title, WARNING, f"{detail} is older than the manager definition ({distro.revision})", build, "outdated")
+    if state == "newer definition":
         return Check(check_id, title, WARNING, f"{detail} is newer than the manager definition ({distro.revision})",
-                     "Do not rebuild just to remove this warning; check opencode-sandbox --version and the image's release notes")
-    if labels.get(distros.LABEL + "distro-version") != distro.version:
-        return Check(check_id, title, WARNING,
-                     "present, but the distribution version label does not match the manager definition; image revision cannot be verified", review)
+                     "Do not rebuild just to remove this warning; check opencode-sandbox --version and the image release notes")
+    if state != "current definition":
+        return Check(check_id, title, WARNING, f"present, but {state}", f"Review {distro.image} before rebuilding: {build}")
+    latest = (versions.discovery().get("success") or {}).get("value")
+    installed = item.get("version")
+    if installed and latest and versions.describe(installed, latest).startswith("update available:"):
+        return Check(check_id, title, WARNING, f"{detail}; OpenCode {installed} can be updated to {latest}", build, "outdated")
     return Check(check_id, title, PASSED, f"{detail} (current definition)")
 
 
@@ -505,7 +491,8 @@ def reachability_check(m, state, data, *, flags=..., address=..., gateway=...):
     if not state.get("Running"):
         return Check("reachability", title, NOT_CHECKED, "container stopped; measured only in a running container",
                      f"opencode-sandbox start {m['name']}, then run the check again")
-    flags = rootlesskit_flags() if flags is ... else flags
+    if flags is ...:
+        flags = {"net": "rootful bridge"} if backends.get(m) == backends.ROOTFUL else rootlesskit_flags()
     address = host_address() if address is ... else address
     gateway = host_gateway() if gateway is ... else gateway
     actual = (data.get("HostConfig") or {}).get("NetworkMode")
@@ -537,7 +524,9 @@ def reachability_check(m, state, data, *, flags=..., address=..., gateway=...):
     else:
         lines.append(f"internet: not reachable ({INTERNET[0]}: {internet})")
     if not loopback_known:
-        lines.append(f"host 127.0.0.1 services: not checked (rootless network driver {flags.get('net')})")
+        driver = flags.get("net")
+        label = "rootful bridge" if backends.get(m) == backends.ROOTFUL else f"rootless network driver {driver}"
+        lines.append(f"host 127.0.0.1 services: not checked ({label})")
     elif reached_loopback:
         lines.append("host 127.0.0.1 services: REACHABLE (a test listener on the host's 127.0.0.1 received the connection)")
         problems.append("host loopback")
@@ -659,12 +648,23 @@ def delivery_check(m, state):
                   if ac.enabled(m) else "automatic inclusion intentionally disabled; generated file remains mounted and matches the host file"))
 
 
-def opencode_check(m, state, data):
+def opencode_availability_check(m, status):
+    from . import opencode_availability as availability
+
+    if status == availability.Status.AVAILABLE:
+        return Check("opencode-availability", "OpenCode availability", PASSED, status.value)
+    if status == availability.Status.UNKNOWN:
+        return Check("opencode-availability", "OpenCode availability", NOT_CHECKED, status.value,
+                     "Checking requires a running environment and a working container diagnostic command.")
+    return Check("opencode-availability", "OpenCode availability", FAILED, status.value,
+                 f"Inspect or repair OpenCode with opencode-sandbox shell {m['name']}.")
+
+def opencode_check(m, state, data, *, probe=None):
     from . import opencode_versions as v
     title = "OpenCode"
     if state is None or not state.get("Running"):
         return Check("opencode", title, NOT_CHECKED, "container not running")
-    item = {"state": "running", "policy": v.policy(m), **v.environment_version(m)}
+    item = {"state": "running", "policy": v.policy(m), **v.environment_version(m, probe=probe)}
     line = v.environment_line(item)
     env = (data.get("Config") or {}).get("Env") or []
     if item.get("recovery") or (item.get("verification") != "verified" and not item.get("error")) \
@@ -683,11 +683,33 @@ def opencode_check(m, state, data):
     return Check("opencode", title, PASSED, line + "; self-update off")
 
 
+def _opencode_checks(m, state, data):
+    from . import opencode_availability as availability
+    from . import opencode_versions as versions
+
+    status = availability.Status.UNKNOWN
+
+    def probe(m, *, container_id):
+        nonlocal status
+        status, version = availability.observe(m, container_id=container_id)
+        if status != availability.Status.AVAILABLE:
+            raise c.SandboxError(f"OpenCode availability: {status.value}")
+        try:
+            return versions.normalize(version)
+        except c.SandboxError:
+            raise c.SandboxError("OpenCode answered but did not report a recognizable version") from None
+
+    version_check = _guard(opencode_check, m, state, data, probe=probe, _id="opencode")
+    if state and state.get("Running") and status != availability.Status.AVAILABLE:
+        version_check = Check("opencode", "OpenCode", NOT_CHECKED, "No live version verified; see OpenCode availability.")
+    return opencode_availability_check(m, status), version_check
+
+
 TITLES = {"daemon": "Docker daemon", "resource-support": "Resource-limit support", "workspace": "Workspace", "operation": "Pending operation", "image": "Image",
           "container": "Container", "volume": "Home volume", "runtime": "Resource limits", "network": "Network mode",
           "ports": "Published ports", "reachability": "Network reachability (measured)", "profile": "Provider profile",
           "agent-context": "Agent Context file", "agent-context-delivery": "Agent Context delivery", "opencode": "OpenCode",
-          "storage": "Docker storage"}
+          "opencode-availability": "OpenCode availability", "storage": "Docker storage"}
 
 
 def _skipped(ids, why):
@@ -712,7 +734,7 @@ def environment_checks(m):
         out += _skipped(("resource-support", "image", "container", "volume", "runtime", "network", "ports", "reachability", "profile"),
                         "Docker daemon not verified")
         out.append(_guard(agent_context_check, m, observe=False, _id="agent-context"))
-        out += _skipped(("agent-context-delivery", "opencode", "storage"), "Docker daemon not verified")
+        out += _skipped(("agent-context-delivery", "opencode-availability", "opencode", "storage"), "Docker daemon not verified")
         return out
     out.append(_guard(resource_support_check, _id="resource-support"))
     try:
@@ -726,7 +748,7 @@ def environment_checks(m):
                 *_skipped(("runtime", "network", "ports", "reachability"), "container not inspected"),
                 _guard(profile_check, m, None, None, _id="profile"),
                 _guard(agent_context_check, m, observe=False, _id="agent-context"),
-                *_skipped(("agent-context-delivery", "opencode"), "container not inspected"),
+                *_skipped(("agent-context-delivery", "opencode-availability", "opencode"), "container not inspected"),
                 _guard(storage_check, _id="storage")]
         return out
     out += [_guard(operation_check, m, state, _id="operation"),
@@ -740,15 +762,18 @@ def environment_checks(m):
             _guard(profile_check, m, state, data, _id="profile"),
             _guard(agent_context_check, m, _id="agent-context"),
             _guard(delivery_check, m, state, _id="agent-context-delivery"),
-            _guard(opencode_check, m, state, data, _id="opencode"),
+            *_opencode_checks(m, state, data),
             _guard(storage_check, _id="storage")]
     return out
 
 
+@backends.environment
 def run(m):
     """Run every check for one environment and cache the report; read-only otherwise."""
     from . import __version__
+    m = c.resolve(m["id"])
     report = {"schema": SCHEMA, "environment": m["id"], "at": c.now(), "manager_version": __version__,
+              "environment_revision": m.get("updated") or m.get("created"),
               "checks": [asdict(x) for x in environment_checks(m)]}
     _save(m, report)
     return report
@@ -805,6 +830,23 @@ def format_report(report, width=14):
         if check.get("hint") and check["status"] in (WARNING, FAILED, NOT_CHECKED):
             lines.append(" " * (width + 2) + f"-> {check['hint']}")
     return lines
+
+
+def cached_opencode_availability(m):
+    from .opencode_availability import Status
+
+    if m.get("status") != "running":
+        return Status.UNKNOWN.value
+    report = cached(m)
+    if not report or report.get("environment_revision") != (m.get("updated") or m.get("created")):
+        return Status.UNKNOWN.value
+    for item in (report or {}).get("checks", []):
+        if not isinstance(item, dict) or item.get("id") != "opencode-availability":
+            continue
+        value = item.get("detail")
+        if value in (Status.AVAILABLE.value, Status.MISSING.value, Status.BROKEN.value):
+            return f"{value} (last check)"
+    return Status.UNKNOWN.value
 
 
 def cached_line(m):

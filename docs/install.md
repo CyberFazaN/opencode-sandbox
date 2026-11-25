@@ -5,8 +5,8 @@ Installing OpenCode Sandbox has two separate parts:
 1. **The application**: a Python program that you install with pipx straight from the GitHub
    repository. It writes only its own pipx environment and the launcher
    `~/.local/bin/opencode-sandbox`.
-2. **Docker**: your own rootless Docker daemon and the base images the environments start from.
-   You set up the daemon yourself. The manager checks it before every use, but it never
+2. **Docker**: a supported local daemon (rootless by default) and the base images the
+   environments start from. You set up the daemon yourself. The manager verifies it, but never
    installs or configures Docker or host OS packages/services, `/etc` files, firewall rules or
    Docker contexts. Explicit application updates affect only its own user-level pipx installation.
 
@@ -18,26 +18,27 @@ tells you what is still missing.
 | Requirement | Notes |
 |---|---|
 | Linux | Any distribution that meets the requirements below is meant to work. Tested with real Docker: Arch Linux only; see [the tested environment](../README.md#tested-environment). |
-| Python 3.11 or newer | For the application's venv (tested: 3.11 and 3.14). Release 6.0.0 required 3.14 or newer. pipx can run on a different Python; select the application's interpreter with `--python`. |
+| Python 3.11 or newer | For the application's venv (tested: 3.11 and 3.14). pipx can run on a different Python; select the application's interpreter with `--python`. |
 | pipx and Git | Install them using your distribution's official documentation. pipx installs the application, not Docker. |
 | Network access during installation | pipx downloads the source from GitHub and the Python dependencies (Typer, Textual and theirs) from PyPI. |
-| Docker in rootless mode | Your own rootless daemon; see [Prepare Docker](#prepare-docker). |
-| Kernel and system support for rootless Docker | Subordinate UID and GID ranges for your user and `newuidmap`/`newgidmap`; unprivileged user namespaces (some distributions restrict them by policy); cgroup v2 with the `cpu`, `memory` and `pids` controllers delegated to your user's daemon, because the manager sets CPU, memory and process limits on every container. See [Prepare Docker](#prepare-docker) for upstream guidance and the limits of the application's checks. |
-| Disk space | Each base image is about 2.2 GB (Debian) or 2.4 GB (Arch); a build also leaves several GB of Docker build cache. |
+| Docker | Your own rootless daemon by default. A configured local rootful daemon can be used with [explicit opt-in](settings.md#docker-backend). |
+| Kernel and system support for the default rootless backend | Subordinate UID and GID ranges for your user and `newuidmap`/`newgidmap`; unprivileged user namespaces (some distributions restrict them by policy); cgroup v2 with the `cpu`, `memory` and `pids` controllers delegated to your user's daemon, because the manager sets CPU, memory and process limits on every container. See [Prepare Docker](#prepare-docker) for upstream guidance and the limits of the application's checks. |
+| Disk space | Debian is about 2.2 GB and Arch about 2.4 GB. Kali rolling varies with the upstream packages. A build can also leave several GB of Docker build cache. |
 
-The base images (Debian 13 or Arch Linux) are the distribution inside the containers. Choose
-either one on any host; they are independent of the distribution your host runs.
+The base images supply the distribution inside the containers: Debian 13, Arch Linux rolling
+or Kali Linux rolling. Kali adds OpenCode and basic development tools to the official Kali
+image, not Kali tool metapackages. The container's distribution is independent of your host's.
 
 ## Install the application
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.5.0
 opencode-sandbox --version
 ```
 
-The `@v6.1.0` at the end selects a release tag; the available releases are on the project's
-GitHub releases page. Dependencies are resolved at install time within the version ranges the
-project declares; there is no lock file.
+The suffix after `@` selects a tag from the
+[releases page](https://github.com/CyberFazaN/opencode-sandbox/releases). Dependencies are resolved
+at install time within the declared version ranges; there is no lock file.
 
 pipx normally uses its own interpreter for the application venv. If that is older than the
 selected release supports, installation fails. Name an installed interpreter explicitly when
@@ -45,7 +46,7 @@ needed:
 
 ```sh
 pipx install --python python3.11 \
-  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
+  git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.5.0
 ```
 
 `opencode-sandbox --help`, `--version` and `doctor` work without Docker.
@@ -82,14 +83,15 @@ explicit independently verified completion/recovery may reopen startup; never de
 
 ## Prepare Docker
 
-The manager only uses **your own rootless Docker daemon**, reached through a Docker context
-(default name `rootless`). It refuses rootful daemons, other users' daemons, socket proxies and
-remote (`tcp://`, `ssh://`) endpoints; [security.md](security.md#daemon-identity) explains the
-check.
+The default is **your own rootless Docker daemon**, reached through a Docker context (default
+name `rootless`). That context cannot point to a rootful daemon or to another user's daemon.
+Rootful Docker is a separate, explicitly [opted-in backend](settings.md#docker-backend) using
+`/run/docker.sock`; for its readiness report, use `opencode-sandbox --docker-backend rootful doctor`.
+Both backends refuse proxies and remote endpoints; see [daemon identity](security.md#daemon-identity).
 
 ### Set up the daemon separately
 
-Use [Docker's official Rootless mode installation guide](https://docs.docker.com/engine/security/rootless/)
+For the default backend, use [Docker's official Rootless mode installation guide](https://docs.docker.com/engine/security/rootless/)
 and your Linux distribution's official documentation for the packages and setup procedure that
 match your system. Arch Linux users should also consult the
 [ArchWiki Rootless Docker daemon section](https://wiki.archlinux.org/title/Docker#Rootless_Docker_daemon):
@@ -132,7 +134,8 @@ Docker operations.
 separately reports cgroup version/driver and Docker-reported CPU quota, memory and PID
 limit support. Missing capabilities produce a warning; unavailable or unrecognized evidence is
 `not checked`, not success. This is not a measurement of kernel enforcement or a host policy
-verification, and it does not check user-namespace policy. Use the upstream resource-limit and
+verification. Daemon identity checks namespace identity separately; neither check certifies your
+host's namespace policy. Use the upstream resource-limit and
 [rootless troubleshooting guidance](https://docs.docker.com/engine/security/rootless/troubleshoot/)
 for those prerequisites. A successful `doctor` exit is not a complete host-setup certification;
 resource/image/storage warnings and unknown checks may accompany exit 0. Nothing repairs host
@@ -147,28 +150,24 @@ change or block existing environments, and image warnings do not change `doctor`
 Build the image for each distribution you want to use:
 
 ```sh
-opencode-sandbox build                # Debian 13
+opencode-sandbox build              # Debian 13
 opencode-sandbox build --distro arch  # Arch Linux, optional
+opencode-sandbox build --distro kali  # Kali rolling, optional
 ```
 
 A build downloads the distribution's base image from Docker Hub, operating-system packages,
-and OpenCode (npm package `@opencode/cli`: the release npm marks as latest, or the 2.x version
-you pass with `--opencode-version`; only OpenCode 2.x is installed). The Arch build also builds
+and OpenCode (the newest supported stable `@opencode/cli` 2.x, or the exact 2.x version you
+pass with `--opencode-version`). Run the build on the backend that will use the image; a tag on
+one daemon is not available on the other. The Arch build also builds
 the AUR helper `paru`. A build takes a few minutes and installs packages only inside the image,
 never on your host. Afterwards `opencode-sandbox doctor` lists the base images. Once you have
 an environment, `opencode-sandbox check NAME` checks its readiness without starting or changing
 it; some checks require an already running container.
 
-Release 6.0.0 built Debian 12 (image revision 1); 6.1.0 builds Debian 13 (revision 2). After
-upgrading from 6.0.0, explicitly rebuild the Debian base when `doctor` reports revision 1.
-Release 6.4.0 defines Debian revision 5 and Arch revision 4. Rebuild the affected base with the
-commands above if `doctor` reports an older definition, to get the executable direct-launch
-wrapper and, on Arch, the updated AUR helper.
-Retained environment layers do not acquire new image files merely from a manager/base upgrade.
-Neither upgrading the manager nor rebuilding the base upgrades an existing container.
-Stop/start, recreation and backups with the system layer keep its OS;
-[workspaces.md](workspaces.md#distributions-and-images) explains the explicit choice for a new
-OS. No metadata migration is needed.
+If `doctor` reports an older definition, rebuild the affected base with the command it suggests.
+Manager upgrades and base rebuilds do not add image files to existing environments or upgrade
+their OS. Stop/start, recreation and backups that include the system layer keep the environment's
+OS. See [base images and OS changes](workspaces.md#distributions-and-images).
 
 Continue with [getting-started.md](getting-started.md).
 
@@ -271,20 +270,18 @@ pipx uninstall opencode-sandbox
 This removes the application and its launcher only. Your environments, their containers,
 volumes and images, backups, exports and provider profiles stay. To remove those too, do it
 **before** uninstalling: `opencode-sandbox delete NAME` for each environment, then
-`opencode-sandbox disk cleanup --superseded --yes`, then delete the data and configuration
-directories ([concepts.md](concepts.md#where-things-live)) and, if you want, the base images
-(`docker --context rootless image rm opencode-sandbox:debian opencode-sandbox:arch`).
+preview `opencode-sandbox disk cleanup --superseded` on each backend you used. Add `--yes`
+only after reviewing the list. Delete the data and configuration directories only if you no
+longer need them ([concepts.md](concepts.md#where-things-live)). Base tags and shared rootful base
+artifacts are not removed by cleanup. If you also want to remove an image, verify the daemon,
+tag and other users' dependencies before removing it with Docker.
 
-pipx from a GitHub release tag is the only recommended application installation method. There
-is no application installer or Rootless Docker setup script since 6.1.0. For a
-contributor's local development venv, see
-[CONTRIBUTING.md](../CONTRIBUTING.md#development-setup); that is not another user installer.
+Install the application with pipx from a GitHub release tag. Configure Docker separately.
 
 ## Moving from a legacy source installation
 
-Release 6.0.0 included an application installer, `install.sh`. Its launcher can shadow a pipx
-installation: pipx may warn "Not modifying" yet report a successful installation. First inspect
-what runs:
+A launcher from a legacy `install.sh` installation can shadow pipx. If pipx warns "Not modifying"
+yet reports a successful installation, inspect what runs:
 
 ```sh
 command -v opencode-sandbox
@@ -295,12 +292,11 @@ A legacy launcher normally points into
 `~/.local/share/opencode-sandbox-manager/current/bin/` (or the corresponding `XDG_DATA_HOME`
 location), not pipx's venv. Inspect that launcher's symlink target before changing anything.
 
-If it is the legacy application, use your trusted **old checkout** of the release that installed
-it (for example the `v6.0.0` sources). From that old checkout only, run
+If it is the legacy application, use the trusted source checkout that installed it. From that
+checkout only, run
 `./install.sh uninstall` as your normal user and review its confirmation. The old uninstaller
 removes its application releases and launcher, not environments, backups, profiles or Docker
-objects. Releases from 6.1.0 on no longer contain that script. If you do not have the old sources,
-obtain that release's trusted sources first; do not substitute a script from an unknown source.
+objects. If you no longer have the sources, obtain them from a trusted tag before proceeding.
 
 Then follow [Install the application](#install-the-application). If pipx was already installed
 behind the legacy launcher, repeat its release-tag installation with `--force` to create the

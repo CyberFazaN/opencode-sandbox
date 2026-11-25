@@ -5,7 +5,7 @@ isolation boundary. Read this page before you give an agent work you would not r
 
 ## What the sandbox gives you
 
-- The agent runs in a container of **your own rootless Docker daemon**. It is root inside the
+- By default the agent runs in a container of **your own rootless Docker daemon**. It is root inside the
   container, and container root maps to **your user** on the host, not to the host's root. A
   container escape would have your user's privileges.
 - With a managed workspace (the default) the agent works on a copy; your project changes only
@@ -13,17 +13,37 @@ isolation boundary. Read this page before you give an agent work you would not r
 - Host files are visible only at `/workspace` (and read-only manager files under `/run`). The
   manager never mounts the Docker socket into a container and never uses `--privileged` or host
   networking.
-- Containers run with `no-new-privileges` and without the capabilities `NET_RAW` and `MKNOD`;
+- Rootless containers run with `no-new-privileges`. Both backends drop the capabilities `NET_RAW` and `MKNOD`;
   published ports bind to `127.0.0.1` only.
 - OpenCode's self-update is disabled; versions change only through the manager.
+
+## Rootful Docker
+
+Rootful support is off by default. When explicitly enabled and selected at creation, the
+manager authenticates the local root-owned daemon at `/run/docker.sock` and requires Docker
+without user namespace remapping. Access to that socket already grants host root authority.
+The manager uses the daemon for the environment's lifetime.
+
+The session starts as the host user and can become container root using passwordless
+`sudo`. Rootful containers omit `no-new-privileges` to make this possible. A container escape
+can have host root impact. Container-root commands can also write root-owned files and change
+ownership or permissions on writable bind mounts. The manager still drops `NET_RAW` and
+`MKNOD`, keeps Docker's normal separation, and leaves privileged mode, extra capabilities,
+host networking and Docker socket mounts disabled.
+
+This risk extends to the host even without a container escape. Root-owned setuid files or
+files with capabilities on a writable workspace can elevate privileges if executed on the
+host. Use rootless Docker for untrusted work. Prefer a managed copy, do not execute untrusted
+workspace files on the host, and use storage already mounted with `nosuid` as defense in depth.
 
 ## What it does not give you
 
 - **No protection against kernel or container-runtime exploits.** Rootless Docker reduces the
   damage, it does not prevent an escape. For code you consider hostile, use a virtual machine.
-- **No network isolation in `bridge` mode** (the default): the agent reaches the internet, your
-  local network and services on the host's LAN address; only the host's loopback is blocked.
-  There is no egress filtering. Use `--network none` to cut the network entirely
+- **No egress or LAN isolation in `bridge` mode** (the default): the agent can reach the internet,
+  your local network and services on the host's LAN address. The tested rootless configuration
+  blocks the host's loopback; this is not a guarantee for every setup. Use `--network none` to
+  disconnect the container from external networks
   ([settings.md](settings.md#network-modes)).
 - **Credentials are readable by the agent.** The provider profile is mounted into the container,
   and root there can read it. Use scoped, budget-limited keys ([providers.md](providers.md)).
@@ -32,15 +52,15 @@ isolation boundary. Read this page before you give an agent work you would not r
   build configuration) ([workspaces.md](workspaces.md#direct-workspaces-not-recommended)).
 - **The system layer is the agent's.** The root filesystem inside the container is writable;
   packages the agent installs (including AUR packages) run as root in the container.
-- **Backups are not encrypted** and contain what the agent stored in `/root`, which may include
+- **Backups are not encrypted** and contain what the agent stored in the home volume, which may include
   credentials. Only restore backups you trust: their system image is executable content.
 - The Agent Context is guidance for the model, not a security policy.
 
 ## Daemon identity
 
-Before any Docker command, the manager verifies that the Docker endpoint is your own rootless
-daemon. The same check runs in `doctor`, `check`, Docker-backed operations and the dashboard.
-It resolves the Docker context (`OPENCODE_SANDBOX_DOCKER_CONTEXT`, default
+The manager verifies the selected Docker backend before using it. The same check runs in
+`doctor`, `check`, Docker-backed operations and the dashboard. For rootless, the manager
+resolves the Docker context (`OPENCODE_SANDBOX_DOCKER_CONTEXT`, default
 `rootless`) to its endpoint and then:
 
 - requires a local `unix://` socket without TLS material (`tcp://`, `ssh://` and TLS are
@@ -56,11 +76,15 @@ It resolves the Docker context (`OPENCODE_SANDBOX_DOCKER_CONTEXT`, default
   **unavailable**, a Docker CLI that is not installed as **missing**, and a context that does not
   exist or has no Docker endpoint as **not-configured**.
 
-Only **verified** is accepted. Every Docker command then runs against that socket
-(`docker -H unix://<socket>`); the endpoint is fixed for the life of the process, and
-`DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_TLS_VERIFY` and `DOCKER_CERT_PATH` are ignored. Context
-names, socket paths and socket owners are shown but never trusted. What each result means for
-you: [troubleshooting.md](troubleshooting.md#daemon-identity-results).
+For rootful, the manager uses the fixed `/run/docker.sock` under root-controlled directories.
+The same bounded response proof must identify a local UID 0 `dockerd` with an unmapped user
+namespace; Docker's security options must show neither rootless mode nor user namespace remapping.
+A rootful socket is never a fallback for a failing rootless context.
+
+Only **verified** is accepted. Commands run against the verified socket (`docker -H unix://<socket>`),
+not the CLI's default context. `DOCKER_HOST`, `DOCKER_CONTEXT`, `DOCKER_TLS_VERIFY` and
+`DOCKER_CERT_PATH` are ignored. Context names or socket ownership alone do not prove identity.
+See [troubleshooting.md](troubleshooting.md#daemon-identity-results) for the possible results.
 
 Readiness has a 10-second total acquisition budget, including context lookup. A ready daemon
 does not sleep. Only specific transport interruptions are retried; missing/stale sockets,
@@ -108,10 +132,10 @@ build tools inside a managed workspace directory; use the `changes` commands ins
 
 ## Known limitations
 
-- Ownership checks rely on Docker labels. Any process that can use the same rootless Docker
+- Ownership checks rely on Docker labels. Any process that can use the same Docker
   daemon can create objects with forged labels, which the manager would treat as its own. Name
   collisions with unlabelled objects are refused.
-- Another process of your user could replace the daemon's socket between the check and its use
+- Another process of your user could replace the rootless socket between the check and its use
   (`$XDG_RUNTIME_DIR` is private to your user).
 - The direct-workspace checks are a snapshot at each container start: a socket or mount added
   later inside the directory is visible to the running container.

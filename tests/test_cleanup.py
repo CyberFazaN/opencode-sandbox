@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from typer.testing import CliRunner
 
+from opencode_sandbox import backends, preferences
 from opencode_sandbox import backup as b
 from opencode_sandbox import cleanup as cl
 from opencode_sandbox import core as c
@@ -190,6 +191,20 @@ def world(monkeypatch):
 
 def status(inv):
     return {i.name: (i.status, i.scope) for i in inv.items}
+
+
+def test_rootful_cleanup_keeps_shared_base_artifacts(world):
+    preferences.write({**preferences.read(), "allow_rootful": True})
+    keys = [item.key for item in cl.inventory().eligible(superseded=True) if item.base_distro]
+    assert len(keys) == 3
+    with backends.use(backends.ROOTFUL):
+        inv = cl.inventory()
+        shared = [i for i in inv.items if i.key in keys]
+        assert len(shared) == len(keys)
+        assert all(i.scope is None and "shared rootful" in i.detail for i in shared)
+        assert not any(i.key in keys for i in inv.eligible(superseded=True))
+        assert all(error for _, error in cl.apply(keys, superseded=True))
+    assert {i.key for i in cl.inventory().eligible(superseded=True)}.issuperset(keys)
 
 
 def test_inventory_classifies_everything_and_is_read_only(world):

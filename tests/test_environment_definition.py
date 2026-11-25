@@ -117,6 +117,9 @@ def test_custom_definition_is_unknown_without_probing(monkeypatch):
 
 def test_first_start_captures_the_selected_image(monkeypatch):
     import json
+
+    from docker_fixtures import managed_image_json
+
     m = c.create("ocs-test-first-definition", "scratch")
     d = distros.get(m["distro"])
     labels = {distros.LABEL + "managed": "true", **d.image_labels()}
@@ -124,8 +127,13 @@ def test_first_start_captures_the_selected_image(monkeypatch):
     monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
     monkeypatch.setattr(c, "port_conflicts", lambda *a: [])
-    monkeypatch.setattr(c, "docker", lambda *a, **k: SimpleNamespace(
-        returncode=0, stdout=json.dumps(labels) if "{{json .Config.Labels}}" in a else "", stderr=""))
+    def docker(*a, **k):
+        if a == ("image", "inspect", d.image): stdout = managed_image_json(d.id)
+        elif "{{json .Config.Labels}}" in a: stdout = json.dumps(labels)
+        else: stdout = ""
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(c, "docker", docker)
     c.start(m)
     text = ac.path(m, c.env_dir).read_text()
     assert f"Base OS: {d.name} {d.version}" in text

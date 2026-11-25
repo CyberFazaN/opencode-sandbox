@@ -26,7 +26,7 @@ def test_registry_records_are_complete_and_assets_exist():
         assert "FROM " in d.dockerfile.read_text()
     with pytest.raises(dataclass_error()):
         distros.REGISTRY[distros.DEFAULT].id = "x"
-    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch"):
+    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch, kali"):
         distros.get("nope")
 
 
@@ -39,6 +39,7 @@ def test_custom_images_are_explicit_not_selected_by_environment(tmp_path):
     # A fresh process also covers environment settings read at import/startup time.
     code = '''import json
 from opencode_sandbox import core as c
+c.ensure_runtime = lambda *a: None  # this subprocess checks import-time image selection, not Docker
 default = c.create("ocs-test-default", "scratch")
 explicit = c.create("ocs-test-explicit", "scratch", image="example.org/explicit:1")
 print(json.dumps([(m["distro"], c.env_image(m)) for m in (default, explicit)]))
@@ -65,11 +66,14 @@ def test_create_records_the_distribution():
     assert c.env_distro(m) is distros.REGISTRY[distros.DEFAULT]
     assert c.env_image(m) == "opencode-sandbox:debian"
     assert c.resolve("ocs-qa-d1")["distro"] == distros.DEFAULT
-    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch"):
+    with pytest.raises(c.SandboxError, match="Unknown distribution 'nope'; available: debian, arch, kali"):
         c.create("ocs-qa-d2", "scratch", distro="nope")
     arch = c.create("ocs-qa-d3", "scratch", distro="arch")
     assert arch["distro"] == "arch" and c.env_image(arch) == "opencode-sandbox:arch"
-    assert sorted(e["name"] for e in c.all_envs()) == ["ocs-qa-d1", "ocs-qa-d3"]
+    kali = c.create("ocs-qa-d4", "scratch", distro="kali")
+    assert c.env_distro(c.resolve(kali["id"])) is distros.get("kali")
+    assert c.env_image(kali) == "opencode-sandbox:kali"
+    assert sorted(e["name"] for e in c.all_envs()) == ["ocs-qa-d1", "ocs-qa-d3", "ocs-qa-d4"]
 
 
 def test_custom_image_is_explicit():
@@ -99,12 +103,14 @@ def test_start_checks_the_distribution_image_and_uses_it(monkeypatch):
     calls = []
     def docker(*a, **k):
         calls.append(a)
-        return SimpleNamespace(returncode=1 if a[:2] == ("image", "inspect") else 0, stdout="", stderr="")
+        if a[:2] == ("image", "inspect"):
+            return SimpleNamespace(returncode=1, stdout="", stderr=f"No such image: {a[-1]}")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
     monkeypatch.setattr(c, "docker", docker)
-    with pytest.raises(c.SandboxError, match="opencode-sandbox:debian missing. Run: opencode-sandbox build --distro debian"):
+    monkeypatch.setattr(c, "inspect_container", lambda m: None)
+    with pytest.raises(c.MissingBaseImage, match="missing opencode-sandbox:debian. Run: opencode-sandbox build --distro debian"):
         c.start(m)
     custom = c.create("ocs-qa-start2", "scratch", image="custom:1")
-    monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
     monkeypatch.setattr(c, "port_conflicts", lambda m, r: [])
     calls.clear()
@@ -117,7 +123,7 @@ def test_backup_manifest_carries_the_distribution_and_restore_requires_it(tmp_pa
     for name, value in (("ensure_runtime", lambda image=True: None), ("inspect_container", lambda m: None),
                         ("assert_volume_owned", lambda m: None), ("volume_state", lambda m: None)):
         monkeypatch.setattr(c, name, value)
-    for name, options in (("registry", {}), ("custom", {"image": "custom:1"})):
+    for name, options in (("registry", {}), ("kali", {"distro": "kali"}), ("custom", {"image": "custom:1"})):
         m = c.create(f"ocs-test-{name}", "scratch", **options)
         manifest = b.verify(b.backup(m, tmp_path / "backups"))
         restored = b._restored_settings(manifest["environment"])

@@ -22,7 +22,7 @@ tools = local_tools
 @pytest.mark.parametrize('size', [(80, 24), (120, 40)])
 @pytest.mark.parametrize('action', ['escape', 'cancel', 'confirm'])
 def test_exact_review_cancel_default_explicit_policy_and_no_helper_or_install(prepared, monkeypatch, size, action):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     monkeypatch.setattr(handoff, 'prepare', lambda *a, **k: pytest.fail('review staged a helper'))
     results = []
     async def test():
@@ -58,7 +58,7 @@ def test_exact_review_cancel_default_explicit_policy_and_no_helper_or_install(pr
 
 
 def test_open_manager_consent_blocks_internal_terminal_handoff_before_artifact_inspection(prepared, monkeypatch):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     async def test():
         app = tui.Dashboard()
         async with app.run_test(size=(80, 24)) as pilot:
@@ -76,7 +76,7 @@ def test_plain_dict_or_boolean_is_not_a_prepared_review():
 
 @pytest.mark.parametrize('size', [(80, 24), (120, 40)])
 def test_keyboard_only_policy_selection_then_confirm_returns_exact_receipt(prepared, monkeypatch, size):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     results = []
     async def test():
         app = tui.Dashboard()

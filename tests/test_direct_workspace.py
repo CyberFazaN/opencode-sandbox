@@ -239,11 +239,17 @@ def test_metadata_without_valid_workspace_record_is_ignored(monkeypatch, project
 # --- lifecycle ---------------------------------------------------------------------------------
 
 def test_start_mounts_the_direct_directory_after_rechecking(monkeypatch, project):
+    from docker_fixtures import managed_image_json
+
     m = direct_env(monkeypatch, project)
     runs = []
     monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "ensure_volume", lambda m: None)
-    monkeypatch.setattr(c, "docker", lambda *a, **k: runs.append(a) or SimpleNamespace(returncode=0, stdout="", stderr=""))
+    def docker(*a, **k):
+        runs.append(a)
+        return SimpleNamespace(returncode=0, stderr="", stdout=(
+            managed_image_json() if a == ("image", "inspect", c.env_image(m)) else ""))
+    monkeypatch.setattr(c, "docker", docker)
     c.start(m)
     assert f"type=bind,src={project},dst=/workspace" in next(a for a in runs if a[0] == "run")
     assert "Working directory: /workspace" in ac.path(m, c.env_dir).read_text()

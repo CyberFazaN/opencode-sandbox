@@ -84,12 +84,14 @@ def test_managed_launcher_sets_umask(monkeypatch):
     seen = []
     monkeypatch.setattr(c, "_tty", lambda: True)
     monkeypatch.setattr(c, "start", lambda m: None)
+    monkeypatch.setattr(c, "inspect_container", lambda m: None)
     monkeypatch.setattr(c, "observed_runtime", lambda m: None)
     monkeypatch.setattr(c, "image_definition", lambda m, **k: None)  # isolate the launcher script
     monkeypatch.setattr(c, "profile_mismatch", lambda m: None)
     monkeypatch.setattr(c, "docker", lambda *a, **k: seen.append(a) or type("R", (), {"returncode": 0})())
     c.interactive(m)
-    assert "os.umask(0o022)" in seen[0][seen[0].index("-c") + 1]
+    launch = next(a for a in seen if a[:2] == ("exec", "-it"))
+    assert "os.umask(0o022)" in launch[launch.index("-c") + 1]
 
 
 def _image_tar(tmp_path, repo_tags, ann_name, ref, n=1):

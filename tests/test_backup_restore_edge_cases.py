@@ -153,12 +153,16 @@ class CreatedOnFailure:
         monkeypatch.setattr(c, "host_cpus", lambda: 8)
 
     def __call__(self, *args, capture=False, check=True):
+        from docker_fixtures import managed_image_json
+
         self.calls.append(args)
         if args[0] == "run":
             self.state = {"Running": False, "Status": "created"}
             raise c.SandboxError("Command failed (125): docker run: port is already allocated")
         if args[0] == "rm":
             self.state = None
+        if args == ("image", "inspect", c.distros.get(c.distros.DEFAULT).image):
+            return subprocess.CompletedProcess(args, 0, managed_image_json(), "")
         return subprocess.CompletedProcess(args, 0, "", "")
 
 

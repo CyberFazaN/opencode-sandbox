@@ -52,9 +52,11 @@ def test_missing_volume_is_not_assumed_on_daemon_error(monkeypatch):
     with pytest.raises(c.SandboxError,match='Volume inspect failed'): c.volume_state(m)
 
 def test_start_marks_intent_before_docker_side_effect(monkeypatch):
+    from docker_fixtures import start_transport
+
     m=c.create('demo','scratch')
     monkeypatch.setattr(c,'inspect_container',lambda _:None)
-    monkeypatch.setattr(c,'docker',lambda *a,**k:SimpleNamespace(returncode=0,stdout='',stderr=''))  # read-only image check
+    monkeypatch.setattr(c,'docker', start_transport([]))
     def fail(_):
         assert c.resolve(m['id'])['operation']=='start'
         raise c.SandboxError('injected')

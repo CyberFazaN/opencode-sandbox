@@ -12,11 +12,12 @@ never lift the "Never" list.
 ## Product contract
 
 OpenCode Sandbox is a Python >= 3.11 Typer CLI and Textual TUI that runs OpenCode V2 coding agents
-in per-environment containers on the current user's **own rootless Docker daemon** (identity
-verified, never assumed). Hosts: Linux distributions that meet the prerequisites (D-046); Arch
+in per-environment containers. The default is the current user's **own rootless Docker daemon**.
+Opted-in environments can use the local rootful daemon. The manager verifies both identities. Hosts: Linux distributions that meet the prerequisites (D-046); Arch
 Linux is the development and real-test host. Base images come from a distribution
-registry (`src/opencode_sandbox/distros.py`): Debian 13 (`node:24-trixie`, default) and Arch
-Linux (`archlinux:base-devel`, AUR via `ocs-aur`); OpenCode is the npm package `@opencode/cli`
+registry (`src/opencode_sandbox/distros.py`): Debian 13 (`node:24-trixie`, default), Arch
+Linux (`archlinux:base-devel`, AUR via `ocs-aur`), and Kali Linux rolling
+(`kalilinux/kali-rolling`); OpenCode is the npm package `@opencode/cli`
 (2.x only). Preserve user files, persistent environments and configuration; never silently expand
 host access. Feature/module details are in [ARCHITECTURE.md](docs/engineering/ARCHITECTURE.md),
 not an instruction to inspect or retest every subsystem for every task.
@@ -32,6 +33,10 @@ Versions are separate and each has one source of truth: manager
 (`src/opencode_sandbox/__init__.py`), OpenCode, distribution, image revision, metadata and backup
 schemas. Data of other schema versions is not migrated, and the manager never modifies or deletes
 it.
+
+Product documentation describes the current codebase as the definitive product, not as a
+comparison with previous releases or development branches. Keep version history in the changelog
+and release notes, not in the README or user guides.
 
 ## Orientation and execution
 
@@ -103,6 +108,10 @@ tests pass; silently skip or suppress failing tests.
 
 For explicit release requests such as "Review develop and prepare a new release if warranted", use
 the [release prompt](.github/prompts/release.md); this reference alone does not initiate a release.
+
+An agent may create and push an annotated release tag only when the owner explicitly authorizes
+both operations for the exact version and verified `main` commit. Tag authorization does not grant
+permission to publish the GitHub Release.
 
 A release is recommended only when every P0 and P1 row of `docs/engineering/CAMPAIGN.md` is
 PASS with real evidence or explicitly BLOCKED with accepted risk and a reproducible next step

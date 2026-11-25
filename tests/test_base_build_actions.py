@@ -34,7 +34,7 @@ def runtime(monkeypatch):
 @pytest.mark.parametrize('distro', list(distros.REGISTRY))
 @pytest.mark.parametrize('refresh', [False, True])
 def test_both_modes_build_verify_and_preserve_copy_without_cache_pruning(runtime, monkeypatch, distro, refresh):
-    monkeypatch.setattr(c, 'docker', fake_docker(runtime, os_release='ID=arch\nBUILD_ID=rolling' if distro == 'arch' else 'ID=debian\nVERSION_ID=13'))
+    monkeypatch.setattr(c, 'docker', fake_docker(runtime, os_release='\n'.join(f'{key}={value}' for key, value in distros.get(distro).os_release)))
     plan = v.prepare_base_build('2.1.4', distro, refresh=refresh)
     result = v.update_base(plan.target, distro, refresh=refresh, plan=plan)
     build = next(a for a in runtime if a[0] == 'build')
@@ -49,7 +49,7 @@ def test_both_modes_build_verify_and_preserve_copy_without_cache_pruning(runtime
 @pytest.mark.parametrize('distro', list(distros.REGISTRY))
 @pytest.mark.parametrize('refresh', [False, True])
 def test_every_build_upgrades_packages_with_a_fresh_package_layer(runtime, monkeypatch, distro, refresh):
-    monkeypatch.setattr(c, 'docker', fake_docker(runtime, os_release='ID=arch\nBUILD_ID=rolling' if distro == 'arch' else 'ID=debian\nVERSION_ID=13'))
+    monkeypatch.setattr(c, 'docker', fake_docker(runtime, os_release='\n'.join(f'{key}={value}' for key, value in distros.get(distro).os_release)))
     plan = v.prepare_base_build('2.1.4', distro, refresh=refresh)
     assert 'always refreshed and upgraded in both modes' in v.describe_base_build(plan)
     assert distros.get(distro).build_upgrade in v.describe_base_build(plan)
@@ -67,7 +67,7 @@ def test_package_layer_always_upgrades_and_requires_the_nonce(distro):
     assert 'UPGRADE_SYSTEM' not in text and 'ARG SYSTEM_PACKAGE_REFRESH\n' in text
     step = next(block for block in text.split('\nRUN ')[1:] if 'SYSTEM_PACKAGE_REFRESH' in block)
     assert '${SYSTEM_PACKAGE_REFRESH:?' in step and ' if ' not in step
-    assert ('apt-get update' in step and 'apt-get upgrade -y' in step) if distro == 'debian' else '-Syu' in step
+    assert ('apt-get update' in step and 'apt-get upgrade -y' in step) if distros.get(distro).package_manager == 'apt' else '-Syu' in step
 
 
 @pytest.mark.parametrize('command', [['opencode', 'update-base'], ['build']])

@@ -23,8 +23,8 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import backends, distros
 from . import core as c
-from . import distros
 
 MANAGED, ID, VERSION = "org.opencode-sandbox.managed", "org.opencode-sandbox.id", "org.opencode-sandbox.manager-version"
 
@@ -73,6 +73,7 @@ class Inventory:
     host: list = field(default_factory=list)
     build_cache: dict | None = None
     errors: list = field(default_factory=list)
+    backend: str = backends.ROOTLESS
 
     def eligible(self, superseded=False):
         return [i for i in self.items if i.scope == DEFAULT or (superseded and i.scope == EXTRA)]
@@ -335,6 +336,9 @@ def _images(inv, sizes, tags, data, ids, envs, data_id):
             if len(names) > 1:
                 item.detail = f"same image as {', '.join(sorted(names - {tag}))}; "
             _classify_image(item, tag, labels, ids, envs, data_id, referenced, base, previous, candidate)
+            if inv.backend == backends.ROOTFUL and item.base_distro and item.scope is not None:
+                item.status, item.scope = KEPT, None
+                item.detail = "shared rootful base artifact; other data directories or builds may still need it"
             inv.items.append(item)
 
 
@@ -448,7 +452,7 @@ def _host(inv, ids, envs):
 def inventory():
     """Read-only. Raises only when the daemon is not verified; other failures are reported."""
     c.ensure_runtime(False)
-    inv = Inventory(str(c.BASE), c.data_id())
+    inv = Inventory(str(c.BASE), c.data_id(), backend=backends.selected())
     sizes = _docker_df(inv)
     try:
         fetched = _fetch()
@@ -476,6 +480,8 @@ def _recheck(item):
             return "no longer an unfinished backup directory"
         return None
     if item.base_distro:
+        if backends.selected() == backends.ROOTFUL:
+            return "shared rootful base artifacts are not eligible for disk cleanup"
         try:
             info = c.inspect_base_image(distros.get(item.base_distro), item.ref)
         except c.SandboxError as exc:
@@ -618,7 +624,7 @@ BUILD_CACHE_NOTE = ("  daemon-wide: Docker does not record which builds created 
 
 def format_inventory(inv):
     lines = [f"Data directory: {inv.data_dir} (Docker label org.opencode-sandbox.data-dir={inv.data_id})",
-             SIZES_NOTE, "", "Environments (remove one with: delete NAME):"]
+             f"Docker backend: {inv.backend}", SIZES_NOTE, "", "Environments (remove one with: delete NAME):"]
     shown = set()
     for e in inv.environments:
         parts = [f"directory {human(e['size'])}" + ("" if e["complete"] else " or more (some files unreadable)")]

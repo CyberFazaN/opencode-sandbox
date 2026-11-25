@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from docker_fixtures import managed_image_json
 
 from opencode_sandbox import core as c
 
@@ -20,7 +21,7 @@ def test_start_creation_failure_recoverable(monkeypatch):
     monkeypatch.setattr(c,'inspect_container',lambda m:None)
     def fake(*args,**kw):
         if args[0]=='run': raise c.SandboxError('simulated failure')
-        return response()
+        return response(managed_image_json() if args == ("image", "inspect", c.env_image(m)) else "")
     monkeypatch.setattr(c,'docker',fake)
     monkeypatch.setattr(c,'ensure_volume',lambda m: None)
     with pytest.raises(c.SandboxError,match='simulated'): c.start(m)

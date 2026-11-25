@@ -20,6 +20,8 @@ the risk of silently taking ownership of unknown data.
 
 ## D-003 Own rootless Docker endpoint
 
+Applies to the default backend; D-066 adds a separate opt-in backend without changing this proof.
+
 Accept only the user's authenticated rootless daemon through a local Unix socket, never remote,
 rootful, foreign or proxied Docker. Resolve the configured context once, pin its canonical endpoint
 and reverify it for explicit acquisition; drop Docker environment overrides. Names/socket ownership
@@ -27,6 +29,8 @@ are not proof and there is no override flag. D-052 defines response-sender authe
 same-user socket replacement between check and use remains an accepted residual risk.
 
 ## D-004 Container execution identity
+
+Applies to managed rootless images. D-066 defines the separate rootful execution identity.
 
 Run as container UID 0, mapped to the host user by rootless Docker: package management works and
 bind-mounted files remain owned by that user. Non-root container IDs map to subordinate IDs and
@@ -501,6 +505,17 @@ including recreation/update/temporary checks. Preserve unrelated JSON/list order
 fail without resetting them. Stopped changes reconcile at next start; active sessions are never
 interrupted. Native user references remain possible. Reserve exactly the three config path/content
 provider variables at host and container validation boundaries, with no broad OPENCODE_* ban.
-The same stdlib validator powers managed launches and both images' discoverable `ocs-opencode`
+The same stdlib validator powers managed launches and managed images' discoverable `ocs-opencode`
 executable; private-server semantics, safe JSON/argv handling and conditional interactive hints
 replace shell aliases/evaluation or duplicated credential rules.
+
+## D-066 Opt-in local rootful backend
+
+Keep the rootless default and its proof (D-003/D-052). Rootful is explicit, never a fallback:
+authenticate UID 0 `dockerd` on `/run/docker.sock` and refuse user namespace remapping. Bind an
+environment to its selected backend and host username/UID/GID for life. Separate metadata and
+backup schemas prevent older managers from adopting these environments. Matching the host IDs
+allows ordinary writes to retain the user's ownership; container-local sudo is explicit and makes
+writable bind mounts more dangerous. Only managed distribution images support this backend.
+The shared rootful daemon may serve other users and data directories, so normal disk cleanup
+leaves shared base candidates, rollback copies and replaced base layers alone.

@@ -7,6 +7,7 @@ from textual.widgets import Button, Checkbox, Input, Select, Static, TextArea
 
 from . import core as c
 from . import opencode_versions as v
+from .tui_widgets import FormBody, FormCheckbox
 
 
 class TargetScreen(ModalScreen[tuple | None]):
@@ -20,19 +21,22 @@ class TargetScreen(ModalScreen[tuple | None]):
 
     def compose(self) -> ComposeResult:
         p = v.policy(self.environment)
-        with Vertical(id="target-panel"):
+        with Vertical(id="target-panel", classes="dialog-fields"):
             d = c.env_distro(self.environment)
-            yield Static(f"Update OpenCode — {self.environment['name']}", markup=False)
-            yield Static("Exact 2.x version, or latest supported stable:", markup=False)
-            yield Input(value=p["version"] or "latest", id="update-target", compact=True)
-            yield Checkbox(f"Update system packages first ({d.package_manager})" if d
-                           else "Update system packages (unavailable: custom image)",
-                           value=False, disabled=d is None, id="update-system", compact=True)
-            yield Static("Off: update only OpenCode.\n"
-                         "On: upgrade packages first; a failed upgrade stops before OpenCode.\n"
-                         "Package upgrades are not fully reversible by rollback.\n"
-                         "Next: resolve, check eligibility, then review exact consent.", markup=False)
-            with Horizontal():
+            with FormBody():
+                yield Static(f"Update OpenCode — {self.environment['name']}", classes="form-title", markup=False)
+                yield Static("Exact 2.x version, or latest supported stable:", markup=False)
+                yield Input(value=p["version"] or "latest", id="update-target", compact=True)
+                yield FormCheckbox(
+                    f"Update system packages first ({d.package_manager})" if d
+                    else "Update system packages (unavailable: custom image)",
+                    value=False, disabled=d is None, id="update-system", compact=True,
+                )
+                yield Static("Off: update only OpenCode.\n"
+                             "On: upgrade packages first; a failed upgrade stops before OpenCode.\n"
+                             "Package upgrades are not fully reversible by rollback.\n"
+                             "Next: resolve, check eligibility, then review exact consent.", markup=False)
+            with Horizontal(classes="dialog-actions"):
                 yield Button("Cancel", id="target-cancel", compact=True)
                 yield Button("Review", id="target-review", compact=True)
 
@@ -58,19 +62,25 @@ class PolicyScreen(ModalScreen[tuple | None]):
 
     def compose(self) -> ComposeResult:
         p = v.policy(self.environment)
-        with Vertical(id="policy-panel"):
-            yield Static(f"OpenCode policy — {self.environment['name']}", markup=False)
-            yield Select([("Notify", "notify"), ("Manual", "manual"), ("Pinned", "pinned")],
-                         value=p["mode"], allow_blank=False, compact=True, id="opencode-policy")
-            yield Static("Exact pin (used only for Pinned):", markup=False)
-            yield Input(value=p["version"] or "", id="opencode-pin", compact=True)
-            yield Static("No installation. Manual/Pinned suppress general newer-version notices,\nnot explicit comparisons. Pins still restrict update/rollback/start.", markup=False)
-            yield Static("", id="policy-error", markup=False)
-            with Horizontal():
+        with Vertical(id="policy-panel", classes="dialog-fields"):
+            with FormBody():
+                yield Static(f"OpenCode policy — {self.environment['name']}", classes="form-title", markup=False)
+                yield Static("Policy mode", markup=False)
+                yield Select([("Notify", "notify"), ("Manual", "manual"), ("Pinned", "pinned")],
+                             value=p["mode"], allow_blank=False, compact=True, id="opencode-policy")
+                yield Static("Exact version pin (Pinned only)", markup=False)
+                yield Input(value=p["version"] or "", id="opencode-pin", compact=True, disabled=p["mode"] != "pinned")
+                yield Static("No installation. Manual/Pinned suppress general newer-version notices,\nnot explicit comparisons. Pins still restrict update/rollback/start.", markup=False)
+                yield Static("", id="policy-error", markup=False)
+            with Horizontal(classes="dialog-actions"):
                 yield Button("Cancel", id="policy-cancel", compact=True)
                 yield Button("Review", id="policy-review", compact=True)
 
     def action_cancel(self): self.dismiss(None)
+
+    def on_select_changed(self, event: Select.Changed):
+        if event.select.id == "opencode-policy":
+            self.query_one("#opencode-pin", Input).disabled = event.value != "pinned"
 
     def on_button_pressed(self, event: Button.Pressed):
         event.stop()
@@ -98,7 +108,7 @@ class EnvironmentConsentScreen(ModalScreen[bool]):
         with Vertical(id="environment-consent"):
             yield Static("Caution — stop environment and update" if self.caution else "Review environment operation", markup=False)
             yield TextArea(self.message, read_only=True, id="environment-consent-text")
-            with Horizontal():
+            with Horizontal(classes="dialog-actions"):
                 yield Button("Cancel", id="environment-cancel", compact=True)
                 yield Button("Confirm", id="environment-confirm", variant="warning", compact=True)
 

@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ENABLED = os.environ.get("OCS_TEST_DOCKER") == "1"
 SOCKET = f"unix:///run/user/{os.getuid()}/docker.sock"
-DISTROS = os.environ.get("OCS_TEST_DISTROS", "debian arch").split()
+DISTROS = os.environ.get("OCS_TEST_DISTROS", "debian arch kali").split()
 # The manager under test: the source tree, or an installed launcher such as a pipx installation
 # (OCS_TEST_MANAGER=/path/to/opencode-sandbox); then the source tree is not put on PYTHONPATH, so
 # the commands run the installed package. Helper snippets still import the test venv's package.

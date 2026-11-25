@@ -47,18 +47,23 @@ def main():
     shell = False
     if args[:1] == ["--ocs-managed"]:
         context, system, token, enabled = args[1:]
-        try:
-            instructions = json.loads(Path(system).read_text()).get("instructions", [])
-            if not isinstance(instructions, list) or instructions.count(context) != int(enabled):
-                raise ValueError()
-        except (OSError, ValueError, AttributeError):
-            sys.exit("Agent Context activation differs from saved settings; rerun manager start to reconcile it")
-        os.environ["OCS_RUN_TOKEN"] = token
         shell = os.environ.get("OCS_SHELL") == "1"
+        if not shell:
+            try:
+                instructions = json.loads(Path(system).read_text()).get("instructions", [])
+                if not isinstance(instructions, list) or instructions.count(context) != int(enabled):
+                    raise ValueError()
+            except (OSError, ValueError, AttributeError):
+                sys.exit("Agent Context activation differs from saved settings; rerun manager start to reconcile it")
+        os.environ["OCS_RUN_TOKEN"] = token
         args = []
     argv = ["bash"] if shell else ["opencode", "--standalone", *args]
     os.umask(0o022)
-    os.execvp(argv[0], argv)
+    try:
+        os.execvp(argv[0], argv)
+    except OSError as exc:
+        sys.exit(f"Cannot launch {argv[0]}: {exc.strerror}"
+                 + ("" if shell else ". Open a sandbox shell to inspect the installation."))
 
 
 if __name__ == "__main__":

@@ -14,6 +14,10 @@ from opencode_sandbox import readiness as r
 LABEL = distros.LABEL
 
 
+def inspected(labels):
+    return response(json.dumps([{"Id": "sha256:" + "a" * 64, "Config": {"Labels": labels}}]))
+
+
 def response(stdout="", stderr="", rc=0):
     return SimpleNamespace(returncode=rc, stdout=stdout, stderr=stderr)
 
@@ -22,13 +26,16 @@ def response(stdout="", stderr="", rc=0):
 def images(monkeypatch):
     distro = replace(distros.get(distros.DEFAULT), revision=2)
     monkeypatch.setitem(distros.REGISTRY, distro.id, distro)
-    replies = {d.image: response(json.dumps({LABEL + "managed": "true", **d.image_labels()}))
+    replies = {d.image: inspected({LABEL + "managed": "true", **d.image_labels()})
                for d in distros.REGISTRY.values()}
     calls = []
 
     def docker(*args, **kwargs):
         calls.append(args)
         if args[:2] == ("image", "inspect"):
+            if "--format" in args:
+                ref = args[-1]
+                return response(ref + "|{}")
             result = replies[args[-1]]
             if isinstance(result, Exception):
                 raise result
@@ -53,7 +60,7 @@ def result(images):
 def test_base_revision_comparison(images, revision, status, detail):
     distro, replies, calls = images
     labels = {LABEL + "managed": "true", **distro.image_labels(), LABEL + "image-revision": revision}
-    replies[distro.image] = response(json.dumps(labels))
+    replies[distro.image] = inspected(labels)
     check = result(images)
     assert check.status == status and detail in check.detail
     if revision == "1":
@@ -61,7 +68,7 @@ def test_base_revision_comparison(images, revision, status, detail):
     elif revision == "3":
         assert "do not rebuild" in check.hint.lower() and "opencode-sandbox --version" in check.hint
     assert all(args[:2] == ("image", "inspect") for args in calls)
-    assert calls[0][2:4] == ("--format", "{{json .Config.Labels}}")
+    assert calls[0] == ("image", "inspect", distro.image)
 
 
 @pytest.mark.parametrize("revision", [None, "", "0", "-1", "+2", "02", "2.0", " 2", "two", "٢", 2, True, "9" * 5000])
@@ -72,9 +79,9 @@ def test_missing_or_invalid_revision_is_not_current(images, revision):
         labels.pop(LABEL + "image-revision")
     else:
         labels[LABEL + "image-revision"] = revision
-    replies[distro.image] = response(json.dumps(labels))
+    replies[distro.image] = inspected(labels)
     check = result(images)
-    assert check.status == r.WARNING and "revision" in check.detail and "cannot be verified" in check.detail
+    assert check.status == r.WARNING and "provenance unknown" in check.detail
     assert f"opencode-sandbox build --distro {distro.id}" in check.hint
 
 
@@ -83,19 +90,19 @@ def test_missing_or_invalid_revision_is_not_current(images, revision):
                                      {LABEL + "managed": "true", LABEL + "distro": "other"}])
 def test_unrecognized_labels_are_not_trusted(images, labels):
     distro, replies, _ = images
-    replies[distro.image] = response(json.dumps(labels))
+    replies[distro.image] = inspected(labels)
     check = result(images)
-    assert check.status == r.WARNING and "cannot be verified" in check.detail
+    assert check.status == r.WARNING and "provenance unknown" in check.detail
     assert "review" in check.hint.lower()
 
 
 @pytest.mark.parametrize("version", [None, "", 12, "unexpected"])
 def test_inconsistent_distribution_version_is_not_current(images, version):
     distro, replies, _ = images
-    replies[distro.image] = response(json.dumps({LABEL + "managed": "true", **distro.image_labels(),
-                                                LABEL + "distro-version": version}))
+    replies[distro.image] = inspected({LABEL + "managed": "true", **distro.image_labels(),
+                                     LABEL + "distro-version": version})
     check = result(images)
-    assert check.status == r.WARNING and "distribution version" in check.detail
+    assert check.status == r.WARNING and "provenance unknown" in check.detail
 
 
 @pytest.mark.parametrize("error", ["Error: No such image: opencode-sandbox:debian",
@@ -113,7 +120,7 @@ def test_inspect_failure_is_not_a_missing_image(images, error):
     distro, replies, _ = images
     replies[distro.image] = response(stderr=error, rc=1)
     check = result(images)
-    assert check.status == r.NOT_CHECKED and "inspect failed" in check.detail
+    assert check.status == r.NOT_CHECKED and "Cannot inspect" in check.detail
     assert "missing" not in check.detail and "build" not in check.hint
     assert len(r.image_checks()) == len(distros.REGISTRY)
 
@@ -139,8 +146,7 @@ def test_one_inspect_exception_does_not_hide_other_images(images):
 def test_doctor_and_dashboard_share_nonblocking_image_report(images, case):
     distro, replies, calls = images
     if case == "old":
-        replies[distro.image] = response(json.dumps({LABEL + "managed": "true", **distro.image_labels(),
-                                                    LABEL + "image-revision": "1"}))
+        replies[distro.image] = inspected({LABEL + "managed": "true", **distro.image_labels(), LABEL + "image-revision": "1"})
     else:
         replies[distro.image] = response(stderr="No such image: " + distro.image if case == "missing" else "permission denied", rc=1)
     expected = result(images)
@@ -154,8 +160,9 @@ def test_doctor_and_dashboard_share_nonblocking_image_report(images, case):
     async def test(app, pilot):
         await settle(pilot)
         notes = [n for n in app._notifications if n.title == "Base images need attention"]
-        assert notes and text in notes[0].message
-        assert not notes[0].markup and "opencode-sandbox doctor" in str(app.query_one("#status").render())
+        assert not notes
+        status = str(app.query_one("#status").render())
+        assert ("Rootless has base image updates" in status) == (case == "old")
         assert app.query_one("#envs").row_count == 1 and metadata.read_bytes() == before
     run(test, size=(80, 24))
     assert all(args[:2] in (("image", "inspect"), ("system", "df")) for args in calls)
@@ -169,26 +176,35 @@ def test_dashboard_does_not_report_an_image_problem_when_current(images):
 
 
 def test_advisory_does_not_replace_an_operation_status_or_change_its_guard(images):
+    from dataclasses import replace
+
     check = result(images)
 
     async def test(app, pilot):
         await settle(pilot)
         app._operation_pending = True
         app._set_busy("Starting an existing environment")
-        app._show_image_checks([check])
+        outdated = replace(check, image_status="outdated")
+        app._show_image_checks([outdated])
         assert app._operation_pending and str(app.query_one("#status").render()) == "Starting an existing environment"
+        app._finished("Session launch failed", True)
+        app._show_image_checks([outdated])
+        assert not app._operation_pending and str(app.query_one("#status").render()) == "Session launch failed"
+        app._expire_error_result(app._error_result)
+        assert "has base image updates" in str(app.query_one("#status").render())
     run(test)
 
 
 @pytest.mark.parametrize("size", [(80, 24), (100, 30)])
 def test_successful_refresh_clears_the_previous_base_warning(images, size):
     distro, replies, _ = images
-    replies[distro.image] = response(stderr="No such image: " + distro.image, rc=1)
+    for image in replies:
+        replies[image] = response(stderr="No such image: " + image, rc=1)
 
     async def test(app, pilot):
         await settle(pilot)
-        assert any(n.title == "Base images need attention" for n in app._notifications)
-        replies[distro.image] = response(json.dumps({LABEL + "managed": "true", **distro.image_labels()}))
+        assert "Rootless has no base images" in str(app.query_one("#status").render())
+        replies[distro.image] = inspected({LABEL + "managed": "true", **distro.image_labels()})
         app.action_refresh_readiness()
         await settle(pilot)
         assert not any(n.title == "Base images need attention" for n in app._notifications)

@@ -2,6 +2,8 @@
 
 This walk-through assumes the application is installed and Docker is prepared
 ([install.md](install.md)). The terms are explained in [concepts.md](concepts.md).
+It uses the default rootless backend. For opt-in rootful Docker, see
+[Docker backend settings](settings.md#docker-backend).
 
 ## 1. Check the host
 
@@ -11,7 +13,7 @@ opencode-sandbox doctor
 
 The daemon identity must be `verified`; read any resource, image or storage warnings too. Exit 0
 does not certify every advisory or measured resource enforcement. See
-[troubleshooting.md](troubleshooting.md) for failures. Build a base image if `doctor` reports none:
+[troubleshooting.md](troubleshooting.md) for failures. Build the Debian base if `doctor` reports it missing:
 `opencode-sandbox build`.
 
 ## 2. Store a provider key
@@ -23,7 +25,7 @@ value is read at a hidden prompt and never displayed again:
 opencode-sandbox providers set work --key OPENROUTER_API_KEY
 ```
 
-Use a scoped, budget-limited key: the agent runs as root inside its container and can read it.
+Use a scoped, budget-limited key: the agent inside the container can read it.
 Details: [providers.md](providers.md).
 
 ## 3. Create an environment
@@ -67,7 +69,7 @@ OpenCode's sessions and anything you installed stay until you delete the environ
 Other ways in:
 
 ```sh
-opencode-sandbox shell webapp            # a root shell in the container
+opencode-sandbox shell webapp            # shell as the environment user
 opencode-sandbox exec webapp -- ls -la   # one command (no provider profile)
 opencode-sandbox stop webapp             # stop the container
 ```

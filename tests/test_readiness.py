@@ -96,6 +96,8 @@ class FakeDocker:
             if argv[:2] == ("cat", ac.CONTAINER_PATH):  # the mounted Agent Context
                 host = ac.path(self.m, c.env_dir)
                 return ok(host.read_text()) if host.exists() else fail("No such file", 1)
+            if argv[:2] == ("sh", "-c") and "command -v opencode" in argv[2]:
+                return ok(f"Found\n{self.version}\n\nocs-exit:0\n" if self.version else "Missing\n")
             if argv[:2] == ("opencode", "--version"):
                 return ok(self.version + "\n") if self.version else fail("not found", 127)
             if argv[0] == "sh":
@@ -139,7 +141,7 @@ def test_healthy_running_environment_passes_and_the_check_is_read_only(monkeypat
         "daemon": "passed", "resource-support": "passed", "workspace": "passed", "operation": "passed", "image": "passed", "container": "passed",
         "volume": "passed", "runtime": "passed", "network": "passed", "ports": "not applicable",
         "reachability": "passed", "profile": "passed", "agent-context": "passed",
-        "agent-context-delivery": "passed", "opencode": "passed", "storage": "not checked"}
+        "agent-context-delivery": "passed", "opencode-availability": "passed", "opencode": "passed", "storage": "not checked"}
     assert not fake.ops() & MUTATING
     detail = result["reachability"]["detail"]
     assert "not isolated from the LAN" in detail and "internet: reachable (verified TLS handshake with registry.npmjs.org)" in detail
@@ -147,6 +149,8 @@ def test_healthy_running_environment_passes_and_the_check_is_read_only(monkeypat
     assert "host LAN address 192.0.2.10: reachable (the host answered)" in detail
     assert "LAN gateway 192.0.2.1: answered" in detail
     assert result["opencode"]["detail"] == "2.2.0; notify; self-update off"
+    version_calls = [a for a in fake.calls if a[0] == "exec" and any("--version" in arg for arg in a)]
+    assert len(version_calls) == 1
 
 
 def test_unverified_daemon_fails_and_nothing_else_touches_docker(monkeypatch):
@@ -227,7 +231,7 @@ def test_container_and_volume_checks(monkeypatch):
     result = checks(m)
     assert result["container"]["status"] == "failed" and "ownership mismatch" in result["container"]["detail"]
     # The other checks still report; container-dependent ones say why they did not run.
-    assert len(result) == 16 and result["volume"]["status"] == "passed" and result["profile"]["status"] == "passed"
+    assert len(result) == len(r.TITLES) and result["volume"]["status"] == "passed" and result["profile"]["status"] == "passed"
     assert result["network"]["status"] == result["opencode"]["status"] == "not checked"
     assert result["network"]["detail"] == "container not inspected"
 
@@ -375,8 +379,9 @@ def test_opencode_check(monkeypatch):
     m = env()
     fake = FakeDocker(monkeypatch, m)
     fake.version = None
-    check = checks(m)["opencode"]
-    assert check["status"] == "failed" and "opencode --version` failed" in check["detail"]
+    report = checks(m)
+    assert report["opencode-availability"]["status"] == "failed" and report["opencode-availability"]["detail"] == "Missing"
+    assert report["opencode"]["status"] == "not checked"
     fake.version = "opencode v2.2.0"
     fake.env = ["PATH=/usr/bin"]
     check = checks(m)["opencode"]
@@ -384,13 +389,22 @@ def test_opencode_check(monkeypatch):
     fake.env.append("OPENCODE_DISABLE_AUTOUPDATE=1")
     custom = env("ocs-qa-custom", distro=None, image="example.org/tools:1")
     FakeDocker(monkeypatch, custom).version = None
-    check = checks(custom)["opencode"]
-    assert check["status"] == "failed" and "custom image without a working OpenCode" in check["detail"] and "opencode update" not in check["hint"]
+    check = checks(custom)["opencode-availability"]
+    assert check["status"] == "failed" and "shell ocs-qa-custom" in check["hint"] and "opencode update" not in check["hint"]
     p = env("ocs-qa-pin", opencode_policy="pinned", opencode_pin="2.1.4")
     FakeDocker(monkeypatch, p)
     check = checks(p)["opencode"]
     assert check["status"] == "warning" and "changed outside the manager" in check["detail"]
     assert check["hint"].endswith("opencode update ocs-qa-pin --version 2.1.4")
+
+
+def test_cached_availability_is_not_reused_after_environment_changes(monkeypatch):
+    m = env(status="running")
+    FakeDocker(monkeypatch, m)
+    checks(m)
+    assert r.cached_opencode_availability(m) == "Available (last check)"
+    c.mark(m, "running")
+    assert r.cached_opencode_availability(m) == "Unknown"
 
 
 def test_storage_check(monkeypatch, tmp_path):
@@ -501,7 +515,7 @@ def test_tui_check_key_shows_the_report_and_the_details_line(monkeypatch):
     import asyncio
 
     from opencode_sandbox import tui
-    m = env()
+    m = env(status="running")
     FakeDocker(monkeypatch, m)
 
     async def main():
@@ -518,5 +532,7 @@ def test_tui_check_key_shows_the_report_and_the_details_line(monkeypatch):
             assert str(app.screen.query_one("#report-title").render()) == "Readiness check (read-only; nothing was started or changed)"
             assert f"Readiness of {m['name']}" in app.screen.report and "[passed]" in app.screen.report
             await pilot.press("escape"); await pilot.pause()
-            assert "Readiness: last check 20" in str(app.query_one("#details").render())
+            details = str(app.query_one("#details").render())
+            assert "Readiness: last check 20" in details
+            assert "OpenCode: Available (last check)" in details
     asyncio.run(main())

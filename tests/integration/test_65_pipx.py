@@ -159,7 +159,8 @@ def test_pipx_install_upgrade_uninstall(campaign, checks):
     bindir.mkdir(parents=True, exist_ok=True)
     launcher.symlink_to(release)
     p = px("install", f"{url}@v{v1}", check=False)
-    ck(os.readlink(launcher) == str(release) and "Not modifying" in p.stdout + p.stderr,
+    warning = " ".join((p.stdout + p.stderr).split())
+    ck(os.readlink(launcher) == str(release) and "Not modifying" in warning,
        "B12 pipx does not replace a foreign/legacy launcher (warns 'Not modifying')")
     px("uninstall", "opencode-sandbox")
     ck(os.readlink(launcher) == str(release) and release.read_text() == "#!/bin/sh\necho legacy-release\n",

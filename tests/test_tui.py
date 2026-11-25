@@ -81,13 +81,28 @@ def test_initial_focus_lets_letter_keys_work():
     run(t)
 
 
-def test_enter_on_row_opens_opencode(monkeypatch):
-    c.create("ocs-qa-open", "scratch")
-    opened = []
+def test_selecting_a_row_does_not_launch_a_session(monkeypatch):
+    from opencode_sandbox import backends, preferences
+
+    preferences.write({**preferences.read(), "allow_rootful": True})
+    monkeypatch.setattr(backends, "host_identity", lambda: {"name": "coder", "uid": 1100, "gid": 1100})
+    rootless = c.create("ocs-qa-open", "scratch")
+    rootful = c.create("ocs-qa-other", "scratch", backend=backends.ROOTFUL)
+    opened, probed = [], []
     monkeypatch.setattr(tui.Dashboard, "_attach", lambda self, shell: opened.append((self.selected()["name"], shell)))
+    monkeypatch.setattr(tui.Dashboard, "_request_readiness", lambda self, backend: probed.append(backend))
     async def t(app, pilot):
-        await pilot.press("enter")
-        await pilot.press("s")
+        table = app.query_one("#envs")
+        await pilot.pause()
+        startup = probed.copy()
+        assert len(startup) == 1
+        for environment in (rootful, rootless):
+            table.move_cursor(row=table.get_row_index(environment["id"]))
+            await pilot.press("enter")
+        await pilot.click("#envs", offset=(2, 1))
+        assert opened == [] and probed == startup
+        table.move_cursor(row=table.get_row_index(rootless["id"]))
+        await pilot.press("o", "s")
         assert opened == [("ocs-qa-open", False), ("ocs-qa-open", True)]
     run(t)
 
@@ -209,6 +224,68 @@ def test_busy_flag_blocks_duplicate_and_attach(monkeypatch):
     run(t)
 
 
+@pytest.mark.parametrize("shell", [False, True])
+@pytest.mark.parametrize("result", ["prepare", 125, 130, 1, 0])
+def test_session_setup_and_launch_errors_are_visible(monkeypatch, shell, result):
+    from contextlib import contextmanager
+
+    from opencode_sandbox import backends, preferences
+
+    preferences.write({**preferences.read(), "allow_rootful": True})
+    monkeypatch.setattr(backends, "host_identity", lambda: {"name": "coder", "uid": 1100, "gid": 1100})
+    m = c.create("ocs-test-attach", backend=backends.ROOTFUL)
+    events = []
+    endpoint = "unix:///verified-test-rootful.sock"
+
+    def prepare(environment, *, shell, warn):
+        assert environment["id"] == m["id"] and backends.selected() == backends.ROOTFUL
+        events.append(("prepare", shell))
+        if result == "prepare":
+            raise c.SandboxError("Cannot prepare session [test]")
+        warn("Provider profile mismatch [test]")
+        backends.endpoint.set(endpoint)
+        return environment
+
+    @contextmanager
+    def suspend(self):
+        assert self._session_active
+        events.append("suspend")
+        yield
+        events.append("resume")
+
+    def attach(environment, *, shell, prepared):
+        assert prepared and environment["id"] == m["id"]
+        assert backends.selected() == backends.ROOTFUL and backends.endpoint.get() == endpoint
+        events.append(("attach", shell))
+        return result
+
+    monkeypatch.setattr(c, "_tty", lambda: True)
+    monkeypatch.setattr(c, "prepare_interactive", prepare)
+    monkeypatch.setattr(c, "interactive", attach)
+    monkeypatch.setattr(tui.Dashboard, "suspend", suspend)
+
+    async def test(app, pilot):
+        await pilot.press("s" if shell else "o")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert not app._operation_pending and not app._session_active
+        error = result in ("prepare", 125) or (not shell and result == 1)
+        if result == "prepare":
+            expected = "Cannot prepare session"
+        elif error:
+            expected = f"{'Shell' if shell else 'OpenCode'} session exited with status {result}"
+        else:
+            expected = "Shell exited with status 1" if result == 1 else "Session exited"
+        assert expected in str(app.query_one("#status").render())
+        assert any(expected in n.message and n.severity == "error" for n in app._notifications) is error
+        if result != "prepare":
+            assert any("Provider profile mismatch" in n.message and n.severity == "warning" for n in app._notifications)
+        assert events == [("prepare", shell)] + ([] if result == "prepare"
+                                                  else ["suspend", ("attach", shell), "resume"])
+
+    run(test)
+
+
 def test_confirm_dialog_buttons_are_normal_size():
     """The panel and the Confirm button shared id 'confirm': the panel CSS made the button 72 wide."""
     c.create("ocs-qa-dlg", "scratch")
@@ -276,6 +353,7 @@ def test_subscreens_fit_80x24(key):
         await pilot.pause()
         assert len(app.screen_stack) == 2
         for b in app.screen.query(Button):
+            if not b.display: continue
             r = b.region
             assert r.width > 0 and r.height > 0 and r.right <= 80 and r.bottom <= 24, (key, b.id, r)
             for parent in b.ancestors:
@@ -587,7 +665,11 @@ def test_create_form_discloses_options_progressively(size):
     run(t, size)
 
 
-def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
+@pytest.mark.parametrize(("distro", "distro_label", "size"), [
+    ("arch", "Arch Linux", (120, 40)),
+    ("kali", "Kali Linux", (80, 24)),
+])
+def test_create_form_uses_the_shared_rules_and_choices(tmp_path, distro, distro_label, size):
     folder = tmp_path / "proj"
     folder.mkdir()
     (folder / "a.txt").write_text("x")
@@ -616,7 +698,14 @@ def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
         assert stack(app)[-1] == "CreateScreen" and "name" in str(form.query_one("#create-error").render()).lower()
         form.query_one("#name").value = "ocs-qa-form"
         form.query_one("#more").collapsed = False
-        form.query_one("#distro").value = "arch"
+        distro_select = form.query_one("#distro")
+        if distro == "kali":
+            await settle(pilot)
+            distro_select.focus()
+            await pilot.press("enter", "down", "down", "enter")
+            assert distro_select.value == "kali"
+        else:
+            distro_select.value = distro
         form.query_one("#profile").value = "work"
         form.query_one("#include-agent-context").value = False
         await settle(pilot)
@@ -624,13 +713,13 @@ def test_create_form_uses_the_shared_rules_and_choices(tmp_path):
         await settle(pilot, 1.0)
         m = c.resolve("ocs-qa-form")
         assert app.selected()["id"] == m["id"]  # The new environment is selected
-        assert (m["kind"], m["distro"], m["profile"], m["agent_context_enabled"]) == ("project", "arch", "work", False)
+        assert (m["kind"], m["distro"], m["profile"], m["agent_context_enabled"]) == ("project", distro, "work", False)
         assert m["source"] == str(folder.resolve())
         details = str(app.query_one("#details").render())
-        for text in ("Distribution: Arch Linux (OS version not inspected)", "Provider profile: work", f"managed copy of {folder.resolve()}",
+        for text in (f"Distribution: {distro_label} (OS version not inspected)", "Provider profile: work", f"managed copy of {folder.resolve()}",
                      "Settings: ", "network bridge", "Readiness: "):
             assert text in details, text
-    run(t, (120, 40))
+    run(t, size)
 
 
 def test_bars_separate_global_and_environment_actions_with_cli_terms():
@@ -673,9 +762,7 @@ def test_recovery_center_names_the_finishing_command():
     async def t(app, pilot):
         app.push_screen(RecoveryScreen())
         await settle(pilot)
-        table = app.screen.query_one("#recovery-table")
-        row = [str(cell) for cell in table.get_row_at(0)]  # Text cells
-        assert "opencode-sandbox container recreate-recover ocs-qa-rec" in row
+        assert "opencode-sandbox container recreate-recover ocs-qa-rec" in app.screen.query_one("#recovery-detail").text
     run(t, (120, 40))
 
 
@@ -695,3 +782,26 @@ def test_settings_fields_are_labelled_at_80x24():
         label = network.query("SelectCurrent > Static").first()
         assert network.region.height == 1 and label.region.width >= len("bridge: internet + LAN")  # not cut by the label style
     run(t, (80, 24))
+
+
+def test_environment_actions_warn_if_filter_hides_every_row(fake_runtime):
+    c.create("ocs-test-filtered", "scratch")
+
+    async def test(app, pilot):
+        await app.workers.wait_for_complete()
+        app.query_one("#search").value = "no matching environment"
+        await pilot.pause()
+        assert app.selected() is None
+        for action in (app.action_open_selected, app.action_shell_selected, app.action_start_selected,
+                       app.action_stop_selected, app.action_delete_selected, app.action_runtime,
+                       app.action_usage, app.action_check_selected, app.action_repair_selected,
+                       app.action_backup_selected, app.action_export_selected, app.action_keep_quick,
+                       app.action_git_review, app.action_agent_context):
+            before = len([note for note in app._notifications if note.message == "Select an environment"])
+            action()
+            await pilot.pause()
+            assert len([note for note in app._notifications if note.message == "Select an environment"]) == before + 1
+            assert stack(app) == ["Screen"] and not app._operation_pending
+        assert not any(args[0] in {"start", "stop", "run", "exec", "rm"} for args in fake_runtime)
+
+    run(test)

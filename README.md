@@ -4,9 +4,9 @@
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
 Run [OpenCode](https://github.com/anomalyco/opencode) coding agents in per-environment containers on **your own
-rootless Docker daemon**, from a command line or a terminal dashboard. Each environment has its
-own workspace, home volume, settings and credentials; the agent's changes reach your repository
-only when you transfer them, for example as a review branch.
+rootless Docker daemon** by default, from a command line or a terminal dashboard. Each environment
+has its own workspace, home volume, settings and credentials. With the default managed workspace,
+changes reach your repository only when you transfer them, for example as a review branch.
 
 OpenCode Sandbox is an independent open-source project. It is not affiliated with or endorsed by
 the OpenCode project, and it is unrelated to other projects with similar names.
@@ -31,16 +31,18 @@ Consider something else if:
 - you need a hard isolation boundary for untrusted code: use a virtual machine;
 - you need network isolation with internet access: there is no egress filtering, only `bridge`
   (internet and local network) or `none`;
-- you are on macOS or Windows: the manager needs a Linux host with rootless Docker;
+- you are on macOS or Windows: the manager needs a Linux host and a supported local Docker daemon;
 - you want a general container or dev-container manager: this manages OpenCode environments
   only. Dev containers, a plain `docker run`, or OpenCode directly on your host may suit you
   better.
 
 ## Features
 
+- **Docker backends** include rootless by default and opt-in local rootful Docker.
+  [Backend settings](docs/settings.md#docker-backend)
 - **Environments**: scratch (empty), project (a Git clone, optionally including local working
   changes, or a filtered copy of a folder) and
-  disposable quick sessions; Debian 13 or Arch Linux images (AUR through `ocs-aur`), or a
+  disposable quick sessions; Debian 13, Arch Linux (AUR through `ocs-aur`) or Kali Linux rolling images, or a
   custom image.
 - **Managed workspaces** by default, never your original folder; direct host workspaces only with
   explicit consent and checks (not recommended).
@@ -75,16 +77,16 @@ Consider something else if:
 - **Direct container launches**: `ocs-opencode` safely loads the mounted provider profile and
   starts a private OpenCode server, including from scripts or a direct Docker shell.
 - **Diagnostics**: `doctor` for the host, read-only `check NAME` per environment including
-  measured network reachability, disk usage and conservative cleanup.
+  measured network reachability, a live OpenCode availability probe, disk usage and conservative cleanup.
 
 ## Security in brief
 
-- The agent is **root inside its container**. Container root maps to your user on the host, not
-  to the host's root; rootless Docker reduces the damage of an escape but does not prevent one.
-- The manager verifies that Docker is **your own rootless daemon** before every use and refuses
-  rootful, other users', proxied and remote daemons.
-- The default network mode `bridge` reaches the internet **and your local network**; only the
-  host's loopback is blocked. `none` has no network.
+- In the default **rootless** backend, container root maps to your user on the host.
+  Opted-in rootful environments run as your UID and can use container-local passwordless sudo.
+- The manager authenticates the selected daemon and refuses foreign, proxied and remote endpoints.
+  Access to the rootful socket carries host root authority. [Security model](docs/security.md#rootful-docker)
+- The default network mode `bridge` can reach the internet **and your local network**. It is
+  not egress isolation. `none` disables container networking apart from its own loopback.
 - The agent **can read the provider keys** mounted into its container: use scoped,
   budget-limited keys.
 - A direct workspace gives the agent your folder itself, with no undo.
@@ -99,22 +101,20 @@ Details: [docs/security.md](docs/security.md).
 | Host, real rootless Docker | Arch Linux, kernel 7.3.4: the full test campaign |
 | Host, hosted CI only | Ubuntu 26.04: simulated-Docker tests, package and pipx checks on Python 3.11/3.14; rolling Arch userland tests as an unprivileged user |
 | Python | Local endpoints 3.11.18 and 3.14.10; Python 3.12/3.13 are accepted but not tested separately |
-| Docker | 29.10.0, rootless, slirp4netns |
+| Docker | 29.10.0, rootless with slirp4netns and separate rootful checks on Debian, Arch and Kali images |
 | pipx | 1.18.7 |
 | Typer, Textual | 0.29.2, 8.2.8 |
 | OpenCode | 2.1.4 and 2.2.0 in the real campaign; 2.3.2 in hosted image builds (npm `@opencode/cli`; 2.x only) |
-| Images (inside the containers) | Debian 13 (`node:24-trixie`, the default) and Arch Linux (`archlinux:base-devel`); existing Debian 12 environments from 6.0.0 keep working |
+| Images (inside the containers) | Debian 13 and Arch Linux in the full rootless campaign; focused Kali rolling build verification and rootful testing with Debian and Kali |
 
 The manager is meant to run on any Linux distribution that meets the
-[requirements](docs/install.md#requirements): rootless Docker with its kernel prerequisites,
-Python 3.11 or newer with pipx, and Git. Real-world testing has been done on Arch Linux only;
+[requirements](docs/install.md#requirements): a supported local Docker daemon, Python 3.11 or
+newer with pipx, and Git. Real-world testing has been done on Arch Linux only;
 other distributions are untested, so compatibility with them is expected but not guaranteed. The
 image you choose for an environment is the distribution inside its container and does not depend
 on your host's distribution.
 
-The Debian image is Debian 13 since 6.1.0 (6.0.0 used Debian 12). Neither a manager upgrade
-nor a base rebuild upgrades an existing container's OS: Debian 12 environments and system
-backups stay on Debian 12, which has LTS-only security support until 2028-06-30. See
+Manager upgrades and base rebuilds do not change an existing container's OS. See the
 [base-image guidance](docs/workspaces.md#distributions-and-images). One real model provider was
 tested with OpenCode 2.x: OpenRouter (`z-ai/glm-5.3-flash`); the automated tests use a fake
 OpenAI-compatible provider.
@@ -125,7 +125,7 @@ You need Linux with Python 3.11 or newer, pipx and Git; install them using your 
 documentation. Install the application from a release tag:
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.5.0
 opencode-sandbox --version
 ```
 
@@ -134,9 +134,8 @@ To upgrade, install another tag with `--force`; `pipx upgrade` keeps the install
 explicitly. Existing environments are not rebuilt.
 `pipx uninstall opencode-sandbox` removes the application and keeps your environments and data.
 
-The application does not install or configure Docker. Prepare your rootless Docker daemon and the
-base images separately, as described in [docs/install.md](docs/install.md#prepare-docker); the
-manager only checks them.
+The application does not install or configure Docker. Set up your [Docker daemon](docs/install.md#prepare-docker)
+and [build the base images](docs/install.md#build-the-sandbox-images) for the backend you use.
 
 ## Quick start
 
@@ -168,9 +167,9 @@ The manager sends no telemetry. These services are contacted:
 | Service | When |
 |---|---|
 | GitHub, PyPI | Installation and upgrades with pipx (the source, then Typer, Textual and their dependencies) |
-| Docker Hub | Base image builds (`node:24-trixie`, `archlinux:base-devel`) |
+| Docker Hub | Base image builds (`node:24-trixie`, `archlinux:base-devel`, `kalilinux/kali-rolling`) |
 | The registry of a custom image | The first start of an environment created with `create --image` |
-| Debian or Arch package mirrors | Base image builds, and packages you install in an environment |
+| Debian, Arch or Kali package mirrors | Base image builds, and packages you install in an environment |
 | AUR, GitHub, crates.io | The Arch image build (the AUR helper `paru` and its sources); AUR packages you install |
 | npm registry | OpenCode installs and updates; version checks (`opencode check`, `opencode versions --check`) from the host; the internet probe of `check NAME` from inside the container |
 | Your model provider | Whatever your provider profile and OpenCode configuration use |

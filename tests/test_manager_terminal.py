@@ -29,7 +29,7 @@ artifact = staged_artifact
 
 
 def test_attached_session_refuses_handoff_before_artifact_inspection(monkeypatch):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     async def test():
         app = tui.Dashboard()
         async with app.run_test(size=(80, 24)) as pilot:
@@ -43,7 +43,7 @@ def test_attached_session_refuses_handoff_before_artifact_inspection(monkeypatch
 
 @pytest.mark.parametrize('flag', ['_operation_pending', '_updates_mutation_active'])
 def test_operations_refuse_handoff_before_inspection(monkeypatch, flag):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     async def test():
         app = tui.Dashboard()
         async with app.run_test() as pilot:
@@ -55,7 +55,7 @@ def test_operations_refuse_handoff_before_inspection(monkeypatch, flag):
 
 
 def test_open_screen_or_consent_refuses_handoff(monkeypatch):
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     async def test():
         app = tui.Dashboard()
         async with app.run_test() as pilot:
@@ -68,7 +68,7 @@ def test_open_screen_or_consent_refuses_handoff(monkeypatch):
 @pytest.mark.parametrize('cancel', [False, True])
 def test_live_thread_body_refuses_handoff_even_after_textual_cancellation(artifact, monkeypatch, cancel):
     origin(monkeypatch, artifact)
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     entered, release = threading.Event(), threading.Event()
     class App(tui.Dashboard):
         @work(thread=True)
@@ -119,7 +119,7 @@ def test_queued_worker_also_refuses_sealing():
 def test_configuration_recovery_retains_app_ownership_and_actual_body_tracking(monkeypatch):
     from opencode_sandbox.management_tui import RecoveryScreen
     entered, release = threading.Event(), threading.Event()
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     def recover(*args):
         entered.set()
         assert release.wait(8)
@@ -143,7 +143,7 @@ def test_configuration_recovery_retains_app_ownership_and_actual_body_tracking(m
 
 def test_successful_internal_request_exits_but_never_starts_or_arms_fixture(artifact, monkeypatch):
     origin(monkeypatch, artifact)
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     async def test():
         app = tui.Dashboard()
         async with app.run_test(size=(80, 24)) as pilot:
@@ -160,7 +160,7 @@ def test_successful_internal_request_exits_but_never_starts_or_arms_fixture(arti
 @pytest.mark.parametrize('bad', ['missing', 'verify', 'used', 'prefix'])
 def test_invalid_or_stale_requests_do_not_seal_or_exit_the_dashboard(artifact, monkeypatch, bad):
     origin(monkeypatch, artifact)
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     async def test():
         app = tui.Dashboard()
         async with app.run_test() as pilot:
@@ -177,7 +177,7 @@ def test_invalid_or_stale_requests_do_not_seal_or_exit_the_dashboard(artifact, m
 
 def test_off_ui_thread_cannot_request_handoff_or_consume_the_artifact(artifact, monkeypatch):
     origin(monkeypatch, artifact)
-    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self: None)
+    monkeypatch.setattr(tui.Dashboard, '_prerequisites_worker', lambda self, *_: None)
     async def test():
         app = tui.Dashboard()
         async with app.run_test() as pilot:

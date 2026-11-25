@@ -9,8 +9,9 @@ Engineering records provide design and evidence, not additional routine executio
 
 ## Scope
 
-OpenCode Sandbox runs OpenCode coding agents in containers on the user's own rootless Docker
-daemon, on Linux hosts; Arch Linux is the development and test host (D-046). It is deliberately not
+OpenCode Sandbox runs OpenCode coding agents in Linux containers using the user's own rootless
+daemon by default, or an explicitly opted-in local rootful daemon. Arch Linux is the development
+and test host (D-046). The project is deliberately not
 a general container manager, does not manage repositories or package repositories, and leaves an
 environment's OpenCode configuration to the user, with only explicitly requested global-config
 file transfers and no automatic provisioning/synchronization. Please open an issue to
@@ -55,11 +56,12 @@ host/application setup script or replacement wizard in the repository.
   pushes do not trigger release automation; that workflow accepts version tags only. The weekly
   Images workflow checks the published definitions on the default branch (`main`) and publishes
   no images. Use **Run workflow** on `develop` or a topic branch to check unreleased definitions
-  with the same Debian and Arch matrix. A fix on `develop` reaches the schedule only after it is
+  with the same Debian, Arch and Kali matrix. A fix on `develop` reaches the schedule only after it is
   integrated into `main` through an approved release or stable hotfix PR.
 - Agents need explicit human authorization for remote pushes, remote changes, tags and releases
-  (`AGENTS.md`). Only the maintainer creates release tags. Do not bypass branch protection or use
-  force pushes; the branch model itself grants no publication permission.
+  (`AGENTS.md`). The owner may delegate release tagging for an exact version and verified `main`
+  commit under [the release procedure](docs/engineering/RELEASING.md#3-tag-and-publish). Do not
+  bypass branch protection or use force pushes; the branch model grants no publication permission.
 
 User guides on `develop` evolve with the next release; the matching stable guides remain on
 `main` and version tags. Keep release status in `CHANGELOG.md` and engineering records, not
@@ -137,7 +139,7 @@ describe earlier assignments, not standing orders.
 | Unit, host, Textual pilot | Mocked Docker (`tests/conftest.py`); real files and Git; the dashboard headless | `pytest -q` (no daemon is contacted) |
 | Quality | `ruff check src tests .github/scripts` and `shellcheck` on the shell scripts (`tests/test_quality.py`); skipped when the tool is missing | part of `pytest -q` |
 | Real identity and sessions | Tests marked `real_identity` and `real_session` run the daemon-identity verifier and session watchdogs as real local processes (against fake sockets and a fake `docker`) | part of `pytest -q` |
-| Real campaign | Real rootless Docker, both base images, real OpenCode, real terminals, fault injection (`tests/integration/`) | see below |
+| Real campaign | Real rootless Docker, the managed base images, real OpenCode, real terminals, fault injection (`tests/integration/`) | see below |
 
 `pytest -q` is the complete default suite, not the required command for every local task. It mixes
 mocked Docker with real host files/Git, sockets, processes and terminal fixtures; it is not live
@@ -150,7 +152,7 @@ inside the checkout trigger direct-workspace/import guards; deep paths exceed Un
 Keep logs and manifests under ignored `.work/`; never remove other runs' resources.
 
 The real campaign creates and deletes containers, volumes and images on your rootless daemon,
-kills and interrupts operations on purpose, and needs both base images, network access and
+kills and interrupts operations on purpose, and needs the selected base images, network access and
 `pyte`. **Run it only on a disposable machine, such as a VM set aside for testing**, never on a
 machine whose Docker data you care about:
 
@@ -164,7 +166,7 @@ manifest of what it created to `.work/logs/` and removes it again. Variables:
 | Variable | Effect |
 |---|---|
 | `OCS_TEST_DOCKER=1` | Enable the real campaign (otherwise its tests are skipped) |
-| `OCS_TEST_DISTROS` | Distributions to test (default `debian arch`) |
+| `OCS_TEST_DISTROS` | Distributions to test (default `debian arch kali`) |
 | `OCS_TEST_RUN` | Run id, used in names and log files |
 | `OCS_TEST_PRIVILEGED=1` | Add the rows that use `sudo` and restart or kill your daemon; read the docstring of `tests/integration/test_70_privileged.py` first |
 | `OCS_TEST_SOCKET_ACTIVATION=1` | Explicit permission for C10's separate rootless daemon and temporary `ocs-test-act-*` user units; read `test_36_socket_activation.py`; never restarts the existing daemon |
@@ -204,20 +206,20 @@ High-risk selection checklist (apply the affected rows, not every row to every c
 
 | Boundary | Failure modes / evidence to cover |
 |---|---|
-| Rootless daemon identity/isolation | Own UID, authenticated `dockerd` peer/user namespace/rootless option; refuse proxies, rootful/foreign/remote daemons; ownership/data-dir labels/collisions; measured `bridge`/`none` reachability, not assumed isolation |
+| Docker daemon identity/isolation | Authenticate `dockerd` response sender; verify own UID/namespace for rootless, local UID 0/unmapped for rootful; never fall back or use rootful without consent; refuse foreign/remote/proxied endpoints; verify ownership and measured reachability |
 | Filesystem/direct workspaces and host Git transfer | Symlink/traversal/unsafe paths and permissions, hostile Git configuration, uncommitted files/conflicts, export/stage/apply boundaries and preservation of user data |
 | Secrets/profiles | JSON permissions, executable `.env` refusal, safe argv/key injection; no leakage in processes, logs, metadata or backups; dummy credentials/fake providers unless explicitly authorized |
 | Lifecycle/configuration, locking/concurrency | Creation/start/recreate/cleanup races and lock order, journals/crash consistency, home/workspace/system-layer boundaries, once-only integrations, read-only readiness and no cross-data-directory/base/cache cleanup |
 | Backup/restore/rollback/recovery | Archive/link validation, interrupted/staged restore, retained checkpoints/copies, failed recovery and data/configuration preservation; no unsupported-schema migration |
 | Manager self-update/destructive operations | pipx tag install/upgrade/downgrade/uninstall/data retention, foreign-launcher refusal, independent helper/terminal handoff, exact installed-result verification and interruption/recovery, not success-path-only checks |
-| OpenCode/images/session boundaries | Both affected distributions, supported-major/pin/update/rollback policy, disabled self-update, real first-prompt Agent Context and user-owned configuration; keyboard/focus/confirmation/async errors and terminal/session return or manager death when affected |
+| OpenCode/images/session boundaries | Every affected distribution and backend, supported-major/pin/update/rollback policy, disabled self-update, real first-prompt Agent Context and user-owned configuration; keyboard/focus/confirmation/async errors and terminal/session return or manager death when affected |
 
 At meaningful local integration checkpoints, default to the complete suite on Python 3.11 with
 lowest direct dependencies and Python 3.14 with current compatible dependencies. Add the other
 combinations immediately when dependency/interpreter interactions or high-risk uncertainty warrant
 them; do not require four full runs after every shared-code edit. Use targeted endpoint checks for
 narrower risks. Public CI and final release qualification still require the complete four-way matrix.
-Affected real-Docker/OpenCode paths need both distributions where applicable, and installed pipx/
+Affected real-Docker/OpenCode paths need all affected distributions, and installed pipx/
 terminal/fault paths for installation changes. Obtain the permissions in AGENTS first; if unavailable,
 report the gap and residual risk, not a PASS. A full default-suite PASS is not real integration proof.
 

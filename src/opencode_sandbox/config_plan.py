@@ -24,8 +24,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from . import agent_context as ac
+from . import backends, workspaces
 from . import core as c
-from . import workspaces
 
 CATEGORIES = ("none", "saved", "dynamic", "restart", "recreate")
 LIMITS = ("cpus", "memory", "pids")
@@ -104,6 +104,7 @@ def _memory_category(old, new, running):
     return "dynamic", "docker update"
 
 
+@backends.environment
 def plan(m: dict, changes: dict) -> Plan:
     """Read-only: what applying `changes` (a subset of FIELDS) would do now."""
     unknown = set(changes) - set(FIELDS)
@@ -169,11 +170,11 @@ def plan(m: dict, changes: dict) -> Plan:
         "dynamic": ["Apply the limits to the existing container with docker update (no restart)."],
         "restart": ["Stop the container.", "Apply the limits with docker update.", "Start the container again."],
         "recreate": [*(["Stop the container."] if running else []),
-                     "Commit its system layer (packages, files outside /workspace and /root) to an ocs-runtime image.",
+                     "Commit its system layer (packages, files outside /workspace and the home volume) to an ocs-runtime image.",
                      "Remove the container; a new one is created from that image with the new settings "
                      + ("now." if running else "at the next start.")
-                     + (" The direct host directory is mounted again, unchanged; the /root volume is kept." if direct
-                        else " /workspace and the /root volume are kept."),
+                     + (" The direct host directory is mounted again, unchanged; the home volume is kept." if direct
+                        else " /workspace and the home volume are kept."),
                      *(["Start the new container."] if running else [])],
     }[category]
     if category == "dynamic" and not changed.intersection(LIMITS):
@@ -207,6 +208,7 @@ def _show(value):
     return str(value)
 
 
+@backends.environment
 def apply(m: dict, changes: dict, *, confirmed: Plan | None = None) -> dict:
     """Apply `changes`; with `confirmed`, refuse if the plan changed since it was shown."""
     p = plan(m, changes)
@@ -259,6 +261,7 @@ def apply(m: dict, changes: dict, *, confirmed: Plan | None = None) -> dict:
     return {"category": category, "applied": True, "settings": p.target}
 
 
+@backends.environment
 def _update_container(m):
     """Run the journalled `config-update` steps (idempotent; also used by recover). Lock held."""
     pending = m["pending_config"]
@@ -297,6 +300,7 @@ def _refresh_guidance(env_id):
         ac.refresh(m, c.env_dir, **c.guidance_inputs(m))
 
 
+@backends.environment
 def recover(m: dict, *, precondition=None) -> dict:
     """Finish an interrupted change: re-run a journalled limit update, or complete a container
     recreation (`core.recover_runtime_reconfigure`)."""

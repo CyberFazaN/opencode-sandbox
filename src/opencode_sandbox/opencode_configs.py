@@ -17,6 +17,7 @@ import time
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
+from . import backends
 from . import config_tree as tree
 from . import core as c
 
@@ -37,6 +38,10 @@ class Conflict(c.SandboxError):
     def __init__(self, fingerprint):
         super().__init__("Container config changed since the last Export/Apply. Cancel or Overwrite Anyway.")
         self.fingerprint = fingerprint
+
+
+def scope(m):
+    return SCOPE.replace(BOUNDARY, backends.home(m) + "/.config/opencode/")
 
 
 def profiles_directory():
@@ -342,29 +347,34 @@ def _volume_ready(m):
     if declared is None: declared = {}
     if not isinstance(declared, dict):
         raise c.SandboxError("Cannot inspect config helper image volumes; no transfer started")
-    target = BOUNDARY.rstrip("/")
+    home = backends.home(m)
+    target = home + "/.config/opencode"
     for name in declared:
         if not isinstance(name, str) or not name.startswith("/"):
             raise c.SandboxError("Unsupported image volume declaration; no transfer started")
         name = posixpath.normpath("/" + name.lstrip("/"))
-        if name != "/root" and (name == target or name.startswith(target + "/") or target.startswith(name.rstrip("/") + "/")):
-            raise c.SandboxError("Global config has an overlapping image volume; transfers require the persistent /root volume alone")
+        if name != home and (name == target or name.startswith(target + "/") or target.startswith(name.rstrip("/") + "/")):
+            raise c.SandboxError("Global config has an overlapping image volume; transfers require the persistent home volume alone")
     return image
 
 
+@backends.environment
 def volume_operation(m, action, *, incoming=None, outgoing=None, bounds=None, **options):
     """Locked service transport. Binary config bytes never enter logs, argv or notifications.
 
     `bounds`: the limits computed once for this operation, before its host archive used /tmp."""
     image = _volume_ready(m)
     request = {"action": action, "binding": binding(m), **(bounds or limits()), **options}
+    if backends.get(m) == backends.ROOTFUL:
+        request.update(home=backends.home(m), identity=m["identity"])
     token = secrets.token_hex(12)
     name = "ocs-config-" + token
-    argv = ["docker", "-H", c.docker_endpoint(), "run", "--rm", *c.helper_labels("opencode-config"), "--pull", "never", "--name", name,
+    # Give timeout its own process group instead of running it as container PID 1.
+    argv = ["docker", "-H", c.docker_endpoint(), "run", "--rm", "--init", *c.helper_labels("opencode-config"), "--pull", "never", "--name", name,
             "--network", "none", "--security-opt", "no-new-privileges:true", "--cap-drop", "NET_RAW",
             "--cap-drop", "MKNOD", "--user", "0:0",
             "--label", f"org.opencode-sandbox.config-operation={token}",
-            "--mount", f"type=volume,src={c.volume(m)},dst=/root" + ("" if options.get("fresh") else ",volume-nocopy"),
+            "--mount", f"type=volume,src={c.volume(m)},dst={backends.home(m)}" + ("" if options.get("fresh") else ",volume-nocopy"),
             "--entrypoint", "timeout", "-i", image, "--signal=KILL", "1800s", "python3", "-c",
             _helper_source(), json.dumps(request)]
     # The spool is file-backed, not an unbounded capture_output. The helper codec enforces
@@ -405,6 +415,7 @@ def volume_operation(m, action, *, incoming=None, outgoing=None, bounds=None, **
     return result
 
 
+@backends.environment
 def initialize(m, archive, bounds=None):
     """Creation only: new labelled volume, no destination data to merge or overwrite."""
     if c.volume_state(m) is not None:
@@ -454,6 +465,7 @@ def _complete(m):
            operation=None, last_error=None)
 
 
+@backends.environment
 def recover(m):
     """Explicitly resolve only this operation's recoverable volume transaction."""
     with c.lock(m["id"]):
@@ -465,6 +477,7 @@ def recover(m):
         return "Recovered global config transfer. A durably committed replacement is retained; an uncommitted switch is rolled back. Export baseline is unchanged; re-export or review any Apply drift."
 
 
+@backends.environment
 def export(m, *, replace=False):
     with c.lock(m["id"]):
         m = _environment(m)
@@ -511,6 +524,7 @@ def export(m, *, replace=False):
             return str(path / "config")
 
 
+@backends.environment
 def apply(m, *, overwrite=None):
     with c.lock(m["id"]):
         m = _environment(m)
@@ -560,6 +574,7 @@ def reload(m, source, *, confirmed=False):
         return _reload(m, None, archive, bounds)
 
 
+@backends.environment
 def _reload(m, source, archive, bounds=None):
     with c.lock(m["id"]):
         m = _environment(m)

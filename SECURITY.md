@@ -7,7 +7,7 @@ Only the latest release receives fixes. Upgrade by installing the newest tag
 
 | Version | Supported |
 |---|---|
-| 6.3.0 | yes |
+| 6.5.0 | yes |
 
 ## Reporting a vulnerability
 
@@ -27,7 +27,8 @@ the maintainer a reasonable time to fix it before you disclose it.
 In scope: ways in which OpenCode Sandbox itself fails to keep a boundary it claims
 ([docs/security.md](docs/security.md)), for example:
 
-- the daemon identity check accepts a daemon that is not the user's own rootless daemon;
+- the daemon identity check accepts an endpoint that does not match the selected backend's
+  identity requirements, or the manager uses rootful Docker without opt-in;
 - an environment gets host access beyond its documented workspace and mounts;
 - credentials leak into logs, metadata, process listings, exports or backups;
 - the `changes` commands let the sandbox's repository run code on the host or write outside the
