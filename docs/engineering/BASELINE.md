@@ -9,15 +9,15 @@ Recorded checks apply only to the code and configurations tested.
 
 | Item | Current state |
 |---|---|
-| Manager | `6.4.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
+| Manager | `6.5.0`, Beta; source: `src/opencode_sandbox/__init__.py` |
 | Branches | `main`: published stable source/docs; `develop`: unreleased changes (D-058) |
 | Distribution | MIT `opencode-sandbox`; pipx from versioned GitHub tags, no package index |
 | Schemas | Rootless metadata 2 and backup 3; rootful metadata 3 and backup 4. Unknown schemas are refused |
 | Images | Debian 13/default (`node:24-trixie`, revision 5); Arch rolling (`archlinux:base-devel`, revision 4); Kali rolling (`kalilinux/kali-rolling`, revision 2) |
 
-6.4.0 adds opt-in full-directory copies, clarifies workspace setup and Agent Context activation,
-and corrects the Debian/Arch launcher installation and the Arch AUR helper build. Environment and
-backup schemas are unchanged. Manager upgrades do not rebuild existing images or environments.
+6.5.0 adds Kali rolling, opt-in rootful Docker, runtime OpenCode availability checks and dashboard
+improvements. Rootless environment and backup schemas stay at 2 and 3. Rootful environments and
+backups use schemas 3 and 4. Manager upgrades do not rebuild existing images or environments.
 
 ## Supported environments
 
@@ -33,23 +33,51 @@ backup schemas are unchanged. Manager upgrades do not rebuild existing images or
   current/lowest, installed-package/process verification and review of the required-check transition.
 - Current Typer/Textual 0.29.2/8.2.8; lowest direct versions 0.16.0/4.0.0. Test environment:
   pytest 9.2.0, pyte 0.8.2, Ruff 0.17.3, shellcheck 0.11.0; pipx 1.18.7.
-- OpenCode `@opencode/cli` 2.x only; 2.1.4 and 2.2.0 in the 6.4.0 real campaign, and 2.3.2 in
-  the hosted Debian/Arch image builds for that release.
+- OpenCode `@opencode/cli` 2.x only. Versions 2.1.4 and 2.2.0 were exercised in the 6.5.0
+  campaign, and 2.3.2 in the earlier 6.4.0 hosted Debian and Arch image builds.
 
 ## Verification
 
+### 6.5.0 candidate qualification
+
+The installed product was packaged from `3521605`. Subsequent changes cover tests and release
+documentation. Local verification used an Arch Linux host and all three managed image definitions.
+
+| Layer | Result and scope |
+|---|---|
+| Local Python and dependency matrix | Each combination passed 2,440 tests with 140 real-campaign opt-in skips. Python 3.11 and 3.14 used current Typer/Textual 0.29.2/8.2.8 and minimum direct versions 0.16.0/4.0.0. The minimum pairs emitted two dependency deprecation warnings each. |
+| Packaging and private-tag pipx | Both Python endpoints passed sdist and wheel builds, strict Twine and content checks, private-tag installation and verified rootless `doctor`. All 78 installed product files matched the release source before adding the disposable test hook. |
+| Installed rootless campaign | All 140 collected cases passed across measured batches on the same product. Coverage includes all three packaged base definitions, retained Debian 12, real OpenCode with a fake provider, fault injection, real terminal sessions, installed-manager replacement, isolated socket activation and the privileged rows. |
+| Python 3.11 installed-manager floor | All eight cases passed, covering pipx lifecycle, both installation layouts, replacement and independent recovery, and session exclusion on all three images. |
+| Scoped rootful campaign | Debian, Arch and Kali passed opt-in, host identity, daemon separation, direct workspace and home ownership, in-container sudo, real OpenCode, system backup and restore across data directories, cleanup boundary checks, and interrupted recreation recovery. Each run restored the original rootful daemon inventory. |
+| Static and privacy checks | actionlint and offline zizmor passed. Gitleaks found no leaks in history or the tracked tree. The detect-secrets fingerprints matched the 13 previously reviewed dummy fixtures. Path, host, address, and email scans matched only known test data. |
+
+The two public `develop` commits preceding qualification failed the same hanging-version test on
+Ubuntu 26.04. Its `uutils timeout` exited while the probe pipeline still held its output pipes. The
+old test transport raised `TimeoutExpired` outside the product's diagnostic budget. The revised
+transport exercised that budget and reported `Unknown`. This was reproduced with Ubuntu's packaged
+utilities. A separate Kali integration failure returned 125 when the config helper's timeout ran as
+container PID 1. Docker init resolved it, and real Kali profile transfer and interruption recovery passed.
+
+Test updates covered the custom-image repair and refusal paths, daemon admission before metadata
+creation, keyboard focus in the discovery and policy dialogs, explicit Manager-tab selection,
+and pipx warning line wrapping. The first Arch base-image
+terminal build at 120×40 hit the real disk reserve. It passed on retry with more free space and
+the same reserve. Coverage was checked against the collection and counted only passed cases.
+B15 repeated same-boot refusal and independent recovery. The earlier 6.4.0 two-boot result remains
+the evidence for the unchanged post-boot path.
+
 ### Focused backend and image verification
 
-Focused rootful evidence on the disposable Arch host covered Debian and Kali: authentication and
-daemon separation, UID/GID and direct-bind ownership, container-local sudo, config copy/export,
-OpenCode update/rollback, system-image backup/restore, recreation and the disabled gate. It does
-not extend to the Arch base on rootful.
+Before qualification, focused rootful evidence on the disposable Arch host covered Debian and
+Kali daemon identity and separation, UID/GID and direct-bind ownership, container-local sudo,
+config copy/export, OpenCode update/rollback, system-image backup/restore, recreation and opt-in.
 
 Follow-up verification covered executable availability and bounded probes on real Debian/Arch
 rootless environments, a real dashboard shell attach, a rootful cleanup preview, and a local
 Kali revision 2 image build with `npm` and `npx` verification. The affected tests passed after
-the fixes, including selected minimum-dependency pilots. The full suite and real release campaign
-were not repeated on the final product tree. This is focused evidence, not candidate qualification.
+the fixes, including selected minimum-dependency pilots. The qualification above records the
+subsequent release checks.
 
 ### Published 6.4.0
 
@@ -440,9 +468,6 @@ in the tagged Git tree; [CAMPAIGN](CAMPAIGN.md) keeps the applicable row-level s
 
 ## Unverified behaviour
 
-- **Backend and image coverage:** full regression has not been repeated after the focused fixes.
-  Arch's managed image on rootful remains unqualified. Run the applicable release gates on the
-  candidate tree.
 - **Host reboot generally (D09):** risk accepted for 6.3.0 on 2026-11-04, not executed. Daemon restart,
   stop/start and daemon-unit SIGKILL passed. Next: authorized reboot, then `start NAME` and
   `check NAME` on a manifested test environment; do not equate this with B15's separate proof.
