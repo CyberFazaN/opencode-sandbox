@@ -6,12 +6,19 @@ All notable changes to OpenCode Sandbox are recorded here. Versions follow
 
 ## Unreleased
 
+## 6.5.0 — 2026-11-25
+
+Python 3.11 or newer. Existing rootless environments and backups keep their schema versions.
+Rootful environments and backups use separate schemas. Restoring a rootful backup requires
+rootful Docker access.
+
 - Add opt-in rootful Docker environments with an immutable backend and host-matched session
   identity, a persistent home and container-local passwordless sudo. Rootful disk cleanup keeps
   shared base artifacts.
 - Add the Kali Linux rolling base image to CLI and dashboard creation and the scheduled image
   verification matrix. Rebuild a development Kali revision 1 base for `npx` support; a rebuild
   does not change existing containers.
+- Fix OpenCode configuration profile transfers on Kali when the helper runs on rootless Docker.
 - Check runtime OpenCode availability from the CLI and dashboard. A probe timeout is unknown,
   not broken. Restore smoke checks report OpenCode separately from the mounts.
 - Keep confirmation actions visible while long reviews scroll. Improve keyboard focus and

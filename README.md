@@ -101,7 +101,7 @@ Details: [docs/security.md](docs/security.md).
 | Host, real rootless Docker | Arch Linux, kernel 7.3.4: the full test campaign |
 | Host, hosted CI only | Ubuntu 26.04: simulated-Docker tests, package and pipx checks on Python 3.11/3.14; rolling Arch userland tests as an unprivileged user |
 | Python | Local endpoints 3.11.18 and 3.14.10; Python 3.12/3.13 are accepted but not tested separately |
-| Docker | 29.10.0, rootless, slirp4netns |
+| Docker | 29.10.0, rootless with slirp4netns and separate rootful checks on Debian, Arch and Kali images |
 | pipx | 1.18.7 |
 | Typer, Textual | 0.29.2, 8.2.8 |
 | OpenCode | 2.1.4 and 2.2.0 in the real campaign; 2.3.2 in hosted image builds (npm `@opencode/cli`; 2.x only) |
@@ -125,7 +125,7 @@ You need Linux with Python 3.11 or newer, pipx and Git; install them using your 
 documentation. Install the application from a release tag:
 
 ```sh
-pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.4.0
+pipx install git+https://github.com/CyberFazaN/opencode-sandbox.git@v6.5.0
 opencode-sandbox --version
 ```
 

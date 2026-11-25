@@ -110,14 +110,20 @@ def test_rootful_and_foreign_daemons_are_refused(campaign, checks, sudo):
         env = context_env(camp, "ocs-test-rootful", sock)
         p = camp.ocs("doctor", check=False, env=env)
         ck(p.returncode != 0 and "root (a rootful daemon)" in p.stdout + p.stderr, "C01 doctor: rootful daemon refused (mismatch)")
-        camp.ocs("create", "ocs-test-viarootful", env=env)
-        camp.adopt("ocs-test-viarootful")
-        p = camp.ocs("start", "ocs-test-viarootful", check=False, env=env)
+        existing = "ocs-test-start-viarootful"
+        camp.create(existing)
+        p = camp.ocs("create", "ocs-test-viarootful", check=False, env=env)
+        ck(p.returncode != 0 and "root (a rootful daemon)" in p.stdout + p.stderr,
+           "C01 rootless create through the rootful daemon refused")
+        if p.returncode == 0:
+            camp.adopt("ocs-test-viarootful")
+            camp.delete("ocs-test-viarootful")
+        p = camp.ocs("start", existing, check=False, env=env)
         ck(p.returncode != 0 and "rootful" in p.stdout + p.stderr and "Traceback" not in p.stdout + p.stderr,
            "C01 start through the rootful daemon refused")
         listed = subprocess.run(["docker", "-H", f"unix://{sock}", "ps", "-aq"], capture_output=True, text=True, check=False).stdout
         ck(listed.strip() == "", "C01 nothing was created on the rootful daemon")
-        camp.delete("ocs-test-viarootful")
+        camp.delete(existing)
     finally:
         pid = (work / "dockerd.pid").read_text().strip() if (work / "dockerd.pid").exists() else None
         if pid:
@@ -133,7 +139,8 @@ def test_rootful_and_foreign_daemons_are_refused(campaign, checks, sudo):
         sudo(camp, "rm", "-rf", "--", str(work), check=True)
         camp.note(f"stopped the rootful dockerd; removed {work}")
     ck(subprocess.run(["pgrep", "-f", str(work)], capture_output=True, check=False).returncode == 1, "C01 no process of the rootful daemon left")
-    ck(firewall(camp, sudo) == net_before, f"C01 firewall rules and network interfaces unchanged {net_before}")
+    net_after = firewall(camp, sudo)
+    ck(net_after == net_before, f"C01 firewall rules and network interfaces unchanged ({net_before} -> {net_after})")
     ck(Path("/etc/docker").exists() == etc_before, "C01 the rootful daemon created no /etc/docker")
 
     # Another user's socket: the peer check refuses before talking to it.

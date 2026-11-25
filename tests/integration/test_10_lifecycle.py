@@ -355,19 +355,28 @@ def test_custom_image_provenance(campaign, checks, custom_image):
     camp.delete(name)
 
 
-def test_custom_image_without_python_refuses_managed_start(campaign, checks):
-    """The prepared fixture must not conceal refusal of an unprepared custom image."""
+def test_custom_image_without_python_reports_reconciliation_failure(campaign, checks):
+    """An unprepared custom image remains available for repair while OpenCode is absent."""
     camp, ck = campaign, checks
     name = "ocs-test-custom-unprepared"
     eid = camp.create(name, "--image", "ubuntu:24.04")
     workspace = camp.data / "environments" / eid / "workspace"
     (workspace / "preserved").write_text("custom-start-data")
+    result = camp.ocs("start", name)
+    ck("WARNING: Cannot reconcile system Agent Context activation" in result.stderr
+       and "Cannot reconcile system Agent Context activation" in camp.metadata(name)["last_error"],
+       "E11 unprepared image without OpenCode starts with a persisted reconciliation warning")
+    ck(camp.sh(eid, "command -v python3", check=False).returncode != 0
+       and camp.metadata(name)["status"] == "running", "E11 missing Python is visible and repair is reachable")
+
+    camp.sh(eid, "printf '#!/bin/sh\\necho 2.2.0\\n' > /usr/local/bin/opencode; chmod 755 /usr/local/bin/opencode")
+    ck(camp.ocs("opencode", "availability", name).stdout.strip() == "Available",
+       "E11 OpenCode is present before testing the reconciliation refusal")
     result = camp.ocs("start", name, check=False)
     ck(result.returncode != 0 and "Cannot reconcile system Agent Context activation" in result.stderr
        and "Traceback" not in result.stdout + result.stderr,
-       "E11 unprepared custom image refuses managed-start success without weakening reconciliation")
-    ck(camp.sh(eid, "command -v python3", check=False).returncode != 0
-       and camp.metadata(name)["status"] == "error", "E11 missing Python is the actual refusal cause")
+       "E11 unprepared custom image with OpenCode refuses managed-start success")
+    ck(camp.metadata(name)["status"] == "error", "E11 reconciliation refusal is persisted")
     ck((workspace / "preserved").read_text() == "custom-start-data"
        and camp.sh(eid, "test ! -e /etc/opencode/opencode.json").returncode == 0,
        "E11 failed reconciliation preserves workspace and does not replace system config with defaults")
@@ -398,4 +407,6 @@ def test_opencode_availability_does_not_start_or_block_lifecycle(campaign, distr
     camp.sh(eid, """printf '#!/bin/sh\\nexit 1\\n' > /usr/local/bin/opencode
 chmod 755 /usr/local/bin/opencode""")
     status("Broken")
+    camp.sh(eid, "printf '#!/bin/sh\\nexec sleep 30\\n' > /usr/local/bin/opencode")
+    status("Unknown")
     camp.delete(name)
